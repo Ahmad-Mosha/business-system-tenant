@@ -36,7 +36,9 @@ describe('authentication', () => {
 
     expect(res.body.email).toBe(fixture.admin.email);
     expect(res.body.roles).toEqual(['ADMIN']);
-    expect(res.body.grants).toEqual([{ permission: 'order:read', scope: 'ALL' }]);
+    // Assert the grant we care about is present and unrestricted, rather than pinning
+    // the whole list - roles gain permissions as slices land.
+    expect(res.body.grants).toContainEqual({ permission: 'order:read', scope: 'ALL' });
     expect(sessionCookie(res)).toMatch(/^cops_session=/);
   });
 
