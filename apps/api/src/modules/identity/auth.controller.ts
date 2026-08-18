@@ -5,8 +5,19 @@ import {
   type CurrentUser,
   type LoginRequest,
 } from '@app/contracts';
-import { Body, Controller, Get, HttpCode, Inject, Post, Req, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Inject,
+  Post,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import { AuthThrottlerGuard } from './auth-throttler.guard.js';
 import type { Request, Response } from 'express';
 import { ENV, type Env } from '../../config/env.js';
 import { ZodValidationPipe } from '../../shared/zod-validation.pipe.js';
@@ -16,6 +27,7 @@ import { AuthService } from './auth.service.js';
 import { SESSION_COOKIE } from './session.service.js';
 
 @Controller('auth')
+@UseGuards(AuthThrottlerGuard)
 export class AuthController {
   constructor(
     private readonly auth: AuthService,
