@@ -14,6 +14,15 @@ const envSchema = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((v) => v === 'true'),
+
+  /** EasyOrders. Absent means the integration is simply unavailable, not broken. */
+  EASY_ORDER_KEY: z.string().min(1).optional(),
+  EASY_ORDER_BASE_URL: z
+    .string()
+    .url()
+    .default('https://api.easy-orders.net/api/v1/external-apps'),
+  /** Shared secret EasyOrders sends in the `secret` header on every webhook. */
+  EASY_ORDER_WEBHOOK_SECRET: z.string().min(1).optional(),
 });
 
 export type Env = Omit<z.infer<typeof envSchema>, 'WEB_ORIGIN'> & {

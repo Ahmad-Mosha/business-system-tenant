@@ -39,6 +39,8 @@ export async function resetDatabase(db: Database): Promise<void> {
   await db.execute(sql`
     truncate table
       audit_events, sessions, user_roles, role_permissions,
+      order_assignments, order_status_history, order_lines,
+      listing_components, channel_listings, variants, products,
       orders, users, roles, permissions, organizations
     restart identity cascade
   `);
@@ -136,9 +138,13 @@ export async function seedIdentityFixture(ctx: TestContext) {
   const organizationId = await seedOrganization(ctx.db);
   const adminRole = await seedRole(ctx.db, organizationId, 'ADMIN', [
     { permission: PERMISSIONS.ORDER_READ, scope: 'ALL' },
+    { permission: PERMISSIONS.ORDER_ASSIGN, scope: 'ALL' },
+    { permission: PERMISSIONS.ORDER_UPDATE_STATUS, scope: 'ALL' },
+    { permission: PERMISSIONS.USER_READ, scope: 'ALL' },
   ]);
   const moderatorRole = await seedRole(ctx.db, organizationId, 'MODERATOR', [
     { permission: PERMISSIONS.ORDER_READ, scope: 'ASSIGNED' },
+    { permission: PERMISSIONS.ORDER_UPDATE_STATUS, scope: 'ASSIGNED' },
   ]);
 
   const adminPassword = 'admin-password-1234';

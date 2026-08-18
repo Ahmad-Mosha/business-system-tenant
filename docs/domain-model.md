@@ -40,6 +40,33 @@ organizations ──< users ──< user_roles >── roles ──< role_permis
   is never mistaken for a person's.
 - Distinct from application logs, which are transient and technical.
 
+## Catalog
+
+```
+products ──< variants ──< listing_components >── channel_listings
+                │
+          (stock and cost will attach here)
+```
+
+| Table | Purpose |
+|---|---|
+| `products` | Marketing grouping. No stock, no logic |
+| `variants` | **The atomic unit.** Internal SKU; stock and cost attach here |
+| `channel_listings` | One sellable thing on one channel, holding that channel's ids |
+| `listing_components` | How a listing resolves to variants, with a quantity |
+
+**Invariants**
+
+- One physical item sold on EasyOrders, Amazon and noon is **one variant** with three
+  listings. Three sales therefore move one stock figure by three.
+- A plain item is one component of quantity 1; a two-pack is quantity 2; a bundle is
+  several components. Modelling this from the start is what avoids rewriting order
+  history when the first multi-pack appears.
+- `(organization_id, channel, external_id)` is unique - the idempotency key for
+  catalog import.
+- Internal SKUs are ours (`SKU-00001`), never a provider's, though a provider SKU is
+  adopted when it exists.
+
 ## Sales
 
 | Table | Purpose |
@@ -55,8 +82,21 @@ organizations ──< users ──< user_roles >── roles ──< role_permis
   not rewrite what was agreed on a past order.
 - Amounts are minor units with an explicit currency.
 
-**Not built yet:** order lines, status history, assignment history, customers as their
-own entity, catalog. Each arrives with the step that needs it.
+| `order_lines` | What was ordered, and what it resolved to |
+| `order_status_history` | Every status change, with actor and note |
+| `order_assignments` | Who held the order, and when |
+
+**More invariants**
+
+- A line always keeps `external_sku` and `external_title` alongside the resolved
+  `variant_id`. An unrecognised SKU produces a line marked `UNRESOLVED` - never
+  dropped, never guessed at, and visibly excluded downstream.
+- Assignment is sticky in normal operation, but reassignment closes the previous
+  holder's period rather than overwriting it, so who worked an order survives.
+- Legal transitions live in `@app/contracts` so the API and UI cannot disagree.
+
+**Not built yet:** customers as their own entity, inventory, cost. Each arrives with
+the step that needs it.
 
 ## Order status
 

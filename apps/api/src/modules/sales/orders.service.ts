@@ -5,7 +5,7 @@ import {
   type OrderListItem,
 } from '@app/contracts';
 import { Inject, Injectable } from '@nestjs/common';
-import { aliasedTable, and, count, desc, eq, type SQL } from 'drizzle-orm';
+import { aliasedTable, and, count, desc, eq, sql, type SQL } from 'drizzle-orm';
 import { DB, schema, type Database } from '../../db/db.module.js';
 import type { AuthContext } from '../identity/auth-context.js';
 
@@ -46,6 +46,11 @@ export class OrdersService {
           placedAt: schema.orders.placedAt,
           assigneeId: assignee.id,
           assigneeName: assignee.name,
+          itemCount: sql<number>`(
+            select coalesce(sum(${schema.orderLines.quantity}), 0)::int
+            from ${schema.orderLines}
+            where ${schema.orderLines.orderId} = ${schema.orders.id}
+          )`,
         })
         .from(schema.orders)
         .leftJoin(assignee, eq(assignee.id, schema.orders.assignedToUserId))
@@ -75,6 +80,7 @@ type OrderRow = {
   placedAt: Date;
   assigneeId: string | null;
   assigneeName: string | null;
+  itemCount: number;
 };
 
 function toListItem(row: OrderRow): OrderListItem {
@@ -90,6 +96,7 @@ function toListItem(row: OrderRow): OrderListItem {
       row.assigneeId && row.assigneeName
         ? { id: row.assigneeId, name: row.assigneeName }
         : null,
+    itemCount: row.itemCount,
     placedAt: row.placedAt.toISOString(),
   };
 }

@@ -22,15 +22,15 @@ export default function ErrorBoundary({
   return (
     <div className="flex min-h-dvh items-center justify-center px-6">
       <div className="max-w-md text-center">
-        <p className="font-display text-[26px] leading-tight text-ink">
+        <p className="text-[20px] font-semibold text-ink">
           We could not load this page
         </p>
-        <p className="mt-3 text-sm leading-relaxed text-ink-soft">
+        <p className="mt-3 text-sm leading-relaxed text-ink-2">
           The service did not respond as expected. This is usually temporary - try again,
           and tell an administrator if it keeps happening.
         </p>
         {error.digest ? (
-          <p className="tnum mt-4 text-[13px] text-ink-faint">Reference: {error.digest}</p>
+          <p className="tnum mt-4 text-[13px] text-ink-3">Reference: {error.digest}</p>
         ) : null}
         <Button onClick={reset} variant="secondary" className="mt-7">
           Try again

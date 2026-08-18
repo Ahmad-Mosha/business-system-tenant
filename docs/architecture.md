@@ -4,8 +4,14 @@ What exists today, and the conventions everything new is expected to follow.
 This document describes the system as built. It is not a specification of the future -
 see `docs/discovery/` for analysis and direction.
 
-**Current state:** Slice 1a in progress. Authentication, authorization and a read-only
-orders list are working end to end.
+**Current state:** Slice 1b. Auth, authorization, catalog (imported live from
+EasyOrders), order detail, assignment and status transitions all work end to end.
+Order ingestion by webhook and the Bosta pull are not built yet.
+
+**Known provider constraint:** EasyOrders has **no list-orders endpoint** - only
+`GET /orders/:id`. Order ingestion is therefore webhook-only, and the reconciliation
+sweep described in ADR-004 is impossible for that provider. A missed webhook cannot be
+detected by polling; the mitigation still has to be chosen.
 
 ## Shape
 
@@ -27,7 +33,9 @@ Server components call the API directly, forwarding the caller's cookie.
 |---|---|---|
 | `identity` | users, roles, permissions, sessions, login | built |
 | `audit` | append-only business history | built |
-| `sales` | orders | read-only list |
+| `sales` | orders, lines, assignment, status transitions | built |
+| `catalog` | products, variants, channel listings | built |
+| `integrations/easyorders` | API client, catalog import | partial - webhook pending |
 
 Modules for later slices do not exist yet. They are created when the slice that needs
 them is built, not in anticipation.
