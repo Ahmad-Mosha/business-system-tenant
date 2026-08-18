@@ -8,6 +8,7 @@
  */
 export const PERMISSIONS = {
   ORDER_READ: 'order:read',
+  ORDER_CREATE: 'order:create',
   ORDER_ASSIGN: 'order:assign',
   ORDER_UPDATE_STATUS: 'order:update_status',
   CATALOG_READ: 'catalog:read',

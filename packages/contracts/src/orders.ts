@@ -142,6 +142,44 @@ export const updateOrderStatusRequestSchema = z.object({
 });
 export type UpdateOrderStatusRequest = z.infer<typeof updateOrderStatusRequestSchema>;
 
+/** Egyptian mobile numbers, normalised to +20 before storage. */
+export const phoneSchema = z
+  .string()
+  .trim()
+  .min(1, 'Enter a phone number')
+  .transform((v) => v.replace(/[\s-()]/g, ''))
+  .refine(
+    (v) => /^(\+20|0)?1[0-9]{9}$/.test(v),
+    'Enter a valid Egyptian mobile number, e.g. 01001234567',
+  );
+
+export const createOrderLineSchema = z.object({
+  variantId: z.string().uuid(),
+  quantity: z.number().int().min(1, 'Quantity must be at least 1').max(999),
+  /** Minor units. Captured per line because a manual order is often negotiated. */
+  unitPrice: z.number().int().min(0),
+});
+export type CreateOrderLine = z.infer<typeof createOrderLineSchema>;
+
+export const createOrderRequestSchema = z.object({
+  customerName: z.string().trim().min(2, 'Enter the customer name').max(160),
+  customerPhone: phoneSchema,
+  customerAddress: z.string().trim().max(400).optional(),
+  customerGovernorate: z.string().trim().max(80).optional(),
+  shippingTotal: z.number().int().min(0).default(0),
+  discountTotal: z.number().int().min(0).default(0),
+  /** Admins may hand the order straight to someone; moderators keep their own. */
+  assigneeId: z.string().uuid().optional(),
+  lines: z.array(createOrderLineSchema).min(1, 'Add at least one product'),
+});
+export type CreateOrderRequest = z.infer<typeof createOrderRequestSchema>;
+
+export const createOrderResponseSchema = z.object({
+  id: z.string().uuid(),
+  orderNumber: z.string(),
+});
+export type CreateOrderResponse = z.infer<typeof createOrderResponseSchema>;
+
 export const assignableUserSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),

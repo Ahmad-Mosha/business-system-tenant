@@ -1,10 +1,13 @@
 import {
   PERMISSIONS,
   assignOrderRequestSchema,
+  createOrderRequestSchema,
   listOrdersQuerySchema,
   updateOrderStatusRequestSchema,
   type AssignOrderRequest,
   type AssignableUser,
+  type CreateOrderRequest,
+  type CreateOrderResponse,
   type ListOrdersQuery,
   type ListOrdersResponse,
   type OrderDetail,
@@ -15,6 +18,7 @@ import type { Request } from 'express';
 import { ZodValidationPipe } from '../../shared/zod-validation.pipe.js';
 import type { AuthContext } from '../identity/auth-context.js';
 import { CurrentAuth, RequirePermission } from '../identity/auth.guard.js';
+import { CreateOrderService } from './create-order.service.js';
 import { OrderDetailService } from './order-detail.service.js';
 import { OrdersService } from './orders.service.js';
 
@@ -23,7 +27,18 @@ export class OrdersController {
   constructor(
     private readonly orders: OrdersService,
     private readonly details: OrderDetailService,
+    private readonly creation: CreateOrderService,
   ) {}
+
+  @Post()
+  @RequirePermission(PERMISSIONS.ORDER_CREATE)
+  create(
+    @CurrentAuth() auth: AuthContext,
+    @Body(new ZodValidationPipe(createOrderRequestSchema)) body: CreateOrderRequest,
+    @Req() req: Request,
+  ): Promise<CreateOrderResponse> {
+    return this.creation.create(auth, body, req.correlationId);
+  }
 
   @Get()
   @RequirePermission(PERMISSIONS.ORDER_READ)
