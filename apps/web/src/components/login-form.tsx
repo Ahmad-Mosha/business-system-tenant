@@ -68,7 +68,7 @@ export function LoginForm() {
       {formError ? (
         <p
           role="alert"
-          className="rounded-md border border-danger/30 bg-danger-soft px-3 py-2.5 text-[13px] text-danger"
+          className="rounded-lg border border-bad/25 bg-bad-bg px-3 py-2.5 text-[13px] text-bad"
         >
           {formError}
         </p>
