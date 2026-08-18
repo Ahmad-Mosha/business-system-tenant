@@ -8,6 +8,11 @@
  */
 export const PERMISSIONS = {
   ORDER_READ: 'order:read',
+  ORDER_ASSIGN: 'order:assign',
+  ORDER_UPDATE_STATUS: 'order:update_status',
+  CATALOG_READ: 'catalog:read',
+  CATALOG_WRITE: 'catalog:write',
+  USER_READ: 'user:read',
 } as const;
 
 export type PermissionCode = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
