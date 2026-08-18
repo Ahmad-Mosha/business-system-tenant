@@ -33,6 +33,7 @@ const envSchema = z.object({
 
 const PERMISSION_CATALOGUE = [
   { code: PERMISSIONS.ORDER_READ, description: 'View orders' },
+  { code: PERMISSIONS.ORDER_CREATE, description: 'Create a manual order' },
   { code: PERMISSIONS.ORDER_ASSIGN, description: 'Assign orders to a moderator' },
   { code: PERMISSIONS.ORDER_UPDATE_STATUS, description: 'Move an order through its lifecycle' },
   { code: PERMISSIONS.CATALOG_READ, description: 'View products and variants' },
@@ -46,6 +47,7 @@ const ROLES = [
     name: 'Admin',
     grants: [
       { permission: PERMISSIONS.ORDER_READ, scope: 'ALL' as const },
+      { permission: PERMISSIONS.ORDER_CREATE, scope: 'ALL' as const },
       { permission: PERMISSIONS.ORDER_ASSIGN, scope: 'ALL' as const },
       { permission: PERMISSIONS.ORDER_UPDATE_STATUS, scope: 'ALL' as const },
       { permission: PERMISSIONS.CATALOG_READ, scope: 'ALL' as const },
@@ -60,6 +62,8 @@ const ROLES = [
     name: 'Moderator',
     grants: [
       { permission: PERMISSIONS.ORDER_READ, scope: 'ASSIGNED' as const },
+      // Moderators take orders from social channels themselves.
+      { permission: PERMISSIONS.ORDER_CREATE, scope: 'ASSIGNED' as const },
       { permission: PERMISSIONS.ORDER_UPDATE_STATUS, scope: 'ASSIGNED' as const },
       { permission: PERMISSIONS.CATALOG_READ, scope: 'ALL' as const },
     ],

@@ -6,6 +6,7 @@ import {
   index,
   jsonb,
   pgEnum,
+  pgSequence,
   pgTable,
   primaryKey,
   text,
@@ -281,6 +282,12 @@ export const orderStatus = pgEnum('order_status', [
 ]);
 
 export const orderSource = pgEnum('order_source', ['MANUAL', 'EASYORDERS']);
+
+/**
+ * Human-facing order numbers. A sequence rather than count+1, so two people creating
+ * an order at the same instant cannot land on the same number.
+ */
+export const orderNumberSeq = pgSequence('order_number_seq', { startWith: 1000 });
 
 export const orders = pgTable(
   'orders',
