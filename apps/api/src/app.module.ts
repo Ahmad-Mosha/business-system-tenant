@@ -5,6 +5,7 @@ import { DbModule } from './db/db.module.js';
 import { AuditModule } from './modules/audit/audit.module.js';
 import { AuthGuard } from './modules/identity/auth.guard.js';
 import { IdentityModule } from './modules/identity/identity.module.js';
+import { CatalogModule } from './modules/catalog/catalog.module.js';
 import { SalesModule } from './modules/sales/sales.module.js';
 import { CorrelationMiddleware } from './shared/correlation.middleware.js';
 import { HttpExceptionFilter } from './shared/http-exception.filter.js';
@@ -17,6 +18,7 @@ import { HealthController } from './health.controller.js';
     // Limits are declared per route with @Throttle; this only supplies storage.
     ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 1_000_000 }]),
     IdentityModule,
+    CatalogModule,
     SalesModule,
   ],
   controllers: [HealthController],

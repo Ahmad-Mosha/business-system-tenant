@@ -33,18 +33,36 @@ const envSchema = z.object({
 
 const PERMISSION_CATALOGUE = [
   { code: PERMISSIONS.ORDER_READ, description: 'View orders' },
+  { code: PERMISSIONS.ORDER_ASSIGN, description: 'Assign orders to a moderator' },
+  { code: PERMISSIONS.ORDER_UPDATE_STATUS, description: 'Move an order through its lifecycle' },
+  { code: PERMISSIONS.CATALOG_READ, description: 'View products and variants' },
+  { code: PERMISSIONS.CATALOG_WRITE, description: 'Create and edit catalog entries' },
+  { code: PERMISSIONS.USER_READ, description: 'View team members' },
 ];
 
 const ROLES = [
   {
     code: 'ADMIN',
     name: 'Admin',
-    grants: [{ permission: PERMISSIONS.ORDER_READ, scope: 'ALL' as const }],
+    grants: [
+      { permission: PERMISSIONS.ORDER_READ, scope: 'ALL' as const },
+      { permission: PERMISSIONS.ORDER_ASSIGN, scope: 'ALL' as const },
+      { permission: PERMISSIONS.ORDER_UPDATE_STATUS, scope: 'ALL' as const },
+      { permission: PERMISSIONS.CATALOG_READ, scope: 'ALL' as const },
+      { permission: PERMISSIONS.CATALOG_WRITE, scope: 'ALL' as const },
+      { permission: PERMISSIONS.USER_READ, scope: 'ALL' as const },
+    ],
   },
   {
+    // A moderator works their own orders and needs the catalog to read them,
+    // but cannot assign work or change the catalog.
     code: 'MODERATOR',
     name: 'Moderator',
-    grants: [{ permission: PERMISSIONS.ORDER_READ, scope: 'ASSIGNED' as const }],
+    grants: [
+      { permission: PERMISSIONS.ORDER_READ, scope: 'ASSIGNED' as const },
+      { permission: PERMISSIONS.ORDER_UPDATE_STATUS, scope: 'ASSIGNED' as const },
+      { permission: PERMISSIONS.CATALOG_READ, scope: 'ALL' as const },
+    ],
   },
 ];
 

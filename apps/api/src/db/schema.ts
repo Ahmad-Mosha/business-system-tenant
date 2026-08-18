@@ -2,6 +2,7 @@ import { relations, sql } from 'drizzle-orm';
 import {
   bigint,
   boolean,
+  integer,
   index,
   jsonb,
   pgEnum,
@@ -163,6 +164,112 @@ export const auditEvents = pgTable(
   ],
 );
 
+
+/* ------------------------------------------------------------------ *
+ * Catalog
+ *
+ * The identity rule this model exists to enforce: the same physical item sold
+ * on Amazon, noon and the website is ONE variant. Three channel listings point
+ * at it, so three sales decrement one stock figure by three.
+ * ------------------------------------------------------------------ */
+
+export const salesChannel = pgEnum('sales_channel', [
+  'EASYORDERS',
+  'AMAZON',
+  'NOON',
+  'SOCIAL',
+]);
+
+/** Marketing-level grouping. Carries no stock and no logic. */
+export const products = pgTable(
+  'products',
+  {
+    id: uuid('id').primaryKey(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organizations.id),
+    name: text('name').notNull(),
+    description: text('description'),
+    imageUrl: text('image_url'),
+    active: boolean('active').notNull().default(true),
+    ...timestamps,
+  },
+  (t) => [index('products_org_idx').on(t.organizationId)],
+);
+
+/**
+ * The atomic unit. Internal SKU, and later stock and cost, attach here.
+ * Everything else in the system resolves down to a variant.
+ */
+export const variants = pgTable(
+  'variants',
+  {
+    id: uuid('id').primaryKey(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organizations.id),
+    productId: uuid('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'cascade' }),
+    /** Internal SKU: ours, stable, and never a provider's. */
+    sku: text('sku').notNull(),
+    name: text('name').notNull(),
+    barcode: text('barcode'),
+    active: boolean('active').notNull().default(true),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('variants_org_sku_unique').on(t.organizationId, t.sku),
+    index('variants_product_idx').on(t.productId),
+  ],
+);
+
+/** One sellable thing on one channel, holding that channel's identifiers. */
+export const channelListings = pgTable(
+  'channel_listings',
+  {
+    id: uuid('id').primaryKey(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organizations.id),
+    channel: salesChannel('channel').notNull(),
+    externalId: text('external_id').notNull(),
+    externalSku: text('external_sku'),
+    title: text('title'),
+    /** Channel price in minor units; informational, the order carries what was charged. */
+    price: bigint('price', { mode: 'number' }),
+    active: boolean('active').notNull().default(true),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('channel_listings_org_channel_external_unique').on(
+      t.organizationId,
+      t.channel,
+      t.externalId,
+    ),
+    index('channel_listings_channel_sku_idx').on(t.channel, t.externalSku),
+  ],
+);
+
+/**
+ * How a listing resolves to stock. A plain item is one component of quantity 1;
+ * a two-pack is one component of quantity 2; a bundle is several components.
+ * Modelling this from the start is what avoids rewriting order history later.
+ */
+export const listingComponents = pgTable(
+  'listing_components',
+  {
+    listingId: uuid('listing_id')
+      .notNull()
+      .references(() => channelListings.id, { onDelete: 'cascade' }),
+    variantId: uuid('variant_id')
+      .notNull()
+      .references(() => variants.id),
+    quantity: integer('quantity').notNull().default(1),
+  },
+  (t) => [primaryKey({ columns: [t.listingId, t.variantId] })],
+);
+
 export const orderStatus = pgEnum('order_status', [
   'NEW',
   'CONTACTED',
@@ -242,3 +349,80 @@ export const userRolesRelations = relations(userRoles, ({ one }) => ({
 export const rolePermissionsRelations = relations(rolePermissions, ({ one }) => ({
   role: one(roles, { fields: [rolePermissions.roleId], references: [roles.id] }),
 }));
+
+export const orderLineResolution = pgEnum('order_line_resolution', [
+  'RESOLVED',
+  'UNRESOLVED',
+]);
+
+/**
+ * A line always keeps what the channel said, alongside what we resolved it to.
+ * An unrecognised external SKU still produces a workable line marked UNRESOLVED -
+ * it is never dropped, and never guessed at.
+ */
+export const orderLines = pgTable(
+  'order_lines',
+  {
+    id: uuid('id').primaryKey(),
+    organizationId: uuid('organization_id')
+      .notNull()
+      .references(() => organizations.id),
+    orderId: uuid('order_id')
+      .notNull()
+      .references(() => orders.id, { onDelete: 'cascade' }),
+    /** The provider's line identifier, or the index when it supplies none. */
+    externalLineId: text('external_line_id'),
+    listingId: uuid('listing_id').references(() => channelListings.id),
+    variantId: uuid('variant_id').references(() => variants.id),
+    resolution: orderLineResolution('resolution').notNull().default('UNRESOLVED'),
+    /** Exactly what the channel called it, kept for mapping and for audit. */
+    externalSku: text('external_sku'),
+    externalTitle: text('external_title').notNull(),
+    quantity: integer('quantity').notNull(),
+    unitPrice: bigint('unit_price', { mode: 'number' }).notNull(),
+    lineTotal: bigint('line_total', { mode: 'number' }).notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    index('order_lines_order_idx').on(t.orderId),
+    uniqueIndex('order_lines_order_external_unique').on(t.orderId, t.externalLineId),
+  ],
+);
+
+/** Every status change, with who made it and why. Append-only. */
+export const orderStatusHistory = pgTable(
+  'order_status_history',
+  {
+    id: uuid('id').primaryKey(),
+    orderId: uuid('order_id')
+      .notNull()
+      .references(() => orders.id, { onDelete: 'cascade' }),
+    fromStatus: orderStatus('from_status'),
+    toStatus: orderStatus('to_status').notNull(),
+    changedByUserId: uuid('changed_by_user_id').references(() => users.id),
+    note: text('note'),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('order_status_history_order_idx').on(t.orderId, t.occurredAt)],
+);
+
+/**
+ * Assignment history. An order stays with one moderator in normal operation, but
+ * reassignment happens - and when it does, who held it and when has to survive.
+ */
+export const orderAssignments = pgTable(
+  'order_assignments',
+  {
+    id: uuid('id').primaryKey(),
+    orderId: uuid('order_id')
+      .notNull()
+      .references(() => orders.id, { onDelete: 'cascade' }),
+    assignedToUserId: uuid('assigned_to_user_id')
+      .notNull()
+      .references(() => users.id),
+    assignedByUserId: uuid('assigned_by_user_id').references(() => users.id),
+    assignedAt: timestamp('assigned_at', { withTimezone: true }).notNull().defaultNow(),
+    unassignedAt: timestamp('unassigned_at', { withTimezone: true }),
+  },
+  (t) => [index('order_assignments_order_idx').on(t.orderId, t.assignedAt)],
+);
