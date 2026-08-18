@@ -1,17 +1,12 @@
 import type { ReactNode } from 'react';
-import { AppShell } from '@/components/app-shell';
 import { requireUser } from '@/lib/session';
+import { ShellFrame } from '@/components/shell-frame';
 
 /**
- * Everything under this layout requires a session. The check runs on the server before
- * any page renders, so protected content is never sent to an anonymous browser.
+ * Everything below requires a session. The check runs on the server before any page
+ * renders, so protected content never reaches an anonymous browser.
  */
 export default async function AuthenticatedLayout({ children }: { children: ReactNode }) {
   const user = await requireUser();
-
-  return (
-    <AppShell user={user} activeHref="/orders" nav={[{ href: '/orders', label: 'Orders' }]}>
-      {children}
-    </AppShell>
-  );
+  return <ShellFrame user={user}>{children}</ShellFrame>;
 }

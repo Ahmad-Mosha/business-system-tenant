@@ -8,6 +8,20 @@
       "when": 1787064477359,
       "tag": "0000_lucky_hellcat",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1787071191700,
+      "tag": "0001_blue_xavin",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787075405957,
+      "tag": "0002_peaceful_omega_flight",
+      "breakpoints": true
     }
   ]
 }
