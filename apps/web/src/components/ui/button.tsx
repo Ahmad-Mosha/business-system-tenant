@@ -1,39 +1,33 @@
 import { cn } from '@/lib/cn';
 import type { ButtonHTMLAttributes } from 'react';
 
-type Variant = 'primary' | 'secondary' | 'ghost';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
 type Size = 'sm' | 'md';
 
 const VARIANTS: Record<Variant, string> = {
-  primary:
-    'bg-accent text-accent-ink hover:opacity-90 active:opacity-100 disabled:opacity-45',
-  secondary:
-    'border border-rule-strong bg-surface text-ink hover:bg-sunken disabled:opacity-45',
-  ghost: 'text-ink-soft hover:bg-sunken hover:text-ink disabled:opacity-45',
+  primary: 'bg-primary text-primary-ink hover:opacity-90',
+  secondary: 'border border-line bg-surface text-ink hover:bg-canvas',
+  ghost: 'text-ink-2 hover:bg-line-soft hover:text-ink',
+  danger: 'border border-bad/25 bg-bad-bg text-bad hover:bg-bad-bg/70',
 };
 
 const SIZES: Record<Size, string> = {
   sm: 'h-8 px-3 text-[13px]',
-  md: 'h-10 px-4 text-sm',
+  md: 'h-9 px-4 text-sm',
 };
-
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: Variant;
-  size?: Size;
-}
 
 export function Button({
   variant = 'primary',
   size = 'md',
   className,
   ...props
-}: ButtonProps) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: Size }) {
   return (
     <button
       className={cn(
-        'inline-flex items-center justify-center gap-2 rounded-md font-medium',
+        'inline-flex items-center justify-center gap-2 rounded-lg font-medium',
         'transition-[opacity,background-color] duration-150',
-        'disabled:cursor-not-allowed',
+        'disabled:cursor-not-allowed disabled:opacity-45',
         VARIANTS[variant],
         SIZES[size],
         className,

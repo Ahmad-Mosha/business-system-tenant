@@ -21,7 +21,7 @@ export function Field({ label, hint, error, className, id, ...props }: FieldProp
 
   return (
     <div className="space-y-1.5">
-      <label htmlFor={inputId} className="block text-[13px] font-medium text-ink-soft">
+      <label htmlFor={inputId} className="block text-[13px] font-medium text-ink-2">
         {label}
       </label>
       <input
@@ -29,20 +29,20 @@ export function Field({ label, hint, error, className, id, ...props }: FieldProp
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errorId : undefined}
         className={cn(
-          'h-10 w-full rounded-md border bg-surface px-3 text-sm text-ink',
-          'placeholder:text-ink-faint',
+          'h-10 w-full rounded-lg border bg-surface px-3 text-sm text-ink',
+          'placeholder:text-ink-3',
           'transition-colors duration-150',
-          error ? 'border-danger' : 'border-rule-strong hover:border-ink-faint',
+          error ? 'border-bad' : 'border-line hover:border-ink-3',
           className,
         )}
         {...props}
       />
       {error ? (
-        <p id={errorId} role="alert" className="text-[13px] text-danger">
+        <p id={errorId} role="alert" className="text-[13px] text-bad">
           {error}
         </p>
       ) : hint ? (
-        <p className="text-[13px] text-ink-faint">{hint}</p>
+        <p className="text-[13px] text-ink-3">{hint}</p>
       ) : null}
     </div>
   );

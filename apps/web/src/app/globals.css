@@ -1,108 +1,84 @@
 @import 'tailwindcss';
 
 /*
- * Design language: "Ledger".
+ * Design tokens, taken from the approved screens.
  *
- * Warm paper neutrals rather than the cool grey-and-blue of stock admin software, one
- * restrained accent, and hierarchy carried by typography and space instead of borders
- * and cards. Numbers are set in tabular figures because this is a system people read
- * columns of money in.
+ * Light neutral ground, white surfaces, black primary actions, and soft-tinted
+ * status pills. Colour is reserved for state; everything else is greyscale so the
+ * data reads first.
  */
 
 @theme {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-display: var(--font-display), ui-serif, Georgia, serif;
-  --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
 
-  --color-paper: var(--paper);
+  --color-canvas: var(--canvas);
   --color-surface: var(--surface);
-  --color-sunken: var(--sunken);
+  --color-rail: var(--rail);
+  --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
   --color-ink: var(--ink);
-  --color-ink-soft: var(--ink-soft);
-  --color-ink-faint: var(--ink-faint);
-  --color-rule: var(--rule);
-  --color-rule-strong: var(--rule-strong);
-  --color-accent: var(--accent);
-  --color-accent-soft: var(--accent-soft);
-  --color-accent-ink: var(--accent-ink);
-  --color-warn: var(--warn);
-  --color-warn-soft: var(--warn-soft);
-  --color-danger: var(--danger);
-  --color-danger-soft: var(--danger-soft);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-active: var(--active);
+  --color-active-ink: var(--active-ink);
+  --color-primary: var(--primary);
+  --color-primary-ink: var(--primary-ink);
 
-  --radius-card: 0.625rem;
+  --color-ok: var(--ok);
+  --color-ok-bg: var(--ok-bg);
+  --color-warn: var(--warn);
+  --color-warn-bg: var(--warn-bg);
+  --color-bad: var(--bad);
+  --color-bad-bg: var(--bad-bg);
+  --color-info: var(--info);
+  --color-info-bg: var(--info-bg);
+  --color-mute: var(--mute);
+  --color-mute-bg: var(--mute-bg);
 }
 
 :root {
-  --paper: #faf8f5;
+  --canvas: #f7f7fb;
   --surface: #ffffff;
-  --sunken: #f2eee7;
-  --ink: #1c1a17;
-  --ink-soft: #57534c;
-  --ink-faint: #8a857c;
-  --rule: #e6e0d6;
-  --rule-strong: #d3cbbe;
-  --accent: #1f4b3f;
-  --accent-soft: #e7efeb;
-  --accent-ink: #ffffff;
-  --warn: #8a5310;
-  --warn-soft: #f7eedd;
-  --danger: #8f2033;
-  --danger-soft: #f9e9eb;
+  --rail: #fbfbfd;
+  --line: #e6e6ee;
+  --line-soft: #f0f0f5;
+  --ink: #14151a;
+  --ink-2: #5b5f6b;
+  --ink-3: #8b8f9c;
+  --active: #eef1ff;
+  --active-ink: #1f2430;
+  --primary: #111318;
+  --primary-ink: #ffffff;
+
+  --ok: #166534;        --ok-bg: #dcfce7;
+  --warn: #92400e;      --warn-bg: #fef3c7;
+  --bad: #991b1b;       --bad-bg: #fee2e2;
+  --info: #1e40af;      --info-bg: #dbeafe;
+  --mute: #4b5563;      --mute-bg: #eef0f4;
 
   color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #141310;
-    --surface: #1c1a16;
-    --sunken: #100f0c;
-    --ink: #f0ede6;
-    --ink-soft: #a8a296;
-    --ink-faint: #7a7468;
-    --rule: #2e2b25;
-    --rule-strong: #423d35;
-    --accent: #6fb89a;
-    --accent-soft: #1b2e27;
-    --accent-ink: #0e1512;
-    --warn: #d9a05b;
-    --warn-soft: #2b2317;
-    --danger: #e08a96;
-    --danger-soft: #2e1a1d;
-
-    color-scheme: dark;
-  }
-}
-
 @layer base {
-  * {
-    border-color: var(--rule);
-  }
+  * { border-color: var(--line); }
 
   body {
-    background-color: var(--paper);
+    background-color: var(--canvas);
     color: var(--ink);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
-    text-rendering: optimizeLegibility;
   }
 
-  /* Money and identifiers must line up vertically when scanned in a column. */
+  /* Money, counts and identifiers must align when scanned down a column. */
   .tnum {
     font-variant-numeric: tabular-nums;
     font-feature-settings: 'tnum';
   }
 
-  ::selection {
-    background-color: var(--accent-soft);
-    color: var(--ink);
-  }
-
-  /* One focus treatment everywhere, visible in both themes. */
   :focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--primary);
     outline-offset: 2px;
-    border-radius: 3px;
+    border-radius: 4px;
   }
 }
