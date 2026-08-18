@@ -11,7 +11,7 @@ import { StatusPill } from '@/components/ui/status-pill';
 import { OrderFilters } from '@/components/order-filters';
 import { apiGet } from '@/lib/api';
 import { formatDateTime, formatMoney } from '@/lib/format';
-import { isScopedToSelf } from '@/lib/permissions';
+import { can, isScopedToSelf } from '@/lib/permissions';
 import { requireUser } from '@/lib/session';
 
 export const metadata = { title: 'Orders' };
@@ -40,13 +40,23 @@ export default async function OrdersPage({
 
   return (
     <div className="mx-auto max-w-[1400px]">
-      <header className="mb-6">
-        <h1 className="text-[26px] font-semibold tracking-tight text-ink">Orders</h1>
-        <p className="mt-1 text-[14px] text-ink-2">
-          {scopedToMe
-            ? 'Orders assigned to you.'
-            : 'Every order across all channels, with its current owner.'}
-        </p>
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-[26px] font-semibold tracking-tight text-ink">Orders</h1>
+          <p className="mt-1 text-[14px] text-ink-2">
+            {scopedToMe
+              ? 'Orders assigned to you.'
+              : 'Every order across all channels, with its current owner.'}
+          </p>
+        </div>
+        {can(user, PERMISSIONS.ORDER_CREATE) ? (
+          <Link
+            href="/orders/new"
+            className="inline-flex h-9 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-ink hover:opacity-90"
+          >
+            New order
+          </Link>
+        ) : null}
       </header>
 
       <OrderFilters activeStatus={status.success ? status.data : undefined} />
@@ -202,9 +212,17 @@ function EmptyState({ scopedToMe, filtered }: { scopedToMe: boolean; filtered: b
         {filtered
           ? 'Clear the filter to see everything else.'
           : scopedToMe
-            ? 'Orders appear here as soon as a manager assigns them to you.'
+            ? 'Orders appear here when a manager assigns them to you, or when you take one yourself.'
             : 'Orders will appear here once they are created or arrive from a sales channel.'}
       </p>
+      {!filtered ? (
+        <Link
+          href="/orders/new"
+          className="mt-5 inline-flex h-9 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-ink hover:opacity-90"
+        >
+          Create the first order
+        </Link>
+      ) : null}
     </div>
   );
 }

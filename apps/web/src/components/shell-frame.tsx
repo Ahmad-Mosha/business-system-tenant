@@ -15,7 +15,8 @@ export function ShellFrame({ user, children }: { user: CurrentUser; children: Re
     breadcrumbs.push({ label: 'Catalog' });
   } else {
     breadcrumbs.push(pathname === '/orders' ? { label: 'Orders' } : { label: 'Orders', href: '/orders' });
-    if (pathname !== '/orders') breadcrumbs.push({ label: 'Order detail' });
+    if (pathname === '/orders/new') breadcrumbs.push({ label: 'New order' });
+    else if (pathname !== '/orders') breadcrumbs.push({ label: 'Order detail' });
   }
 
   return (
