@@ -1,13 +1,18 @@
 import { ORDER_STATUS_LABELS, type OrderStatus } from '@app/contracts';
 import { cn } from '@/lib/cn';
 
-/** Tone marks what needs a human: amber waiting, red stopped, green moving. */
+/**
+ * Tone marks what needs a human, not what happened. NEW and CONTACTED are neutral -
+ * merely existing isn't a state worth colouring - so colour stays reserved for what
+ * is actually good (CONFIRMED/READY), actually blocked (WARN), or actually stopped
+ * (CANCELLED).
+ */
 const TONES: Record<OrderStatus, string> = {
-  NEW: 'bg-info-bg text-info',
+  NEW: 'bg-mute-bg text-mute',
   CONTACTED: 'bg-warn-bg text-warn',
   CONFIRMED: 'bg-ok-bg text-ok',
   READY_TO_SHIP: 'bg-ok-bg text-ok',
-  SHIPPED: 'bg-mute-bg text-mute',
+  SHIPPED: 'bg-accent-soft text-accent',
   ON_HOLD: 'bg-warn-bg text-warn',
   CANCELLED: 'bg-bad-bg text-bad',
 };

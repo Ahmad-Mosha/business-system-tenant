@@ -173,7 +173,7 @@ export default async function OrderDetailPage({
                   <span className="mt-1.5 flex flex-col items-center">
                     <span
                       className={
-                        i === 0 ? 'size-2 rounded-full bg-primary' : 'size-2 rounded-full bg-line'
+                        i === 0 ? 'size-2 rounded-full bg-accent' : 'size-2 rounded-full bg-line'
                       }
                     />
                     {i < order.timeline.length - 1 ? (

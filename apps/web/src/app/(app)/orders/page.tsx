@@ -52,7 +52,7 @@ export default async function OrdersPage({
         {can(user, PERMISSIONS.ORDER_CREATE) ? (
           <Link
             href="/orders/new"
-            className="inline-flex h-9 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-ink hover:opacity-90"
+            className="inline-flex h-9 items-center rounded-lg bg-accent px-4 text-sm font-medium text-primary-ink hover:opacity-90"
           >
             New order
           </Link>
@@ -68,7 +68,7 @@ export default async function OrdersPage({
           <div className="overflow-x-auto">
             <table className="w-full min-w-[60rem] border-collapse text-sm">
               <thead>
-                <tr className="border-b border-line bg-canvas/60 text-left">
+                <tr className="border-b border-line-soft bg-rail text-left">
                   <Th>Order</Th>
                   <Th>Customer</Th>
                   <Th align="right">Items</Th>
@@ -81,11 +81,11 @@ export default async function OrdersPage({
               </thead>
               <tbody>
                 {items.map((order) => (
-                  <tr key={order.id} className="border-b border-line-soft last:border-0 hover:bg-canvas/50">
+                  <tr key={order.id} className="border-b border-line-soft last:border-0 hover:bg-rail/70">
                     <Td>
                       <Link
                         href={`/orders/${order.id}`}
-                        className="tnum font-medium text-ink underline-offset-4 hover:underline"
+                        className="tnum font-medium text-ink underline-offset-4 hover:underline hover:decoration-accent"
                       >
                         {order.orderNumber}
                       </Link>
@@ -185,7 +185,7 @@ function Th({ children, align }: { children: React.ReactNode; align?: 'right' })
   return (
     <th
       scope="col"
-      className={`px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3 ${
+      className={`px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3 ${
         align === 'right' ? 'text-right' : ''
       }`}
     >
@@ -196,7 +196,7 @@ function Th({ children, align }: { children: React.ReactNode; align?: 'right' })
 
 function Td({ children, align }: { children: React.ReactNode; align?: 'right' }) {
   return (
-    <td className={`px-4 py-3.5 align-middle ${align === 'right' ? 'text-right' : ''}`}>
+    <td className={`px-5 py-4 align-middle ${align === 'right' ? 'text-right' : ''}`}>
       {children}
     </td>
   );
@@ -218,7 +218,7 @@ function EmptyState({ scopedToMe, filtered }: { scopedToMe: boolean; filtered: b
       {!filtered ? (
         <Link
           href="/orders/new"
-          className="mt-5 inline-flex h-9 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-ink hover:opacity-90"
+          className="mt-5 inline-flex h-9 items-center rounded-lg bg-accent px-4 text-sm font-medium text-primary-ink hover:opacity-90"
         >
           Create the first order
         </Link>

@@ -50,9 +50,13 @@ export class CatalogService {
           sku: schema.variants.sku,
           name: schema.variants.name,
           productName: schema.products.name,
+          imageUrl: schema.products.imageUrl,
           active: schema.variants.active,
           channels: sql<string[]>`coalesce(array_agg(distinct ${schema.channelListings.channel}) filter (where ${schema.channelListings.id} is not null), '{}')`,
           listingCount: sql<number>`count(distinct ${schema.channelListings.id})::int`,
+          // bigint aggregates come back as strings from postgres.js; cast to integer so the
+          // API's own contract (fromPrice: number) is actually true, not just claimed.
+          fromPrice: sql<number | null>`min(${schema.channelListings.price})::integer`,
         })
         .from(schema.variants)
         .innerJoin(schema.products, eq(schema.products.id, schema.variants.productId))
@@ -65,7 +69,7 @@ export class CatalogService {
           eq(schema.channelListings.id, schema.listingComponents.listingId),
         )
         .where(where)
-        .groupBy(schema.variants.id, schema.products.name)
+        .groupBy(schema.variants.id, schema.products.name, schema.products.imageUrl)
         .orderBy(asc(schema.variants.sku))
         .limit(query.limit)
         .offset(query.offset),
@@ -82,6 +86,9 @@ export class CatalogService {
         sku: r.sku,
         name: r.name,
         productName: r.productName,
+        imageUrl: r.imageUrl,
+        fromPrice: r.fromPrice,
+        currency: 'EGP',
         listingCount: r.listingCount,
         channels: (r.channels ?? []) as SalesChannel[],
         active: r.active,
