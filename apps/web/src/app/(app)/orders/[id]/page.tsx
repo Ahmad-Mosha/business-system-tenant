@@ -6,9 +6,8 @@ import {
 } from '@app/contracts';
 import { notFound } from 'next/navigation';
 import { Avatar } from '@/components/ui/avatar';
-import { StatusPill } from '@/components/ui/status-pill';
 import { AssignControl } from '@/components/assign-control';
-import { StatusActions } from '@/components/status-actions';
+import { StatusControl } from '@/components/status-control';
 import { ApiRequestError, apiGet } from '@/lib/api';
 import { formatDateTime, formatMoney } from '@/lib/format';
 import { can } from '@/lib/permissions';
@@ -35,25 +34,35 @@ export default async function OrderDetailPage({
   }
 
   const mayAssign = can(user, PERMISSIONS.ORDER_ASSIGN);
+  const mayUpdateStatus = can(user, PERMISSIONS.ORDER_UPDATE_STATUS);
   const assignable = mayAssign ? await apiGet<AssignableUser[]>('/orders/assignable-users') : [];
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="mx-auto max-w-[1500px]">
       <div className="flex flex-col gap-4 lg:flex-row">
         {/* Left column */}
         <div className="flex flex-1 flex-col gap-4">
           {/* Hero */}
-          <div className="flex items-start justify-between rounded border border-line bg-surface p-6">
+          <div className="flex flex-wrap items-start justify-between gap-4 rounded-lg border border-line bg-surface p-5">
             <div>
-              <div className="mb-1 flex items-center gap-2">
-                <h1 className="tnum text-[22px] font-bold text-ink">{order.orderNumber}</h1>
-                <StatusPill status={order.status} />
-              </div>
-              <p className="text-[13px] text-ink-2">
+              <h1 className="tnum text-[21px] font-bold leading-tight text-ink">
+                {order.orderNumber}
+              </h1>
+              <p className="mt-1 text-[13px] text-ink-2">
                 Placed {formatDateTime(order.placedAt)} via {ORDER_SOURCE_LABELS[order.source]}
               </p>
             </div>
-            <StatusActions orderId={order.id} transitions={order.availableTransitions} />
+            <div className="flex flex-col items-start gap-1.5 sm:items-end">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-ink-3">
+                Status
+              </span>
+              <StatusControl
+                orderId={order.id}
+                status={order.status}
+                canUpdate={mayUpdateStatus}
+                size="md"
+              />
+            </div>
           </div>
 
           {/* Customer + Assignment */}

@@ -4,9 +4,10 @@ import { z } from 'zod';
  * The canonical order lifecycle. Provider-specific statuses are mapped onto this;
  * an unmapped external status is never guessed at.
  *
- * DELIVERED and RETURNED are deliberately absent: those become facts only when a
- * courier reports them, and the courier integration does not exist yet. Adding them
- * now would create a second source of truth for the same event.
+ * DELIVERED, RETURNED and COLLECTED are outcomes that a courier or a payout
+ * ultimately confirms. They are settable by a person today; when the courier
+ * integration lands it becomes the authority for delivery outcomes and people
+ * stop setting them by hand. The state survives - only who sets it changes.
  */
 export const orderStatusSchema = z.enum([
   'NEW',
@@ -14,6 +15,9 @@ export const orderStatusSchema = z.enum([
   'CONFIRMED',
   'READY_TO_SHIP',
   'SHIPPED',
+  'DELIVERED',
+  'COLLECTED',
+  'RETURNED',
   'ON_HOLD',
   'CANCELLED',
 ]);
@@ -25,8 +29,28 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   CONFIRMED: 'Confirmed',
   READY_TO_SHIP: 'Ready to ship',
   SHIPPED: 'Shipped',
+  DELIVERED: 'Delivered',
+  COLLECTED: 'Collected',
+  RETURNED: 'Returned',
   ON_HOLD: 'On hold',
   CANCELLED: 'Cancelled',
+};
+
+/**
+ * What each state means in plain language, shown in the status menu so the
+ * workflow explains itself rather than relying on the reader knowing the enum.
+ */
+export const ORDER_STATUS_MEANING: Record<OrderStatus, string> = {
+  NEW: 'Just arrived, nobody has worked it yet',
+  CONTACTED: 'You have reached the customer',
+  CONFIRMED: 'Customer confirmed what they want',
+  READY_TO_SHIP: 'Packed and waiting for the courier',
+  SHIPPED: 'Handed over to the courier',
+  DELIVERED: 'Courier delivered it to the customer',
+  COLLECTED: 'Money received and in our account',
+  RETURNED: 'Came back to us instead of being delivered',
+  ON_HOLD: 'Blocked - waiting on someone or something',
+  CANCELLED: 'This order will not go ahead',
 };
 
 /** Where an order entered the system. Marketplaces join this list in later slices. */
@@ -54,18 +78,33 @@ export type Money = z.infer<typeof moneySchema>;
  * Which transitions are legal, and therefore which buttons a screen may offer.
  * Declared once here so the API and the UI cannot disagree about the lifecycle.
  *
- * DELIVERED and RETURNED are absent on purpose: those are facts a courier reports,
- * and letting a person type them would create a second source of truth.
+ * COLLECTED is the money-landed marker: for cash on delivery the cash sits with
+ * the courier after DELIVERED until they remit it, and that gap is real working
+ * capital the finance slice will need to account for.
  */
 export const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   NEW: ['CONTACTED', 'ON_HOLD', 'CANCELLED'],
   CONTACTED: ['CONFIRMED', 'ON_HOLD', 'CANCELLED'],
   CONFIRMED: ['READY_TO_SHIP', 'ON_HOLD', 'CANCELLED'],
   READY_TO_SHIP: ['SHIPPED', 'ON_HOLD', 'CANCELLED'],
-  SHIPPED: [],
-  ON_HOLD: ['CONTACTED', 'CONFIRMED', 'READY_TO_SHIP', 'CANCELLED'],
+  // Once it is with the courier the outcome is delivery or return, not a
+  // free jump back into the office workflow.
+  SHIPPED: ['DELIVERED', 'RETURNED', 'ON_HOLD'],
+  // Delivered but not yet paid out: for cash on delivery the money sits with
+  // the courier until they remit it, which is exactly what COLLECTED marks.
+  DELIVERED: ['COLLECTED', 'RETURNED'],
+  // Money is in our account. A late refund still has to be representable.
+  COLLECTED: ['RETURNED'],
+  RETURNED: [],
+  ON_HOLD: ['CONTACTED', 'CONFIRMED', 'READY_TO_SHIP', 'SHIPPED', 'CANCELLED'],
   CANCELLED: [],
 };
+
+/**
+ * Statuses that mean money has actually reached us. Kept here so the finance
+ * slice and the UI agree on what "paid" means instead of each hard-coding it.
+ */
+export const SETTLED_STATUSES: OrderStatus[] = ['COLLECTED'];
 
 export function canTransition(from: OrderStatus, to: OrderStatus): boolean {
   return ALLOWED_TRANSITIONS[from].includes(to);
@@ -190,6 +229,12 @@ export type AssignableUser = z.infer<typeof assignableUserSchema>;
 
 export const listOrdersQuerySchema = z.object({
   status: orderStatusSchema.optional(),
+  /** Matches order number, customer name or phone. */
+  search: z.string().trim().max(120).optional(),
+  assigneeId: z.string().uuid().optional(),
+  /** Inclusive placed-at bounds, as YYYY-MM-DD in Africa/Cairo. */
+  placedFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  placedTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().min(0).default(0),
 });

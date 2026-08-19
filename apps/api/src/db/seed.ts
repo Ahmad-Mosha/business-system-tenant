@@ -19,8 +19,8 @@ import * as schema from './schema.js';
  */
 const envSchema = z.object({
   DATABASE_URL: z.string().url(),
-  SEED_ORG_NAME: z.string().default('Sazine'),
-  SEED_ORG_SLUG: z.string().default('sazine'),
+  SEED_ORG_NAME: z.string().default('PRIME'),
+  SEED_ORG_SLUG: z.string().default('prime'),
   SEED_ADMIN_EMAIL: z.string().email(),
   SEED_ADMIN_PASSWORD: z.string().min(12, 'Use at least 12 characters'),
   SEED_ADMIN_NAME: z.string().default('Administrator'),

@@ -12,9 +12,9 @@ export default async function LoginPage() {
       <div className="w-full max-w-[24rem]">
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex size-11 items-center justify-center rounded-xl bg-primary text-[15px] font-bold text-primary-ink">
-            SZ
+            P
           </div>
-          <h1 className="text-[22px] font-semibold tracking-tight text-ink">Operations</h1>
+          <h1 className="text-[22px] font-bold tracking-tight text-ink">PRIME</h1>
           <p className="mt-1 text-[13px] text-ink-2">Secure system access</p>
         </div>
 

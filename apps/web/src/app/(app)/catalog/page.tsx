@@ -1,9 +1,10 @@
 import { CHANNEL_LABELS, type ListVariantsResponse } from '@app/contracts';
+import Link from 'next/link';
 import { apiGet } from '@/lib/api';
 import { formatMoney } from '@/lib/format';
 import { requireUser } from '@/lib/session';
 
-export const metadata = { title: 'Catalog' };
+export const metadata = { title: 'Catalog · PRIME' };
 
 export default async function CatalogPage() {
   await requireUser();
@@ -34,7 +35,8 @@ export default async function CatalogPage() {
         ) : (
           <ul className="divide-y divide-line-soft">
             {items.map((v) => (
-              <li key={v.id} className="flex items-center gap-4 px-5 py-4 hover:bg-rail/60">
+              <li key={v.id} className="row-hover">
+                <Link href={`/catalog/${v.id}`} className="flex items-center gap-4 px-5 py-4">
                 <span className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-rail">
                   {v.imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element -- external, unoptimizable channel-hosted image
@@ -82,6 +84,7 @@ export default async function CatalogPage() {
                     {v.listingCount} {v.listingCount === 1 ? 'listing' : 'listings'}
                   </span>
                 </span>
+                </Link>
               </li>
             ))}
           </ul>

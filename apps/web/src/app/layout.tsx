@@ -10,8 +10,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'Operations',
-  description: 'Order and inventory operations',
+  title: 'PRIME',
+  description: 'PRIME operations system',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
