@@ -1,5 +1,6 @@
 import { CHANNEL_LABELS, type VariantDetail } from '@app/contracts';
 import { ArrowLeft, PackageSearch } from 'lucide-react';
+import { CHANNEL_TONES } from '@/lib/channel-colors';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ApiRequestError, apiGet } from '@/lib/api';
@@ -105,7 +106,9 @@ export default async function ProductDetailPage({
                     {variant.listings.map((listing) => (
                       <tr key={listing.id} className="row-hover">
                         <Td>
-                          <span className="rounded-md border border-line bg-line-soft px-1.5 py-0.5 text-[11.5px] font-medium text-ink-2">
+                          <span
+                            className={`rounded-md border px-1.5 py-0.5 text-[11.5px] font-medium ${CHANNEL_TONES[listing.channel]}`}
+                          >
                             {CHANNEL_LABELS[listing.channel]}
                           </span>
                         </Td>
