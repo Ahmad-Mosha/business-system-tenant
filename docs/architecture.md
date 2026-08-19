@@ -65,6 +65,26 @@ them is built, not in anticipation.
 - Rate limiting applies to the credential routes only, keyed on **IP and email
   together** - see ADR-003 for why the obvious alternatives are worse.
 
+## Types and DTOs
+
+There are no hand-written `*.dto.ts` classes with `class-validator` decorators.
+Instead, every request and response shape is a **Zod schema** in
+`packages/contracts`, and the TypeScript type is derived from that same schema
+with `z.infer<...>` - so the compile-time type and the runtime validator can
+never drift apart, which is a real failure mode of the class-DTO pattern (the
+decorator says one thing, the type says another, and nothing catches it).
+
+`ZodValidationPipe` enforces the schema at the controller boundary; every
+controller method's parameter and return types come from `@app/contracts`, so
+the same type is shared by the API and the Next.js app with no duplication.
+`@typescript-eslint/no-explicit-any` is `error`, not `warn` - the build fails
+if one appears. The database layer is Drizzle's typed schema builder, not
+raw SQL strings, so a column rename is a type error everywhere it's read.
+
+If Swagger/OpenAPI generation becomes a real requirement (e.g. an external
+integrator needs a spec to code against), Zod schemas convert to OpenAPI
+directly - this doesn't require moving to class-based DTOs.
+
 ## Testing
 
 - Unit tests for rules that stand alone (scope resolution).

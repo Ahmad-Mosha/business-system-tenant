@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { Avatar } from '@/components/ui/avatar';
 import { StatusPill } from '@/components/ui/status-pill';
 import { OrderFilters } from '@/components/order-filters';
+import { OrderRowActions } from '@/components/order-row-actions';
 import { apiGet } from '@/lib/api';
 import { formatDateTime, formatMoney } from '@/lib/format';
 import { can, isScopedToSelf } from '@/lib/permissions';
@@ -36,65 +37,70 @@ export default async function OrdersPage({
 
   const { items, total } = await apiGet<ListOrdersResponse>(`/orders?${query}`);
   const scopedToMe = isScopedToSelf(user, PERMISSIONS.ORDER_READ);
+  const canUpdateStatus = can(user, PERMISSIONS.ORDER_UPDATE_STATUS);
   const lastPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <div className="mx-auto max-w-[1400px]">
-      <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
+      <header className="mb-5 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-[26px] font-semibold tracking-tight text-ink">Orders</h1>
+          <h1 className="text-[22px] font-bold tracking-tight text-ink">Orders</h1>
           <p className="mt-1 text-[14px] text-ink-2">
             {scopedToMe
               ? 'Orders assigned to you.'
-              : 'Every order across all channels, with its current owner.'}
+              : 'Manage and track orders across every channel.'}
           </p>
         </div>
         {can(user, PERMISSIONS.ORDER_CREATE) ? (
           <Link
             href="/orders/new"
-            className="inline-flex h-9 items-center rounded-lg bg-accent px-4 text-sm font-medium text-primary-ink hover:opacity-90"
+            className="inline-flex h-9 items-center gap-1.5 rounded bg-primary px-4 text-sm font-medium text-primary-ink shadow-sm hover:bg-black"
           >
-            New order
+            <span className="text-[16px] leading-none">+</span> New order
           </Link>
         ) : null}
       </header>
 
-      <OrderFilters activeStatus={status.success ? status.data : undefined} />
+      <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-line bg-surface p-2">
+        <OrderFilters activeStatus={status.success ? status.data : undefined} />
+      </div>
 
-      <div className="mt-4 overflow-hidden rounded-xl border border-line bg-surface">
+      <div className="overflow-hidden rounded-lg border border-line bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
         {items.length === 0 ? (
           <EmptyState scopedToMe={scopedToMe} filtered={status.success} />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[60rem] border-collapse text-sm">
+            <table className="w-full min-w-[62rem] border-collapse text-left text-sm">
               <thead>
-                <tr className="border-b border-line-soft bg-rail text-left">
+                <tr className="border-b border-line bg-line-soft text-left">
                   <Th>Order</Th>
                   <Th>Customer</Th>
+                  <Th>Phone</Th>
                   <Th align="right">Items</Th>
                   <Th align="right">Total</Th>
                   <Th>Status</Th>
                   <Th>Assignee</Th>
                   <Th>Source</Th>
                   <Th align="right">Placed</Th>
+                  <th className="w-10 px-3 py-2" />
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-line">
                 {items.map((order) => (
-                  <tr key={order.id} className="border-b border-line-soft last:border-0 hover:bg-rail/70">
+                  <tr key={order.id} className="group transition-colors hover:bg-line-soft">
                     <Td>
                       <Link
                         href={`/orders/${order.id}`}
-                        className="tnum font-medium text-ink underline-offset-4 hover:underline hover:decoration-accent"
+                        className="tnum font-medium text-ink underline-offset-4 hover:underline"
                       >
                         {order.orderNumber}
                       </Link>
                     </Td>
                     <Td>
-                      <span className="block text-ink">{order.customerName}</span>
-                      <span className="tnum mt-0.5 block text-[12px] text-ink-3">
-                        {order.customerPhone}
-                      </span>
+                      <span className="block font-medium text-ink">{order.customerName}</span>
+                    </Td>
+                    <Td>
+                      <span className="tnum text-ink-2">{order.customerPhone}</span>
                     </Td>
                     <Td align="right">
                       <span className="tnum text-ink-2">{order.itemCount}</span>
@@ -108,23 +114,29 @@ export default async function OrdersPage({
                     <Td>
                       {order.assignedTo ? (
                         <span className="flex items-center gap-2">
-                          <Avatar name={order.assignedTo.name} />
-                          <span className="text-ink-2">{order.assignedTo.name}</span>
+                          <Avatar name={order.assignedTo.name} className="size-5 text-[9px]" />
+                          <span className="text-ink">{order.assignedTo.name}</span>
                         </span>
                       ) : (
                         <span className="text-[13px] text-ink-3">Unassigned</span>
                       )}
                     </Td>
                     <Td>
-                      <span className="text-[13px] text-ink-2">
-                        {ORDER_SOURCE_LABELS[order.source]}
-                      </span>
+                      <span className="text-ink-2">{ORDER_SOURCE_LABELS[order.source]}</span>
                     </Td>
                     <Td align="right">
-                      <span className="tnum text-[13px] text-ink-3">
+                      <span className="tnum text-[12px] text-ink-2">
                         {formatDateTime(order.placedAt)}
                       </span>
                     </Td>
+                    <td className="px-3 py-2.5 text-right">
+                      <OrderRowActions
+                        orderId={order.id}
+                        orderNumber={order.orderNumber}
+                        status={order.status}
+                        canUpdateStatus={canUpdateStatus}
+                      />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -133,15 +145,15 @@ export default async function OrdersPage({
         )}
 
         {total > 0 ? (
-          <div className="flex items-center justify-between border-t border-line px-5 py-3 text-[13px]">
-            <span className="tnum text-ink-3">
+          <div className="flex items-center justify-between border-t border-line bg-surface px-3 py-3 text-[13px] text-ink-2">
+            <span className="tnum">
               Showing {offset + 1}–{Math.min(offset + items.length, total)} of {total}
             </span>
             <span className="flex items-center gap-2">
               <PageLink page={page - 1} disabled={page <= 1} status={params.status}>
-                Previous
+                Prev
               </PageLink>
-              <span className="tnum px-1 text-ink-2">
+              <span className="tnum px-1 text-ink">
                 {page} / {lastPage}
               </span>
               <PageLink page={page + 1} disabled={page >= lastPage} status={params.status}>
@@ -167,14 +179,16 @@ function PageLink({
   children: React.ReactNode;
 }) {
   if (disabled) {
-    return <span className="rounded-md border border-line px-2.5 py-1 text-ink-3/60">{children}</span>;
+    return (
+      <span className="rounded border border-line px-2 py-1 text-ink-3/60">{children}</span>
+    );
   }
   const query = new URLSearchParams({ page: String(page) });
   if (status) query.set('status', status);
   return (
     <Link
       href={`/orders?${query}`}
-      className="rounded-md border border-line px-2.5 py-1 text-ink-2 hover:bg-canvas hover:text-ink"
+      className="rounded border border-line px-2 py-1 text-ink-2 hover:bg-line-soft"
     >
       {children}
     </Link>
@@ -185,7 +199,7 @@ function Th({ children, align }: { children: React.ReactNode; align?: 'right' })
   return (
     <th
       scope="col"
-      className={`px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-3 ${
+      className={`px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-ink-2 ${
         align === 'right' ? 'text-right' : ''
       }`}
     >
@@ -196,7 +210,7 @@ function Th({ children, align }: { children: React.ReactNode; align?: 'right' })
 
 function Td({ children, align }: { children: React.ReactNode; align?: 'right' }) {
   return (
-    <td className={`px-5 py-4 align-middle ${align === 'right' ? 'text-right' : ''}`}>
+    <td className={`px-3 py-2.5 align-middle ${align === 'right' ? 'text-right' : ''}`}>
       {children}
     </td>
   );
@@ -218,7 +232,7 @@ function EmptyState({ scopedToMe, filtered }: { scopedToMe: boolean; filtered: b
       {!filtered ? (
         <Link
           href="/orders/new"
-          className="mt-5 inline-flex h-9 items-center rounded-lg bg-accent px-4 text-sm font-medium text-primary-ink hover:opacity-90"
+          className="mt-5 inline-flex h-9 items-center rounded bg-primary px-4 text-sm font-medium text-primary-ink hover:bg-black"
         >
           Create the first order
         </Link>
