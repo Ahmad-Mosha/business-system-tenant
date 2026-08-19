@@ -1,10 +1,11 @@
 @import 'tailwindcss';
 
 /*
- * Design tokens, matched directly to the approved Stitch reference
- * (projects/15333762573627160371 "Nexus Operations System") - not an
- * interpretation of it. Values below are the literal colors from that
- * project's own tailwind config plus its orders-list screen.
+ * PRIME design tokens.
+ *
+ * Neutral ground, near-black primary actions, and status colour that maps to
+ * business meaning rather than decoration. Interaction states are defined once
+ * here so hover/focus feel identical across every surface.
  */
 
 @theme {
@@ -33,33 +34,32 @@
   --color-bad: var(--bad);
   --color-bad-bg: var(--bad-bg);
   --color-bad-border: var(--bad-border);
-  --color-mute: var(--mute);
-  --color-mute-bg: var(--mute-bg);
-  --color-mute-border: var(--mute-border);
+  --color-info: var(--info);
+  --color-info-bg: var(--info-bg);
+  --color-info-border: var(--info-border);
 }
 
 :root {
   --canvas: #fafafa;
   --surface: #ffffff;
-  --rail: #fbf8ff;
+  --rail: #fbfbfd;
   --line: #e4e4e7;
-  --line-soft: #f1f1f3;
-  --ink: #1a1b22;
-  --ink-2: #47464a;
-  --ink-3: #8a8a92;
+  --line-soft: #f4f4f5;
+  --ink: #18181b;
+  --ink-2: #52525b;
+  --ink-3: #8b8b93;
 
-  /* Active nav item: the Stitch reference's own secondary-fixed tint. */
-  --active: #d8e2ff;
-  --active-ink: #001a42;
+  --active: #eef2ff;
+  --active-ink: #1e1b4b;
 
   --primary: #09090b;
   --primary-ink: #ffffff;
 
-  /* Status pills: translucent fill over a matching border - the Stitch pattern. */
-  --ok: #047857;         --ok-bg: rgb(16 185 129 / 0.1);       --ok-border: rgb(16 185 129 / 0.2);
-  --warn: #a16207;       --warn-bg: rgb(234 179 8 / 0.1);       --warn-border: rgb(234 179 8 / 0.2);
-  --bad: #b91c1c;        --bad-bg: rgb(239 68 68 / 0.1);        --bad-border: rgb(239 68 68 / 0.2);
-  --mute: #1d4ed8;       --mute-bg: rgb(59 130 246 / 0.1);      --mute-border: rgb(59 130 246 / 0.2);
+  /* Status: translucent fill over a matching border. */
+  --ok: #047857;    --ok-bg: rgb(16 185 129 / 0.10);   --ok-border: rgb(16 185 129 / 0.22);
+  --warn: #a16207;  --warn-bg: rgb(234 179 8 / 0.12);  --warn-border: rgb(234 179 8 / 0.25);
+  --bad: #b91c1c;   --bad-bg: rgb(239 68 68 / 0.10);   --bad-border: rgb(239 68 68 / 0.22);
+  --info: #1d4ed8;  --info-bg: rgb(59 130 246 / 0.10); --info-border: rgb(59 130 246 / 0.22);
 
   color-scheme: light;
 }
@@ -74,15 +74,38 @@
     -webkit-font-smoothing: antialiased;
   }
 
-  /* Money, counts and identifiers must align when scanned down a column. */
+  /*
+   * Every figure that appears in a column - money, counts, phone numbers, dates,
+   * order numbers - uses tabular figures so digits occupy identical width and
+   * the column reads as a straight edge instead of a ragged one.
+   */
   .tnum {
     font-variant-numeric: tabular-nums;
     font-feature-settings: 'tnum';
   }
 
   :focus-visible {
-    outline: 2px solid #3b82f6;
+    outline: 2px solid var(--primary);
     outline-offset: 2px;
     border-radius: 4px;
   }
+}
+
+@layer components {
+  /* One hover language: a quick, shallow tint rather than a hard colour flip. */
+  .row-hover {
+    transition: background-color 120ms ease;
+  }
+  .row-hover:hover {
+    background-color: var(--line-soft);
+  }
+}
+
+/* Menus and popovers get a short, restrained entrance - no bounce. */
+@keyframes menu-in {
+  from { opacity: 0; transform: translateY(-2px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+[data-radix-popper-content-wrapper] > * {
+  animation: menu-in 110ms ease-out;
 }

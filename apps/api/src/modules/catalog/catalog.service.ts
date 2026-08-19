@@ -3,12 +3,20 @@ import {
   type ListVariantsQuery,
   type ListVariantsResponse,
   type SalesChannel,
+  type VariantDetail,
 } from '@app/contracts';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, count, eq, ilike, or, sql, type SQL } from 'drizzle-orm';
 import { DB, schema, type Database } from '../../db/db.module.js';
+import { DomainError } from '../../shared/errors.js';
 import { newId } from '../../shared/ids.js';
 import type { AuthContext } from '../identity/auth-context.js';
+
+export class VariantNotFoundError extends DomainError {
+  constructor() {
+    super('VARIANT_NOT_FOUND', 'That product is not in your catalog', 404);
+  }
+}
 
 export interface UpsertListingInput {
   organizationId: string;
@@ -94,6 +102,68 @@ export class CatalogService {
         active: r.active,
       })),
       total: totals?.value ?? 0,
+    };
+  }
+
+  /** One variant with every channel it is listed on. */
+  async getVariant(auth: AuthContext, variantId: string): Promise<VariantDetail> {
+    auth.requireScope(PERMISSIONS.CATALOG_READ);
+
+    const [variant] = await this.db
+      .select({
+        id: schema.variants.id,
+        sku: schema.variants.sku,
+        name: schema.variants.name,
+        active: schema.variants.active,
+        createdAt: schema.variants.createdAt,
+        productId: schema.products.id,
+        productName: schema.products.name,
+        description: schema.products.description,
+        imageUrl: schema.products.imageUrl,
+      })
+      .from(schema.variants)
+      .innerJoin(schema.products, eq(schema.products.id, schema.variants.productId))
+      .where(
+        and(
+          eq(schema.variants.id, variantId),
+          eq(schema.variants.organizationId, auth.user.organizationId),
+        ),
+      )
+      .limit(1);
+
+    if (!variant) throw new VariantNotFoundError();
+
+    const listings = await this.db
+      .select({
+        id: schema.channelListings.id,
+        channel: schema.channelListings.channel,
+        externalId: schema.channelListings.externalId,
+        externalSku: schema.channelListings.externalSku,
+        title: schema.channelListings.title,
+        price: sql<number | null>`${schema.channelListings.price}::integer`,
+        active: schema.channelListings.active,
+        quantityPerUnit: schema.listingComponents.quantity,
+      })
+      .from(schema.listingComponents)
+      .innerJoin(
+        schema.channelListings,
+        eq(schema.channelListings.id, schema.listingComponents.listingId),
+      )
+      .where(eq(schema.listingComponents.variantId, variantId))
+      .orderBy(asc(schema.channelListings.channel));
+
+    return {
+      id: variant.id,
+      sku: variant.sku,
+      name: variant.name,
+      active: variant.active,
+      productId: variant.productId,
+      productName: variant.productName,
+      description: variant.description,
+      imageUrl: variant.imageUrl,
+      currency: 'EGP',
+      listings,
+      createdAt: variant.createdAt.toISOString(),
     };
   }
 

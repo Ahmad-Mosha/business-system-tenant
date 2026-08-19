@@ -42,3 +42,32 @@ export const listVariantsResponseSchema = z.object({
   total: z.number().int(),
 });
 export type ListVariantsResponse = z.infer<typeof listVariantsResponseSchema>;
+
+export const listingDetailSchema = z.object({
+  id: z.string().uuid(),
+  channel: salesChannelSchema,
+  externalId: z.string(),
+  externalSku: z.string().nullable(),
+  title: z.string().nullable(),
+  price: z.number().int().nullable(),
+  active: z.boolean(),
+  /** How many of this variant one unit of the listing consumes. */
+  quantityPerUnit: z.number().int(),
+});
+export type ListingDetail = z.infer<typeof listingDetailSchema>;
+
+export const variantDetailSchema = z.object({
+  id: z.string().uuid(),
+  sku: z.string(),
+  name: z.string(),
+  active: z.boolean(),
+  productId: z.string().uuid(),
+  productName: z.string(),
+  description: z.string().nullable(),
+  imageUrl: z.string().nullable(),
+  currency: z.string().length(3),
+  /** Every channel this one variant is sold through. */
+  listings: z.array(listingDetailSchema),
+  createdAt: z.string().datetime(),
+});
+export type VariantDetail = z.infer<typeof variantDetailSchema>;

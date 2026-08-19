@@ -5,7 +5,7 @@ import {
   type OrderListItem,
 } from '@app/contracts';
 import { Inject, Injectable } from '@nestjs/common';
-import { aliasedTable, and, count, desc, eq, sql, type SQL } from 'drizzle-orm';
+import { aliasedTable, and, count, desc, eq, gte, ilike, lte, or, sql, type SQL } from 'drizzle-orm';
 import { DB, schema, type Database } from '../../db/db.module.js';
 import type { AuthContext } from '../identity/auth-context.js';
 
@@ -29,6 +29,33 @@ export class OrdersService {
     }
     if (query.status) {
       conditions.push(eq(schema.orders.status, query.status));
+    }
+    if (query.assigneeId) {
+      conditions.push(eq(schema.orders.assignedToUserId, query.assigneeId));
+    }
+    if (query.search) {
+      const term = `%${query.search}%`;
+      const match = or(
+        ilike(schema.orders.orderNumber, term),
+        ilike(schema.orders.customerName, term),
+        ilike(schema.orders.customerPhone, term),
+      );
+      if (match) conditions.push(match);
+    }
+    // Dates arrive as calendar days in Africa/Cairo; convert to an instant range so
+    // an order placed at 23:30 Cairo is not filed under the previous UTC day.
+    if (query.placedFrom) {
+      conditions.push(
+        gte(schema.orders.placedAt, sql`(${query.placedFrom}::date) at time zone 'Africa/Cairo'`),
+      );
+    }
+    if (query.placedTo) {
+      conditions.push(
+        lte(
+          schema.orders.placedAt,
+          sql`((${query.placedTo}::date + 1) at time zone 'Africa/Cairo') - interval '1 microsecond'`,
+        ),
+      );
     }
     const where = and(...conditions);
 

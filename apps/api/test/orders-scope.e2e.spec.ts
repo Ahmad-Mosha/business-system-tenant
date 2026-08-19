@@ -159,7 +159,7 @@ describe('order access scoping', () => {
   it('rejects an unknown status value instead of ignoring it', async () => {
     const cookie = await login(fixture.admin.email, fixture.admin.password);
     const res = await request(ctx.app.getHttpServer())
-      .get('/orders?status=DELIVERED')
+      .get('/orders?status=NOT_A_REAL_STATUS')
       .set('Cookie', cookie)
       .expect(400);
 

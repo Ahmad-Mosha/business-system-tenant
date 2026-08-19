@@ -3,8 +3,19 @@ import {
   listVariantsQuerySchema,
   type ListVariantsQuery,
   type ListVariantsResponse,
+  type VariantDetail,
 } from '@app/contracts';
-import { Controller, Get, HttpCode, Inject, Post, Query, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  HttpCode,
+  Inject,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  Req,
+} from '@nestjs/common';
 import type { Request } from 'express';
 import { ENV, type Env } from '../../config/env.js';
 import { ZodValidationPipe } from '../../shared/zod-validation.pipe.js';
@@ -28,6 +39,15 @@ export class CatalogController {
     @Query(new ZodValidationPipe(listVariantsQuerySchema)) query: ListVariantsQuery,
   ): Promise<ListVariantsResponse> {
     return this.catalog.listVariants(auth, query);
+  }
+
+  @Get('variants/:id')
+  @RequirePermission(PERMISSIONS.CATALOG_READ)
+  getVariant(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<VariantDetail> {
+    return this.catalog.getVariant(auth, id);
   }
 
   /** Operator-triggered pull of the EasyOrders product list into our catalog. */

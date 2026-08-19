@@ -138,13 +138,42 @@ describe('order assignment and status workflow', () => {
     expect(change.actorName).toBe('Admin');
   });
 
-  it('rejects DELIVERED outright - the courier owns that fact, not a person', async () => {
+  it('refuses to skip the courier stages on the way to DELIVERED', async () => {
     const admin = await login(fixture.admin.email, fixture.admin.password);
+    // DELIVERED is a real status now, but only reachable from SHIPPED - a NEW
+    // order jumping straight there would fabricate a delivery that never happened.
     const res = await request(ctx.app.getHttpServer())
       .post(`/orders/${orderId}/status`)
       .set('Cookie', admin)
       .send({ status: 'DELIVERED' })
-      .expect(400);
-    expect(res.body.error.code).toBe('VALIDATION_FAILED');
+      .expect(422);
+    expect(res.body.error.code).toBe('INVALID_TRANSITION');
+  });
+
+  it('walks an order through to COLLECTED, the point money is actually ours', async () => {
+    const admin = await login(fixture.admin.email, fixture.admin.password);
+    const server = ctx.app.getHttpServer();
+    const move = (status: string) =>
+      request(server)
+        .post(`/orders/${orderId}/status`)
+        .set('Cookie', admin)
+        .send({ status })
+        .expect(204);
+
+    for (const status of [
+      'CONTACTED',
+      'CONFIRMED',
+      'READY_TO_SHIP',
+      'SHIPPED',
+      'DELIVERED',
+      'COLLECTED',
+    ]) {
+      await move(status);
+    }
+
+    const res = await request(server).get(`/orders/${orderId}`).set('Cookie', admin).expect(200);
+    expect(res.body.status).toBe('COLLECTED');
+    // Cash received is near-terminal: only a later refund can follow.
+    expect(res.body.availableTransitions).toEqual(['RETURNED']);
   });
 });
