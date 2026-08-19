@@ -1,13 +1,10 @@
 @import 'tailwindcss';
 
 /*
- * Design tokens.
- *
- * Warm neutral ground (not the cool blue-grey of generic admin templates),
- * near-black for primary actions, and ONE considered accent - a deep pine -
- * used sparingly for the things that are truly "yours to act on". Status
- * colour is reserved for genuine state (ok/warn/danger); a merely-new order
- * gets ink, not brand-blue, because "new" is not an accomplishment.
+ * Design tokens, matched directly to the approved Stitch reference
+ * (projects/15333762573627160371 "Nexus Operations System") - not an
+ * interpretation of it. Values below are the literal colors from that
+ * project's own tailwind config plus its orders-list screen.
  */
 
 @theme {
@@ -26,43 +23,43 @@
   --color-active-ink: var(--active-ink);
   --color-primary: var(--primary);
   --color-primary-ink: var(--primary-ink);
-  --color-accent: var(--accent);
-  --color-accent-soft: var(--accent-soft);
 
   --color-ok: var(--ok);
   --color-ok-bg: var(--ok-bg);
+  --color-ok-border: var(--ok-border);
   --color-warn: var(--warn);
   --color-warn-bg: var(--warn-bg);
+  --color-warn-border: var(--warn-border);
   --color-bad: var(--bad);
   --color-bad-bg: var(--bad-bg);
+  --color-bad-border: var(--bad-border);
   --color-mute: var(--mute);
   --color-mute-bg: var(--mute-bg);
+  --color-mute-border: var(--mute-border);
 }
 
 :root {
-  --canvas: #faf9f6;
+  --canvas: #fafafa;
   --surface: #ffffff;
-  --rail: #f7f5f1;
-  --line: #e9e5dd;
-  --line-soft: #f1eee8;
-  --ink: #16150f;
-  --ink-2: #5c574c;
-  --ink-3: #8f8a7c;
+  --rail: #fbf8ff;
+  --line: #e4e4e7;
+  --line-soft: #f1f1f3;
+  --ink: #1a1b22;
+  --ink-2: #47464a;
+  --ink-3: #8a8a92;
 
-  /* One accent: deep pine. Used for the active nav item and small emphasis marks -
-     never for "New"/informational status, which stays neutral ink. */
-  --accent: #1f4b3f;
-  --accent-soft: #e8efec;
+  /* Active nav item: the Stitch reference's own secondary-fixed tint. */
+  --active: #d8e2ff;
+  --active-ink: #001a42;
 
-  --active: #eef1ec;
-  --active-ink: #16150f;
-  --primary: #16150f;
+  --primary: #09090b;
   --primary-ink: #ffffff;
 
-  --ok: #166534;        --ok-bg: #e3f3e8;
-  --warn: #92400e;      --warn-bg: #faf0dd;
-  --bad: #991b1b;       --bad-bg: #fbe9e9;
-  --mute: #57534c;      --mute-bg: #f1eee7;
+  /* Status pills: translucent fill over a matching border - the Stitch pattern. */
+  --ok: #047857;         --ok-bg: rgb(16 185 129 / 0.1);       --ok-border: rgb(16 185 129 / 0.2);
+  --warn: #a16207;       --warn-bg: rgb(234 179 8 / 0.1);       --warn-border: rgb(234 179 8 / 0.2);
+  --bad: #b91c1c;        --bad-bg: rgb(239 68 68 / 0.1);        --bad-border: rgb(239 68 68 / 0.2);
+  --mute: #1d4ed8;       --mute-bg: rgb(59 130 246 / 0.1);      --mute-border: rgb(59 130 246 / 0.2);
 
   color-scheme: light;
 }
@@ -84,7 +81,7 @@
   }
 
   :focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid #3b82f6;
     outline-offset: 2px;
     border-radius: 4px;
   }
