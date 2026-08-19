@@ -138,6 +138,35 @@ describe('order assignment and status workflow', () => {
     expect(change.actorName).toBe('Admin');
   });
 
+  it('lets a mistaken cancellation be reopened, but only back to NEW', async () => {
+    const admin = await login(fixture.admin.email, fixture.admin.password);
+    const server = ctx.app.getHttpServer();
+
+    await request(server)
+      .post(`/orders/${orderId}/status`)
+      .set('Cookie', admin)
+      .send({ status: 'CANCELLED' })
+      .expect(204);
+
+    // A cancellation is a staff decision, not a courier-reported fact, so it
+    // must be reversible - unlike RETURNED or COLLECTED, which stay terminal.
+    const blocked = await request(server)
+      .post(`/orders/${orderId}/status`)
+      .set('Cookie', admin)
+      .send({ status: 'CONTACTED' })
+      .expect(422);
+    expect(blocked.body.error.code).toBe('INVALID_TRANSITION');
+
+    await request(server)
+      .post(`/orders/${orderId}/status`)
+      .set('Cookie', admin)
+      .send({ status: 'NEW' })
+      .expect(204);
+
+    const res = await request(server).get(`/orders/${orderId}`).set('Cookie', admin).expect(200);
+    expect(res.body.status).toBe('NEW');
+  });
+
   it('refuses to skip the courier stages on the way to DELIVERED', async () => {
     const admin = await login(fixture.admin.email, fixture.admin.password);
     // DELIVERED is a real status now, but only reachable from SHIPPED - a NEW

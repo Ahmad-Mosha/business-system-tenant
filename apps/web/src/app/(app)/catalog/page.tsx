@@ -1,5 +1,6 @@
 import { CHANNEL_LABELS, type ListVariantsResponse } from '@app/contracts';
 import Link from 'next/link';
+import { CHANNEL_TONES } from '@/lib/channel-colors';
 import { apiGet } from '@/lib/api';
 import { formatMoney } from '@/lib/format';
 import { requireUser } from '@/lib/session';
@@ -65,7 +66,7 @@ export default async function CatalogPage() {
                       v.channels.map((c) => (
                         <span
                           key={c}
-                          className="rounded-md bg-mute-bg px-1.5 py-0.5 text-[11px] font-medium text-mute"
+                          className={`rounded-md border px-1.5 py-0.5 text-[11px] font-medium ${CHANNEL_TONES[c]}`}
                         >
                           {CHANNEL_LABELS[c]}
                         </span>

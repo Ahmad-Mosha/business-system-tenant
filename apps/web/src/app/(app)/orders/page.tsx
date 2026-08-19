@@ -87,23 +87,21 @@ export default async function OrdersPage({
               re-flow columns based on content, so a long customer name can never
               shove the numeric columns out of alignment between rows.
             */}
-            <table className="w-full min-w-[77rem] table-fixed border-collapse text-left text-[13.5px]">
+            <table className="w-full min-w-[68rem] table-fixed border-collapse text-left text-[13.5px]">
               <colgroup>
-                <col className="w-[7.5rem]" />
-                <col className="w-[12rem]" />
-                <col className="w-[9.5rem]" />
-                <col className="w-[4.5rem]" />
-                <col className="w-[8.5rem]" />
+                <col className="w-[7rem]" />
+                <col className="w-[13.5rem]" />
+                <col className="w-[3.5rem]" />
+                <col className="w-[8rem]" />
                 <col className="w-[9rem]" />
-                <col className="w-[9.5rem]" />
-                <col className="w-[6.5rem]" />
+                <col className="w-[9rem]" />
+                <col className="w-[7rem]" />
                 <col className="w-[10rem]" />
               </colgroup>
               <thead>
                 <tr className="border-b border-line bg-line-soft">
                   <Th>Order</Th>
                   <Th>Customer</Th>
-                  <Th numeric>Phone</Th>
                   <Th numeric>Items</Th>
                   <Th numeric>Total</Th>
                   <Th>Status</Th>
@@ -127,9 +125,9 @@ export default async function OrdersPage({
                       <span className="block truncate font-medium text-ink" title={order.customerName}>
                         {order.customerName}
                       </span>
-                    </Td>
-                    <Td numeric>
-                      <span className="tnum text-ink-2">{order.customerPhone}</span>
+                      <span className="tnum block truncate text-[12px] text-ink-3">
+                        {order.customerPhone}
+                      </span>
                     </Td>
                     <Td numeric>
                       <span className="tnum text-ink-2">{order.itemCount}</span>

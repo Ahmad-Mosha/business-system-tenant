@@ -97,7 +97,12 @@ export const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   COLLECTED: ['RETURNED'],
   RETURNED: [],
   ON_HOLD: ['CONTACTED', 'CONFIRMED', 'READY_TO_SHIP', 'SHIPPED', 'CANCELLED'],
-  CANCELLED: [],
+  // A cancellation is a staff decision, not a physical fact - unlike a courier
+  // report it can be a misclick, so it must be reversible. Reopening returns the
+  // order to NEW rather than wherever it was, since nothing about the earlier
+  // progress (was the customer contacted? confirmed?) is still trustworthy once
+  // the order sat cancelled for a while.
+  CANCELLED: ['NEW'],
 };
 
 /**
