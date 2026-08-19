@@ -74,7 +74,7 @@ export function StatusActions({
         disabled={busy}
         items={items}
         trigger={
-          <span className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-ink">
+          <span className="inline-flex h-9 items-center gap-2 rounded-lg bg-accent px-4 text-sm font-medium text-primary-ink">
             {busy ? 'Updating…' : 'Update status'}
             <ChevronIcon className="size-4 rotate-90" />
           </span>

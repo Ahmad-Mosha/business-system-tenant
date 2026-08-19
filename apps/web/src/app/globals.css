@@ -1,11 +1,13 @@
 @import 'tailwindcss';
 
 /*
- * Design tokens, taken from the approved screens.
+ * Design tokens.
  *
- * Light neutral ground, white surfaces, black primary actions, and soft-tinted
- * status pills. Colour is reserved for state; everything else is greyscale so the
- * data reads first.
+ * Warm neutral ground (not the cool blue-grey of generic admin templates),
+ * near-black for primary actions, and ONE considered accent - a deep pine -
+ * used sparingly for the things that are truly "yours to act on". Status
+ * colour is reserved for genuine state (ok/warn/danger); a merely-new order
+ * gets ink, not brand-blue, because "new" is not an accomplishment.
  */
 
 @theme {
@@ -24,6 +26,8 @@
   --color-active-ink: var(--active-ink);
   --color-primary: var(--primary);
   --color-primary-ink: var(--primary-ink);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
 
   --color-ok: var(--ok);
   --color-ok-bg: var(--ok-bg);
@@ -31,31 +35,34 @@
   --color-warn-bg: var(--warn-bg);
   --color-bad: var(--bad);
   --color-bad-bg: var(--bad-bg);
-  --color-info: var(--info);
-  --color-info-bg: var(--info-bg);
   --color-mute: var(--mute);
   --color-mute-bg: var(--mute-bg);
 }
 
 :root {
-  --canvas: #f7f7fb;
+  --canvas: #faf9f6;
   --surface: #ffffff;
-  --rail: #fbfbfd;
-  --line: #e6e6ee;
-  --line-soft: #f0f0f5;
-  --ink: #14151a;
-  --ink-2: #5b5f6b;
-  --ink-3: #8b8f9c;
-  --active: #eef1ff;
-  --active-ink: #1f2430;
-  --primary: #111318;
+  --rail: #f7f5f1;
+  --line: #e9e5dd;
+  --line-soft: #f1eee8;
+  --ink: #16150f;
+  --ink-2: #5c574c;
+  --ink-3: #8f8a7c;
+
+  /* One accent: deep pine. Used for the active nav item and small emphasis marks -
+     never for "New"/informational status, which stays neutral ink. */
+  --accent: #1f4b3f;
+  --accent-soft: #e8efec;
+
+  --active: #eef1ec;
+  --active-ink: #16150f;
+  --primary: #16150f;
   --primary-ink: #ffffff;
 
-  --ok: #166534;        --ok-bg: #dcfce7;
-  --warn: #92400e;      --warn-bg: #fef3c7;
-  --bad: #991b1b;       --bad-bg: #fee2e2;
-  --info: #1e40af;      --info-bg: #dbeafe;
-  --mute: #4b5563;      --mute-bg: #eef0f4;
+  --ok: #166534;        --ok-bg: #e3f3e8;
+  --warn: #92400e;      --warn-bg: #faf0dd;
+  --bad: #991b1b;       --bad-bg: #fbe9e9;
+  --mute: #57534c;      --mute-bg: #f1eee7;
 
   color-scheme: light;
 }
@@ -77,7 +84,7 @@
   }
 
   :focus-visible {
-    outline: 2px solid var(--primary);
+    outline: 2px solid var(--accent);
     outline-offset: 2px;
     border-radius: 4px;
   }

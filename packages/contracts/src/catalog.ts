@@ -19,6 +19,10 @@ export const variantListItemSchema = z.object({
   sku: z.string(),
   name: z.string(),
   productName: z.string(),
+  imageUrl: z.string().nullable(),
+  /** The lowest listed price across channels, in minor units. Null if no listing has one. */
+  fromPrice: z.number().int().nullable(),
+  currency: z.string().length(3),
   /** How many channels this one variant is sold through. */
   listingCount: z.number().int(),
   channels: z.array(salesChannelSchema),

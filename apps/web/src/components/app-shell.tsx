@@ -53,7 +53,7 @@ export function AppShell({
     <div className="flex min-h-dvh">
       <aside className="hidden w-60 shrink-0 flex-col border-r border-line bg-rail lg:flex">
         <div className="flex items-center gap-3 border-b border-line px-5 py-4">
-          <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-[13px] font-bold text-primary-ink">
+          <span className="flex size-9 items-center justify-center rounded-lg bg-accent text-[13px] font-bold text-primary-ink">
             {user.organizationName.slice(0, 2).toUpperCase()}
           </span>
           <span className="min-w-0">
@@ -91,12 +91,18 @@ export function AppShell({
                 href={entry.href}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2 text-[14px] transition-colors',
+                  'relative flex items-center gap-3 rounded-lg px-3 py-2 text-[14px] transition-colors',
                   active
                     ? 'bg-active font-medium text-active-ink'
                     : 'text-ink-2 hover:bg-line-soft hover:text-ink',
                 )}
               >
+                {active ? (
+                  <span
+                    aria-hidden
+                    className="absolute -left-3 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-r-full bg-accent"
+                  />
+                ) : null}
                 <Icon className="size-[18px] shrink-0" />
                 {entry.label}
               </Link>
