@@ -1,3 +1,4 @@
+import { AlertTriangle } from 'lucide-react';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { ShipmentTrackerView } from '@/components/shipment-tracker-view';
 import { ShipmentsView } from '@/components/shipments-view';
@@ -9,7 +10,16 @@ import { requireSession } from '@/lib/session';
 export default async function ShipmentsPage() {
   await requireSession();
 
-  const shipments = await getBostaShipments().catch(() => []);
+  // A failed fetch must not read as "zero shipments" — those look identical
+  // to a user with nothing to indicate anything went wrong. The error is
+  // captured and shown instead of silently defaulting to an empty list.
+  let shipments: Awaited<ReturnType<typeof getBostaShipments>> = [];
+  let loadError: string | null = null;
+  try {
+    shipments = await getBostaShipments();
+  } catch (e) {
+    loadError = e instanceof Error ? e.message : 'Could not reach Bosta.';
+  }
 
   const deliveredCount = shipments.filter((s) => s.status === 'DELIVERED').length;
   const inTransitCount = shipments.filter((s) => s.status !== 'DELIVERED' && !s.isDelayed).length;
@@ -30,6 +40,15 @@ export default async function ShipmentsPage() {
       />
 
       <PageBody>
+        {loadError && (
+          <div className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive-subtle px-4 py-3 text-sm text-destructive">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0" strokeWidth={2} />
+            <div>
+              <p className="font-medium">Could not load shipments from Bosta.</p>
+              <p className="mt-0.5 text-destructive/80">{loadError}</p>
+            </div>
+          </div>
+        )}
         <StatGrid>
           <StatCell>
             <Stat
