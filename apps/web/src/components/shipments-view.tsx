@@ -249,7 +249,7 @@ export function ShipmentsView({
                         className={cn(
                           'inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium whitespace-nowrap',
                           isDelivered
-                            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-300'
+                            ? 'border-success/30 bg-success-subtle text-success dark:border-success/30 dark:bg-success-subtle dark:text-success'
                             : s.isDelayed
                               ? 'border-warning/30 bg-warning-subtle text-warning'
                               : 'border-border bg-muted text-foreground',
@@ -263,7 +263,7 @@ export function ShipmentsView({
                     {/* Attempts */}
                     <td className="px-4 py-3 text-center font-mono text-xs tabular-nums text-muted-foreground">
                       <div className="inline-flex items-center gap-1 rounded border border-border bg-muted/40 px-1.5 py-0.5 text-[11px]">
-                        <span className="size-1.5 rounded-full bg-emerald-500" />
+                        <span className="size-1.5 rounded-full bg-success" />
                         <span>
                           {s.attempts.count}/{s.attempts.max}
                         </span>
@@ -276,8 +276,8 @@ export function ShipmentsView({
                         className={cn(
                           'inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold whitespace-nowrap border',
                           isUnpaid
-                            ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300'
-                            : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+                            ? 'border-destructive/30 bg-destructive-subtle text-destructive dark:border-destructive/30 dark:bg-destructive-subtle/40 dark:text-destructive'
+                            : 'border-success/30 bg-success-subtle text-success dark:text-success',
                         )}
                       >
                         {isUnpaid ? 'غير مدفوع' : 'مدفوع'}
@@ -337,7 +337,7 @@ export function ShipmentsView({
                   <h2 className="font-mono text-lg font-bold tracking-tight text-foreground">
                     توصيل #{selectedShipment.trackingNumber}
                   </h2>
-                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-success/30 bg-success-subtle px-2.5 py-0.5 text-xs font-semibold text-success dark:text-success">
                     <Check className="size-3 stroke-[2.5]" />
                     {selectedShipment.status === 'DELIVERED' ? 'تم بنجاح' : selectedShipment.statusLabel}
                   </span>
@@ -380,7 +380,7 @@ export function ShipmentsView({
 
             {/* Banner: Delivery Success */}
             {selectedShipment.status === 'DELIVERED' && (
-              <div className="mt-4 flex items-center gap-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-xs font-medium text-emerald-800 dark:text-emerald-300">
+              <div className="mt-4 flex items-center gap-2.5 rounded-xl border border-success/30 bg-success-subtle px-4 py-3 text-xs font-medium text-success dark:text-success">
                 <CheckCircle2 className="size-4 shrink-0" />
                 <span>
                   تم تسليم الأوردر لعميلك بنجاح
@@ -391,9 +391,9 @@ export function ShipmentsView({
 
             {/* WhatsApp Confirmation Banner */}
             {selectedShipment.whatsAppConfirmation?.isConfirmed && (
-              <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-xs text-emerald-800 dark:text-emerald-300">
+              <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-success/30 bg-success-subtle px-4 py-2.5 text-xs text-success dark:text-success">
                 <div className="flex items-center gap-2">
-                  <MessageSquare className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <MessageSquare className="size-4 shrink-0 text-success dark:text-success" />
                   <span>
                     تواصل مع العميل عبر الواتس آب: تم تأكيد التوصيل{' '}
                     {selectedShipment.whatsAppConfirmation.confirmedAt
@@ -401,7 +401,7 @@ export function ShipmentsView({
                       : ''}
                   </span>
                 </div>
-                <span className="font-semibold text-emerald-700 dark:text-emerald-300">مؤكد</span>
+                <span className="font-semibold text-success dark:text-success">مؤكد</span>
               </div>
             )}
 
@@ -502,14 +502,14 @@ export function ShipmentsView({
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">حالة المبلغ المحصل:</span>
-                    <span className="font-semibold text-rose-700 dark:text-rose-300">
+                    <span className="font-semibold text-destructive dark:text-destructive">
                       {selectedShipment.cod?.collectionStatusLabel || 'غير مدفوع'}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">تطبيق فليكس شيب:</span>
                     <span className="font-medium text-foreground">
-                      {selectedShipment.flexShipFee ? money(selectedShipment.flexShipFee) : '80.00 EGP'}
+                      {selectedShipment.flexShipFee ? money(selectedShipment.flexShipFee) : '—'}
                     </span>
                   </div>
                   <div className="flex justify-between">
