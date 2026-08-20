@@ -35,14 +35,20 @@ export class CatalogController {
   @Get('products')
   listProducts(
     @Query('search') search?: string,
+    @Query('channel') channel?: string,
+    @Query('category') category?: string,
+    @Query('stock') stock?: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
   ) {
-    return this.catalog.listProducts(
-      search?.trim() || undefined,
-      limit ? Number(limit) : undefined,
-      offset ? Number(offset) : undefined,
-    );
+    return this.catalog.listProducts({
+      search: search?.trim() || undefined,
+      channel: channel?.trim() || undefined,
+      category: category?.trim() || undefined,
+      stock: stock?.trim() || undefined,
+      limit: limit ? Number(limit) : undefined,
+      offset: offset ? Number(offset) : undefined,
+    });
   }
 
   @Roles('ADMIN')

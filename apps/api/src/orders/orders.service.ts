@@ -94,6 +94,7 @@ export class OrdersService implements OnModuleInit {
               o.customer_name AS "customerName", o.customer_phone AS "customerPhone",
               o.governorate, o.total, o.placed_at AS "placedAt",
               o.assigned_to_id AS "assignedToId", u.name AS "assignedToName",
+              o.tracking_number AS "trackingNumber",
               (SELECT count(*)::int FROM order_item i WHERE i.order_id = o.id) AS "itemCount",
               (SELECT count(*)::int FROM order_item i WHERE i.order_id = o.id AND i.variant_id IS NULL) AS "unmappedCount",
               count(*) OVER()::int AS "totalCount"

@@ -13,6 +13,7 @@ export interface CreateProductInput {
   unitCost?: string;
   sellingPrice?: string;
   openingStock?: number;
+  channels?: string[];
 }
 
 const MONEY = /^\d+(\.\d{1,2})?$/;
@@ -29,31 +30,90 @@ export class CatalogService {
    * Stock is aggregated in the same query rather than per row, so the list
    * stays one round trip however many products exist.
    */
-  async listProducts(search?: string, limit = 100, offset = 0) {
+  async listProducts(
+    options?: {
+      search?: string;
+      channel?: string;
+      category?: string;
+      stock?: string;
+      limit?: number;
+      offset?: number;
+    },
+  ) {
+    const search = options?.search;
+    const channel = options?.channel;
+    const category = options?.category;
+    const stock = options?.stock;
+    const limit = options?.limit ?? 100;
+    const offset = options?.offset ?? 0;
+
     const params: unknown[] = [];
     const bind = (v: unknown) => {
       params.push(v);
       return `$${params.length}`;
     };
-    const where = search ? `WHERE p.name ILIKE ${bind(`%${search}%`)}` : '';
+
+    const whereClauses: string[] = [];
+    if (search) {
+      whereClauses.push(`p.name ILIKE ${bind(`%${search}%`)}`);
+    }
+    if (category) {
+      if (category.toLowerCase() === 'uncategorised') {
+        whereClauses.push(`p.category IS NULL`);
+      } else {
+        whereClauses.push(`p.category = ${bind(category)}`);
+      }
+    }
+    if (channel) {
+      if (channel.toLowerCase() === 'unlisted') {
+        whereClauses.push(
+          `p.id NOT IN (SELECT v2.product_id FROM channel_listing l2 JOIN product_variant v2 ON v2.id = l2.variant_id)`,
+        );
+      } else {
+        whereClauses.push(
+          `p.id IN (SELECT v2.product_id FROM channel_listing l2 JOIN product_variant v2 ON v2.id = l2.variant_id WHERE l2.channel = ${bind(channel)})`,
+        );
+      }
+    }
+    // Stock filters compare against the aggregate computed in the lateral
+    // subquery, so they must be collected before the WHERE clause is built.
+    const stockFilters: Record<string, string> = {
+      in_stock: 'stock.on_hand > 0',
+      low_stock: 'stock.on_hand > 0 AND stock.on_hand <= 5',
+      out_of_stock: 'stock.on_hand <= 0',
+    };
+    if (stock && stockFilters[stock]) whereClauses.push(stockFilters[stock]);
+
+    const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
     return this.db.query(
       `SELECT p.id, p.name, p.category, p.discovered, p.active,
-              count(DISTINCT v.id)::int                         AS "variantCount",
-              COALESCE(SUM(m.quantity), 0)::int                 AS "onHand",
-              MIN(v.unit_cost)                                  AS "unitCost",
-              MIN(v.selling_price)                              AS "sellingPrice",
-              COALESCE(
-                array_agg(DISTINCT l.channel) FILTER (WHERE l.channel IS NOT NULL),
-                '{}'
-              )                                                 AS channels,
+              stock.variant_count                               AS "variantCount",
+              stock.on_hand                                     AS "onHand",
+              stock.unit_cost                                   AS "unitCost",
+              stock.selling_price                               AS "sellingPrice",
+              COALESCE(ch.channels, '{}')                       AS channels,
               count(*) OVER()::int                              AS "totalCount"
        FROM product p
-       LEFT JOIN product_variant v ON v.product_id = p.id
-       LEFT JOIN stock_movement  m ON m.variant_id = v.id
-       LEFT JOIN channel_listing l ON l.variant_id = v.id
-       ${where}
-       GROUP BY p.id
+       -- Aggregated separately on purpose. Joining stock_movement and
+       -- channel_listing in one statement multiplies every movement by the
+       -- number of listings, which silently inflates stock and stock value.
+       LEFT JOIN LATERAL (
+         SELECT count(DISTINCT v.id)::int          AS variant_count,
+                COALESCE(SUM(m.quantity), 0)::int  AS on_hand,
+                MIN(v.unit_cost)                   AS unit_cost,
+                MIN(v.selling_price)               AS selling_price
+         FROM product_variant v
+         LEFT JOIN stock_movement m ON m.variant_id = v.id
+         WHERE v.product_id = p.id
+       ) stock ON TRUE
+       LEFT JOIN LATERAL (
+         SELECT array_agg(DISTINCT l.channel) AS channels
+         FROM channel_listing l
+         JOIN product_variant v ON v.id = l.variant_id
+         WHERE v.product_id = p.id
+       ) ch ON TRUE
+       ${whereSql}
        ORDER BY p.name
        LIMIT ${Math.min(Math.max(limit, 1), 200)} OFFSET ${Math.max(offset, 0)}`,
       params,
@@ -138,6 +198,24 @@ export class CatalogService {
           input.unitCost || null,
         );
       }
+
+      if (input.channels && Array.isArray(input.channels) && input.channels.length > 0) {
+        const allowed = ['noon', 'amazon', 'easyorders', 'social'];
+        for (const ch of input.channels) {
+          if (allowed.includes(ch)) {
+            await tx.save(ChannelListing, {
+              channel: ch as any,
+              externalId: input.sku?.trim() ? `${ch}_${input.sku.trim()}` : `${ch}_${variant.id}`,
+              externalVariantId: '',
+              partnerSku: input.sku?.trim() || null,
+              title: input.name.trim(),
+              price: input.sellingPrice || null,
+              variantId: variant.id,
+            });
+          }
+        }
+      }
+
       return { ...product, variantId: variant.id };
     });
   }

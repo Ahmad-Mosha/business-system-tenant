@@ -3,7 +3,7 @@
 import { Check, Loader2 } from 'lucide-react';
 import { useActionState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { setOpeningBalance, type AnchorState } from '@/app/months/actions';
+import { setOpeningBalance, type AnchorState } from '@/app/(app)/months/actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
