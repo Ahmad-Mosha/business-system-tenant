@@ -1,4 +1,5 @@
 import { PageBody, PageHeader } from '@/components/page-header';
+import { ShipmentTrackerView } from '@/components/shipment-tracker-view';
 import { ShipmentsView } from '@/components/shipments-view';
 import { Stat, StatCell, StatGrid } from '@/components/stat';
 import { getBostaShipments } from '@/lib/api';
@@ -56,9 +57,15 @@ export default async function ShipmentsPage() {
           </StatCell>
         </StatGrid>
 
-        {/* Live Shipments View */}
         <section>
           <ShipmentsView initialShipments={shipments} />
+        </section>
+
+        {/* Bosta has no "list my deliveries" endpoint — it only answers about a
+            tracking number you already know. This is how a shipment that is not
+            yet recorded against an order can still be looked up. */}
+        <section>
+          <ShipmentTrackerView />
         </section>
       </PageBody>
     </>
