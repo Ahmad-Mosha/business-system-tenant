@@ -7,9 +7,10 @@ turning noon settlement exports into per-product answers.
 
 ```bash
 npm install
-npm run db:up          # postgres via docker
+npm run db:up          # postgres 17 via docker
 cp .env.example .env
-npm run dev            # api on :3001
+npm run dev:api        # api on :3001
+npm run dev:web        # ui  on :3000
 ```
 
 Without Docker, point `DATABASE_URL` at any Postgres 14+ and create the database.
@@ -44,6 +45,20 @@ hash. An *overlapping* export is deduplicated row by row against a SHA-256
 fingerprint of the raw line, so re-uploading a wider date range inserts only
 what is genuinely new.
 
+## Interface
+
+Three screens: **Overview** (statement, fee breakdown, best performers),
+**Products** (per-product performance), **Imports** (upload and history).
+
+Monochrome by design — colour carries meaning or is absent. Semantic tokens
+(`--success`, `--warning`, `--destructive`) live in `globals.css`; nothing
+hard-codes a hex. The UI stays legible with all of them collapsed to grey.
+
+Pages are server components that fetch and render on the server. The only
+client code is the sidebar (needs the current path) and the import form (needs
+upload state). Uploads go through a server action, so the API origin stays
+private and the browser never needs CORS.
+
 ## Layout
 
 ```
@@ -52,6 +67,10 @@ apps/api/src/
   noon/        settlement export: parser, import, endpoints
   reporting/   read models (SQL aggregates, nothing cached)
   database/    naming strategy
+apps/web/src/
+  app/         routes (server components)
+  components/  sidebar, page chrome, import form
+  lib/         api client, formatting
 docs/evidence/ what the source reports actually contain
 ```
 
@@ -66,3 +85,6 @@ happens in Postgres so nothing is routed through a float.
   The gap is in noon's own CSV, not in this code — see `docs/evidence/`.
 - Schema is `synchronize: true`. Needs migrations before real data lands.
 - No auth yet. Do not expose this.
+- Three products appear twice under different Partner SKUs (one uses an older
+  `CCC-0014` convention). They may be duplicate listings or genuine variants —
+  merging them is a business decision, and there is no merge action yet.
