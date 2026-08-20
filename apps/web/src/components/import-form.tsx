@@ -4,7 +4,7 @@ import { CheckCircle2, FileText, Info, Loader2, Upload, X } from 'lucide-react';
 import { useActionState, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { uploadReport, type UploadState } from '@/app/imports/actions';
+import { uploadReport, type UploadState } from '@/app/(app)/imports/actions';
 import { cn } from '@/lib/utils';
 
 const INITIAL: UploadState = { status: 'idle' };

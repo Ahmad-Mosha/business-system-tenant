@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { createHash } from 'node:crypto';
 import { DataSource, EntityManager } from 'typeorm';
@@ -15,6 +15,7 @@ import { EasyOrdersEvent } from './easyorders-event.entity';
  */
 interface EasyOrdersOrder {
   id: string;
+  store_id?: string;
   created_at?: string;
   cost?: number;
   shipping_cost?: number;
@@ -100,6 +101,15 @@ export class EasyOrdersService {
 
   private async createOrder(payload: EasyOrdersOrder): Promise<IngestResult> {
     if (!payload?.id) throw new Error('payload has no order id');
+
+    // The secret is shared per webhook; this also rejects a payload that
+    // belongs to a different store, so one leaked secret cannot inject orders.
+    const expectedStore = process.env.EASYORDERS_STORE_ID;
+    if (expectedStore && payload.store_id && payload.store_id !== expectedStore) {
+      throw new BadRequestException(
+        `payload belongs to store ${payload.store_id}, not ours`,
+      );
+    }
 
     return this.db.transaction(async (tx) => {
       const existing = await tx.findOne(Order, {

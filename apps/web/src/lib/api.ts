@@ -1,3 +1,5 @@
+import { authHeaders } from './session';
+
 const API = process.env.API_URL ?? 'http://localhost:3001';
 
 export interface Statement {
@@ -77,7 +79,10 @@ export interface ImportRecord {
  * import and a stale figure here is worse than a round trip.
  */
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${API}${path}`, { cache: 'no-store' });
+  const res = await fetch(`${API}${path}`, {
+    cache: 'no-store',
+    headers: await authHeaders(),
+  });
   if (!res.ok) throw new Error(`${path} failed: ${res.status} ${await res.text()}`);
   return res.json() as Promise<T>;
 }
@@ -110,3 +115,206 @@ export async function getDataRange(): Promise<{ from: string; to: string } | nul
   if (!starts.length || !ends.length) return null;
   return { from: starts.sort()[0], to: ends.sort()[ends.length - 1] };
 }
+
+export type OrderStatus =
+  | 'NEW' | 'ASSIGNED' | 'CONFIRMED' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED' | 'RETURNED';
+export type PaymentStatus = 'UNPAID' | 'PAID' | 'REFUNDED';
+
+export interface OrderRow {
+  id: string;
+  orderNumber: string;
+  source: 'EASYORDERS' | 'SOCIAL';
+  status: OrderStatus;
+  paymentStatus: PaymentStatus;
+  paymentMethod: string;
+  customerName: string;
+  customerPhone: string;
+  governorate: string | null;
+  total: string;
+  placedAt: string;
+  assignedToId: string | null;
+  assignedToName: string | null;
+  trackingNumber: string | null;
+  itemCount: number;
+  unmappedCount: number;
+}
+
+export interface OrderDetail extends Omit<OrderRow, 'assignedToName' | 'itemCount' | 'unmappedCount'> {
+  address: string | null;
+  notes: string | null;
+  subtotal: string;
+  shippingCost: string;
+  externalId: string;
+  externalStatus: string | null;
+  assignedTo: { id: string; name: string } | null;
+  items: Array<{
+    id: string;
+    title: string;
+    quantity: number;
+    unitPrice: string;
+    lineTotal: string;
+    variantId: string | null;
+    externalProductId: string | null;
+  }>;
+  events: Array<{
+    id: string;
+    type: string;
+    fromValue: string | null;
+    toValue: string | null;
+    note: string | null;
+    actorName: string | null;
+    createdAt: string;
+  }>;
+}
+
+export interface DeliveryTimelineStep {
+  code: number;
+  key: string;
+  label: string;
+  isDone: boolean;
+  date: string | null;
+  description?: string | null;
+}
+
+export interface DeliveryAttempt {
+  date: string | null;
+  state?: number;
+  driverName?: string | null;
+  driverPhone?: string | null;
+  hubName?: string | null;
+  succeeded?: boolean;
+}
+
+export interface ShipmentTracking {
+  trackingNumber: string;
+  carrier: 'BOSTA';
+  status: string;
+  statusLabel: string;
+  statusCode?: number;
+  isDelayed: boolean;
+  receiver: {
+    name: string;
+    phone: string;
+    secondPhone?: string | null;
+  };
+  destination: {
+    city?: string | null;
+    zone?: string | null;
+    district?: string | null;
+    address?: string | null;
+  };
+  cod: {
+    amount: number;
+    currency: string;
+    isCollected?: boolean;
+    collectionStatus?: 'UNPAID' | 'PAID' | 'PENDING';
+    collectionStatusLabel?: string;
+    paymentMethodLabel?: string;
+  };
+  timeline: DeliveryTimelineStep[];
+  attempts: {
+    count: number;
+    max: number;
+    list: DeliveryAttempt[];
+  };
+  packageSpecs: {
+    type?: string | null;
+    typeAr?: string | null;
+    description?: string | null;
+    weight?: number | null;
+  };
+  allowOpenPackage: boolean;
+  notes?: string | null;
+  whatsAppConfirmation?: {
+    isConfirmed: boolean;
+    confirmedAt?: string | null;
+  } | null;
+  flexShipFee?: number | null;
+  flexShipStatusLabel?: string | null;
+  scheduledDeliveryDate?: string | null;
+  deliveredAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface OrderSummary {
+  total: number;
+  unassigned: number;
+  needsWork: number;
+  deliveredUnpaid: number;
+}
+
+export interface Assignee {
+  id: string;
+  name: string;
+  email: string;
+  role: 'ADMIN' | 'MODERATOR';
+}
+
+export interface ProductRow {
+  id: string;
+  name: string;
+  category: string | null;
+  discovered: boolean;
+  active: boolean;
+  variantCount: number;
+  onHand: number;
+  unitCost: string | null;
+  sellingPrice: string | null;
+  channels: string[];
+}
+
+export interface ProductDetail {
+  id: string;
+  name: string;
+  category: string | null;
+  discovered: boolean;
+  variants: Array<{
+    id: string;
+    name: string;
+    sku: string | null;
+    attributes: Record<string, string>;
+    unitCost: string | null;
+    sellingPrice: string | null;
+    active: boolean;
+    onHand: number;
+  }>;
+  listings: Array<{
+    id: string;
+    channel: string;
+    externalId: string;
+    externalVariantId: string;
+    partnerSku: string | null;
+    title: string | null;
+    price: string | null;
+    variantId: string;
+  }>;
+}
+
+export const getOrders = (query = '') =>
+  get<{ orders: OrderRow[]; total: number; limit: number; offset: number }>(
+    `/orders${query ? `?${query}` : ''}`,
+  );
+
+export const getOrder = (id: string) => get<OrderDetail>(`/orders/${id}`);
+export const getOrderSummary = () => get<OrderSummary>('/orders/summary');
+export const getAssignees = () => get<Assignee[]>('/auth/users');
+export const getProductsCatalog = (query?: string) =>
+  get<ProductRow[]>(`/catalog/products${query ? (query.startsWith('?') ? query : `?${query}`) : ''}`);
+export const getProductDetail = (id: string) => get<ProductDetail>(`/catalog/products/${id}`);
+export const getStockHistory = (variantId: string) =>
+  get<Array<{ id: string; quantity: number; reason: string; note: string | null; occurredAt: string; runningTotal: number }>>(
+    `/catalog/variants/${variantId}/stock`,
+  );
+
+export const getBostaShipments = () =>
+  get<ShipmentTracking[]>('/bosta/shipments');
+
+export const trackBostaShipment = (trackingNumber: string) =>
+  get<ShipmentTracking>(`/bosta/track/${encodeURIComponent(trackingNumber)}`);
+
+export const getOrderShipment = (orderId: string) =>
+  get<ShipmentTracking | null>(`/bosta/orders/${orderId}`);
+
+
+

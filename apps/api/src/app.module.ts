@@ -16,6 +16,9 @@ import { SnakeNamingStrategy } from './database/snake-naming.strategy';
 import { EasyOrdersController } from './integrations/easyorders/easyorders.controller';
 import { EasyOrdersEvent } from './integrations/easyorders/easyorders-event.entity';
 import { EasyOrdersService } from './integrations/easyorders/easyorders.service';
+import { BostaClient } from './integrations/bosta/bosta.client';
+import { BostaController } from './integrations/bosta/bosta.controller';
+import { BostaService } from './integrations/bosta/bosta.service';
 import { StockMovement } from './inventory/stock-movement.entity';
 import { ChannelAccount } from './noon/channel-account.entity';
 import { NoonImport } from './noon/noon-import.entity';
@@ -71,6 +74,7 @@ const ENTITIES = [
     OrdersController,
     CatalogController,
     EasyOrdersController,
+    BostaController,
   ],
   providers: [
     // Every endpoint requires a session unless it opts out with @Public(),
@@ -82,6 +86,8 @@ const ENTITIES = [
     OrdersService,
     CatalogService,
     EasyOrdersService,
+    BostaClient,
+    BostaService,
   ],
 })
 export class AppModule implements OnModuleInit {

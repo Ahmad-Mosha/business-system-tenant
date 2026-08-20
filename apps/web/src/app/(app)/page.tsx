@@ -1,11 +1,18 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { NoDataYet } from '@/components/empty-state';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { StatementView } from '@/components/statement-view';
 import { getDataRange, getPeriods } from '@/lib/api';
 import { date, money, monthLabel } from '@/lib/format';
+import { requireSession } from '@/lib/session';
 
 export default async function OverviewPage() {
+  const user = await requireSession();
+  if (user.role === 'MODERATOR') {
+    redirect('/orders');
+  }
+
   const range = await getDataRange();
   if (!range) {
     return (

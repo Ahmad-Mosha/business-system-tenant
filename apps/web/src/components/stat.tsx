@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { Children, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 /**
@@ -41,8 +41,19 @@ export function Stat({
  * showing through 1px gaps, so cells stay perfectly aligned at any count.
  */
 export function StatGrid({ children }: { children: ReactNode }) {
+  // Column count follows the number of cells, so a page with three stats does
+  // not render a fourth empty one.
+  const count = Children.toArray(children).filter(Boolean).length;
+  const columns =
+    count % 4 === 0 ? 'lg:grid-cols-4' : count % 3 === 0 ? 'lg:grid-cols-3' : 'lg:grid-cols-2';
+
   return (
-    <div className="grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
+    <div
+      className={cn(
+        'grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-2',
+        columns,
+      )}
+    >
       {children}
     </div>
   );

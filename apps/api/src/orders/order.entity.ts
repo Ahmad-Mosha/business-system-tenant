@@ -130,6 +130,11 @@ export class Order {
   @Column({ type: 'text', nullable: true })
   notes: string | null;
 
+  /** External courier tracking number, e.g. Bosta AWB. */
+  @Index('ix_order_tracking_number')
+  @Column({ type: 'text', nullable: true })
+  trackingNumber: string | null;
+
   @OneToMany(() => OrderItem, (i) => i.order, { cascade: ['insert'] })
   items: OrderItem[];
 
