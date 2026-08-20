@@ -60,7 +60,7 @@ is a business decision (same item, or genuine variants?) and needs a merge actio
 
 ## 4. Order lifecycle  **[Recommendation, implemented]**
 
-**Two independent状态 fields, not one, and not four.**
+**Two independent state fields, not one, and not four.**
 
 `status` — the operational lifecycle the team drives:
 
