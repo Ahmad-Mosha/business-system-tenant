@@ -1,6 +1,6 @@
 'use client';
 
-import { LayoutGrid, Menu, Package, Upload, X } from 'lucide-react';
+import { CalendarRange, LayoutGrid, Menu, Package, Upload, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -15,6 +15,7 @@ const NAVIGATION = [
     label: 'Analysis',
     items: [
       { href: '/', label: 'Overview', icon: LayoutGrid },
+      { href: '/months', label: 'Months', icon: CalendarRange },
       { href: '/products', label: 'Products', icon: Package },
     ],
   },
@@ -77,7 +78,8 @@ export function AppSidebar() {
               </p>
               <ul className="flex flex-col gap-0.5">
                 {group.items.map(({ href, label, icon: Icon }) => {
-                  const active = pathname === href;
+                  const active =
+                    href === '/' ? pathname === '/' : pathname.startsWith(href);
                   return (
                     <li key={href}>
                       <Link

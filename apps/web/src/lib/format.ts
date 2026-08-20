@@ -37,3 +37,12 @@ export function dateTime(v: string): string {
 
 export const isNegative = (v: string | number | null | undefined) =>
   v !== null && v !== undefined && v !== '' && Number(v) < 0;
+
+/** `2026-07` -> `July 2026`. */
+export function monthLabel(month: string): string {
+  return new Date(`${month}-01T00:00:00Z`).toLocaleDateString('en-GB', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}

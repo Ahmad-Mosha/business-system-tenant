@@ -1,7 +1,9 @@
 import {
   BadRequestException,
+  Body,
   Controller,
   Get,
+  Patch,
   Post,
   Query,
   UploadedFile,
@@ -11,6 +13,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { NoonReportingService } from '../reporting/noon-reporting.service';
+import { ChannelAccount } from './channel-account.entity';
 import { NoonImport } from './noon-import.entity';
 import { NoonImportService } from './noon-import.service';
 import { NoonReportFormatError } from './noon-report.parser';
@@ -48,11 +51,41 @@ export class NoonController {
     return this.db.getRepository(NoonImport).find({ order: { createdAt: 'DESC' }, take: 50 });
   }
 
+  @Get('periods')
+  periods() {
+    return this.reporting.periods();
+  }
+
+  @Get('account')
+  async account() {
+    const repo = this.db.getRepository(ChannelAccount);
+    return (await repo.findOneBy({ channel: 'noon' })) ?? {
+      channel: 'noon',
+      openingBalance: '0',
+      openingAsOf: null,
+    };
+  }
+
+  /** Sets the anchor the running balance is measured from. */
+  @Patch('account')
+  async setAccount(@Body() body: { openingBalance?: string; openingAsOf?: string }) {
+    if (body.openingBalance !== undefined && !/^-?\d+(\.\d{1,2})?$/.test(body.openingBalance)) {
+      throw new BadRequestException('openingBalance must be a number');
+    }
+    if (body.openingAsOf !== undefined && !ISO_DATE.test(body.openingAsOf)) {
+      throw new BadRequestException('openingAsOf must be YYYY-MM-DD');
+    }
+    const repo = this.db.getRepository(ChannelAccount);
+    const current = (await repo.findOneBy({ channel: 'noon' })) ?? repo.create({ channel: 'noon' });
+    Object.assign(current, body);
+    return repo.save(current);
+  }
+
   @Get('statement')
   statement(
     @Query('from') from: string,
     @Query('to') to: string,
-    @Query('openingBalance') openingBalance = '0',
+    @Query('openingBalance') openingBalance?: string,
   ) {
     return this.reporting.statement(...this.range(from, to), openingBalance);
   }

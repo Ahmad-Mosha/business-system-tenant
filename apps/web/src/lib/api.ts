@@ -3,7 +3,7 @@ const API = process.env.API_URL ?? 'http://localhost:3001';
 export interface Statement {
   from: string;
   to: string;
-  openingBalance: string;
+  openingBalance: string | null;
   netProceeds: string;
   referralFee: string;
   fulfilmentFee: string;
@@ -16,7 +16,7 @@ export interface Statement {
   payouts: string;
   movement: string;
   rows: number;
-  closingBalance: string;
+  closingBalance: string | null;
 }
 
 export interface ProductPerformance {
@@ -32,6 +32,26 @@ export interface ProductPerformance {
   otherFees: string;
   net: string;
   grossProfit: string | null;
+}
+
+export interface Period {
+  month: string;
+  from: string;
+  to: string;
+  rows: number;
+  netProceeds: string;
+  fees: string;
+  payouts: string;
+  movement: string;
+  unitsSold: number;
+  openingBalance: string | null;
+  closingBalance: string | null;
+}
+
+export interface ChannelAccount {
+  channel: string;
+  openingBalance: string;
+  openingAsOf: string | null;
 }
 
 export interface Unattributed {
@@ -66,8 +86,12 @@ const range = (from: string, to: string) => `from=${from}&to=${to}`;
 
 export const getImports = () => get<ImportRecord[]>('/noon/imports');
 
-export const getStatement = (from: string, to: string, openingBalance = '0') =>
-  get<Statement>(`/noon/statement?${range(from, to)}&openingBalance=${openingBalance}`);
+export const getStatement = (from: string, to: string) =>
+  get<Statement>(`/noon/statement?${range(from, to)}`);
+
+export const getPeriods = () => get<Period[]>('/noon/periods');
+
+export const getAccount = () => get<ChannelAccount>('/noon/account');
 
 export const getProducts = (from: string, to: string) =>
   get<ProductPerformance[]>(`/noon/products?${range(from, to)}`);
