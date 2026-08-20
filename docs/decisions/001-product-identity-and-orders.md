@@ -120,7 +120,30 @@ URL. Until then the endpoint is reachable but will receive nothing.
 **[Open]** Status values beyond `pending` and `paid` are undocumented; mapping is
 conservative and unknown values are preserved verbatim rather than guessed.
 
-## 8. Bosta  **[Blocked]**
+## 8. Bosta  **[Resolved — live]**
 
-No credentials — account tied to the owner's phone. Nothing built, nothing faked.
-`Shipment` will be its own entity keyed to an order when the real API is available.
+Credentials arrived and the integration is live against `api.bosta.co/api/v1`.
+An order carries a `trackingNumber`; shipment detail is read from Bosta on demand
+rather than stored, with a 60s cache and an 8s timeout.
+
+**"FlexShip" is Bosta, not a second courier.** The earlier screenshot showing
+`رسوم فليكس شيب` came from Bosta's own `flexShippingInfo` block. That open
+question is closed — there is one courier.
+
+Verified against a real AWB: Bosta returns COD 4,500 EGP marked `غير مدفوع`
+against a *delivered* shipment — the exact case that justified separating
+`status` from `paymentStatus` in §4.
+
+**[Open]** Bosta reports a shipment delivered while our order may still sit at
+`CONFIRMED`. Whether courier state should advance our order status automatically
+is a business rule, not a technical one, and is deliberately not implemented.
+
+## 9. Easy Orders webhook  **[Blocked on configuration]**
+
+The receiver is live and verified with the real secret from the seller dashboard,
+including store-id validation and replay protection.
+
+**The registered webhook's URL is literally `*`**, so Easy Orders has nowhere to
+deliver. It needs a public HTTPS URL pointing at
+`POST /integrations/easyorders/webhook`. Only the `orders` type is registered;
+`Order Status Update` needs a second webhook to keep payment state in sync.

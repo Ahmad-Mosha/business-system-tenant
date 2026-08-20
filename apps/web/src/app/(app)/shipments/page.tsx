@@ -1,20 +1,25 @@
 import { PageBody, PageHeader } from '@/components/page-header';
 import { ShipmentsView } from '@/components/shipments-view';
 import { Stat, StatCell, StatGrid } from '@/components/stat';
-import { getBostaShipments, getOrderSummary } from '@/lib/api';
+import { getBostaShipments } from '@/lib/api';
+import { money } from '@/lib/format';
 import { requireSession } from '@/lib/session';
 
 export default async function ShipmentsPage() {
   await requireSession();
 
-  const [shipments, summary] = await Promise.all([
-    getBostaShipments().catch(() => []),
-    getOrderSummary().catch(() => ({ total: 0, unassigned: 0, needsWork: 0, deliveredUnpaid: 0 })),
-  ]);
+  const shipments = await getBostaShipments().catch(() => []);
 
   const deliveredCount = shipments.filter((s) => s.status === 'DELIVERED').length;
   const inTransitCount = shipments.filter((s) => s.status !== 'DELIVERED' && !s.isDelayed).length;
-  const delayedCount = shipments.filter((s) => s.isDelayed).length;
+
+  // What the courier is holding: delivered to the customer, cash not yet
+  // remitted to us. Read from Bosta, not from our order status — the courier
+  // is the authority on whether the money has been collected.
+  const uncollected = shipments.filter(
+    (s) => s.status === 'DELIVERED' && s.cod?.collectionStatus !== 'PAID',
+  );
+  const uncollectedValue = uncollected.reduce((n, s) => n + (s.cod?.amount ?? 0), 0);
 
   return (
     <>
@@ -44,9 +49,9 @@ export default async function ShipmentsPage() {
           </StatCell>
           <StatCell>
             <Stat
-              label="Delivered unpaid"
-              value={String(summary.deliveredUnpaid)}
-              hint="cash not yet collected"
+              label="COD to collect"
+              value={money(uncollectedValue)}
+              hint={`${uncollected.length} delivered, cash not remitted`}
             />
           </StatCell>
         </StatGrid>
