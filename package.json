@@ -5,9 +5,10 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "npm run start:dev -w @prime/api",
+    "dev:api": "npm run start:dev -w @prime/api",
+    "dev:web": "npm run dev -w @prime/web",
     "db:up": "docker compose up -d",
     "test": "npm run test -w @prime/api",
-    "typecheck": "npm run typecheck -w @prime/api"
+    "typecheck": "npm run typecheck -w @prime/api && npm run typecheck -w @prime/web"
   }
 }
