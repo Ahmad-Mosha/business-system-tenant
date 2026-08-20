@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ChannelListing } from './catalog/channel-listing.entity';
 import { Product } from './catalog/product.entity';
+import { ChannelAccount } from './noon/channel-account.entity';
 import { NoonImport } from './noon/noon-import.entity';
 import { NoonImportService } from './noon/noon-import.service';
 import { NoonTransaction } from './noon/noon-transaction.entity';
@@ -10,7 +11,7 @@ import { NoonController } from './noon/noon.controller';
 import { SnakeNamingStrategy } from './database/snake-naming.strategy';
 import { NoonReportingService } from './reporting/noon-reporting.service';
 
-const ENTITIES = [Product, ChannelListing, NoonImport, NoonTransaction];
+const ENTITIES = [Product, ChannelListing, NoonImport, NoonTransaction, ChannelAccount];
 
 @Module({
   imports: [
