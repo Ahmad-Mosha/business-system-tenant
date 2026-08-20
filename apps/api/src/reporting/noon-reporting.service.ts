@@ -128,7 +128,7 @@ export class NoonReportingService {
          p.id                                                       AS "productId",
          p.name,
          p.discovered,
-         p.unit_cost                                                AS "unitCost",
+         MIN(v.unit_cost)                                           AS "unitCost",
          COUNT(*) FILTER (
            WHERE t.transaction_type = 'order' AND t.item_nr IS NOT NULL
          )::int                                                     AS "unitsSold",
@@ -142,15 +142,16 @@ export class NoonReportingService {
                     + t.order_subsidies), 0)                        AS "otherFees",
          COALESCE(SUM(t.total), 0)                                  AS "net",
          -- Null until a cost basis is entered; no marketplace report has one.
-         CASE WHEN p.unit_cost IS NULL THEN NULL ELSE
-           COALESCE(SUM(t.total), 0) - p.unit_cost * COUNT(*) FILTER (
+         CASE WHEN MIN(v.unit_cost) IS NULL THEN NULL ELSE
+           COALESCE(SUM(t.total), 0) - MIN(v.unit_cost) * COUNT(*) FILTER (
              WHERE t.transaction_type = 'order' AND t.item_nr IS NOT NULL)
          END                                                        AS "grossProfit"
        FROM noon_transaction t
        JOIN channel_listing l ON l.id = t.listing_id
-       JOIN product p         ON p.id = l.product_id
+       JOIN product_variant v ON v.id = l.variant_id
+       JOIN product p         ON p.id = v.product_id
        WHERE t.transaction_date BETWEEN $1 AND $2
-       GROUP BY p.id, p.name, p.discovered, p.unit_cost
+       GROUP BY p.id, p.name, p.discovered
        ORDER BY COALESCE(SUM(t.total), 0) DESC`,
       [from, to],
     );

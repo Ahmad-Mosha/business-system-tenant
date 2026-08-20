@@ -1,5 +1,5 @@
 import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, Unique } from 'typeorm';
-import { Product } from './product.entity';
+import { ProductVariant } from './product-variant.entity';
 
 export type Channel = 'noon' | 'amazon' | 'easyorders' | 'social';
 
@@ -9,8 +9,8 @@ export type Channel = 'noon' | 'amazon' | 'easyorders' | 'social';
  * Product, so three sales decrement one pool of stock.
  */
 @Entity('channel_listing')
-// A channel's own SKU is unique within that channel.
-@Unique('uq_listing_channel_sku', ['channel', 'externalSku'])
+// One listing per (channel, product, variant) the channel knows about.
+@Unique('uq_listing_channel_external', ['channel', 'externalId', 'externalVariantId'])
 export class ChannelListing {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -18,9 +18,24 @@ export class ChannelListing {
   @Column({ type: 'text' })
   channel: Channel;
 
-  /** The channel's identifier, e.g. noon's `Z877AF02C8ECC0E81C2EAZ-1`. */
+  /**
+   * The channel's own product identifier, whatever shape it takes: a noon SKU
+   * (`Z877A…Z-1`) or an Easy Orders UUID. Opaque on purpose — Easy Orders has
+   * no SKU field at all, so no single external scheme can be assumed.
+   */
   @Column({ type: 'text' })
-  externalSku: string;
+  externalId: string;
+
+  /**
+   * The channel's variant identifier where it has one (Easy Orders sends
+   * `variant_id`). Empty string rather than null so the unique key works.
+   */
+  @Column({ type: 'text', default: '' })
+  externalVariantId: string;
+
+  /** Last price the channel showed. Reconciliation only, never truth. */
+  @Column({ type: 'numeric', precision: 14, scale: 2, nullable: true })
+  price: string | null;
 
   /**
    * Our own SKU as registered with the channel, e.g. noon's `Partner SKUs`
@@ -34,13 +49,14 @@ export class ChannelListing {
   @Column({ type: 'text', nullable: true })
   title: string | null;
 
-  @ManyToOne(() => Product, (p) => p.listings, { nullable: false, onDelete: 'RESTRICT' })
-  @JoinColumn({ name: 'product_id' })
-  product: Product;
+  /** Resolves to a variant, so three channels selling it share one stock pool. */
+  @ManyToOne(() => ProductVariant, { nullable: false, onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'variant_id' })
+  variant: ProductVariant;
 
-  @Index('ix_listing_product')
-  @Column({ name: 'product_id', type: 'uuid' })
-  productId: string;
+  @Index('ix_listing_variant')
+  @Column({ name: 'variant_id', type: 'uuid' })
+  variantId: string;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;

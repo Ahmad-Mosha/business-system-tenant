@@ -12,6 +12,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { Roles } from '../auth/auth.guard';
 import { NoonReportingService } from '../reporting/noon-reporting.service';
 import { ChannelAccount } from './channel-account.entity';
 import { NoonImport } from './noon-import.entity';
@@ -23,6 +24,8 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 /** 20 MB — the July export is ~250 KB, so this is generous headroom. */
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 
+/** Settlement and revenue data is admin-only; moderators have no reason to see it. */
+@Roles('ADMIN')
 @Controller('noon')
 export class NoonController {
   constructor(

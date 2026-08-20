@@ -3,6 +3,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { createHash } from 'node:crypto';
 import { DataSource, EntityManager, In } from 'typeorm';
 import { ChannelListing } from '../catalog/channel-listing.entity';
+import { ProductVariant } from '../catalog/product-variant.entity';
 import { Product } from '../catalog/product.entity';
 import { NoonImport } from './noon-import.entity';
 import { NoonTransaction } from './noon-transaction.entity';
@@ -110,14 +111,21 @@ export class NoonImportService {
         name: row.title || partnerSku,
         discovered: true,
         category: null,
-        unitCost: null,
+      });
+      // A discovered product still gets its default variant, so stock and
+      // orders can attach to it without a later migration.
+      const variant = await tx.save(ProductVariant, {
+        productId: product.id,
+        name: 'Default',
+        attributes: {},
       });
       const listing = await tx.save(ChannelListing, {
         channel: 'noon' as const,
-        externalSku: row.noonSku ?? partnerSku,
+        externalId: row.noonSku ?? partnerSku,
+        externalVariantId: '',
         partnerSku,
         title: row.title || null,
-        productId: product.id,
+        variantId: variant.id,
       });
       out.set(partnerSku, { id: listing.id, created: true });
     }
