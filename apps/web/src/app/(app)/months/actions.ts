@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { authHeaders } from '@/lib/session';
 
 const API = process.env.API_URL ?? 'http://localhost:3001';
 
@@ -25,7 +26,7 @@ export async function setOpeningBalance(
   try {
     res = await fetch(`${API}/noon/account`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       body: JSON.stringify({ openingBalance, openingAsOf }),
     });
   } catch {
