@@ -1,5 +1,5 @@
 import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
-import { ChannelListing } from './channel-listing.entity';
+import { ProductVariant } from './product-variant.entity';
 
 /**
  * The internal identity of a real thing Prime Market sells. Stable across
@@ -20,21 +20,16 @@ export class Product {
   @Column({ type: 'text', nullable: true })
   category: string | null;
 
-  /**
-   * Cost basis per unit, in EGP. Null until purchasing data is entered — no
-   * marketplace report contains cost, so margin stays unknown until it is.
-   * ponytail: a single current cost, not FIFO layers. Revisit when purchase
-   * batches at different prices start to matter.
-   */
-  @Column({ type: 'numeric', precision: 14, scale: 2, nullable: true })
-  unitCost: string | null;
-
   /** True while the product is an unenriched stub created by an importer. */
   @Column({ type: 'boolean', default: false })
   discovered: boolean;
 
-  @OneToMany(() => ChannelListing, (l) => l.product)
-  listings: ChannelListing[];
+  @Column({ type: 'boolean', default: true })
+  active: boolean;
+
+  /** Cost and price live on the variant — that is what is actually bought and sold. */
+  @OneToMany(() => ProductVariant, (v) => v.product)
+  variants: ProductVariant[];
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
