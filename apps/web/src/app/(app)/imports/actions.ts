@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { authHeaders } from '@/lib/session';
 
 const API = process.env.API_URL ?? 'http://localhost:3001';
 
@@ -38,7 +39,11 @@ export async function uploadReport(
 
   let res: Response;
   try {
-    res = await fetch(`${API}/noon/imports`, { method: 'POST', body });
+    res = await fetch(`${API}/noon/imports`, {
+      method: 'POST',
+      body,
+      headers: await authHeaders(),
+    });
   } catch {
     return { status: 'error', message: 'Could not reach the API. Is it running?' };
   }
