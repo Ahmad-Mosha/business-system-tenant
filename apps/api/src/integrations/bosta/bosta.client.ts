@@ -133,6 +133,43 @@ export class BostaClient {
     ).replace(/\/+$/, '');
   }
 
+  /**
+   * Every delivery on the business account.
+   *
+   * Lives on `/api/v0/`, not `/api/v1/` — v1 has no list route at all, and
+   * `/v1/deliveries/{anything}` is read as a tracking-number lookup, which is
+   * why it answers "Delivery not found" rather than 404.
+   */
+  async listDeliveries(limit = 100): Promise<BostaDeliveryRaw[]> {
+    const url = `${this.baseUrl.replace('/api/v1', '/api/v0')}/deliveries?limit=${limit}`;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (this.apiKey) headers['Authorization'] = this.apiKey;
+
+    try {
+      const res = await fetch(url, {
+        headers,
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+      if (!res.ok) {
+        this.log.error(`Bosta list error [${res.status}]`);
+        throw new Error(`Bosta API error: ${res.status} ${res.statusText}`);
+      }
+      const json = (await res.json()) as { deliveries?: BostaDeliveryRaw[]; count?: number };
+      const deliveries = json?.deliveries ?? [];
+
+      // Warm the per-AWB cache so opening one costs nothing.
+      for (const d of deliveries) {
+        if (d.trackingNumber) this.cache.set(d.trackingNumber, { at: Date.now(), value: d });
+      }
+      return deliveries;
+    } catch (e) {
+      if (e instanceof Error && e.name === 'TimeoutError') {
+        throw new Error(`Bosta did not respond within ${REQUEST_TIMEOUT_MS}ms`);
+      }
+      throw e;
+    }
+  }
+
   async getDelivery(trackingNumber: string): Promise<BostaDeliveryRaw | null> {
     const cleanTn = (trackingNumber ?? '').trim();
     if (!cleanTn) {

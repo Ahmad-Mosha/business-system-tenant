@@ -109,29 +109,31 @@ export class BostaService {
     user: SessionUser,
     query?: { search?: string; status?: string },
   ): Promise<ShipmentTrackingDto[]> {
-    // Shipments are whatever our orders actually carry — never a fixed list.
-    // Scoped like every other order query: a moderator sees only their own.
-    const orderRows = await this.db.getRepository(Order).find({
-      where: user.role === 'ADMIN' ? {} : { assignedToId: user.id },
-      select: { trackingNumber: true, orderNumber: true, id: true },
-    });
-    const allNumbers = Array.from(
-      new Set(orderRows.map((o) => o.trackingNumber).filter(Boolean) as string[]),
-    );
-    if (!allNumbers.length) return [];
+    // One call returns every delivery on the account, so the page costs a
+    // single request rather than one per order.
+    const deliveries = await this.bostaClient.listDeliveries();
+    let list = deliveries
+      .map((raw) => {
+        try {
+          return this.normalizeBostaDelivery(raw);
+        } catch (e) {
+          this.log.warn(`Could not read delivery ${raw.trackingNumber}: ${e}`);
+          return null;
+        }
+      })
+      .filter((r): r is ShipmentTrackingDto => r !== null);
 
-    // Bosta is queried one shipment at a time, so fan-out is capped to keep a
-    // page load from opening dozens of sockets at once.
-    const results = await mapWithConcurrency(allNumbers, 6, async (tn) => {
-      try {
-        return await this.track(tn);
-      } catch (e) {
-        this.log.warn(`Could not track shipment ${tn}: ${e}`);
-        return null;
-      }
-    });
-
-    let list = results.filter((r): r is ShipmentTrackingDto => r !== null);
+    // A moderator sees only shipments belonging to orders assigned to them.
+    // An admin sees the whole account, including shipments not yet linked to
+    // an order — those still need chasing.
+    if (user.role !== 'ADMIN') {
+      const own = await this.db.getRepository(Order).find({
+        where: { assignedToId: user.id },
+        select: { trackingNumber: true },
+      });
+      const allowed = new Set(own.map((o) => o.trackingNumber).filter(Boolean) as string[]);
+      list = list.filter((s) => allowed.has(s.trackingNumber));
+    }
 
     if (query?.search) {
       const s = query.search.toLowerCase().trim();
