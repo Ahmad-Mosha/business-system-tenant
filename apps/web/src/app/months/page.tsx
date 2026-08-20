@@ -55,7 +55,7 @@ export default async function MonthsPage() {
               </TableHeader>
               <TableBody>
                 {periods.map((p) => (
-                  <TableRow key={p.month} className="group">
+                  <TableRow key={p.month} className="group relative">
                     <TableCell className="font-medium">
                       <Link
                         href={`/months/${p.month}`}
