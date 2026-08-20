@@ -95,8 +95,13 @@ export class CatalogController {
   @Roles('ADMIN')
   @Post('sync/easyorders')
   sync() {
-    const key = process.env.easyorder_api_key ?? process.env.EASYORDERS_API_KEY;
-    if (!key) throw new BadRequestException('easyorder_api_key is not configured');
+    // The key has been stored under a few names over time; accept them all
+    // rather than fail silently when one is renamed.
+    const key =
+      process.env.EASY_ORDER_KEY ??
+      process.env.easyorder_api_key ??
+      process.env.EASYORDERS_API_KEY;
+    if (!key) throw new BadRequestException('Easy Orders API key is not configured');
     return this.catalog.syncEasyOrders(key);
   }
 }
