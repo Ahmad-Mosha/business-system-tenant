@@ -9,8 +9,7 @@ turning noon settlement exports into per-product answers.
 npm install
 npm run db:up          # postgres 17 via docker
 cp .env.example .env
-npm run dev:api        # api on :3001
-npm run dev:web        # ui  on :3000
+npm run dev            # api on :3001, ui on :3000
 ```
 
 Without Docker, point `DATABASE_URL` at any Postgres 14+ and create the database.
