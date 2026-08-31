@@ -16,6 +16,18 @@ export interface BostaDeliveryRaw {
   maskedState?: string;
   type?: { code?: number; value?: string };
   cod?: number;
+  /**
+   * The real signal for "has Bosta actually paid us." Absent = nothing
+   * computed yet; present without `oracleTransactionId` = a payout is
+   * scheduled but hasn't run; `oracleTransactionId` present = an actual
+   * accounting transaction executed. Verified against Bosta's own dashboard
+   * ("حالة المبلغ المحصل") on real deliveries — `wallet.cashCycle.deposited_at`
+   * does *not* mean paid; a delivery can have it set and still show unpaid.
+   */
+  cashoutInfo?: {
+    expectedCashoutDate?: string;
+    oracleTransactionId?: string;
+  } | null;
   isDelayed?: boolean;
   receiver?: {
     _id?: string;
