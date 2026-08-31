@@ -11,7 +11,6 @@ export default async function NewOrderPage() {
     <>
       <PageHeader
         title="New order"
-        description="For orders taken through social media conversations"
         actions={
           <Link
             href="/orders"
