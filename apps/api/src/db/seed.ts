@@ -15,6 +15,8 @@ process.loadEnvFile('../../.env');
 const TENANT_SLUG = process.env.TENANT_SLUG ?? 'prime-market';
 const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL ?? 'admin@primemarket.local';
 const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? 'change-me-now';
+const MODERATOR_EMAIL = process.env.SEED_MODERATOR_EMAIL ?? 'moderator@primemarket.local';
+const MODERATOR_PASSWORD = process.env.SEED_MODERATOR_PASSWORD ?? 'moderator-pass';
 
 async function main() {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -29,18 +31,30 @@ async function main() {
     console.log(`tenant created: ${tenant.slug}`);
   }
 
-  const [existing] = await db.select().from(users).where(eq(users.email, ADMIN_EMAIL));
-  if (existing) {
-    console.log(`admin already exists: ${ADMIN_EMAIL}`);
-  } else {
+  // Both roles, so role separation can be checked by signing in rather than
+  // by reading the code.
+  for (const person of [
+    { email: ADMIN_EMAIL, password: ADMIN_PASSWORD, name: 'Owner', role: 'ADMIN' as const },
+    {
+      email: MODERATOR_EMAIL,
+      password: MODERATOR_PASSWORD,
+      name: 'Moderator',
+      role: 'MODERATOR' as const,
+    },
+  ]) {
+    const [existing] = await db.select().from(users).where(eq(users.email, person.email));
+    if (existing) {
+      console.log(`${person.role.toLowerCase()} already exists: ${person.email}`);
+      continue;
+    }
     await db.insert(users).values({
       tenantId: tenant.id,
-      email: ADMIN_EMAIL,
-      name: 'Owner',
-      passwordHash: await hashPassword(ADMIN_PASSWORD),
-      role: 'ADMIN',
+      email: person.email,
+      name: person.name,
+      passwordHash: await hashPassword(person.password),
+      role: person.role,
     });
-    console.log(`admin created: ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`);
+    console.log(`${person.role.toLowerCase()} created: ${person.email} / ${person.password}`);
   }
 
   await pool.end();
