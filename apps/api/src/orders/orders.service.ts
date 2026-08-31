@@ -40,10 +40,6 @@ export interface OrderFilters {
   source?: string;
   assignedToId?: string;
   unassigned?: boolean;
-  /** status IN (NEW, ASSIGNED) — the "needs work" count, as a filter. */
-  needsWork?: boolean;
-  /** The normal COD gap: handed over, cash not collected. */
-  deliveredUnpaid?: boolean;
   search?: string;
   limit?: number;
   offset?: number;
@@ -92,8 +88,6 @@ export class OrdersService implements OnModuleInit {
     if (f.assignedToId) where.push(`o.assigned_to_id = ${bind(f.assignedToId)}`);
     if (f.unassigned) where.push('o.assigned_to_id IS NULL');
     if (f.status) where.push(`o.status = ${bind(f.status)}`);
-    if (f.needsWork) where.push(`o.status IN ('NEW', 'ASSIGNED')`);
-    if (f.deliveredUnpaid) where.push(`o.status = 'DELIVERED' AND o.payment_status = 'UNPAID'`);
     if (f.source) where.push(`o.source = ${bind(f.source)}`);
     if (f.search) {
       const term = bind(`%${f.search}%`); // one placeholder, referenced three times

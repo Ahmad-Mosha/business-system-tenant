@@ -23,8 +23,6 @@ import { cn } from '@/lib/utils';
 /** Sized so a full page of rows fits a laptop without the list outgrowing it. */
 const PAGE_SIZE = 25;
 
-/** The counted views, each backed by a real filter on the API. */
-const VIEWS = ['needsWork', 'unassigned', 'deliveredUnpaid'] as const;
 
 export default async function OrdersPage({
   searchParams,
@@ -38,9 +36,7 @@ export default async function OrdersPage({
   for (const key of ['status', 'source', 'search'] as const) {
     if (params[key]) filters.set(key, params[key]);
   }
-  for (const key of VIEWS) {
-    if (params[key] === 'true') filters.set(key, 'true');
-  }
+  if (params.unassigned === 'true') filters.set('unassigned', 'true');
 
   const page = Math.max(Number(params.page) || 1, 1);
   const offset = (page - 1) * PAGE_SIZE;
@@ -70,15 +66,6 @@ export default async function OrdersPage({
 
   const lastPage = Math.max(Math.ceil(total / PAGE_SIZE), 1);
 
-  /** Each metric card is the filter for what it counts. */
-  const activeView = VIEWS.find((v) => params[v] === 'true') ?? null;
-  const view = (key: (typeof VIEWS)[number] | null) => {
-    const next = new URLSearchParams(filters);
-    for (const v of VIEWS) next.delete(v);
-    if (key) next.set(key, 'true');
-    const qs = next.toString();
-    return qs ? `/orders?${qs}` : '/orders';
-  };
 
   return (
     <Screen>
@@ -108,16 +95,12 @@ export default async function OrdersPage({
                 label="All orders"
                 value={summary.total}
                 hint={isAdmin ? 'social and website' : 'assigned to you'}
-                href={view(null)}
-                active={activeView === null}
               />
               <MetricCard
                 label="Needs work"
                 value={summary.needsWork}
                 hint="new or assigned"
                 tone={summary.needsWork > 0 ? 'warning' : 'default'}
-                href={view('needsWork')}
-                active={activeView === 'needsWork'}
               />
               {isAdmin && (
                 <MetricCard
@@ -125,8 +108,6 @@ export default async function OrdersPage({
                   value={summary.unassigned}
                   hint="nobody owns these"
                   tone={summary.unassigned > 0 ? 'warning' : 'default'}
-                  href={view('unassigned')}
-                  active={activeView === 'unassigned'}
                 />
               )}
               <MetricCard
@@ -134,8 +115,6 @@ export default async function OrdersPage({
                 value={summary.deliveredUnpaid}
                 hint="cash not yet collected"
                 tone={summary.deliveredUnpaid > 0 ? 'warning' : 'default'}
-                href={view('deliveredUnpaid')}
-                active={activeView === 'deliveredUnpaid'}
               />
             </MetricRow>
 
