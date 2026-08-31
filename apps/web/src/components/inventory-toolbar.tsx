@@ -50,7 +50,7 @@ export function InventoryToolbar() {
 
   const apply = (mutate: (next: URLSearchParams) => void) => {
     const next = new URLSearchParams(params.toString());
-    next.delete('offset'); // any filter change starts back at page 1
+    next.delete('page'); // any filter change starts back at page 1
     mutate(next);
     startTransition(() => router.push(`${pathname}?${next.toString()}`, { scroll: false }));
   };

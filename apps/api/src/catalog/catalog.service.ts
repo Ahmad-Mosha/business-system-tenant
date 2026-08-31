@@ -118,15 +118,15 @@ export class CatalogService {
          WHERE v.product_id = p.id
        ) stock ON TRUE
        -- Units already off on-hand (stock leaves at order creation — there is
-       -- no reserved state) but sitting in an order that hasn't shipped,
-       -- delivered or reversed yet. Context on "why is on-hand this number",
-       -- not a second pool of stock.
+       -- no reserved state) but sitting in an order that hasn't been
+       -- delivered or reversed yet. Context on "why is on-hand this number" —
+       -- and it stops counting once the sale is actually done.
        LEFT JOIN LATERAL (
          SELECT SUM(i.quantity) AS open
          FROM order_item i
          JOIN product_variant v ON v.id = i.variant_id
          JOIN customer_order o ON o.id = i.order_id
-         WHERE v.product_id = p.id AND o.status NOT IN ('CANCELLED', 'RETURNED')
+         WHERE v.product_id = p.id AND o.status NOT IN ('CANCELLED', 'RETURNED', 'DELIVERED')
        ) held ON TRUE
        LEFT JOIN LATERAL (
          SELECT array_agg(DISTINCT l.channel) AS channels
@@ -152,7 +152,8 @@ export class CatalogService {
       `SELECT count(*)::int                                              AS products,
               COALESCE(SUM(stock.on_hand), 0)::int                       AS "unitsOnHand",
               COALESCE(SUM(stock.on_hand * COALESCE(stock.unit_cost, 0)), 0) AS "stockValue",
-              count(*) FILTER (WHERE stock.unit_cost IS NULL)::int       AS "missingCost"
+              count(*) FILTER (WHERE stock.unit_cost IS NULL)::int       AS "missingCost",
+              COALESCE(SUM(held.open), 0)::int                           AS "unitsInOrders"
        FROM product p
        LEFT JOIN LATERAL (
          SELECT COALESCE(SUM(m.quantity), 0)::int AS on_hand, MIN(v.unit_cost) AS unit_cost
@@ -160,6 +161,13 @@ export class CatalogService {
          LEFT JOIN stock_movement m ON m.variant_id = v.id
          WHERE v.product_id = p.id
        ) stock ON TRUE
+       LEFT JOIN LATERAL (
+         SELECT SUM(i.quantity) AS open
+         FROM order_item i
+         JOIN product_variant v ON v.id = i.variant_id
+         JOIN customer_order o ON o.id = i.order_id
+         WHERE v.product_id = p.id AND o.status NOT IN ('CANCELLED', 'RETURNED', 'DELIVERED')
+       ) held ON TRUE
        ${whereSql}`,
       params,
     );
@@ -186,7 +194,7 @@ export class CatalogService {
          SELECT SUM(i.quantity) AS open
          FROM order_item i
          JOIN customer_order o ON o.id = i.order_id
-         WHERE i.variant_id = v.id AND o.status NOT IN ('CANCELLED', 'RETURNED')
+         WHERE i.variant_id = v.id AND o.status NOT IN ('CANCELLED', 'RETURNED', 'DELIVERED')
        ) held ON TRUE
        WHERE v.product_id = $1
        ORDER BY v.name`,

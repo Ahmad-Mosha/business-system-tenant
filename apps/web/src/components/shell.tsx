@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { Children, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 /**
@@ -285,7 +285,15 @@ export function MetricCard({
   );
 }
 
-/** The metric row. Equal columns so the cards read as one band, not five objects. */
+/**
+ * The metric row. Equal columns so the cards read as one band, not several
+ * objects — column count follows how many cards are actually passed, so a
+ * 5-metric screen doesn't wrap an odd card onto its own row under a fixed
+ * 4-column grid.
+ */
 export function MetricRow({ children }: { children: ReactNode }) {
-  return <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{children}</div>;
+  const count = Children.toArray(children).filter(Boolean).length;
+  const lg =
+    count >= 5 ? 'lg:grid-cols-5' : count === 3 ? 'lg:grid-cols-3' : 'lg:grid-cols-4';
+  return <div className={cn('grid gap-3 sm:grid-cols-2', lg)}>{children}</div>;
 }
