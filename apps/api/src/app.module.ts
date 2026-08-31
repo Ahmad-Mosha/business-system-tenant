@@ -13,6 +13,10 @@ import { ChannelListing } from './catalog/channel-listing.entity';
 import { ProductVariant } from './catalog/product-variant.entity';
 import { Product } from './catalog/product.entity';
 import { SnakeNamingStrategy } from './database/snake-naming.strategy';
+import { CashAccount } from './finance/cash-account.entity';
+import { CashTransaction } from './finance/cash-transaction.entity';
+import { FinanceController } from './finance/finance.controller';
+import { FinanceService } from './finance/finance.service';
 import { EasyOrdersController } from './integrations/easyorders/easyorders.controller';
 import { EasyOrdersEvent } from './integrations/easyorders/easyorders-event.entity';
 import { EasyOrdersService } from './integrations/easyorders/easyorders.service';
@@ -45,6 +49,8 @@ const ENTITIES = [
   NoonTransaction,
   ChannelAccount,
   EasyOrdersEvent,
+  CashAccount,
+  CashTransaction,
 ];
 
 @Module({
@@ -75,6 +81,7 @@ const ENTITIES = [
     CatalogController,
     EasyOrdersController,
     BostaController,
+    FinanceController,
   ],
   providers: [
     // Every endpoint requires a session unless it opts out with @Public(),
@@ -88,6 +95,7 @@ const ENTITIES = [
     EasyOrdersService,
     BostaClient,
     BostaService,
+    FinanceService,
   ],
 })
 export class AppModule implements OnModuleInit {
