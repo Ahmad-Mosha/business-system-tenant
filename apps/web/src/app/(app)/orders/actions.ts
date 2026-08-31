@@ -92,6 +92,13 @@ export async function createOrder(
     return { status: 'error', message: e instanceof Error ? e.message : 'Could not create order' };
   }
 
+  // Prepaid orders — wallet and InstaPay are usually settled before dispatch.
+  // Creation already succeeded, so a failure here leaves a real order that is
+  // one click from correct, rather than losing the order.
+  if (formData.get('paymentCollected') === 'on') {
+    await send(`/orders/${created.id}/payment`, 'PATCH', { paymentStatus: 'PAID' }).catch(() => null);
+  }
+
   revalidatePath('/orders');
   redirect(`/orders?selected=${created.id}`);
 }
