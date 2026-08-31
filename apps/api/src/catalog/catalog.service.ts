@@ -158,14 +158,25 @@ export class CatalogService {
     const product = await this.db.getRepository(Product).findOne({ where: { id } });
     if (!product) throw new NotFoundException('product not found');
 
+    // Two independent lateral joins, not one double join: stock_movement and
+    // order_item both fan out per variant, and summing either across a join
+    // of the other would multiply rows and inflate the total.
     const variants = await this.db.query(
       `SELECT v.id, v.name, v.sku, v.attributes, v.unit_cost AS "unitCost",
               v.selling_price AS "sellingPrice", v.active,
-              COALESCE(SUM(m.quantity), 0)::int AS "onHand"
+              COALESCE(stock.on_hand, 0)::int AS "onHand",
+              COALESCE(held.open, 0)::int AS "inOpenOrders"
        FROM product_variant v
-       LEFT JOIN stock_movement m ON m.variant_id = v.id
+       LEFT JOIN LATERAL (
+         SELECT SUM(quantity) AS on_hand FROM stock_movement m WHERE m.variant_id = v.id
+       ) stock ON TRUE
+       LEFT JOIN LATERAL (
+         SELECT SUM(i.quantity) AS open
+         FROM order_item i
+         JOIN customer_order o ON o.id = i.order_id
+         WHERE i.variant_id = v.id AND o.status NOT IN ('CANCELLED', 'RETURNED')
+       ) held ON TRUE
        WHERE v.product_id = $1
-       GROUP BY v.id
        ORDER BY v.name`,
       [id],
     );
@@ -414,7 +425,7 @@ export class CatalogService {
   /** Variants an order line can be attached to, for the manual order form. */
   searchVariants(term: string) {
     return this.db.query(
-      `SELECT v.id, v.sku, v.selling_price AS "sellingPrice",
+      `SELECT v.id, v.sku, v.selling_price AS "sellingPrice", v.unit_cost AS "unitCost",
               CASE WHEN v.name = 'Default' THEN p.name ELSE p.name || ' — ' || v.name END AS label,
               COALESCE((SELECT SUM(quantity) FROM stock_movement m WHERE m.variant_id = v.id), 0)::int AS "onHand"
        FROM product_variant v
