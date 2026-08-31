@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
+import { FinanceService } from '../finance/finance.service';
 import { StockMovement, type StockReason } from '../inventory/stock-movement.entity';
 import { ChannelListing } from './channel-listing.entity';
 import { PRODUCT_CATEGORIES, type ProductCategory } from './product.entity';
@@ -29,7 +30,10 @@ const MONEY = /^\d+(\.\d{1,2})?$/;
 export class CatalogService {
   private readonly log = new Logger(CatalogService.name);
 
-  constructor(@InjectDataSource() private readonly db: DataSource) {}
+  constructor(
+    @InjectDataSource() private readonly db: DataSource,
+    private readonly finance: FinanceService,
+  ) {}
 
   /**
    * Products with their stock on hand and channel coverage.
@@ -314,7 +318,18 @@ export class CatalogService {
     const variant = await this.db.getRepository(ProductVariant).findOneBy({ id: variantId });
     if (!variant) throw new NotFoundException('variant not found');
 
-    return this.addMovement(this.db.manager, variantId, quantity, reason, userId, note, variant.unitCost);
+    return this.db.transaction(async (tx) => {
+      const result = await this.addMovement(tx, variantId, quantity, reason, userId, note, variant.unitCost);
+      // A purchase converts cash into stock — record the cash side too, same
+      // transaction, so the two ledgers can never drift apart. No cost on
+      // file means no known cash amount, so it's skipped rather than guessed.
+      if (reason === 'PURCHASE' && quantity > 0 && variant.unitCost) {
+        const movementId = result.identifiers[0]?.id as string;
+        const amount = (quantity * Number(variant.unitCost)).toFixed(2);
+        await this.finance.recordPurchase(tx, amount, movementId);
+      }
+      return result;
+    });
   }
 
   async stockHistory(variantId: string) {
