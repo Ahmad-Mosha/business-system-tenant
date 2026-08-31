@@ -1,22 +1,22 @@
 import Link from 'next/link';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { InventoryToolbar } from '@/components/inventory-toolbar';
-import { ChannelBadge } from '@/components/order-status';
-import { PageBody } from '@/components/page-header';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  MetricCard,
+  MetricRow,
+  PageCard,
+  Pagination,
+  Panel,
+  Screen,
+  Scroller,
+} from '@/components/shell';
 import { categoryLabel } from '@/lib/categories';
 import { getProductsCatalog, getProductsSummary } from '@/lib/api';
 import { money, moneyWhole } from '@/lib/format';
 import { requireAdmin } from '@/lib/session';
+import { cn } from '@/lib/utils';
 
-const PAGE_SIZE = 50;
+/** Fits a laptop screen without scrolling — the point of paginating at all. */
+const PAGE_SIZE = 8;
 
 export default async function InventoryPage({
   searchParams,
@@ -32,7 +32,9 @@ export default async function InventoryPage({
   if (params.category) filterQuery.set('category', params.category);
   if (params.stock) filterQuery.set('stock', params.stock);
 
-  const offset = Math.max(Number(params.offset) || 0, 0);
+  const page = Math.max(Number(params.page) || 1, 1);
+  const offset = (page - 1) * PAGE_SIZE;
+
   const listQuery = new URLSearchParams(filterQuery);
   listQuery.set('limit', String(PAGE_SIZE));
   listQuery.set('offset', String(offset));
@@ -43,63 +45,52 @@ export default async function InventoryPage({
   ]);
 
   const total = products[0]?.totalCount ?? summary.products;
-  const page = Math.floor(offset / PAGE_SIZE) + 1;
-  const pageCount = Math.max(Math.ceil(total / PAGE_SIZE), 1);
-  const pageHref = (o: number) => {
-    const q = new URLSearchParams(filterQuery);
-    if (o > 0) q.set('offset', String(o));
-    const qs = q.toString();
+  const lastPage = Math.max(Math.ceil(total / PAGE_SIZE), 1);
+  const pageHref = (p: number) => {
+    const next = new URLSearchParams(filterQuery);
+    if (p > 1) next.set('page', String(p));
+    const qs = next.toString();
     return qs ? `/inventory?${qs}` : '/inventory';
   };
 
   return (
-    <>
-      {/* A slimmer header than PageHeader: this screen's job is the table
-          underneath it, not a hero. */}
-      <div className="flex items-center justify-between border-b border-border px-6 py-4 lg:px-10">
-        <h1 className="text-lg font-semibold tracking-[-0.01em]">Inventory</h1>
-        <p className="text-xs text-muted-foreground">
-          {summary.products} products{Number.isFinite(offset) ? ` · page ${page} of ${pageCount}` : ''}
-        </p>
-      </div>
+    <Screen>
+      <div className="flex min-h-0 flex-1 flex-col gap-4 p-4">
+        <PageCard title="Inventory" description="Every product, its stock, and what's tied up in open orders." />
 
-      <PageBody>
-        <section className="-mt-2 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-4">
-          <MiniStat label="Products" value={String(summary.products)} />
-          <MiniStat label="Units on hand" value={String(summary.unitsOnHand)} />
-          <MiniStat label="Stock value" value={moneyWhole(summary.stockValue)} />
-          <MiniStat
+        <MetricRow>
+          <MetricCard label="Products" value={summary.products} hint="active catalogue" />
+          <MetricCard label="Units on hand" value={summary.unitsOnHand} />
+          <MetricCard label="Stock value" value={moneyWhole(summary.stockValue)} hint="EGP, at unit cost" />
+          <MetricCard
             label="Missing cost"
-            value={String(summary.missingCost)}
-            warn={summary.missingCost > 0}
+            value={summary.missingCost}
+            tone={summary.missingCost > 0 ? 'warning' : 'default'}
+            hint={summary.missingCost > 0 ? 'stock value understated' : 'all costed'}
           />
-        </section>
+        </MetricRow>
 
-        <section>
-          <InventoryToolbar />
+        <InventoryToolbar />
 
-          {products.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-border px-5 py-14 text-center text-sm text-muted-foreground">
-              No products match.
-            </p>
-          ) : (
-            <div className="overflow-x-auto rounded-xl border border-border">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="w-[36%] min-w-[220px]">Product</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Channels</TableHead>
-                    <TableHead className="text-right">On hand</TableHead>
-                    <TableHead className="text-right">Cost</TableHead>
-                    <TableHead className="text-right">Price</TableHead>
-                    <TableHead className="w-8" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+        <Panel>
+          <Scroller>
+            {products.length === 0 ? (
+              <p className="p-12 text-center text-sm text-muted-foreground">No products match.</p>
+            ) : (
+              <table className="w-full border-collapse text-[13px]">
+                <thead className="sticky top-0 z-10 bg-muted/60 backdrop-blur">
+                  <tr className="border-b border-border text-[11px] tracking-[0.06em] text-muted-foreground uppercase">
+                    <Th>Product</Th>
+                    <Th className="w-[140px]">Category</Th>
+                    <Th className="w-[100px] text-right">On hand</Th>
+                    <Th className="w-[100px] text-right">In orders</Th>
+                    <Th className="w-[110px] text-right">Cost</Th>
+                  </tr>
+                </thead>
+                <tbody>
                   {products.map((p) => (
-                    <TableRow key={p.id} className="group relative">
-                      <TableCell className="max-w-0">
+                    <tr key={p.id} className="group relative h-11 border-b border-border/60 last:border-b-0 hover:bg-accent/50">
+                      <Td className="max-w-0">
                         <Link
                           href={`/inventory/${p.id}`}
                           className="block truncate font-medium after:absolute after:inset-0 focus-visible:underline focus-visible:outline-none"
@@ -108,107 +99,44 @@ export default async function InventoryPage({
                           {p.name}
                         </Link>
                         {p.variantCount > 1 && (
-                          <span className="text-xs text-muted-foreground">
-                            {p.variantCount} variants
-                          </span>
+                          <span className="text-[11px] text-muted-foreground">{p.variantCount} variants</span>
                         )}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {categoryLabel(p.category)}
-                      </TableCell>
-                      <TableCell>
-                        <span className="flex flex-wrap gap-1.5">
-                          {p.channels.length === 0 ? (
-                            <span className="text-xs text-muted-foreground/50">None</span>
-                          ) : (
-                            p.channels.map((c) => <ChannelBadge key={c} channel={c} />)
-                          )}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right font-medium tabular-nums">
-                        {p.onHand === 0 ? (
-                          <span className="text-muted-foreground/40">0</span>
-                        ) : (
-                          p.onHand
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-muted-foreground">
-                        {p.unitCost ? money(p.unitCost) : <span className="text-muted-foreground/40">—</span>}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {p.sellingPrice ? money(p.sellingPrice) : <span className="text-muted-foreground/40">—</span>}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <ChevronRight className="size-4 text-muted-foreground/40 transition-colors group-hover:text-foreground" />
-                      </TableCell>
-                    </TableRow>
+                      </Td>
+                      <Td className="text-muted-foreground">{categoryLabel(p.category)}</Td>
+                      <Td className="text-right font-medium tabular-nums">
+                        {p.onHand === 0 ? <span className="text-muted-foreground/40">0</span> : p.onHand}
+                      </Td>
+                      <Td className="text-right tabular-nums text-muted-foreground">
+                        {p.inOrders > 0 ? p.inOrders : <span className="text-muted-foreground/40">—</span>}
+                      </Td>
+                      <Td className="text-right tabular-nums text-muted-foreground">
+                        {p.unitCost ? money(p.unitCost) : <span className="text-warning/70">—</span>}
+                      </Td>
+                    </tr>
                   ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+                </tbody>
+              </table>
+            )}
+          </Scroller>
 
-          {pageCount > 1 && (
-            <div className="mt-3 flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">
-                {offset + 1}–{Math.min(offset + PAGE_SIZE, total)} of {total}
-              </p>
-              <div className="flex items-center gap-1.5">
-                <PageLink href={pageHref(Math.max(offset - PAGE_SIZE, 0))} disabled={offset === 0}>
-                  <ChevronLeft className="size-3.5" />
-                  Prev
-                </PageLink>
-                <PageLink
-                  href={pageHref(offset + PAGE_SIZE)}
-                  disabled={offset + PAGE_SIZE >= total}
-                >
-                  Next
-                  <ChevronRight className="size-3.5" />
-                </PageLink>
-              </div>
-            </div>
-          )}
-        </section>
-      </PageBody>
-    </>
+          <Pagination
+            from={total === 0 ? 0 : offset + 1}
+            to={offset + products.length}
+            total={total}
+            noun="products"
+            prevHref={page > 1 ? pageHref(page - 1) : null}
+            nextHref={page < lastPage ? pageHref(page + 1) : null}
+          />
+        </Panel>
+      </div>
+    </Screen>
   );
 }
 
-function MiniStat({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
-  return (
-    <div className="bg-background px-4 py-3">
-      <p className="text-[10.5px] font-medium tracking-[0.06em] text-muted-foreground uppercase">
-        {label}
-      </p>
-      <p className={`mt-0.5 text-lg font-semibold tabular-nums ${warn ? 'text-warning' : ''}`}>
-        {value}
-      </p>
-    </div>
-  );
+function Th({ className, children }: { className?: string; children?: React.ReactNode }) {
+  return <th className={cn('px-4 py-2.5 text-left font-medium whitespace-nowrap', className)}>{children}</th>;
 }
 
-function PageLink({
-  href,
-  disabled,
-  children,
-}: {
-  href: string;
-  disabled: boolean;
-  children: React.ReactNode;
-}) {
-  if (disabled) {
-    return (
-      <span className="inline-flex h-8 cursor-not-allowed items-center gap-1 rounded-md border border-border px-2.5 text-xs text-muted-foreground/40">
-        {children}
-      </span>
-    );
-  }
-  return (
-    <Link
-      href={href}
-      className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-2.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-    >
-      {children}
-    </Link>
-  );
+function Td({ className, children }: { className?: string; children?: React.ReactNode }) {
+  return <td className={cn('px-4 whitespace-nowrap', className)}>{children}</td>;
 }
