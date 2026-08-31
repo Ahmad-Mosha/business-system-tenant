@@ -109,6 +109,7 @@ export async function searchVariants(term: string) {
     label: string;
     sku: string | null;
     sellingPrice: string | null;
+    unitCost: string | null;
     onHand: number;
   }>;
 }
