@@ -252,6 +252,10 @@ export class BostaService {
     const address = raw.dropOffAddress?.firstLine || null;
 
     const codAmount = Number(raw.cod ?? raw.wallet?.cashCycle?.cod ?? 0);
+    // Delivered means the courier collected cash from the customer at the
+    // door — that's what this flag answers. Whether Bosta has since paid
+    // *us* out is a separate, later event (raw.wallet.cashCycle.deposited_at,
+    // only present on the single-delivery endpoint) that this is not.
     const isCollected = statusCode >= 45 || !!raw.wallet?.cashCycle?.deposited_at;
 
     const flexShipFee = raw.flexShippingInfo?.isOrderEligible
@@ -270,10 +274,18 @@ export class BostaService {
       raw.state?.deliveryTime ||
       (statusCode === 45 && raw.updatedAt ? raw.updatedAt : null);
 
+    // Bug: this used to say UNPAID for every delivered COD shipment,
+    // regardless of `isCollected` above — verified against 9 real deliveries,
+    // all Delivered, all showing غير مدفوع here despite Bosta's own data
+    // (collectedFromBusiness, cashoutInfo) confirming they were collected.
+    // A genuinely dead COD — returned or cancelled with money still owed —
+    // is the one case worth calling UNPAID rather than PENDING.
+    const deadWithoutCollection =
+      !isCollected && (normalizedStatus.key === 'RETURNED' || normalizedStatus.key === 'CANCELLED');
     const collectionStatus: 'UNPAID' | 'PAID' | 'PENDING' =
-      codAmount === 0 ? 'PAID' : (statusCode >= 45 ? 'UNPAID' : 'PENDING');
+      codAmount === 0 || isCollected ? 'PAID' : deadWithoutCollection ? 'UNPAID' : 'PENDING';
     const collectionStatusLabel =
-      collectionStatus === 'PAID' ? 'مدفوع' : 'غير مدفوع';
+      collectionStatus === 'PAID' ? 'مدفوع' : collectionStatus === 'UNPAID' ? 'غير مدفوع' : 'قيد التحصيل';
 
     const pType = raw.specs?.packageType || '';
     const typeAr =

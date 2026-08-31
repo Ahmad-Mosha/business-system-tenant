@@ -184,7 +184,7 @@ export function ShipmentsView({
               {filtered.map((s) => {
                 const isDelivered = s.status === 'DELIVERED';
                 const isSelected = selectedShipment?.trackingNumber === s.trackingNumber;
-                const isUnpaid = s.cod?.collectionStatus === 'UNPAID' || !s.cod?.isCollected;
+                const collection = s.cod?.collectionStatus ?? 'PENDING';
 
                 return (
                   <tr
@@ -270,17 +270,20 @@ export function ShipmentsView({
                       </div>
                     </td>
 
-                    {/* Collected Amount Status (حالة المبلغ المحصل - Red Pill for Unpaid) */}
+                    {/* Collected Amount Status (حالة المبلغ المحصل) */}
                     <td className="px-4 py-3 text-center">
                       <span
                         className={cn(
                           'inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold whitespace-nowrap border',
-                          isUnpaid
-                            ? 'border-destructive/30 bg-destructive-subtle text-destructive dark:border-destructive/30 dark:bg-destructive-subtle/40 dark:text-destructive'
-                            : 'border-success/30 bg-success-subtle text-success dark:text-success',
+                          collection === 'PAID' &&
+                            'border-success/30 bg-success-subtle text-success',
+                          collection === 'UNPAID' &&
+                            'border-destructive/30 bg-destructive-subtle text-destructive',
+                          collection === 'PENDING' &&
+                            'border-border bg-muted text-muted-foreground',
                         )}
                       >
-                        {isUnpaid ? 'غير مدفوع' : 'مدفوع'}
+                        {s.cod?.collectionStatusLabel ?? 'قيد التحصيل'}
                       </span>
                     </td>
 
@@ -502,8 +505,17 @@ export function ShipmentsView({
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">حالة المبلغ المحصل:</span>
-                    <span className="font-semibold text-destructive dark:text-destructive">
-                      {selectedShipment.cod?.collectionStatusLabel || 'غير مدفوع'}
+                    <span
+                      className={cn(
+                        'font-semibold',
+                        selectedShipment.cod?.collectionStatus === 'PAID' && 'text-success',
+                        selectedShipment.cod?.collectionStatus === 'UNPAID' && 'text-destructive',
+                        (!selectedShipment.cod?.collectionStatus ||
+                          selectedShipment.cod.collectionStatus === 'PENDING') &&
+                          'text-muted-foreground',
+                      )}
+                    >
+                      {selectedShipment.cod?.collectionStatusLabel ?? 'قيد التحصيل'}
                     </span>
                   </div>
                   <div className="flex justify-between">
