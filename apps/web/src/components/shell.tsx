@@ -152,7 +152,7 @@ export function PageCard({
   actions?: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border px-5 py-4">
+    <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-card px-5 py-4 shadow-xs">
       <div className="min-w-0">
         <h1 className="text-xl font-semibold tracking-[-0.02em]">{title}</h1>
         {description ? (
@@ -167,7 +167,7 @@ export function PageCard({
 /** A bordered card that fills the remaining height and clips its own overflow. */
 export function Panel({ children }: { children: ReactNode }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xs">
       {children}
     </div>
   );
@@ -266,7 +266,7 @@ export function MetricCard({
   tone?: 'default' | 'warning' | 'destructive' | 'success';
 }) {
   return (
-    <div className="rounded-xl border border-border px-4 py-3">
+    <div className="rounded-xl border border-border bg-card px-4 py-3 shadow-xs">
       <p className="text-[11px] font-medium tracking-[0.07em] text-muted-foreground uppercase">
         {label}
       </p>
