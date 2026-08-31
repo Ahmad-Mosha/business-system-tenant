@@ -20,6 +20,13 @@ hours.
 | 4 | [evidence/](evidence/) | Hard facts about each external system, with the data behind them |
 | 5 | [business-answers-ar.md](business-answers-ar.md) | The owner's own answers, verbatim, in Arabic — source of truth |
 
+## The build
+
+| File | What it gives you |
+|---|---|
+| [architecture.md](architecture.md) | How the system is designed, and why each decision was taken |
+| [roadmap.md](roadmap.md) | The phases, their dependency order, and how each is verified |
+
 ## Data
 
 | File | What it is |
