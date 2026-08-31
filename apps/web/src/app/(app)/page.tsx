@@ -4,7 +4,7 @@ import { NoDataYet } from '@/components/empty-state';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { StatementView } from '@/components/statement-view';
 import { getDataRange, getPeriods } from '@/lib/api';
-import { date, money, monthLabel } from '@/lib/format';
+import { money, monthLabel } from '@/lib/format';
 import { requireSession } from '@/lib/session';
 
 export default async function OverviewPage() {
@@ -17,7 +17,7 @@ export default async function OverviewPage() {
   if (!range) {
     return (
       <>
-        <PageHeader title="Overview" description="noon settlement performance" />
+        <PageHeader title="Overview" />
         <PageBody>
           <NoDataYet />
         </PageBody>
@@ -31,11 +31,6 @@ export default async function OverviewPage() {
     <>
       <PageHeader
         title="Overview"
-        description={
-          <>
-            All {periods.length} months · {date(range.from)} – {date(range.to)}
-          </>
-        }
         actions={
           <Link
             href="/months"

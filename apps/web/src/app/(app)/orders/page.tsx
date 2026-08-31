@@ -41,7 +41,6 @@ export default async function OrdersPage({
     <>
       <PageHeader
         title="Orders"
-        description={isAdmin ? 'Every order across all channels' : 'Orders assigned to you'}
         actions={
           <Link
             href="/orders/new"

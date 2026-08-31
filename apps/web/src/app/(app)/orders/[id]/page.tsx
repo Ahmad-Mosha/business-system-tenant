@@ -23,19 +23,19 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
     <>
       <PageHeader
         title={order.orderNumber}
-        description={
-          <>
-            <SourceLabel source={order.source} /> · placed {dateTime(order.placedAt)}
-          </>
-        }
         actions={
-          <Link
-            href="/orders"
-            className="inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-          >
-            <ArrowLeft className="size-4" />
-            All orders
-          </Link>
+          <>
+            <p className="text-xs text-muted-foreground">
+              <SourceLabel source={order.source} /> · placed {dateTime(order.placedAt)}
+            </p>
+            <Link
+              href="/orders"
+              className="inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            >
+              <ArrowLeft className="size-4" />
+              All orders
+            </Link>
+          </>
         }
       />
 

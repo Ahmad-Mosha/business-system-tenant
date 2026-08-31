@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { getDataRange, getPeriods, getProducts } from '@/lib/api';
-import { date, money, moneyWhole } from '@/lib/format';
+import { money, moneyWhole } from '@/lib/format';
 import { requireAdmin } from '@/lib/session';
 
 export default async function ProductsPage({
@@ -26,7 +26,7 @@ export default async function ProductsPage({
   if (!dataRange) {
     return (
       <>
-        <PageHeader title="Products" description="Performance by product" />
+        <PageHeader title="Products" />
         <PageBody>
           <NoDataYet />
         </PageBody>
@@ -54,7 +54,6 @@ export default async function ProductsPage({
     products = products.filter((p) => p.unitCost === null);
   }
 
-  const units = products.reduce((n, p) => n + p.unitsSold, 0);
   // Every product starts as a stub, so flagging all of them says nothing.
   // The badge only earns its place once some have been enriched.
   const stubs = products.filter((p) => p.discovered).length;
@@ -63,10 +62,7 @@ export default async function ProductsPage({
 
   return (
     <>
-      <PageHeader
-        title="Products"
-        description={`${products.length} ${products.length === 1 ? 'product' : 'products'} · ${units} units · ${date(range.from)} – ${date(range.to)}`}
-      />
+      <PageHeader title="Products" />
       <PageBody>
         <ProductsToolbar periods={periods} />
 
