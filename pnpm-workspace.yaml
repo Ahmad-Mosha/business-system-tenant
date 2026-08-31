@@ -1,0 +1,6 @@
+packages:
+  - 'apps/*'
+
+# esbuild and tsx need their install scripts to fetch the right platform binary.
+onlyBuiltDependencies:
+  - esbuild
