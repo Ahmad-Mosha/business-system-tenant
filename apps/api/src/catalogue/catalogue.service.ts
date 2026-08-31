@@ -257,10 +257,24 @@ export class CatalogueService {
         .select({ listings: count() })
         .from(channelListings);
 
+      // Products no arriving sale can attach to. This is the number that
+      // matters before an import runs.
+      const [{ unmapped }] = await tx.execute<{ unmapped: number }>(sql`
+        select count(*)::int as unmapped
+        from product p
+        where p.active
+          and not exists (
+            select 1 from product_variant v
+            join channel_listing l on l.variant_id = v.id
+            where v.product_id = p.id
+          )
+      `).then((r) => r.rows);
+
       return {
         byCategory: Object.fromEntries(rows.map((r) => [r.category, r.total])),
         products: rows.reduce((n, r) => n + r.total, 0),
         listings,
+        unmapped,
       };
     });
   }

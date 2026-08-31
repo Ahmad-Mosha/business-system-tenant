@@ -4,6 +4,7 @@ import {
   Boxes,
   ClipboardList,
   LayoutGrid,
+  Package,
   Plug,
   Settings,
   Truck,
@@ -21,6 +22,7 @@ import type { Role } from '@/lib/session';
  */
 const NAV = [
   { href: '/', label: 'Overview', icon: LayoutGrid, roles: ['ADMIN'] },
+  { href: '/products', label: 'Products', icon: Package, roles: ['ADMIN'] },
   { href: '/inventory', label: 'Inventory', icon: Boxes, roles: ['ADMIN'] },
   { href: '/orders', label: 'Orders', icon: ClipboardList, roles: ['ADMIN', 'MODERATOR'] },
   { href: '/shipping', label: 'Shipping', icon: Truck, roles: ['ADMIN', 'MODERATOR'] },

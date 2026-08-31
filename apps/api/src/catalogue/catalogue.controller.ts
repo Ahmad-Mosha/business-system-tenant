@@ -57,10 +57,13 @@ export class CatalogueController {
   @Get('summary')
   @ApiOperation({
     summary: 'Counts for the catalogue header',
-    description: 'Active products per category, and how many channel listings exist in total.',
+    description:
+      'Active products per category, how many channel listings exist, and how many products no arriving sale could attach to yet.',
   })
   @ApiOkResponse({
-    schema: { example: { byCategory: { COSMETICS: 58, HOME: 77 }, products: 135, listings: 0 } },
+    schema: {
+      example: { byCategory: { COSMETICS: 58, HOME: 77 }, products: 135, listings: 0, unmapped: 135 },
+    },
   })
   summary(@Req() req: AuthedRequest) {
     return this.catalogue.summary(req.user.tenantId);
