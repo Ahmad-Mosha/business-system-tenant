@@ -1,4 +1,5 @@
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, X } from 'lucide-react';
+import Link from 'next/link';
 import { OrderActions } from '@/components/order-actions';
 import { SourceLabel, StatusBadge, PaymentBadge } from '@/components/order-status';
 import { Scroller } from '@/components/shell';
@@ -11,7 +12,15 @@ import type { SessionUser } from '@/lib/session';
  * fixed height: the identity line and the actions are pinned, and only the
  * middle scrolls — so the total and the next move are never scrolled away.
  */
-export async function OrderDetail({ id, user }: { id: string; user: SessionUser }) {
+export async function OrderDetail({
+  id,
+  user,
+  closeHref,
+}: {
+  id: string;
+  user: SessionUser;
+  closeHref: string;
+}) {
   const order = await getOrder(id).catch(() => null);
   if (!order) {
     return (
@@ -33,6 +42,14 @@ export async function OrderDetail({ id, user }: { id: string; user: SessionUser 
           <div className="flex shrink-0 items-center gap-1.5">
             <StatusBadge status={order.status} />
             <PaymentBadge status={order.paymentStatus} />
+            <Link
+              href={closeHref}
+              scroll={false}
+              aria-label="Close order details"
+              className="-me-1 inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            >
+              <X className="size-4" />
+            </Link>
           </div>
         </div>
         <p className="mt-1 text-xs text-muted-foreground">
