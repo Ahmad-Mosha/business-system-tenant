@@ -183,6 +183,7 @@ export function ShipmentsView({
             <tbody className="divide-y divide-border">
               {filtered.map((s) => {
                 const isDelivered = s.status === 'DELIVERED';
+                const isReturnedOrDead = s.status === 'RETURNED' || s.status === 'CANCELLED';
                 const isSelected = selectedShipment?.trackingNumber === s.trackingNumber;
                 const collection = s.cod?.collectionStatus ?? 'PENDING';
 
@@ -250,13 +251,15 @@ export function ShipmentsView({
                           'inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium whitespace-nowrap',
                           isDelivered
                             ? 'border-success/30 bg-success-subtle text-success dark:border-success/30 dark:bg-success-subtle dark:text-success'
-                            : s.isDelayed
-                              ? 'border-warning/30 bg-warning-subtle text-warning'
-                              : 'border-border bg-muted text-foreground',
+                            : isReturnedOrDead
+                              ? 'border-destructive/30 bg-destructive-subtle text-destructive'
+                              : s.isDelayed
+                                ? 'border-warning/30 bg-warning-subtle text-warning'
+                                : 'border-border bg-muted text-foreground',
                         )}
                       >
-                        <Check className="size-3 stroke-[2.5]" />
-                        {isDelivered ? 'تم بنجاح' : s.statusLabel}
+                        {isDelivered ? <Check className="size-3 stroke-[2.5]" /> : null}
+                        {isDelivered ? 'تم بنجاح' : isReturnedOrDead ? 'تم الاسترجاع' : s.statusLabel}
                       </span>
                     </td>
 
@@ -340,9 +343,22 @@ export function ShipmentsView({
                   <h2 className="font-mono text-lg font-bold tracking-tight text-foreground">
                     توصيل #{selectedShipment.trackingNumber}
                   </h2>
-                  <span className="inline-flex items-center gap-1 rounded-full border border-success/30 bg-success-subtle px-2.5 py-0.5 text-xs font-semibold text-success dark:text-success">
-                    <Check className="size-3 stroke-[2.5]" />
-                    {selectedShipment.status === 'DELIVERED' ? 'تم بنجاح' : selectedShipment.statusLabel}
+                  <span
+                    className={cn(
+                      'inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold',
+                      selectedShipment.status === 'DELIVERED'
+                        ? 'border-success/30 bg-success-subtle text-success'
+                        : selectedShipment.status === 'RETURNED' || selectedShipment.status === 'CANCELLED'
+                          ? 'border-destructive/30 bg-destructive-subtle text-destructive'
+                          : 'border-border bg-muted text-foreground',
+                    )}
+                  >
+                    {selectedShipment.status === 'DELIVERED' && <Check className="size-3 stroke-[2.5]" />}
+                    {selectedShipment.status === 'DELIVERED'
+                      ? 'تم بنجاح'
+                      : selectedShipment.status === 'RETURNED' || selectedShipment.status === 'CANCELLED'
+                        ? 'تم الاسترجاع'
+                        : selectedShipment.statusLabel}
                   </span>
                   <span className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-foreground">
                     مؤكد
