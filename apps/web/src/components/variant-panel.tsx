@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { recordStock, updateVariant } from '@/app/(app)/inventory/actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { dateTime, money } from '@/lib/format';
+import { dateTime } from '@/lib/format';
 
 const REASONS = [
   { value: 'PURCHASE', label: 'Purchased' },
@@ -23,6 +23,7 @@ interface Variant {
   unitCost: string | null;
   sellingPrice: string | null;
   onHand: number;
+  inOpenOrders: number;
 }
 
 interface Movement {
@@ -82,6 +83,7 @@ export function VariantPanel({
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {variant.onHand} on hand
+            {variant.inOpenOrders > 0 ? ` · ${variant.inOpenOrders} in open orders` : ''}
           </p>
         </div>
         <p className="text-2xl font-semibold tabular-nums">{variant.onHand}</p>

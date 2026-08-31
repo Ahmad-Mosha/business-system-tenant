@@ -144,7 +144,7 @@ export interface OrderDetail extends Omit<OrderRow, 'assignedToName' | 'itemCoun
   notes: string | null;
   subtotal: string;
   shippingCost: string;
-  externalId: string;
+  externalId: string | null;
   externalStatus: string | null;
   assignedTo: { id: string; name: string } | null;
   items: Array<{
@@ -287,6 +287,8 @@ export interface ProductDetail {
     sellingPrice: string | null;
     active: boolean;
     onHand: number;
+    /** In orders that are neither cancelled nor returned — already off on-hand, shown for context. */
+    inOpenOrders: number;
   }>;
   listings: Array<{
     id: string;
