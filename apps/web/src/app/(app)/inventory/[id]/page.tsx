@@ -3,16 +3,10 @@ import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { ChannelBadge } from '@/components/order-status';
 import { PageBody, PageHeader, SectionHeading } from '@/components/page-header';
+import { ProductDetailsPanel } from '@/components/product-details-panel';
 import { VariantPanel } from '@/components/variant-panel';
 import { getProductDetail, getStockHistory } from '@/lib/api';
 import { requireAdmin } from '@/lib/session';
-
-const CHANNEL_LABELS: Record<string, string> = {
-  noon: 'noon',
-  easyorders: 'Website',
-  amazon: 'Amazon',
-  social: 'Social',
-};
 
 export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
   await requireAdmin();
@@ -30,7 +24,6 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     <>
       <PageHeader
         title={product.name}
-        description={product.category ?? 'Uncategorised'}
         actions={
           <Link
             href="/inventory"
@@ -43,6 +36,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       />
 
       <PageBody>
+        <ProductDetailsPanel productId={product.id} name={product.name} category={product.category} />
+
         <section>
           <SectionHeading
             title="Variants and stock"

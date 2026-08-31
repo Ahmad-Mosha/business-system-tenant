@@ -262,6 +262,15 @@ export interface ProductRow {
   unitCost: string | null;
   sellingPrice: string | null;
   channels: string[];
+  /** Count across every product matching the current filters, not just this page. */
+  totalCount: number;
+}
+
+export interface ProductsSummary {
+  products: number;
+  unitsOnHand: number;
+  stockValue: string;
+  missingCost: number;
 }
 
 export interface ProductDetail {
@@ -301,6 +310,8 @@ export const getOrderSummary = () => get<OrderSummary>('/orders/summary');
 export const getAssignees = () => get<Assignee[]>('/auth/users');
 export const getProductsCatalog = (query?: string) =>
   get<ProductRow[]>(`/catalog/products${query ? (query.startsWith('?') ? query : `?${query}`) : ''}`);
+export const getProductsSummary = (query?: string) =>
+  get<ProductsSummary>(`/catalog/products/summary${query ? (query.startsWith('?') ? query : `?${query}`) : ''}`);
 export const getProductDetail = (id: string) => get<ProductDetail>(`/catalog/products/${id}`);
 export const getStockHistory = (variantId: string) =>
   get<Array<{ id: string; quantity: number; reason: string; note: string | null; occurredAt: string; runningTotal: number }>>(
