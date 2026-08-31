@@ -19,7 +19,7 @@ export function Status({ tone = 'neutral', children }: { tone?: Tone; children: 
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 rounded-full border px-1.5 py-px',
+        'inline-flex w-fit shrink-0 items-center gap-1 self-start rounded-full border px-1.5 py-px',
         'label-caps !text-[10px] leading-4',
         TONES[tone],
       )}
