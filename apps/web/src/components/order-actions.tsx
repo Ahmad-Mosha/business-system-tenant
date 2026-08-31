@@ -6,16 +6,11 @@ import { toast } from 'sonner';
 import { assignOrder, setOrderStatus, setPaymentStatus } from '@/app/(app)/orders/actions';
 import { isReverse, NEXT_STATUSES, STATUS_LABELS } from '@/components/order-status';
 import type { OrderStatus, PaymentStatus } from '@/lib/api';
-import { money } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 const PAYMENTS: PaymentStatus[] = ['UNPAID', 'PAID', 'REFUNDED'];
 
-/**
- * The detail pane's fixed footer: the total and every move available on this
- * order, always in view. It replaces a full-width workflow bar that pushed the
- * order's own content down the page.
- */
+/** Every move available on this order, beside the summary it belongs to. */
 export function OrderActions({
   orderId,
   status,
@@ -23,7 +18,6 @@ export function OrderActions({
   assignedToId,
   assignees,
   canAssign,
-  total,
 }: {
   orderId: string;
   status: OrderStatus;
@@ -31,7 +25,6 @@ export function OrderActions({
   assignedToId: string | null;
   assignees: Array<{ id: string; name: string }>;
   canAssign: boolean;
-  total: string;
 }) {
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState<string | null>(null);
@@ -51,15 +44,9 @@ export function OrderActions({
     'inline-flex h-[var(--control-h)] items-center gap-1.5 rounded-md border px-2.5 text-[13px] transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-50';
 
   return (
-    <div className="shrink-0 border-t border-border bg-background">
-      <div className="flex items-baseline justify-between gap-3 px-4 py-2.5">
-        <span className="text-[11px] font-medium tracking-[0.07em] text-muted-foreground uppercase">
-          Total
-        </span>
-        <span className="text-lg font-semibold tabular-nums">{money(total)}</span>
-      </div>
-
-      <div className="space-y-2 border-t border-border px-4 py-3">
+    <div className="rounded-xl border border-border bg-card p-5 shadow-xs">
+      <h2 className="mb-4 text-[15px] font-semibold">Workflow</h2>
+      <div className="space-y-3">
         {canAssign && (
           <label className="flex items-center gap-2">
             <span className="w-16 shrink-0 text-[11px] text-muted-foreground">Assigned</span>
