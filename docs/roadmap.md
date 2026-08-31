@@ -3,27 +3,31 @@
 Phases in dependency order. Each one is finished — usable and verified against
 real data — before the next starts.
 
-The ordering rule comes from what broke the previous build: **the thing being
-referenced is built before the thing that references it.** Orders reference
-stock. Stock references products. Money references cost. Analytics references
-all of it.
+The ordering rule comes from what broke the previous build: **anything that
+mutates stock or money is built after the thing it mutates.** Orders reference
+stock. Stock references products. Money references cost.
+
+Note the word *mutates*. Reading a report and showing what it says mutates
+nothing, and is not subject to that rule. That distinction is what lets the
+noon work start early instead of waiting behind the foundation.
 
 ```
-0 Foundation
-      │
-      ├─► 1 Catalogue ──► 2 Stock ledger ──► 3 Costing ──► 4 Money ledger
-      │                        │                               │
-      │                        │                               ├─► 6a noon settlements   ★ payoff
-      │                        │                               │
-      │                        └───────────────────────────────┴─► 5 Orders
-      │                                                              │
-      │                                                    ┌─────────┼─────────┐
-      │                                                    ▼         ▼         ▼
-      └───────────────────────────────────────────────► 6b noon   7 Bosta   8 Easy Orders
-                                                         sales    shipping   webhook
-                                                                       │
-                                                                       ▼
-                                                                9 Analytics ──► Amazon
+0  Foundation ─────────────────────────────────────────────┐
+                                                            │
+1  Inventory foundation          2  noon import  ★ read-only, parallel
+   1a catalogue + channel map ──────► maps into it
+   1b stock ledger + locations
+   1c costing + valuation
+        │
+3  Money ledger
+        │
+        ├──► 4  noon settlements post to the ledger   ★★ the 8-hour win
+        │
+5  Orders  (lifecycle reviewed first)
+        │
+        ├──► 6  noon sales move stock and post cost
+        ├──► 7  Bosta + payment reconciliation
+        └──► 8  Easy Orders ──► 9  Analytics ──► Amazon
 ```
 
 ---
@@ -35,32 +39,36 @@ existing volume holds the previous build's schema and must not be collided
 with). Migrations from the first table. `tenant_id` + RLS. Auth with Admin and
 Moderator roles. Swagger UI with working *Try it out*.
 
-Ends with the API deployed to a **fixed HTTPS domain**. This is phase 0 and not
-phase 8 on purpose: it is what makes the Easy Orders webhook permanently
-solvable instead of repeatedly re-tunnelled.
+Ends with the API running in Docker on a **fixed HTTPS domain**. This is phase
+0 and not phase 8 on purpose: it is what makes the Easy Orders webhook
+permanently solvable instead of repeatedly re-tunnelled.
 
 **Done when:** a fresh clone runs `docker compose up` and `npm run dev`, and
 someone with no backend knowledge can log in through Swagger and call an
-endpoint.
+endpoint on the deployed instance.
 
 ---
 
-## Phase 1 — Catalogue and product identity
+## Phase 1 — Inventory foundation
 
-Products, variants, categories, channel listings. Arabic names throughout,
+**This is the phase that matters.** It is one piece of work in three steps,
+because you cannot count stock of a product that does not exist, and you cannot
+value stock without knowing what it cost.
+
+### 1a — Catalogue and product identity
+
+Products, variants, categories, **channel listings**. Arabic names throughout,
 UTF-8 verified end to end. Seeded from the real 135 products.
+
+The channel listing table is the part that makes everything downstream work: it
+is what an incoming noon row or Easy Orders webhook resolves *to*. Without it,
+an arriving sale has nothing to decrement.
 
 The seed is **a starting position, not an audited opening balance** — it agrees
 with Mega's own footer to 99.4% on units. It is loaded as data to be checked by
 a physical count, not as truth.
 
-**Done when:** all 135 products are searchable in Arabic, and the noon Partner
-SKUs from the real settlement files map onto them with the unmapped remainder
-listed rather than invented.
-
----
-
-## Phase 2 — Stock ledger
+### 1b — Stock ledger
 
 Locations, moves, on-hand per variant per location. Receipts, transfers to noon,
 damage, adjustments, counts. Admin-only, actor recorded on every row.
@@ -68,23 +76,50 @@ damage, adjustments, counts. Admin-only, actor recorded on every row.
 Opening stock is entered as a **dated opening count** — the cutover the noon
 import later splits on.
 
-**Done when:** on-hand for any variant reconciles to the sum of its moves, and
-every number on screen can be opened to the movements that produced it.
-
----
-
-## Phase 3 — Costing and valuation
+### 1c — Costing and valuation
 
 Goods receipts with purchase cost and landed cost. A valuation layer per move.
 Stock value derived, never stored.
 
-**Done when:** stock value equals the sum of the layers, and a receipt with
+**Done when:** on-hand for any variant reconciles to the sum of its moves, every
+number on screen opens to the movements that produced it, and a receipt with
 shipping allocated across it produces unit costs that add back to the amount
 actually paid.
 
 ---
 
-## Phase 4 — Money ledger
+## Phase 2 — noon report import ★ read-only
+
+Starts as soon as phase 0 is done and runs alongside phase 1. It **writes
+nothing to stock or money** — it parses, stores and reports. That is why it can
+come this early without repeating the previous build's mistake.
+
+Upload a settlement CSV. Rows are stored raw and fingerprinted, so re-uploading
+an overlapping export changes nothing. The Statement of Account is
+reconstructed from them: net proceeds, the seven fee columns, payouts, closing
+balance. Unmapped rows are listed for a human.
+
+**This is where the manual labour dies.** Reading the report and working out
+what it says is the 8-to-9-hour job. Doing that automatically does not require
+the money ledger, the order lifecycle, or anything still under review.
+
+Once 1a lands, the same rows resolve to products and the report gains a
+per-product view.
+
+### Validation milestone
+
+Four real noon exports covering May to August 2026 — **3,173 rows** — are
+available, along with the parsed results the previous build produced. The
+statements reconstruct cleanly by settlement reference, and the weekly payout
+cycle is visible in them.
+
+**Done when** an import of the real files reproduces noon's own Account Summary
+within the known 1.99 EGP tolerance, that discrepancy is *shown* rather than
+absorbed, and re-importing an overlapping file changes nothing.
+
+---
+
+## Phase 3 — Money ledger
 
 Chart of accounts, journal entries, posting rules. Purchases post cash →
 inventory. Capital in and out. Manual entries with an actor.
@@ -94,31 +129,17 @@ from entries, and every entry can be traced to what caused it.
 
 ---
 
-## Phase 6a — noon settlement import ★
+## Phase 4 — noon settlements post to the ledger ★★
 
-Deliberately **before** orders. It is the owner's single largest time sink — 8
-to 9 hours a day — and the statement side of it needs the money ledger, not the
-order lifecycle. Nothing about it should wait on a decision still under review.
+The imported statements from phase 2 now post: net proceeds, channel fees,
+advertising, payouts. What noon owes appears as a receivable with an expected
+payout date; a bank transfer clears it into cash.
 
-Import a settlement CSV; reconstruct the Statement of Account; post net
-proceeds, fees and payouts to the ledger; show what noon owes and when it is
-expected.
+**Done when:** the noon balance is visibly a receivable and not cash, and the
+weekly accrue-then-pay cycle in the real data reproduces exactly.
 
-### The validation milestone
-
-Four real noon exports covering May to August 2026 — **3,173 rows** — are
-available, along with the parsed results the previous build produced. The
-statements reconstruct cleanly by settlement reference, and the payout cycle is
-visible in the data: statements accrue weekly and are paid about a week in
-arrears.
-
-**Done when** an import of the real files reproduces noon's own Account Summary
-within the known 1.99 EGP tolerance, that discrepancy is *shown* rather than
-absorbed, re-importing an overlapping file changes nothing, and the noon
-receivable is a receivable and not cash.
-
-This is the milestone that proves the money model. If it does not hold here, it
-does not hold anywhere.
+At this point the settlement problem is solved end to end and the daily numbers
+are real. Everything after this is breadth.
 
 ---
 
@@ -138,7 +159,7 @@ both the stock and the money to where they were.
 
 ---
 
-## Phase 6b — noon sales into stock and profit
+## Phase 6 — noon sales into stock and profit
 
 Settlement rows after the cutover date map to products, deplete noon's location,
 and post COGS. Rows before it stay money-only.
@@ -178,6 +199,15 @@ Amazon joins here **when a real report exists**. The noon work is the reason:
 the actual file format dictated nearly every decision, and the natural
 assumptions — that there would be a quantity column, that `order_update` meant
 "return" — were both wrong.
+
+---
+
+## Where the interface work sits
+
+Screens are built with the phase they belong to, not in a separate frontend
+phase. The design system — tokens, table, form, filter bar, master-detail
+panel — is settled once, before the first screen, and every later screen is
+assembled from it. See [ui-ux.md](ui-ux.md).
 
 ---
 

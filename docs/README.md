@@ -26,6 +26,7 @@ hours.
 |---|---|
 | [architecture.md](architecture.md) | How the system is designed, and why each decision was taken |
 | [roadmap.md](roadmap.md) | The phases, their dependency order, and how each is verified |
+| [ui-ux.md](ui-ux.md) | What is kept, dropped and missing from the UI reference, and the design direction |
 
 ## Data
 
