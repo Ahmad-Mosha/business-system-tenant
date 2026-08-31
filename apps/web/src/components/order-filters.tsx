@@ -16,24 +16,21 @@ import { cn } from '@/lib/utils';
 /**
  * Filters live in the URL, so a filtered view is shareable and the back button
  * behaves. The list itself stays a server component.
- *
- * Seven status chips used to sit on their own row above the table. Collapsed
- * into one control that shows its current value, they fit the context bar and
- * cost the screen no vertical space at all.
  */
-export function OrderFilters({ isAdmin }: { isAdmin: boolean }) {
+export function OrderFilters() {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
   const [pending, startTransition] = useTransition();
 
   const status = params.get('status');
-  const unassigned = params.get('unassigned') === 'true';
+  const source = params.get('source');
   const [search, setSearch] = useState(params.get('search') ?? '');
 
-  /** Changing a filter drops the selection — that order may not be in the new list. */
+  /** Any filter change drops the selection and the page — neither survives a new result set. */
   const apply = (next: URLSearchParams) => {
     next.delete('selected');
+    next.delete('page');
     startTransition(() => router.push(`${pathname}?${next.toString()}`, { scroll: false }));
   };
 
@@ -44,7 +41,6 @@ export function OrderFilters({ isAdmin }: { isAdmin: boolean }) {
     apply(next);
   };
 
-  // Debounced so typing does not fire a request per keystroke.
   useEffect(() => {
     const current = params.get('search') ?? '';
     if (search === current) return;
@@ -59,74 +55,101 @@ export function OrderFilters({ isAdmin }: { isAdmin: boolean }) {
   }, [search]);
 
   const control =
-    'inline-flex h-[var(--control-h)] items-center gap-1.5 rounded-md border px-2.5 text-[13px] transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none';
+    'inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[13px] transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none';
 
   return (
-    <div className={cn('flex items-center gap-1.5', pending && 'opacity-70')}>
-      <div className="relative">
-        <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+    <div className={cn('flex flex-wrap items-center gap-2', pending && 'opacity-70')}>
+      <Picker
+        label={source === 'SOCIAL' ? 'Social' : source === 'EASYORDERS' ? 'Website' : 'All channels'}
+        active={!!source}
+        className={control}
+        options={[
+          { value: null, label: 'All channels' },
+          { value: 'SOCIAL', label: 'Social' },
+          { value: 'EASYORDERS', label: 'Website' },
+        ]}
+        current={source}
+        onPick={(v) => set('source', v)}
+      />
+
+      <Picker
+        label={status ? STATUS_LABELS[status as keyof typeof STATUS_LABELS] : 'Any status'}
+        active={!!status}
+        className={control}
+        options={[
+          { value: null, label: 'Any status' },
+          ...ALL_ORDER_STATUSES.map((s) => ({ value: s as string, label: STATUS_LABELS[s] })),
+        ]}
+        current={status}
+        onPick={(v) => set('status', v)}
+      />
+
+      <div className="relative ms-auto">
+        <Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" />
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Name, phone or number"
+          placeholder="Search orders…"
           aria-label="Search orders"
-          className="h-[var(--control-h)] w-[220px] rounded-md border border-border bg-background pr-7 pl-8 text-[13px] placeholder:text-muted-foreground/70 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          className="h-9 w-[240px] rounded-md border border-border bg-background pr-8 pl-8.5 text-[13px] placeholder:text-muted-foreground/70 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         />
         {search && (
           <button
             type="button"
             onClick={() => setSearch('')}
             aria-label="Clear search"
-            className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            className="absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground hover:text-foreground"
           >
             <X className="size-3.5" />
           </button>
         )}
       </div>
+    </div>
+  );
+}
 
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            className={cn(
-              control,
-              status ? 'border-foreground bg-foreground text-background' : 'border-border',
-            )}
-          >
-            {status ? STATUS_LABELS[status as keyof typeof STATUS_LABELS] : 'Any status'}
-            <ChevronDown className="size-3.5 opacity-60" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-40">
-          <DropdownMenuItem onSelect={() => set('status', null)} className="text-sm">
-            {!status && <Check className="size-3.5" />}
-            Any status
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          {ALL_ORDER_STATUSES.map((s) => (
-            <DropdownMenuItem key={s} onSelect={() => set('status', s)} className="text-sm">
-              {status === s && <Check className="size-3.5" />}
-              {STATUS_LABELS[s]}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      {isAdmin && (
+function Picker({
+  label,
+  active,
+  className,
+  options,
+  current,
+  onPick,
+}: {
+  label: string;
+  active: boolean;
+  className: string;
+  options: Array<{ value: string | null; label: string }>;
+  current: string | null;
+  onPick: (value: string | null) => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
         <button
           type="button"
-          onClick={() => set('unassigned', unassigned ? null : 'true')}
-          aria-pressed={unassigned}
           className={cn(
-            control,
-            unassigned
-              ? 'border-foreground bg-foreground text-background'
+            className,
+            active
+              ? 'border-foreground font-medium'
               : 'border-border text-muted-foreground hover:bg-accent hover:text-foreground',
           )}
         >
-          Unassigned
+          {label}
+          <ChevronDown className="size-3.5 opacity-60" />
         </button>
-      )}
-    </div>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-44">
+        {options.map((o, i) => (
+          <div key={o.value ?? 'all'}>
+            {i === 1 && <DropdownMenuSeparator />}
+            <DropdownMenuItem onSelect={() => onPick(o.value)} className="text-sm">
+              {current === o.value && <Check className="size-3.5" />}
+              {o.label}
+            </DropdownMenuItem>
+          </div>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

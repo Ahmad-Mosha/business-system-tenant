@@ -75,10 +75,16 @@ const PAYMENT_LABELS: Record<PaymentStatus, string> = {
 };
 
 const BASE =
-  'inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[11px] font-medium whitespace-nowrap';
+  'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium whitespace-nowrap';
 
+/** The dot carries the state at a glance; the label says which state it is. */
 export function StatusBadge({ status, className }: { status: OrderStatus; className?: string }) {
-  return <span className={cn(BASE, STATUS_STYLES[status], className)}>{STATUS_LABELS[status]}</span>;
+  return (
+    <span className={cn(BASE, STATUS_STYLES[status], className)}>
+      <span className="size-1.5 shrink-0 rounded-full bg-current opacity-70" />
+      {STATUS_LABELS[status]}
+    </span>
+  );
 }
 
 export function PaymentBadge({
