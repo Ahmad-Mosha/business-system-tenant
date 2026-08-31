@@ -1,0 +1,13 @@
+{
+  "name": "prime-market",
+  "private": true,
+  "workspaces": ["apps/*"],
+  "scripts": {
+    "db:up": "docker compose up -d",
+    "dev": "npm run start:dev -w @prime/api",
+    "build": "npm run build -w @prime/api",
+    "typecheck": "npm run typecheck -w @prime/api",
+    "migrate": "npm run migrate -w @prime/api",
+    "generate": "npm run generate -w @prime/api"
+  }
+}
