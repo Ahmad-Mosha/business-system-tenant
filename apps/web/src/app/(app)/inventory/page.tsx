@@ -68,6 +68,11 @@ export default async function InventoryPage({
             tone={summary.missingCost > 0 ? 'warning' : 'default'}
             hint={summary.missingCost > 0 ? 'stock value understated' : 'all costed'}
           />
+          <MetricCard
+            label="Units in orders"
+            value={summary.unitsInOrders}
+            hint="not yet delivered"
+          />
         </MetricRow>
 
         <InventoryToolbar />

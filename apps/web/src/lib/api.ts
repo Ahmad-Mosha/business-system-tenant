@@ -274,6 +274,8 @@ export interface ProductsSummary {
   unitsOnHand: number;
   stockValue: string;
   missingCost: number;
+  /** Sums ProductRow.inOrders across every filtered product. */
+  unitsInOrders: number;
 }
 
 export interface ProductDetail {
