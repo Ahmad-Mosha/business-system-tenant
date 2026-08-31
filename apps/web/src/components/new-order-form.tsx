@@ -1,18 +1,22 @@
 'use client';
 
-import { AlertCircle, Loader2, Plus, Search, Trash2, X } from 'lucide-react';
+import {
+  AlignLeft,
+  ArrowLeft,
+  CheckCircle2,
+  CreditCard,
+  Loader2,
+  Plus,
+  Search,
+  ShoppingBag,
+  Trash2,
+  Truck,
+  User,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useActionState, useEffect, useRef, useState } from 'react';
 import { createOrder, searchVariants, type CreateOrderState } from '@/app/(app)/orders/actions';
-import {
-  ContextBar,
-  DetailPane,
-  ListPane,
-  Screen,
-  Scroller,
-  Split,
-  StatusStrip,
-} from '@/components/shell';
+import { Screen, Scroller } from '@/components/shell';
 import { GOVERNORATES } from '@/lib/governorates';
 import { money } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -37,23 +41,28 @@ interface Line {
 
 type Hit = Awaited<ReturnType<typeof searchVariants>>[number];
 
+const PAYMENT_METHODS = [
+  { value: 'COD', label: 'Cash on Delivery' },
+  { value: 'WALLET', label: 'Mobile Wallet' },
+  { value: 'INSTAPAY', label: 'InstaPay' },
+] as const;
+
 const field =
-  'h-[var(--control-h)] w-full rounded-md border border-border bg-background px-2.5 text-[13px] focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-60';
+  'h-9 w-full rounded-md border border-border bg-background px-3 text-[13px] focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-60';
 
 /**
- * The moderator is on a call. They know the customer, the product and the
- * price, and the order has to be recorded before the call ends.
+ * Manual order entry, for the orders a moderator takes over social.
  *
- * Three columns, no page scroll: who is buying on the left, what they are
- * buying in the middle, what it comes to on the right. The old version stacked
- * all three down a single page, which put the submit button below the fold as
- * soon as a second item was added.
+ * Numbered sections down the work column, and an order summary that stays put:
+ * the total and the create button are visible the whole time, whatever the
+ * section list is doing. Only the work column scrolls.
  */
 export function NewOrderForm({ assignsToSelf }: { assignsToSelf: boolean }) {
   const [state, submit, pending] = useActionState(createOrder, INITIAL);
   const [lines, setLines] = useState<Line[]>([]);
   const [shipping, setShipping] = useState('0');
   const [phone, setPhone] = useState('');
+  const [method, setMethod] = useState<string>('COD');
   const [term, setTerm] = useState('');
   const [hits, setHits] = useState<Hit[]>([]);
   const [searching, setSearching] = useState(false);
@@ -124,238 +133,309 @@ export function NewOrderForm({ assignsToSelf }: { assignsToSelf: boolean }) {
       />
 
       <Screen>
-        <ContextBar
-          title="New order"
-          meta={assignsToSelf ? 'assigned to you' : 'unassigned until an admin assigns it'}
-          actions={
-            <Link
-              href="/orders"
-              className="inline-flex h-[var(--control-h)] items-center gap-1.5 rounded-md px-2.5 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-            >
-              <X className="size-3.5" />
-              Cancel
-            </Link>
-          }
-        />
+        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-5">
+          <Link
+            href="/orders"
+            aria-label="Back to orders"
+            className="-ms-2 inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          >
+            <ArrowLeft className="size-4.5" />
+          </Link>
+          <h1 className="text-lg font-semibold tracking-[-0.02em]">Manual Order Entry</h1>
+          <span className="text-xs text-muted-foreground">
+            {assignsToSelf ? 'assigned to you' : 'unassigned until an admin assigns it'}
+          </span>
+          <Link
+            href="/orders"
+            className="ms-auto inline-flex h-9 items-center rounded-md border border-border px-4 text-[13px] font-medium transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          >
+            Cancel
+          </Link>
+        </header>
 
-        <Split>
-          {/* Who is buying. Fixed width — these fields never need more. */}
-          <aside className="flex w-[300px] shrink-0 flex-col overflow-hidden border-e border-border">
-            <Scroller className="space-y-3 p-4">
-              <Legend>Customer</Legend>
-              <Labelled label="Name" htmlFor="customerName">
-                <input id="customerName" name="customerName" required disabled={pending} className={field} />
-              </Labelled>
-              <Labelled label="Phone" htmlFor="customerPhone">
-                <input
-                  id="customerPhone"
-                  name="customerPhone"
-                  required
-                  inputMode="tel"
-                  placeholder="010 1234 5678"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  aria-invalid={phone.length > 0 && !phoneOk}
-                  disabled={pending}
-                  className={cn(field, phone.length > 0 && !phoneOk && 'border-destructive')}
-                />
-                {phone.length > 0 && !phoneOk && (
-                  <p className="mt-1 text-[11px] text-destructive">Not a valid Egyptian mobile</p>
-                )}
-              </Labelled>
-              <Labelled label="Governorate" htmlFor="governorate">
-                <select id="governorate" name="governorate" required defaultValue="" disabled={pending} className={field}>
-                  <option value="" disabled>
-                    Select…
-                  </option>
-                  {GOVERNORATES.map((g) => (
-                    <option key={g} value={g}>
-                      {g}
-                    </option>
-                  ))}
-                </select>
-              </Labelled>
-              <Labelled label="Address" htmlFor="address">
-                <input id="address" name="address" disabled={pending} className={field} />
-              </Labelled>
+        <div className="flex min-h-0 flex-1">
+          {/* The work column — the only thing that scrolls. */}
+          <Scroller className="px-6 py-6">
+            <div className="mx-auto max-w-[760px] space-y-8">
+              <Section icon={User} step="1" title="Customer Information">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Labelled label="Full Name" htmlFor="customerName">
+                    <input
+                      id="customerName"
+                      name="customerName"
+                      required
+                      placeholder="e.g. أحمد جمال"
+                      disabled={pending}
+                      className={field}
+                    />
+                  </Labelled>
+                  <Labelled label="Phone Number" htmlFor="customerPhone">
+                    <input
+                      id="customerPhone"
+                      name="customerPhone"
+                      required
+                      inputMode="tel"
+                      placeholder="01xxxxxxxxx"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      aria-invalid={phone.length > 0 && !phoneOk}
+                      disabled={pending}
+                      className={cn(field, phone.length > 0 && !phoneOk && 'border-destructive')}
+                    />
+                    {phone.length > 0 && !phoneOk && (
+                      <p className="mt-1 text-[11px] text-destructive">
+                        Not a valid Egyptian mobile number
+                      </p>
+                    )}
+                  </Labelled>
+                </div>
+              </Section>
 
-              <Legend className="pt-2">Payment</Legend>
-              <Labelled label="Method" htmlFor="paymentMethod">
-                <select id="paymentMethod" name="paymentMethod" defaultValue="COD" disabled={pending} className={field}>
-                  <option value="COD">Cash on delivery</option>
-                  <option value="INSTAPAY">InstaPay</option>
-                  <option value="WALLET">Mobile wallet</option>
-                </select>
-              </Labelled>
-
-              <Legend className="pt-2">Notes</Legend>
-              <textarea
-                id="notes"
-                name="notes"
-                rows={3}
-                placeholder="Anything the team should know"
-                disabled={pending}
-                className="w-full resize-none rounded-md border border-border bg-background px-2.5 py-2 text-[13px] focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-60"
-              />
-            </Scroller>
-          </aside>
-
-          {/* What they are buying. Takes the remaining width and does the scrolling. */}
-          <ListPane>
-            <div className="relative shrink-0 border-b border-border p-3">
-              <Search className="pointer-events-none absolute top-1/2 left-6 size-3.5 -translate-y-1/2 text-muted-foreground" />
-              <input
-                value={term}
-                onChange={(e) => setTerm(e.target.value)}
-                placeholder="Search inventory by name or SKU"
-                disabled={pending}
-                className={cn(field, 'pl-8')}
-              />
-              {(hits.length > 0 || searching) && (
-                <ul className="absolute inset-x-3 z-30 mt-1 max-h-72 overflow-y-auto rounded-md border border-border bg-popover shadow-md">
-                  {searching && !hits.length ? (
-                    <li className="px-3 py-2 text-[13px] text-muted-foreground">Searching…</li>
-                  ) : (
-                    hits.map((h) => {
-                      const out = h.onHand <= 0;
-                      return (
-                        <li key={h.id}>
-                          <button
-                            type="button"
-                            onClick={() => addLine(h)}
-                            disabled={out}
-                            className="flex w-full items-center gap-3 px-3 py-2 text-left text-[13px] transition-colors enabled:hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            <span className="min-w-0 flex-1 truncate">{h.label}</span>
-                            <span className={cn('shrink-0 text-[11px]', out ? 'text-destructive' : 'text-muted-foreground')}>
-                              {out ? 'Out of stock' : `${h.onHand} in stock`}
-                            </span>
-                            {h.sellingPrice && (
-                              <span className="w-16 shrink-0 text-right tabular-nums">{money(h.sellingPrice)}</span>
-                            )}
-                          </button>
-                        </li>
-                      );
-                    })
+              <Section icon={ShoppingBag} step="2" title="Order Items">
+                <div className="relative mb-3">
+                  <Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    value={term}
+                    onChange={(e) => setTerm(e.target.value)}
+                    placeholder="Search products by name or SKU"
+                    disabled={pending}
+                    className={cn(field, 'pl-8.5')}
+                  />
+                  {(hits.length > 0 || searching) && (
+                    <ul className="absolute inset-x-0 z-30 mt-1 max-h-72 overflow-y-auto rounded-md border border-border bg-popover shadow-md">
+                      {searching && !hits.length ? (
+                        <li className="px-3 py-2 text-[13px] text-muted-foreground">Searching…</li>
+                      ) : (
+                        hits.map((h) => {
+                          const out = h.onHand <= 0;
+                          return (
+                            <li key={h.id}>
+                              <button
+                                type="button"
+                                onClick={() => addLine(h)}
+                                disabled={out}
+                                className="flex w-full items-center gap-3 px-3 py-2 text-left text-[13px] transition-colors enabled:hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <span className="min-w-0 flex-1 truncate">{h.label}</span>
+                                <span
+                                  className={cn(
+                                    'shrink-0 text-[11px]',
+                                    out ? 'text-destructive' : 'text-muted-foreground',
+                                  )}
+                                >
+                                  {out ? 'Out of stock' : `${h.onHand} in stock`}
+                                </span>
+                                {h.sellingPrice && (
+                                  <span className="w-16 shrink-0 text-right tabular-nums">
+                                    {money(h.sellingPrice)}
+                                  </span>
+                                )}
+                              </button>
+                            </li>
+                          );
+                        })
+                      )}
+                    </ul>
                   )}
-                </ul>
-              )}
-            </div>
+                </div>
 
-            <Scroller>
-              {lines.length === 0 ? (
-                <p className="p-10 text-center text-sm text-muted-foreground">
-                  Search above to add a product, or add a line by hand.
-                </p>
-              ) : (
-                <table className="w-full border-collapse text-[13px]">
-                  <thead className="sticky top-0 z-10 bg-background">
-                    <tr className="border-b border-border text-[11px] tracking-[0.05em] text-muted-foreground uppercase">
-                      <th className="px-3 py-2 text-left font-medium">Item</th>
-                      <th className="w-[76px] px-3 py-2 text-right font-medium">Qty</th>
-                      <th className="w-[110px] px-3 py-2 text-right font-medium">Unit price</th>
-                      <th className="w-[110px] px-3 py-2 text-right font-medium">Line total</th>
-                      <th className="w-10 px-2" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {lines.map((l) => {
-                      const over = l.onHand !== undefined && l.quantity > l.onHand;
-                      const under =
-                        l.unitCost && Number(l.unitPrice) > 0 && Number(l.unitPrice) < Number(l.unitCost);
-                      return (
-                        <tr key={l.key} className="border-b border-border/60 align-middle">
-                          <td className="px-3 py-1.5">
-                            <input
-                              value={l.title}
-                              onChange={(e) => patch(l.key, { title: e.target.value })}
-                              placeholder="Item name"
-                              disabled={pending}
-                              className={cn(field, 'border-transparent px-1.5 hover:border-border')}
-                            />
-                            <p className="mt-0.5 px-1.5 text-[11px] text-muted-foreground">
-                              {l.variantId ? (
-                                <>
-                                  {l.onHand} in stock
-                                  {l.unitCost ? ` · cost ${money(l.unitCost)}` : ''}
-                                  {under ? <span className="text-warning"> · below cost</span> : null}
-                                </>
-                              ) : (
-                                <span className="text-warning">not linked to inventory</span>
-                              )}
-                            </p>
-                          </td>
-                          <td className="px-3 py-1.5 align-top">
-                            <input
-                              type="number"
-                              min={1}
-                              value={l.quantity}
-                              onChange={(e) => patch(l.key, { quantity: Math.max(1, Number(e.target.value)) })}
-                              aria-invalid={over}
-                              disabled={pending}
-                              className={cn(field, 'text-right tabular-nums', over && 'border-destructive')}
-                            />
-                            {over && (
-                              <p className="mt-0.5 text-right text-[11px] text-destructive">max {l.onHand}</p>
-                            )}
-                          </td>
-                          <td className="px-3 py-1.5 align-top">
-                            <input
-                              inputMode="decimal"
-                              value={l.unitPrice}
-                              onChange={(e) => patch(l.key, { unitPrice: e.target.value })}
-                              disabled={pending}
-                              className={cn(field, 'text-right tabular-nums', under && 'border-warning')}
-                            />
-                          </td>
-                          <td className="px-3 py-1.5 text-right align-top font-medium tabular-nums leading-8">
-                            {money(lineTotal(l))}
-                          </td>
-                          <td className="px-2 py-1.5 align-top">
-                            <button
-                              type="button"
-                              onClick={() => setLines((x) => x.filter((y) => y.key !== l.key))}
-                              aria-label={`Remove ${l.title || 'item'}`}
-                              disabled={pending}
-                              className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive-subtle hover:text-destructive"
-                            >
-                              <Trash2 className="size-3.5" />
-                            </button>
+                <div className="overflow-hidden rounded-lg border border-border">
+                  <table className="w-full border-collapse text-[13px]">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/40 text-[11px] tracking-[0.06em] text-muted-foreground uppercase">
+                        <th className="px-3 py-2 text-left font-medium">Item</th>
+                        <th className="w-[84px] px-3 py-2 text-right font-medium">Qty</th>
+                        <th className="w-[120px] px-3 py-2 text-right font-medium">Unit Price</th>
+                        <th className="w-[110px] px-3 py-2 text-right font-medium">Total</th>
+                        <th className="w-11 px-2" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lines.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">
+                            No items yet. Search above, or add a custom item.
                           </td>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
+                      ) : (
+                        lines.map((l) => {
+                          const over = l.onHand !== undefined && l.quantity > l.onHand;
+                          const under =
+                            l.unitCost &&
+                            Number(l.unitPrice) > 0 &&
+                            Number(l.unitPrice) < Number(l.unitCost);
+                          return (
+                            <tr key={l.key} className="border-b border-border/60">
+                              <td className="px-3 py-2">
+                                <input
+                                  value={l.title}
+                                  onChange={(e) => patch(l.key, { title: e.target.value })}
+                                  placeholder="Item name"
+                                  disabled={pending}
+                                  className={cn(field, 'h-8 border-transparent px-2 hover:border-border')}
+                                />
+                                <p className="mt-0.5 px-2 text-[11px] text-muted-foreground">
+                                  {l.variantId ? (
+                                    <>
+                                      {l.onHand} in stock
+                                      {l.unitCost ? ` · cost ${money(l.unitCost)}` : ''}
+                                    </>
+                                  ) : (
+                                    <span className="text-warning">not linked to inventory</span>
+                                  )}
+                                </p>
+                              </td>
+                              <td className="px-3 py-2 align-top">
+                                <input
+                                  type="number"
+                                  min={1}
+                                  value={l.quantity}
+                                  onChange={(e) =>
+                                    patch(l.key, { quantity: Math.max(1, Number(e.target.value)) })
+                                  }
+                                  aria-invalid={over}
+                                  disabled={pending}
+                                  className={cn(
+                                    field,
+                                    'h-8 px-2 text-right tabular-nums',
+                                    over && 'border-destructive',
+                                  )}
+                                />
+                              </td>
+                              <td className="px-3 py-2 align-top">
+                                <input
+                                  inputMode="decimal"
+                                  value={l.unitPrice}
+                                  onChange={(e) => patch(l.key, { unitPrice: e.target.value })}
+                                  disabled={pending}
+                                  className={cn(
+                                    field,
+                                    'h-8 px-2 text-right tabular-nums',
+                                    under && 'border-warning',
+                                  )}
+                                />
+                              </td>
+                              <td className="px-3 py-2 text-right align-top font-medium tabular-nums leading-8">
+                                {money(lineTotal(l))}
+                              </td>
+                              <td className="px-2 py-2 align-top">
+                                <button
+                                  type="button"
+                                  onClick={() => setLines((x) => x.filter((y) => y.key !== l.key))}
+                                  aria-label={`Remove ${l.title || 'item'}`}
+                                  disabled={pending}
+                                  className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive-subtle hover:text-destructive"
+                                >
+                                  <Trash2 className="size-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                      <tr>
+                        <td colSpan={5} className="p-0">
+                          <button
+                            type="button"
+                            onClick={() => addLine()}
+                            disabled={pending}
+                            className="flex w-full items-center justify-center gap-1.5 py-2.5 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                          >
+                            <Plus className="size-3.5" />
+                            Custom Item
+                          </button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </Section>
 
-              <button
-                type="button"
-                onClick={() => addLine()}
-                disabled={pending}
-                className="flex w-full items-center justify-center gap-1.5 border-b border-border py-2 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              >
-                <Plus className="size-3.5" />
-                Custom item
-              </button>
-            </Scroller>
+              <Section icon={CreditCard} title="Payment Method">
+                <input type="hidden" name="paymentMethod" value={method} />
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {PAYMENT_METHODS.map((m) => (
+                    <label
+                      key={m.value}
+                      className={cn(
+                        'flex h-11 cursor-pointer items-center gap-2.5 rounded-lg border px-3 text-[13px] transition-colors',
+                        method === m.value
+                          ? 'border-foreground bg-accent font-medium'
+                          : 'border-border hover:bg-accent/50',
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="paymentMethodChoice"
+                        value={m.value}
+                        checked={method === m.value}
+                        onChange={() => setMethod(m.value)}
+                        disabled={pending}
+                        className="size-3.5 accent-[var(--foreground)]"
+                      />
+                      {m.label}
+                    </label>
+                  ))}
+                </div>
+              </Section>
 
-            <StatusStrip>
-              <span>
-                {lines.length} {lines.length === 1 ? 'line' : 'lines'} · {units}{' '}
-                {units === 1 ? 'unit' : 'units'}
-              </span>
-              <span>Stock leaves when the order is dispatched</span>
-            </StatusStrip>
-          </ListPane>
+              <Section icon={AlignLeft} title="Notes">
+                <textarea
+                  id="notes"
+                  name="notes"
+                  rows={3}
+                  placeholder="Add any special instructions or notes here…"
+                  disabled={pending}
+                  className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-[13px] focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-60"
+                />
+              </Section>
 
-          {/* What it comes to. Always in view — this is what the previous
-              version pushed below the fold. */}
-          <DetailPane className="w-[300px]">
-            <Scroller className="p-4">
-              <Legend>Summary</Legend>
-              <dl className="mt-2 space-y-1.5 text-[13px]">
-                <SummaryRow label={`Subtotal (${units} ${units === 1 ? 'unit' : 'units'})`} value={money(subtotal)} />
+              <Section icon={Truck} step="3" title="Shipping Details">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Labelled label="Governorate" htmlFor="governorate">
+                    <select
+                      id="governorate"
+                      name="governorate"
+                      required
+                      defaultValue=""
+                      disabled={pending}
+                      className={field}
+                    >
+                      <option value="" disabled>
+                        Select governorate
+                      </option>
+                      {GOVERNORATES.map((g) => (
+                        <option key={g} value={g}>
+                          {g}
+                        </option>
+                      ))}
+                    </select>
+                  </Labelled>
+                  <Labelled label="Street Address" htmlFor="address">
+                    <input
+                      id="address"
+                      name="address"
+                      placeholder="Street, building, apartment"
+                      disabled={pending}
+                      className={field}
+                    />
+                  </Labelled>
+                </div>
+              </Section>
+            </div>
+          </Scroller>
+
+          {/* Order Summary — stays put while the work column scrolls. */}
+          <aside className="flex w-[340px] shrink-0 flex-col overflow-hidden border-s border-border">
+            <Scroller className="p-5">
+              <h2 className="text-[15px] font-semibold">Order Summary</h2>
+              <div className="mt-4 space-y-2.5 border-t border-border pt-4 text-[13px]">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-muted-foreground">
+                    Subtotal ({units} {units === 1 ? 'item' : 'items'})
+                  </span>
+                  <span className="tabular-nums">{money(subtotal)}</span>
+                </div>
                 <div className="flex items-center justify-between gap-3">
                   <label htmlFor="shippingCost" className="text-muted-foreground">
                     Shipping
@@ -367,70 +447,103 @@ export function NewOrderForm({ assignsToSelf }: { assignsToSelf: boolean }) {
                     value={shipping}
                     onChange={(e) => setShipping(e.target.value)}
                     disabled={pending}
-                    className={cn(field, 'w-24 text-right tabular-nums')}
+                    className={cn(field, 'h-8 w-28 px-2 text-right tabular-nums')}
                   />
                 </div>
-              </dl>
+              </div>
 
-              {(overStock.length > 0 || belowCost.length > 0 || (phone.length > 0 && !phoneOk)) && (
+              <div className="mt-4 flex items-baseline justify-between gap-3 border-t border-border pt-4">
+                <span className="text-[15px] font-semibold">Total</span>
+                <span className="text-xl font-semibold tabular-nums">{money(total)}</span>
+              </div>
+
+              <label className="mt-5 flex cursor-pointer items-start gap-2.5 rounded-md border border-border px-3 py-2.5 text-[13px]">
+                <input
+                  type="checkbox"
+                  name="paymentCollected"
+                  disabled={pending}
+                  className="mt-0.5 size-3.5 accent-[var(--foreground)]"
+                />
+                <span>
+                  Payment already collected
+                  <span className="block text-[11px] text-muted-foreground">
+                    Marks the order paid on creation.
+                  </span>
+                </span>
+              </label>
+
+              {(overStock.length > 0 || belowCost.length > 0) && (
                 <ul className="mt-4 space-y-1.5 text-[11px]">
                   {overStock.map((l) => (
-                    <li key={l.key} className="rounded-md border border-destructive/30 bg-destructive-subtle px-2 py-1.5 text-destructive">
+                    <li
+                      key={l.key}
+                      className="rounded-md border border-destructive/30 bg-destructive-subtle px-2 py-1.5 text-destructive"
+                    >
                       Only {l.onHand} of <bdi>{l.title}</bdi> in stock.
                     </li>
                   ))}
                   {belowCost.map((l) => (
-                    <li key={l.key} className="rounded-md border border-warning/30 bg-warning-subtle px-2 py-1.5 text-warning">
+                    <li
+                      key={l.key}
+                      className="rounded-md border border-warning/30 bg-warning-subtle px-2 py-1.5 text-warning"
+                    >
                       <bdi>{l.title}</bdi> is priced below its {money(l.unitCost)} cost.
                     </li>
                   ))}
-                  {phone.length > 0 && !phoneOk && (
-                    <li className="rounded-md border border-destructive/30 bg-destructive-subtle px-2 py-1.5 text-destructive">
-                      The phone number is not a valid Egyptian mobile.
-                    </li>
-                  )}
                 </ul>
               )}
 
               {state.status === 'error' && (
                 <p
                   role="alert"
-                  className="mt-4 flex items-start gap-1.5 rounded-md border border-destructive/30 bg-destructive-subtle px-2 py-1.5 text-[11px] text-destructive"
+                  className="mt-4 rounded-md border border-destructive/30 bg-destructive-subtle px-2 py-1.5 text-[11px] text-destructive"
                 >
-                  <AlertCircle className="mt-px size-3.5 shrink-0" strokeWidth={2} />
                   {state.message}
                 </p>
               )}
             </Scroller>
 
-            <div className="shrink-0 border-t border-border p-4">
-              <div className="mb-3 flex items-baseline justify-between gap-3">
-                <span className="text-[11px] font-medium tracking-[0.07em] text-muted-foreground uppercase">
-                  Total
-                </span>
-                <span className="text-xl font-semibold tabular-nums">{money(total)}</span>
-              </div>
+            <div className="shrink-0 border-t border-border p-5">
               <button
                 type="submit"
                 disabled={!ready || pending}
-                className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-md bg-foreground text-[13px] font-medium text-background transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-40"
+                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-foreground text-sm font-medium text-background transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-40"
               >
-                {pending && <Loader2 className="size-4 animate-spin" />}
-                {pending ? 'Creating' : 'Create order'}
+                {pending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="size-4" />
+                )}
+                {pending ? 'Creating' : 'Create Order'}
               </button>
             </div>
-          </DetailPane>
-        </Split>
+          </aside>
+        </div>
       </Screen>
     </form>
   );
 }
 
-function Legend({ children, className }: { children: React.ReactNode; className?: string }) {
+function Section({
+  icon: Icon,
+  step,
+  title,
+  children,
+}: {
+  icon: typeof User;
+  step?: string;
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
-    <p className={cn('text-[11px] font-medium tracking-[0.07em] text-muted-foreground uppercase', className)}>
+    <section>
+      <h2 className="mb-3 flex items-center gap-2 text-[15px] font-semibold tracking-[-0.01em]">
+        <Icon className="size-4.5 text-muted-foreground" strokeWidth={1.9} />
+        {step ? `${step}. ` : ''}
+        {title}
+      </h2>
       {children}
-    </p>
+    </section>
   );
 }
 
@@ -445,19 +558,10 @@ function Labelled({
 }) {
   return (
     <div>
-      <label htmlFor={htmlFor} className="mb-1 block text-[11px] text-muted-foreground">
+      <label htmlFor={htmlFor} className="mb-1.5 block text-[11px] text-muted-foreground">
         {label}
       </label>
       {children}
-    </div>
-  );
-}
-
-function SummaryRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="tabular-nums">{value}</dd>
     </div>
   );
 }
