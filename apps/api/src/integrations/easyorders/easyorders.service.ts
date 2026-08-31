@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { createHash } from 'node:crypto';
 import { DataSource, EntityManager } from 'typeorm';
+import { FinanceService } from '../../finance/finance.service';
 import { OrderItem } from '../../orders/order-item.entity';
 import { Order } from '../../orders/order.entity';
 import { OrdersService } from '../../orders/orders.service';
@@ -55,7 +56,10 @@ export interface IngestResult {
 export class EasyOrdersService {
   private readonly log = new Logger(EasyOrdersService.name);
 
-  constructor(@InjectDataSource() private readonly db: DataSource) {}
+  constructor(
+    @InjectDataSource() private readonly db: DataSource,
+    private readonly finance: FinanceService,
+  ) {}
 
   /**
    * Records the delivery, then tries to turn it into an order. Recording and
@@ -201,24 +205,32 @@ export class EasyOrdersService {
    * operational status is driven by our team, not by the website.
    */
   private async applyStatusChange(payload: StatusChange): Promise<IngestResult> {
-    const repo = this.db.getRepository(Order);
-    const order = await repo.findOneBy({ source: 'EASYORDERS', externalId: payload.order_id });
-    if (!order) return { status: 'ignored' };
+    return this.db.transaction(async (tx) => {
+      const order = await tx.findOneBy(Order, { source: 'EASYORDERS', externalId: payload.order_id });
+      if (!order) return { status: 'ignored' };
 
-    const previous = order.externalStatus;
-    order.externalStatus = payload.new_status ?? null;
-    if (payload.new_status?.toLowerCase() === 'paid') order.paymentStatus = 'PAID';
-    await repo.save(order);
+      const previous = order.externalStatus;
+      const wasPaid = order.paymentStatus === 'PAID';
+      order.externalStatus = payload.new_status ?? null;
+      if (payload.new_status?.toLowerCase() === 'paid') order.paymentStatus = 'PAID';
+      await tx.save(order);
 
-    await this.db.getRepository(OrderEvent).insert({
-      orderId: order.id,
-      type: 'NOTE',
-      fromValue: previous,
-      toValue: payload.new_status ?? null,
-      note: 'status change received from Easy Orders',
+      // Same rule as our own payment-status change: the money only lands the
+      // moment it first turns PAID.
+      if (order.paymentStatus === 'PAID' && !wasPaid) {
+        await this.finance.recordOrderPayment(tx, order.id, order.total);
+      }
+
+      await tx.insert(OrderEvent, {
+        orderId: order.id,
+        type: 'NOTE',
+        fromValue: previous,
+        toValue: payload.new_status ?? null,
+        note: 'status change received from Easy Orders',
+      });
+
+      return { status: 'updated', orderId: order.id, orderNumber: order.orderNumber };
     });
-
-    return { status: 'updated', orderId: order.id, orderNumber: order.orderNumber };
   }
 
   /** Deliveries that could not be turned into an order. */

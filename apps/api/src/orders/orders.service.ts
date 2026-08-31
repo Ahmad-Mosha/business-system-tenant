@@ -8,6 +8,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
 import type { SessionUser } from '../auth/auth.guard';
 import { ChannelListing } from '../catalog/channel-listing.entity';
+import { FinanceService } from '../finance/finance.service';
 import { StockMovement } from '../inventory/stock-movement.entity';
 import { OrderEvent } from './order-event.entity';
 import { OrderItem } from './order-item.entity';
@@ -41,7 +42,10 @@ export interface OrderFilters {
 
 @Injectable()
 export class OrdersService implements OnModuleInit {
-  constructor(@InjectDataSource() private readonly db: DataSource) {}
+  constructor(
+    @InjectDataSource() private readonly db: DataSource,
+    private readonly finance: FinanceService,
+  ) {}
 
   async onModuleInit() {
     // A database sequence, so two concurrent orders can never share a number.
@@ -240,17 +244,24 @@ export class OrdersService implements OnModuleInit {
   }
 
   async updatePayment(user: SessionUser, orderId: string, next: PaymentStatus) {
-    const repo = this.db.getRepository(Order);
-    const order = await repo.findOne({
-      where: user.role === 'ADMIN' ? { id: orderId } : { id: orderId, assignedToId: user.id },
-    });
-    if (!order) throw new NotFoundException('order not found');
+    return this.db.transaction(async (tx) => {
+      const order = await tx.findOne(Order, {
+        where: user.role === 'ADMIN' ? { id: orderId } : { id: orderId, assignedToId: user.id },
+      });
+      if (!order) throw new NotFoundException('order not found');
 
-    const from = order.paymentStatus;
-    order.paymentStatus = next;
-    await repo.save(order);
-    await this.record(this.db.manager, orderId, 'PAYMENT_CHANGED', from, next, user);
-    return order;
+      const from = order.paymentStatus;
+      order.paymentStatus = next;
+      await tx.save(order);
+      await this.record(tx, orderId, 'PAYMENT_CHANGED', from, next, user);
+
+      // The money is only actually in hand the moment it turns PAID — not on
+      // every save, and not when it's already been counted once before.
+      if (next === 'PAID' && from !== 'PAID') {
+        await this.finance.recordOrderPayment(tx, orderId, order.total);
+      }
+      return order;
+    });
   }
 
   /** Counts for the orders header. Scoped the same way the list is. */
