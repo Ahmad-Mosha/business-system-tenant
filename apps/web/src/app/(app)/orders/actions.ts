@@ -93,7 +93,7 @@ export async function createOrder(
   }
 
   revalidatePath('/orders');
-  redirect(`/orders/${created.id}`);
+  redirect(`/orders?selected=${created.id}`);
 }
 
 /** Product lookup for the manual order form. */
