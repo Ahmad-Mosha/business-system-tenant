@@ -15,8 +15,13 @@ import { money, moneyWhole } from '@/lib/format';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
 
-/** Fits a laptop screen without scrolling — the point of paginating at all. */
-const PAGE_SIZE = 8;
+/**
+ * 8 was tuned to a ~900px window and left a dead gap under the table on
+ * anything taller — the panel has no more rows to show, so the empty space
+ * just sits there instead of being filled. 20 fills or slightly overflows
+ * (scrolling inside the panel, never the page) on realistic screen heights.
+ */
+const PAGE_SIZE = 20;
 
 export default async function InventoryPage({
   searchParams,
