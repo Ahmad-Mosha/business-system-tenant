@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
-import { DbService } from './db.service';
-import { tenants } from './schema';
+import { DbService } from './db.service.js';
+import { tenants } from './schema.js';
 
 /**
  * Resolves which tenant a request belongs to. Today there is exactly one, so

@@ -7,8 +7,8 @@
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
-import { hashPassword } from '../auth/password';
-import { tenants, users } from './schema';
+import { hashPassword } from '../auth/password.js';
+import { tenants, users } from './schema.js';
 
 process.loadEnvFile('../../.env');
 
