@@ -176,6 +176,8 @@ export class EasyOrdersService {
         items,
       });
 
+      await OrdersService.debitStockForOrder(tx, items, order.id);
+
       await tx.insert(OrderEvent, {
         orderId: order.id,
         type: 'CREATED',

@@ -8,6 +8,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
 import type { SessionUser } from '../auth/auth.guard';
 import { ChannelListing } from '../catalog/channel-listing.entity';
+import { StockMovement } from '../inventory/stock-movement.entity';
 import { OrderEvent } from './order-event.entity';
 import { OrderItem } from './order-item.entity';
 import {
@@ -188,6 +189,7 @@ export class OrdersService implements OnModuleInit {
         items,
       });
 
+      await OrdersService.debitStockForOrder(tx, items, order.id);
       await this.record(tx, order.id, 'CREATED', null, 'SOCIAL', user);
       return order;
     });
@@ -209,25 +211,32 @@ export class OrdersService implements OnModuleInit {
   }
 
   async updateStatus(user: SessionUser, orderId: string, next: OrderStatus) {
-    const repo = this.db.getRepository(Order);
-    const order = await repo.findOne({
-      where: user.role === 'ADMIN' ? { id: orderId } : { id: orderId, assignedToId: user.id },
+    return this.db.transaction(async (tx) => {
+      const order = await tx.findOne(Order, {
+        where: user.role === 'ADMIN' ? { id: orderId } : { id: orderId, assignedToId: user.id },
+      });
+      if (!order) throw new NotFoundException('order not found');
+
+      const allowed = ALLOWED_TRANSITIONS[order.status] ?? [];
+      if (!allowed.includes(next)) {
+        throw new BadRequestException(
+          `cannot move an order from ${order.status} to ${next}` +
+            (allowed.length ? ` — allowed: ${allowed.join(', ')}` : ' — it is final'),
+        );
+      }
+
+      const from = order.status;
+      order.status = next;
+      await tx.save(order);
+      await this.record(tx, orderId, 'STATUS_CHANGED', from, next, user);
+
+      // Stock was reserved when the order was created; give it back the
+      // moment it stops being a live sale.
+      if (next === 'CANCELLED' || next === 'RETURNED') {
+        await OrdersService.creditStockForOrder(tx, orderId, next);
+      }
+      return order;
     });
-    if (!order) throw new NotFoundException('order not found');
-
-    const allowed = ALLOWED_TRANSITIONS[order.status] ?? [];
-    if (!allowed.includes(next)) {
-      throw new BadRequestException(
-        `cannot move an order from ${order.status} to ${next}` +
-          (allowed.length ? ` — allowed: ${allowed.join(', ')}` : ' — it is final'),
-      );
-    }
-
-    const from = order.status;
-    order.status = next;
-    await repo.save(order);
-    await this.record(this.db.manager, orderId, 'STATUS_CHANGED', from, next, user);
-    return order;
   }
 
   async updatePayment(user: SessionUser, orderId: string, next: PaymentStatus) {
@@ -304,5 +313,52 @@ export class OrdersService implements OnModuleInit {
       select: { variantId: true },
     });
     return listing?.variantId ?? null;
+  }
+
+  /**
+   * Decrements stock for an order's resolved items at the moment the order is
+   * created — the timing decision for every source (noon import, Easy Orders
+   * webhook, manual/social order). An unmapped line has no variant and simply
+   * moves nothing; it is still visible on the order as needing attention.
+   */
+  static async debitStockForOrder(
+    tx: EntityManager,
+    items: Array<{ variantId?: string | null; quantity: number }>,
+    orderId: string,
+  ): Promise<void> {
+    const movements = items
+      .filter((i) => i.variantId)
+      .map((i) => ({
+        variantId: i.variantId as string,
+        quantity: -Math.abs(i.quantity),
+        reason: 'SALE' as const,
+        sourceType: 'order',
+        sourceId: orderId,
+      }));
+    if (movements.length) await tx.insert(StockMovement, movements);
+  }
+
+  /**
+   * Reverses the debit above when an order is cancelled or returned — the
+   * stock physically comes back (or was never really taken), so the ledger
+   * says so explicitly rather than leaving it looking sold forever.
+   */
+  static async creditStockForOrder(
+    tx: EntityManager,
+    orderId: string,
+    reason: 'CANCELLED' | 'RETURNED',
+  ): Promise<void> {
+    const items = await tx.find(OrderItem, { where: { orderId } });
+    const movements = items
+      .filter((i) => i.variantId)
+      .map((i) => ({
+        variantId: i.variantId as string,
+        quantity: Math.abs(i.quantity),
+        reason: reason === 'RETURNED' ? ('RETURN' as const) : ('ADJUSTMENT' as const),
+        sourceType: 'order',
+        sourceId: orderId,
+        note: reason === 'RETURNED' ? 'order returned' : 'order cancelled',
+      }));
+    if (movements.length) await tx.insert(StockMovement, movements);
   }
 }

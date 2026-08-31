@@ -126,7 +126,7 @@ export function InventoryToolbar() {
           onClick={() =>
             startSync(async () => {
               const r = await syncEasyOrders();
-              if (r.ok) toast.success(`Website catalogue synced: ${r.created} new, ${r.updated} updated.`);
+              if (r.ok) toast.success(`Website catalogue synced: ${r.updated} updated, ${r.unmatched.length} unmatched.`);
               else toast.error(r.message);
             })
           }

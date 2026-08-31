@@ -24,9 +24,9 @@ export class NoonImport {
   @Column({ type: 'int' })
   rowsSkipped: number;
 
-  /** Listings created because their partner SKU had never been seen before. */
+  /** Partner SKUs in this file with no matching product — need manual mapping. */
   @Column({ type: 'int', default: 0 })
-  productsDiscovered: number;
+  unmappedListings: number;
 
   @Column({ type: 'date', nullable: true })
   periodStart: string | null;

@@ -11,7 +11,7 @@ export interface ImportOutcome {
   rowsInFile: number;
   rowsInserted: number;
   rowsSkipped: number;
-  productsDiscovered: number;
+  unmappedListings: number;
   periodStart: string | null;
   periodEnd: string | null;
 }

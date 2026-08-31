@@ -3,17 +3,24 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
 import { StockMovement, type StockReason } from '../inventory/stock-movement.entity';
 import { ChannelListing } from './channel-listing.entity';
+import { PRODUCT_CATEGORIES, type ProductCategory } from './product.entity';
 import { ProductVariant } from './product-variant.entity';
 import { Product } from './product.entity';
 
 export interface CreateProductInput {
   name: string;
-  category?: string;
+  category?: ProductCategory;
   sku?: string;
   unitCost?: string;
   sellingPrice?: string;
   openingStock?: number;
-  channels?: string[];
+}
+
+export interface ProductFilters {
+  search?: string;
+  channel?: string;
+  category?: string;
+  stock?: string;
 }
 
 const MONEY = /^\d+(\.\d{1,2})?$/;
@@ -30,50 +37,36 @@ export class CatalogService {
    * Stock is aggregated in the same query rather than per row, so the list
    * stays one round trip however many products exist.
    */
-  async listProducts(
-    options?: {
-      search?: string;
-      channel?: string;
-      category?: string;
-      stock?: string;
-      limit?: number;
-      offset?: number;
-    },
-  ) {
-    const search = options?.search;
-    const channel = options?.channel;
-    const category = options?.category;
-    const stock = options?.stock;
-    const limit = options?.limit ?? 100;
-    const offset = options?.offset ?? 0;
-
+  /**
+   * Builds the WHERE clause shared by the product list and its summary, so the
+   * two can never quietly drift out of agreement — the bug that produced a
+   * fan-out-inflated stock figure earlier came from exactly this kind of
+   * duplicated-but-diverging query logic.
+   */
+  private buildProductFilters(f: ProductFilters): { whereSql: string; params: unknown[] } {
     const params: unknown[] = [];
     const bind = (v: unknown) => {
       params.push(v);
       return `$${params.length}`;
     };
 
-    const whereClauses: string[] = [];
-    if (search) {
-      whereClauses.push(`p.name ILIKE ${bind(`%${search}%`)}`);
+    // Archived products are gone from the working list entirely — there is no
+    // "show archived" view yet because nothing has asked for one.
+    const whereClauses: string[] = ['p.active'];
+    if (f.search) whereClauses.push(`p.name ILIKE ${bind(`%${f.search}%`)}`);
+    if (f.category) {
+      whereClauses.push(
+        f.category.toLowerCase() === 'uncategorised'
+          ? `p.category IS NULL`
+          : `p.category = ${bind(f.category)}`,
+      );
     }
-    if (category) {
-      if (category.toLowerCase() === 'uncategorised') {
-        whereClauses.push(`p.category IS NULL`);
-      } else {
-        whereClauses.push(`p.category = ${bind(category)}`);
-      }
-    }
-    if (channel) {
-      if (channel.toLowerCase() === 'unlisted') {
-        whereClauses.push(
-          `p.id NOT IN (SELECT v2.product_id FROM channel_listing l2 JOIN product_variant v2 ON v2.id = l2.variant_id)`,
-        );
-      } else {
-        whereClauses.push(
-          `p.id IN (SELECT v2.product_id FROM channel_listing l2 JOIN product_variant v2 ON v2.id = l2.variant_id WHERE l2.channel = ${bind(channel)})`,
-        );
-      }
+    if (f.channel) {
+      whereClauses.push(
+        f.channel.toLowerCase() === 'unlisted'
+          ? `p.id NOT IN (SELECT v2.product_id FROM channel_listing l2 JOIN product_variant v2 ON v2.id = l2.variant_id)`
+          : `p.id IN (SELECT v2.product_id FROM channel_listing l2 JOIN product_variant v2 ON v2.id = l2.variant_id WHERE l2.channel = ${bind(f.channel)})`,
+      );
     }
     // Stock filters compare against the aggregate computed in the lateral
     // subquery, so they must be collected before the WHERE clause is built.
@@ -82,9 +75,21 @@ export class CatalogService {
       low_stock: 'stock.on_hand > 0 AND stock.on_hand <= 5',
       out_of_stock: 'stock.on_hand <= 0',
     };
-    if (stock && stockFilters[stock]) whereClauses.push(stockFilters[stock]);
+    if (f.stock && stockFilters[f.stock]) whereClauses.push(stockFilters[f.stock]);
 
-    const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
+    return { whereSql: `WHERE ${whereClauses.join(' AND ')}`, params };
+  }
+
+  /**
+   * Products with their stock on hand and channel coverage.
+   *
+   * Stock is aggregated in the same query rather than per row, so the list
+   * stays one round trip however many products exist.
+   */
+  async listProducts(options?: ProductFilters & { limit?: number; offset?: number }) {
+    const { whereSql, params } = this.buildProductFilters(options ?? {});
+    const limit = Math.min(Math.max(options?.limit ?? 50, 1), 200);
+    const offset = Math.max(options?.offset ?? 0, 0);
 
     return this.db.query(
       `SELECT p.id, p.name, p.category, p.discovered, p.active,
@@ -115,9 +120,34 @@ export class CatalogService {
        ) ch ON TRUE
        ${whereSql}
        ORDER BY p.name
-       LIMIT ${Math.min(Math.max(limit, 1), 200)} OFFSET ${Math.max(offset, 0)}`,
+       LIMIT ${limit} OFFSET ${offset}`,
       params,
     );
+  }
+
+  /**
+   * Aggregate totals across every product matching the filters — not just the
+   * current page. Shares its WHERE clause with listProducts so the header
+   * numbers and the table underneath it always describe the same set.
+   */
+  async productsSummary(options?: ProductFilters) {
+    const { whereSql, params } = this.buildProductFilters(options ?? {});
+    const [row] = await this.db.query(
+      `SELECT count(*)::int                                              AS products,
+              COALESCE(SUM(stock.on_hand), 0)::int                       AS "unitsOnHand",
+              COALESCE(SUM(stock.on_hand * COALESCE(stock.unit_cost, 0)), 0) AS "stockValue",
+              count(*) FILTER (WHERE stock.unit_cost IS NULL)::int       AS "missingCost"
+       FROM product p
+       LEFT JOIN LATERAL (
+         SELECT COALESCE(SUM(m.quantity), 0)::int AS on_hand, MIN(v.unit_cost) AS unit_cost
+         FROM product_variant v
+         LEFT JOIN stock_movement m ON m.variant_id = v.id
+         WHERE v.product_id = p.id
+       ) stock ON TRUE
+       ${whereSql}`,
+      params,
+    );
+    return row;
   }
 
   async getProduct(id: string) {
@@ -157,6 +187,9 @@ export class CatalogService {
    */
   async createProduct(input: CreateProductInput, userId: string) {
     if (!input.name?.trim()) throw new BadRequestException('name is required');
+    if (input.category && !PRODUCT_CATEGORIES.includes(input.category)) {
+      throw new BadRequestException(`category must be one of: ${PRODUCT_CATEGORIES.join(', ')}`);
+    }
     for (const [field, value] of [
       ['unitCost', input.unitCost],
       ['sellingPrice', input.sellingPrice],
@@ -172,7 +205,7 @@ export class CatalogService {
     return this.db.transaction(async (tx) => {
       const product = await tx.save(Product, {
         name: input.name.trim(),
-        category: input.category?.trim() || null,
+        category: input.category ?? null,
         discovered: false,
         active: true,
       });
@@ -199,24 +232,47 @@ export class CatalogService {
         );
       }
 
-      if (input.channels && Array.isArray(input.channels) && input.channels.length > 0) {
-        const allowed = ['noon', 'amazon', 'easyorders', 'social'];
-        for (const ch of input.channels) {
-          if (allowed.includes(ch)) {
-            await tx.save(ChannelListing, {
-              channel: ch as any,
-              externalId: input.sku?.trim() ? `${ch}_${input.sku.trim()}` : `${ch}_${variant.id}`,
-              externalVariantId: '',
-              partnerSku: input.sku?.trim() || null,
-              title: input.name.trim(),
-              price: input.sellingPrice || null,
-              variantId: variant.id,
-            });
-          }
-        }
-      }
+      // No fabricated channel listings here: a channel listing means "this is
+      // literally how noon/Easy Orders refer to this item," and an invented
+      // external id would never match a real transaction — it would just look
+      // connected without being connected. Real listings come from an import
+      // (noon) or a catalogue sync (Easy Orders) matching genuine identifiers.
 
       return { ...product, variantId: variant.id };
+    });
+  }
+
+  /** Renames a product or changes its category. Identity (id) never changes. */
+  async updateProduct(id: string, patch: { name?: string; category?: ProductCategory | null }) {
+    const repo = this.db.getRepository(Product);
+    const product = await repo.findOneBy({ id });
+    if (!product) throw new NotFoundException('product not found');
+
+    if (patch.category && !PRODUCT_CATEGORIES.includes(patch.category)) {
+      throw new BadRequestException(`category must be one of: ${PRODUCT_CATEGORIES.join(', ')}`);
+    }
+    if (patch.name !== undefined) {
+      if (!patch.name.trim()) throw new BadRequestException('name cannot be empty');
+      product.name = patch.name.trim();
+    }
+    if (patch.category !== undefined) product.category = patch.category;
+    return repo.save(product);
+  }
+
+  /**
+   * Soft delete. A product frequently already has order, stock and listing
+   * history by the time anyone wants it gone, and that history must never
+   * silently disappear — so this hides it from the working list rather than
+   * running a real DELETE. Its variants go inactive with it, which also pulls
+   * it out of the manual-order search.
+   */
+  async archiveProduct(id: string) {
+    const product = await this.db.getRepository(Product).findOneBy({ id });
+    if (!product) throw new NotFoundException('product not found');
+
+    await this.db.transaction(async (tx) => {
+      await tx.update(Product, { id }, { active: false });
+      await tx.update(ProductVariant, { productId: id }, { active: false });
     });
   }
 
@@ -294,6 +350,52 @@ export class CatalogService {
     });
   }
 
+  /**
+   * One-time seed from a reviewed Mega export: creates a product + default
+   * variant + opening-stock movement per row. Safe to re-run — an exact name
+   * match is skipped rather than duplicated, since Mega gives no reliable id
+   * to key off (see docs/decisions).
+   */
+  async importReviewedProducts(
+    rows: Array<{ name: string; category: ProductCategory; quantity: number; unitCost: string | null }>,
+    userId: string,
+  ) {
+    let created = 0;
+    let skipped = 0;
+    const failed: Array<{ name: string; reason: string }> = [];
+
+    for (const row of rows) {
+      const name = row.name.trim();
+      if (!name) continue;
+      try {
+        const exists = await this.db.getRepository(Product).findOneBy({ name });
+        if (exists) {
+          skipped++;
+          continue;
+        }
+        await this.createProduct(
+          {
+            name,
+            category: row.category,
+            // The unit_cost column is numeric(14,2); round explicitly here
+            // rather than let Postgres do it silently on insert.
+            unitCost: row.unitCost ? Number(row.unitCost).toFixed(2) : undefined,
+            openingStock: row.quantity || undefined,
+          },
+          userId,
+        );
+        created++;
+      } catch (e) {
+        // One bad row must not take the other 134 down with it.
+        failed.push({ name, reason: e instanceof Error ? e.message : String(e) });
+      }
+    }
+    this.log.log(
+      `mega import: ${created} created, ${skipped} skipped, ${failed.length} failed`,
+    );
+    return { created, skipped, failed };
+  }
+
   /** Variants an order line can be attached to, for the manual order form. */
   searchVariants(term: string) {
     return this.db.query(
@@ -310,11 +412,10 @@ export class CatalogService {
   }
 
   /**
-   * Pulls the live Easy Orders catalogue and maps each product to one of ours.
-   *
-   * Easy Orders has no SKU, so products are matched by the external UUID we
-   * have already seen. Anything unrecognised becomes a new product plus a
-   * listing, which is what makes incoming website orders resolve to stock.
+   * Refreshes title/price on every Easy Orders listing we already have mapped
+   * to a product. Creates nothing: a live Easy Orders product with no
+   * matching listing is reported as unmatched rather than turned into a stub
+   * — Easy Orders can only sell what already exists in our catalogue.
    */
   async syncEasyOrders(apiKey: string) {
     const res = await fetch('https://api.easy-orders.net/api/v1/external-apps/products', {
@@ -329,48 +430,30 @@ export class CatalogService {
       slug?: string;
     }>;
 
-    let created = 0;
+    const existing = await this.db.getRepository(ChannelListing).find({
+      where: { channel: 'easyorders', externalVariantId: '' },
+    });
+    const byExternalId = new Map(existing.map((l) => [l.externalId, l]));
+
     let updated = 0;
+    const unmatched: Array<{ id: string; name: string }> = [];
 
     for (const remote of products) {
       if (!remote?.id) continue;
-      await this.db.transaction(async (tx) => {
-        const existing = await tx.findOne(ChannelListing, {
-          where: { channel: 'easyorders', externalId: remote.id, externalVariantId: '' },
-        });
-
-        if (existing) {
-          existing.title = remote.name?.trim() || existing.title;
-          existing.price = remote.price != null ? String(remote.price) : existing.price;
-          await tx.save(existing);
-          updated++;
-          return;
-        }
-
-        const product = await tx.save(Product, {
-          name: remote.name?.trim() || remote.slug || remote.id,
-          discovered: true,
-          active: true,
-        });
-        const variant = await tx.save(ProductVariant, {
-          productId: product.id,
-          name: 'Default',
-          attributes: {},
-          sellingPrice: remote.price != null ? String(remote.price) : null,
-        });
-        await tx.save(ChannelListing, {
-          channel: 'easyorders' as const,
-          externalId: remote.id,
-          externalVariantId: '',
-          title: remote.name?.trim() || null,
-          price: remote.price != null ? String(remote.price) : null,
-          variantId: variant.id,
-        });
-        created++;
-      });
+      const listing = byExternalId.get(remote.id);
+      if (!listing) {
+        unmatched.push({ id: remote.id, name: remote.name?.trim() || remote.slug || remote.id });
+        continue;
+      }
+      listing.title = remote.name?.trim() || listing.title;
+      listing.price = remote.price != null ? String(remote.price) : listing.price;
+      await this.db.getRepository(ChannelListing).save(listing);
+      updated++;
     }
 
-    this.log.log(`easyorders catalogue sync: ${created} created, ${updated} updated`);
-    return { fetched: products.length, created, updated };
+    this.log.log(
+      `easyorders catalogue sync: ${updated} updated, ${unmatched.length} unmatched`,
+    );
+    return { fetched: products.length, updated, unmatched };
   }
 }
