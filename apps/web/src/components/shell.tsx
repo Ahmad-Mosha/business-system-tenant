@@ -253,27 +253,20 @@ function Step({
   );
 }
 
-/**
- * A headline figure as a card. Passing `href` makes it the filter for what it
- * counts — the number stops being decoration you can only look at.
- */
+/** A headline figure as a card. Read-only — a figure, not a control. */
 export function MetricCard({
   label,
   value,
   hint,
-  href,
-  active = false,
   tone,
 }: {
   label: string;
   value: ReactNode;
   hint?: string;
-  href?: string;
-  active?: boolean;
   tone?: 'default' | 'warning' | 'destructive' | 'success';
 }) {
-  const body = (
-    <>
+  return (
+    <div className="rounded-xl border border-border px-4 py-3">
       <p className="text-[11px] font-medium tracking-[0.07em] text-muted-foreground uppercase">
         {label}
       </p>
@@ -288,29 +281,7 @@ export function MetricCard({
         {value}
       </p>
       {hint ? <p className="mt-1.5 text-[11px] text-muted-foreground">{hint}</p> : null}
-    </>
-  );
-
-  const shell = cn(
-    'rounded-xl border px-4 py-3 transition-colors',
-    active ? 'border-foreground bg-accent' : 'border-border',
-  );
-
-  if (!href) return <div className={shell}>{body}</div>;
-
-  return (
-    <Link
-      href={href}
-      scroll={false}
-      aria-pressed={active}
-      className={cn(
-        shell,
-        'block focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-        !active && 'hover:border-foreground/30 hover:bg-accent/50',
-      )}
-    >
-      {body}
-    </Link>
+    </div>
   );
 }
 
