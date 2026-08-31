@@ -1,21 +1,22 @@
 import Link from 'next/link';
-import { ChevronRight, Plus } from 'lucide-react';
-import { PageBody, PageHeader } from '@/components/page-header';
-import { PaymentBadge, SourceLabel } from '@/components/order-status';
-import { OrderStatusMenu } from '@/components/order-status-menu';
-import { Stat, StatCell, StatGrid } from '@/components/stat';
+import { Plus, X } from 'lucide-react';
+import { OrderDetail } from '@/components/order-detail';
+import { OrderFilters } from '@/components/order-filters';
+import { PaymentBadge, StatusBadge } from '@/components/order-status';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  ContextBar,
+  DetailPane,
+  Figure,
+  ListPane,
+  Screen,
+  Scroller,
+  Split,
+  StatusStrip,
+} from '@/components/shell';
 import { getOrderSummary, getOrders } from '@/lib/api';
 import { dateTime, money } from '@/lib/format';
 import { requireSession } from '@/lib/session';
-import { OrderFilters } from '@/components/order-filters';
+import { cn } from '@/lib/utils';
 
 export default async function OrdersPage({
   searchParams,
@@ -36,128 +37,165 @@ export default async function OrdersPage({
   ]);
 
   const isAdmin = user.role === 'ADMIN';
+  const selected = params.selected ?? null;
+
+  /** Selecting an order is a URL change, so it is shareable and reversible. */
+  const rowHref = (id: string | null) => {
+    const next = new URLSearchParams(query);
+    if (id) next.set('selected', id);
+    const qs = next.toString();
+    return qs ? `/orders?${qs}` : '/orders';
+  };
 
   return (
-    <>
-      <PageHeader
+    <Screen>
+      <ContextBar
         title="Orders"
+        meta={`${total}`}
+        figures={
+          <>
+            <Figure
+              label="Needs work"
+              value={summary.needsWork}
+              tone={summary.needsWork > 0 ? 'warning' : 'default'}
+            />
+            {isAdmin && <Figure label="Unassigned" value={summary.unassigned} />}
+            <Figure
+              label="Delivered unpaid"
+              value={summary.deliveredUnpaid}
+              tone={summary.deliveredUnpaid > 0 ? 'warning' : 'default'}
+            />
+          </>
+        }
         actions={
           <Link
             href="/orders/new"
-            className="inline-flex h-9 items-center gap-1.5 rounded-md bg-foreground px-3 text-sm font-medium text-background transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            className="inline-flex h-[var(--control-h)] items-center gap-1.5 rounded-md bg-foreground px-3 text-[13px] font-medium text-background transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           >
             <Plus className="size-4" />
             New order
           </Link>
         }
-      />
+      >
+        <OrderFilters isAdmin={isAdmin} />
+      </ContextBar>
 
-      <PageBody>
-        <StatGrid>
-          <StatCell>
-            <Stat label="Orders" value={String(summary.total)} hint="in total" />
-          </StatCell>
-          <StatCell>
-            <Stat label="Needs work" value={String(summary.needsWork)} hint="new or assigned" />
-          </StatCell>
-          {isAdmin && (
-            <StatCell>
-              <Stat label="Unassigned" value={String(summary.unassigned)} hint="nobody owns these" />
-            </StatCell>
-          )}
-          <StatCell>
-            <Stat
-              label="Delivered unpaid"
-              value={String(summary.deliveredUnpaid)}
-              hint="cash not yet collected"
-            />
-          </StatCell>
-        </StatGrid>
-
-        <section>
-          <OrderFilters isAdmin={isAdmin} />
-
-          {orders.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-border px-5 py-14 text-center text-sm text-muted-foreground">
-              No orders match this view.
-            </p>
-          ) : (
-            <div className="overflow-x-auto rounded-xl border border-border">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="min-w-[100px]">Order</TableHead>
-                    <TableHead className="min-w-[160px]">Customer</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Payment</TableHead>
-                    {isAdmin && <TableHead>Assigned</TableHead>}
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead className="text-right whitespace-nowrap">Placed</TableHead>
-                    <TableHead className="w-8" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {orders.map((o) => (
-                    <TableRow key={o.id} className="group relative">
-                      <TableCell className="font-medium tabular-nums">
-                        <Link
-                          href={`/orders/${o.id}`}
-                          className="after:absolute after:inset-0 focus-visible:underline focus-visible:outline-none"
-                        >
-                          {o.orderNumber}
-                        </Link>
-                        <span className="mt-0.5 block">
-                          <SourceLabel source={o.source} />
-                        </span>
-                      </TableCell>
-                      <TableCell className="max-w-0">
-                        <span className="block truncate font-medium">{o.customerName}</span>
-                        <span className="block truncate text-xs text-muted-foreground">
-                          {o.customerPhone}
-                          {o.governorate ? ` · ${o.governorate}` : ''}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <OrderStatusMenu orderId={o.id} status={o.status} />
-                        {o.unmappedCount > 0 && (
-                          <span className="mt-1 block text-[11px] text-warning">
-                            {o.unmappedCount} unmatched
-                          </span>
+      <Split>
+        <ListPane>
+          <Scroller>
+            {orders.length === 0 ? (
+              <p className="p-10 text-center text-sm text-muted-foreground">
+                No orders match this view.
+              </p>
+            ) : (
+              <table className="w-full border-collapse text-[13px]">
+                <thead className="sticky top-0 z-10 bg-background">
+                  <tr className="border-b border-border text-[11px] tracking-[0.05em] text-muted-foreground uppercase">
+                    <Th className="w-[110px]">Order</Th>
+                    <Th>Customer</Th>
+                    <Th className="w-[120px]">Phone</Th>
+                    <Th className="w-[70px]">Source</Th>
+                    <Th className="w-[110px]">Status</Th>
+                    <Th className="w-[90px]">Payment</Th>
+                    {isAdmin && <Th className="w-[110px]">Assigned</Th>}
+                    <Th className="w-[100px] text-right">Total</Th>
+                    <Th className="w-[120px] text-right">Placed</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.map((o) => {
+                    const active = o.id === selected;
+                    return (
+                      <tr
+                        key={o.id}
+                        className={cn(
+                          'group relative h-[var(--row-h)] border-b border-border/60',
+                          active ? 'bg-accent' : 'hover:bg-accent/50',
                         )}
-                      </TableCell>
-                      <TableCell>
-                        <PaymentBadge status={o.paymentStatus} />
-                      </TableCell>
-                      {isAdmin && (
-                        <TableCell className="text-sm">
-                          {o.assignedToName ?? (
-                            <span className="text-muted-foreground/50">Unassigned</span>
+                      >
+                        <Td className="font-medium tabular-nums">
+                          <Link
+                            href={rowHref(o.id)}
+                            scroll={false}
+                            className="after:absolute after:inset-0 focus-visible:underline focus-visible:outline-none"
+                          >
+                            {o.orderNumber}
+                          </Link>
+                        </Td>
+                        <Td className="max-w-0">
+                          <span className="block truncate">{o.customerName}</span>
+                        </Td>
+                        <Td className="tabular-nums text-muted-foreground">{o.customerPhone}</Td>
+                        <Td className="text-muted-foreground">
+                          {o.source === 'EASYORDERS' ? 'Website' : 'Social'}
+                        </Td>
+                        <Td>
+                          <StatusBadge status={o.status} />
+                          {o.unmappedCount > 0 && (
+                            <span className="ms-1 text-[11px] text-warning">
+                              {o.unmappedCount}
+                            </span>
                           )}
-                        </TableCell>
-                      )}
-                      <TableCell className="text-right font-medium tabular-nums">
-                        {money(o.total)}
-                      </TableCell>
-                      <TableCell className="text-right whitespace-nowrap text-xs text-muted-foreground">
-                        {dateTime(o.placedAt)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <ChevronRight className="size-4 text-muted-foreground/40 transition-colors group-hover:text-foreground" />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+                        </Td>
+                        <Td>
+                          <PaymentBadge status={o.paymentStatus} />
+                        </Td>
+                        {isAdmin && (
+                          <Td className="truncate text-muted-foreground">
+                            {o.assignedToName ?? <span className="opacity-50">—</span>}
+                          </Td>
+                        )}
+                        <Td className="text-right font-medium tabular-nums">{money(o.total)}</Td>
+                        <Td className="text-right whitespace-nowrap text-muted-foreground">
+                          {dateTime(o.placedAt)}
+                        </Td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </Scroller>
 
-          {total > orders.length && (
-            <p className="mt-3 text-xs text-muted-foreground">
-              Showing {orders.length} of {total}.
-            </p>
-          )}
-        </section>
-      </PageBody>
-    </>
+          <StatusStrip>
+            <span>
+              {orders.length} of {total} {total === 1 ? 'order' : 'orders'}
+              {params.status || params.search || params.unassigned ? ' · filtered' : ''}
+            </span>
+            <span>{isAdmin ? 'All orders' : 'Your orders only'}</span>
+          </StatusStrip>
+        </ListPane>
+
+        {selected && (
+          <DetailPane
+            /* Below xl there is not enough width for two panes side by side, so
+               the detail floats over the list instead of squeezing it. */
+            className="fixed inset-y-0 right-0 z-30 w-[400px] bg-background shadow-xl xl:static xl:z-auto xl:w-[var(--detail-w)] xl:shadow-none"
+          >
+            <Link
+              href={rowHref(null)}
+              scroll={false}
+              aria-label="Close order details"
+              className="absolute end-2 top-2 z-10 inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground xl:hidden"
+            >
+              <X className="size-4" />
+            </Link>
+            <OrderDetail id={selected} user={user} />
+          </DetailPane>
+        )}
+      </Split>
+    </Screen>
   );
+}
+
+function Th({ className, children }: { className?: string; children?: React.ReactNode }) {
+  return (
+    <th className={cn('px-3 py-2 text-left font-medium whitespace-nowrap', className)}>
+      {children}
+    </th>
+  );
+}
+
+function Td({ className, children }: { className?: string; children?: React.ReactNode }) {
+  return <td className={cn('px-3 whitespace-nowrap', className)}>{children}</td>;
 }
