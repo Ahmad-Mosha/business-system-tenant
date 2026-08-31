@@ -17,6 +17,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { signOut } from '@/app/login/actions';
+import { ThemeToggle } from '@/components/theme-toggle';
 import type { Role, SessionUser } from '@/lib/session';
 import { cn } from '@/lib/utils';
 
@@ -42,16 +43,15 @@ const NAVIGATION: Array<{ label: string; items: NavItem[] }> = [
     ],
   },
   {
-    label: 'Analysis',
+    // These four screens all answer one question — what noon owes and why.
+    // They are folded into a single reconciliation screen later.
+    label: 'noon',
     items: [
       { href: '/', label: 'Overview', icon: LayoutGrid, roles: ['ADMIN'] },
       { href: '/months', label: 'Months', icon: CalendarRange, roles: ['ADMIN'] },
       { href: '/products', label: 'Products', icon: BarChart3, roles: ['ADMIN'] },
+      { href: '/imports', label: 'Imports', icon: Upload, roles: ['ADMIN'] },
     ],
-  },
-  {
-    label: 'Data',
-    items: [{ href: '/imports', label: 'Imports', icon: Upload, roles: ['ADMIN'] }],
   },
 ];
 
@@ -94,17 +94,17 @@ export function AppSidebar({ user }: { user: SessionUser }) {
 
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex w-[248px] flex-col border-r border-border bg-sidebar',
+          'fixed inset-y-0 left-0 z-50 flex w-[var(--rail-w)] flex-col border-r border-border bg-sidebar',
           'transition-transform duration-250 ease-[cubic-bezier(0.32,0.72,0,1)]',
-          'lg:sticky lg:inset-auto lg:top-0 lg:h-svh lg:translate-x-0',
+          'lg:static lg:inset-auto lg:h-full lg:shrink-0 lg:translate-x-0',
           open ? 'translate-x-0' : '-translate-x-full',
         )}
       >
-        <div className="flex h-16 shrink-0 items-center px-5">
+        <div className="flex h-[var(--bar-h)] shrink-0 items-center px-4">
           <Wordmark />
         </div>
 
-        <nav className="flex flex-1 flex-col gap-6 overflow-y-auto px-3 py-2">
+        <nav className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-2.5 py-3">
           {groups.map((group) => (
             <div key={group.label}>
               <p className="px-3 pb-2 text-[11px] font-medium tracking-[0.08em] text-muted-foreground/70 uppercase">
@@ -165,6 +165,7 @@ export function AppSidebar({ user }: { user: SessionUser }) {
                 {user.role.toLowerCase()}
               </p>
             </div>
+            <ThemeToggle />
             <form action={signOut}>
               <button
                 type="submit"
