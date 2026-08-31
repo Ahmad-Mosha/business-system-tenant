@@ -10,6 +10,7 @@ import {
   ShoppingBag,
   Truck,
   Upload,
+  Wallet,
   X,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -37,6 +38,7 @@ const NAVIGATION: Array<{ label: string; items: NavItem[] }> = [
       { href: '/orders', label: 'Orders', icon: ShoppingBag },
       { href: '/shipments', label: 'Shipments', icon: Truck },
       { href: '/inventory', label: 'Inventory', icon: Package, roles: ['ADMIN'] },
+      { href: '/finance', label: 'Finance', icon: Wallet, roles: ['ADMIN'] },
     ],
   },
   {

@@ -327,5 +327,27 @@ export const trackBostaShipment = (trackingNumber: string) =>
 export const getOrderShipment = (orderId: string) =>
   get<ShipmentTracking | null>(`/bosta/orders/${orderId}`);
 
+export interface FinanceOverview {
+  /** Null until an opening balance anchor is set. */
+  cash: string | null;
+  stockValue: string;
+  totalAssets: string | null;
+  openingBalance: string;
+  openingAsOf: string | null;
+}
+
+export interface CashTransactionRow {
+  id: string;
+  amount: string;
+  reason: string;
+  note: string | null;
+  sourceType: string | null;
+  sourceId: string | null;
+  occurredAt: string;
+}
+
+export const getFinanceOverview = () => get<FinanceOverview>('/finance/overview');
+export const getFinanceHistory = () => get<CashTransactionRow[]>('/finance/history');
+
 
 
