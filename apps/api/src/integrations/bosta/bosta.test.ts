@@ -107,9 +107,13 @@ test('normalizes real Bosta delivered payload into Prime Market domain DTO', () 
 
   assert.equal(dto.cod.amount, 4500);
   assert.equal(dto.cod.currency, 'EGP');
+  // Delivered → the courier collected cash from the customer at the door.
+  // isCollected and collectionStatus must agree — a prior version of this
+  // fixture asserted them contradicting each other (isCollected: true next to
+  // collectionStatus: 'UNPAID'), which was the bug, encoded as a test.
   assert.equal(dto.cod.isCollected, true);
-  assert.equal(dto.cod.collectionStatus, 'UNPAID');
-  assert.equal(dto.cod.collectionStatusLabel, 'غير مدفوع');
+  assert.equal(dto.cod.collectionStatus, 'PAID');
+  assert.equal(dto.cod.collectionStatusLabel, 'مدفوع');
   assert.equal(dto.cod.paymentMethodLabel, 'الدفع عند الاستلام');
 
   assert.equal(dto.allowOpenPackage, true);
