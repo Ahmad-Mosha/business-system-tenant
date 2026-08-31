@@ -72,6 +72,12 @@ const SAMPLE_DELIVERED_RAW: BostaDeliveryRaw = {
   createdAt: '2026-08-15T11:18:07.155Z',
   updatedAt: '2026-08-16T14:18:53.000Z',
   scheduledDate: '2026-08-17T20:59:59.999Z',
+  // Real cashoutInfo for this same tracking number — an executed payout, the
+  // one case that's actually PAID.
+  cashoutInfo: {
+    expectedCashoutDate: '2026-08-26T00:00:00.000Z',
+    oracleTransactionId: 'WEDCOD26AUG26',
+  },
   flexShippingInfo: {
     isOrderEligible: true,
     isAmountCollected: false,
@@ -108,9 +114,10 @@ test('normalizes real Bosta delivered payload into Prime Market domain DTO', () 
   assert.equal(dto.cod.amount, 4500);
   assert.equal(dto.cod.currency, 'EGP');
   // Delivered → the courier collected cash from the customer at the door.
-  // isCollected and collectionStatus must agree — a prior version of this
-  // fixture asserted them contradicting each other (isCollected: true next to
-  // collectionStatus: 'UNPAID'), which was the bug, encoded as a test.
+  // This delivery's cashoutInfo carries a real oracleTransactionId — an
+  // executed payout, the only case that's genuinely PAID. Verified against
+  // Bosta's own dashboard: delivered alone does not mean paid, and a null
+  // cod (a return) does not mean paid either — only a completed cashout does.
   assert.equal(dto.cod.isCollected, true);
   assert.equal(dto.cod.collectionStatus, 'PAID');
   assert.equal(dto.cod.collectionStatusLabel, 'مدفوع');

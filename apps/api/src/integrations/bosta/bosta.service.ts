@@ -237,7 +237,7 @@ export class BostaService {
     const stateValue = raw.state?.value || raw.maskedState || 'New';
     const statusCode = raw.state?.code ?? 10;
 
-    const normalizedStatus = this.mapBostaStatus(stateValue, statusCode);
+    const normalizedStatus = this.mapBostaStatus(stateValue, statusCode, raw.type?.value);
     const timeline = this.buildTimeline(raw);
     const attempts = this.buildAttempts(raw);
 
@@ -252,11 +252,17 @@ export class BostaService {
     const address = raw.dropOffAddress?.firstLine || null;
 
     const codAmount = Number(raw.cod ?? raw.wallet?.cashCycle?.cod ?? 0);
-    // Delivered means the courier collected cash from the customer at the
-    // door — that's what this flag answers. Whether Bosta has since paid
-    // *us* out is a separate, later event (raw.wallet.cashCycle.deposited_at,
-    // only present on the single-delivery endpoint) that this is not.
-    const isCollected = statusCode >= 45 || !!raw.wallet?.cashCycle?.deposited_at;
+    // The real "has Bosta paid us" signal — verified against Bosta's own
+    // dashboard on real deliveries, not guessed from the delivery status.
+    // Delivered does NOT mean collected: two real شحنات with the same 510 EGP
+    // COD, both Delivered, showed different collection states there, and the
+    // difference tracked `cashoutInfo` exactly — not `state`, not
+    // `wallet.cashCycle.deposited_at` (which was present on the one Bosta
+    // still marked unpaid). No `cashoutInfo` at all = nothing computed yet;
+    // present without a transaction id = a payout is scheduled, not run; a
+    // real `oracleTransactionId` = an actual payout executed.
+    const isPaidOut = !!raw.cashoutInfo?.oracleTransactionId;
+    const hasCashoutRecord = !!raw.cashoutInfo;
 
     const flexShipFee = raw.flexShippingInfo?.isOrderEligible
       ? Number(raw.flexShippingInfo.amountToBeCollected ?? 0)
@@ -274,18 +280,16 @@ export class BostaService {
       raw.state?.deliveryTime ||
       (statusCode === 45 && raw.updatedAt ? raw.updatedAt : null);
 
-    // Bug: this used to say UNPAID for every delivered COD shipment,
-    // regardless of `isCollected` above — verified against 9 real deliveries,
-    // all Delivered, all showing غير مدفوع here despite Bosta's own data
-    // (collectedFromBusiness, cashoutInfo) confirming they were collected.
-    // A genuinely dead COD — returned or cancelled with money still owed —
-    // is the one case worth calling UNPAID rather than PENDING.
-    const deadWithoutCollection =
-      !isCollected && (normalizedStatus.key === 'RETURNED' || normalizedStatus.key === 'CANCELLED');
-    const collectionStatus: 'UNPAID' | 'PAID' | 'PENDING' =
-      codAmount === 0 || isCollected ? 'PAID' : deadWithoutCollection ? 'UNPAID' : 'PENDING';
+    // codAmount === 0 is NOT automatically "paid" — a real returned shipment
+    // with nothing to collect still shows غير مدفوع on Bosta's dashboard, not
+    // a trivial paid/N-A. Only an executed payout counts as paid.
+    const collectionStatus: 'UNPAID' | 'PAID' | 'PENDING' = isPaidOut
+      ? 'PAID'
+      : hasCashoutRecord
+        ? 'UNPAID'
+        : 'PENDING';
     const collectionStatusLabel =
-      collectionStatus === 'PAID' ? 'مدفوع' : collectionStatus === 'UNPAID' ? 'غير مدفوع' : 'قيد التحصيل';
+      collectionStatus === 'PAID' ? 'مدفوع' : collectionStatus === 'UNPAID' ? 'غير مدفوع' : 'غير متوفر';
 
     const pType = raw.specs?.packageType || '';
     const typeAr =
@@ -318,7 +322,7 @@ export class BostaService {
       cod: {
         amount: codAmount,
         currency: 'EGP',
-        isCollected,
+        isCollected: isPaidOut,
         collectionStatus,
         collectionStatusLabel,
         paymentMethodLabel: 'الدفع عند الاستلام',
@@ -346,8 +350,17 @@ export class BostaService {
   private mapBostaStatus(
     stateValue: string,
     code: number,
+    typeValue?: string,
   ): { key: string; label: string } {
     const val = stateValue.toLowerCase();
+    // The direction (forward delivery vs. return-to-origin) lives in `type`,
+    // not `state` — Bosta reuses the "Delivered" state label for a package
+    // delivered *back* to us. Checked first, or a real return (real example:
+    // cod 0, type "Return to Origin", state "Delivered") reads as a normal
+    // successful sale instead of تم الاسترجاع.
+    if ((typeValue ?? '').toLowerCase().includes('return')) {
+      return { key: 'RETURNED', label: 'Returned to Origin' };
+    }
     if (code === 45 || val.includes('deliver') && !val.includes('out') && !val.includes('failed')) {
       return { key: 'DELIVERED', label: 'Delivered' };
     }
