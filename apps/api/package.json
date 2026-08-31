@@ -9,7 +9,8 @@
     "generate": "drizzle-kit generate",
     "migrate": "tsx src/db/migrate.ts",
     "seed": "tsx src/db/seed.ts",
-    "dev": "nest start --watch"
+    "dev": "nest start --watch",
+    "seed:catalogue": "tsx src/db/seed-catalogue.ts"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",

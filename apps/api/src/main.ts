@@ -44,6 +44,10 @@ async function bootstrap() {
     )
     .addTag('System', 'Health and service information')
     .addTag('Auth', 'Signing in and checking the current session')
+    .addTag(
+      'Catalogue',
+      'Products, variants and what each sales channel calls them. The catalogue is what every arriving order and settlement row resolves against.',
+    )
     .build();
 
   SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, docs), {
