@@ -16,6 +16,43 @@ import { OrderItem } from './order-item.entity';
 /** How the order reached us. Not the same as where the product was listed. */
 export type OrderSource = 'EASYORDERS' | 'SOCIAL';
 
+/**
+ * The 27 governorates, fixed — a picklist instead of free text so "Cairo" and
+ * "القاهرة" stop being two different values for the same place. Arabic,
+ * matching how Bosta itself names them (`city.nameAr`, preferred over
+ * `city.name` in bosta.service.ts) — the shipping partner already treats
+ * Arabic as canonical, so the order form does too.
+ */
+export const EGYPT_GOVERNORATES = [
+  'القاهرة',
+  'الجيزة',
+  'الإسكندرية',
+  'الدقهلية',
+  'البحر الأحمر',
+  'البحيرة',
+  'الفيوم',
+  'الغربية',
+  'الإسماعيلية',
+  'المنوفية',
+  'المنيا',
+  'القليوبية',
+  'الوادي الجديد',
+  'السويس',
+  'أسوان',
+  'أسيوط',
+  'بني سويف',
+  'بورسعيد',
+  'دمياط',
+  'الشرقية',
+  'جنوب سيناء',
+  'كفر الشيخ',
+  'مطروح',
+  'الأقصر',
+  'قنا',
+  'شمال سيناء',
+  'سوهاج',
+] as const;
+
 /** The operational lifecycle the team drives. */
 export type OrderStatus =
   | 'NEW'
@@ -74,10 +111,12 @@ export class Order {
 
   /**
    * The channel's own order id, kept so the relationship stays traceable and
-   * so re-delivery of a webhook is a no-op. Empty for manual orders.
+   * so re-delivery of a webhook is a no-op. Null for manual orders — not ''.
+   * The unique index below allows unlimited NULLs but only one '' per source,
+   * so '' as a shared "no id" sentinel broke the second manual order onward.
    */
-  @Column({ type: 'text', default: '' })
-  externalId: string;
+  @Column({ type: 'text', nullable: true })
+  externalId: string | null;
 
   @Index('ix_order_status')
   @Column({ type: 'text', default: 'NEW' })

@@ -14,10 +14,15 @@ import { OrderEvent } from './order-event.entity';
 import { OrderItem } from './order-item.entity';
 import {
   ALLOWED_TRANSITIONS,
+  EGYPT_GOVERNORATES,
   Order,
   type OrderStatus,
   type PaymentStatus,
 } from './order.entity';
+
+/** Egyptian mobile: 01[0125] + 8 digits, with or without a +20/0020/20 prefix. */
+const EGYPT_PHONE = /^(?:\+?20|0)?1[0125]\d{8}$/;
+const GOVERNORATES = new Set<string>(EGYPT_GOVERNORATES);
 
 export interface CreateOrderInput {
   customerName: string;
@@ -144,21 +149,31 @@ export class OrdersService implements OnModuleInit {
   /** Manual creation, used for orders that arrive through social conversations. */
   async create(user: SessionUser, input: CreateOrderInput) {
     if (!input.customerName?.trim()) throw new BadRequestException('customer name is required');
-    if (!input.customerPhone?.trim()) throw new BadRequestException('customer phone is required');
-    if (!input.items?.length) throw new BadRequestException('an order needs at least one item');
 
+    const phone = (input.customerPhone ?? '').replace(/[\s-]/g, '').replace(/^00/, '+');
+    if (!EGYPT_PHONE.test(phone)) {
+      throw new BadRequestException('enter a valid Egyptian mobile number, e.g. 010 1234 5678');
+    }
+
+    const governorate = input.governorate?.trim() ?? '';
+    if (!GOVERNORATES.has(governorate)) {
+      throw new BadRequestException('choose a governorate');
+    }
+
+    if (!input.items?.length) throw new BadRequestException('an order needs at least one item');
     for (const item of input.items) {
       if (!Number.isInteger(item.quantity) || item.quantity < 1) {
         throw new BadRequestException('every item needs a whole quantity of at least 1');
       }
-      if (!/^\d+(\.\d{1,2})?$/.test(item.unitPrice ?? '')) {
-        throw new BadRequestException('every item needs a valid price');
+      if (!/^\d+(\.\d{1,2})?$/.test(item.unitPrice ?? '') || Number(item.unitPrice) <= 0) {
+        throw new BadRequestException('every item needs a price greater than 0');
       }
     }
 
     return this.db.transaction(async (tx) => {
       const variantIds = input.items.map((i) => i.variantId).filter(Boolean) as string[];
       const titles = await this.titlesFor(tx, variantIds);
+      await this.assertStockAvailable(tx, input.items);
 
       const items = input.items.map((i) =>
         tx.create(OrderItem, {
@@ -176,14 +191,14 @@ export class OrdersService implements OnModuleInit {
       const order = await tx.save(Order, {
         orderNumber: await this.nextOrderNumber(tx),
         source: 'SOCIAL' as const,
-        externalId: '',
+        externalId: null,
         // A moderator creating an order already owns it.
         status: user.role === 'MODERATOR' ? ('ASSIGNED' as const) : ('NEW' as const),
         assignedToId: user.role === 'MODERATOR' ? user.id : null,
         createdById: user.id,
         customerName: input.customerName.trim(),
-        customerPhone: input.customerPhone.trim(),
-        governorate: input.governorate?.trim() || null,
+        customerPhone: phone,
+        governorate,
         address: input.address?.trim() || null,
         paymentMethod: input.paymentMethod ?? 'COD',
         notes: input.notes?.trim() || null,
@@ -197,6 +212,39 @@ export class OrdersService implements OnModuleInit {
       await this.record(tx, order.id, 'CREATED', null, 'SOCIAL', user);
       return order;
     });
+  }
+
+  /**
+   * A manual order is ours to refuse, unlike a channel order that already
+   * happened out in the world — so this is the one creation path that blocks
+   * on stock instead of letting on-hand run negative.
+   * ponytail: read-then-check, no row lock — two mods racing the same item
+   * in the same second is rare enough here to not be worth it yet.
+   */
+  private async assertStockAvailable(
+    tx: EntityManager,
+    items: Array<{ variantId?: string; quantity: number }>,
+  ): Promise<void> {
+    const linked = items.filter((i) => i.variantId);
+    if (!linked.length) return;
+
+    const rows: Array<{ id: string; name: string; onHand: number }> = await tx.query(
+      `SELECT v.id, COALESCE(v.name || ' — ' || p.name, p.name) AS name,
+              COALESCE((SELECT SUM(quantity) FROM stock_movement m WHERE m.variant_id = v.id), 0)::int AS "onHand"
+       FROM product_variant v JOIN product p ON p.id = v.product_id
+       WHERE v.id = ANY($1)`,
+      [linked.map((i) => i.variantId)],
+    );
+    const onHand = new Map(rows.map((r) => [r.id, r]));
+
+    for (const item of linked) {
+      const stock = onHand.get(item.variantId as string);
+      if (stock && item.quantity > stock.onHand) {
+        throw new BadRequestException(
+          `${stock.name}: only ${stock.onHand} in stock, ${item.quantity} requested`,
+        );
+      }
+    }
   }
 
   async assign(orderId: string, assigneeId: string | null, actor: SessionUser) {
