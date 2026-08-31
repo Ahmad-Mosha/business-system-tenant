@@ -3,6 +3,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { createHash } from 'node:crypto';
 import { DataSource, EntityManager, In } from 'typeorm';
 import { ChannelListing } from '../catalog/channel-listing.entity';
+import { FinanceService } from '../finance/finance.service';
 import { StockMovement } from '../inventory/stock-movement.entity';
 import { NoonImport } from './noon-import.entity';
 import { NoonTransaction } from './noon-transaction.entity';
@@ -24,7 +25,10 @@ export interface ImportResult {
 export class NoonImportService {
   private readonly log = new Logger(NoonImportService.name);
 
-  constructor(@InjectDataSource() private readonly db: DataSource) {}
+  constructor(
+    @InjectDataSource() private readonly db: DataSource,
+    private readonly finance: FinanceService,
+  ) {}
 
   /**
    * Import a noon settlement export. Safe to call repeatedly: the same file is
@@ -83,6 +87,7 @@ export class NoonImportService {
       }
 
       await this.applyStockMovements(tx, fresh, listingBySku);
+      await this.applyCashPayouts(tx, fresh);
 
       this.log.log(
         `${filename}: ${fresh.length} new, ${rows.length - fresh.length} skipped, ${unmapped} unmapped`,
@@ -154,6 +159,22 @@ export class NoonImportService {
       }
     }
     if (movements.length) await tx.insert(StockMovement, movements);
+  }
+
+  /**
+   * `payment` rows are a real bank transfer landing — actual cash arriving,
+   * not proceeds accrued. `others` is negative in noon's own ledger (money
+   * leaving their payable balance to us), so it's flipped positive for ours.
+   *
+   * `balance_transfer` is deliberately excluded: the evidence only confirms
+   * it as an internal noon balance move, not confirmed as new money reaching
+   * our bank — left unposted rather than risking an overstated cash figure.
+   */
+  private async applyCashPayouts(tx: EntityManager, fresh: NoonRow[]) {
+    for (const r of fresh) {
+      if (r.transactionType !== 'payment') continue;
+      await this.finance.recordNoonPayout(tx, (-Number(r.others)).toFixed(2), r.fingerprint);
+    }
   }
 
   /** Drop rows already stored from an earlier overlapping export. */
