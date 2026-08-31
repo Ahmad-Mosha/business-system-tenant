@@ -49,7 +49,7 @@ export default async function ImportsPage() {
                     <TableHead className="text-right">Rows</TableHead>
                     <TableHead className="text-right">New</TableHead>
                     <TableHead className="text-right">Skipped</TableHead>
-                    <TableHead className="text-right">Products</TableHead>
+                    <TableHead className="text-right">Unmapped</TableHead>
                     <TableHead className="text-right">Imported</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -72,7 +72,7 @@ export default async function ImportsPage() {
                         {i.rowsSkipped || <span className="text-muted-foreground/40">—</span>}
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-muted-foreground">
-                        {i.productsDiscovered || <span className="text-muted-foreground/40">—</span>}
+                        {i.unmappedListings || <span className="text-muted-foreground/40">—</span>}
                       </TableCell>
                       <TableCell className="text-right whitespace-nowrap text-muted-foreground">
                         {dateTime(i.createdAt)}

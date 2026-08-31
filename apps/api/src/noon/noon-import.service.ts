@@ -3,8 +3,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { createHash } from 'node:crypto';
 import { DataSource, EntityManager, In } from 'typeorm';
 import { ChannelListing } from '../catalog/channel-listing.entity';
-import { ProductVariant } from '../catalog/product-variant.entity';
-import { Product } from '../catalog/product.entity';
+import { StockMovement } from '../inventory/stock-movement.entity';
 import { NoonImport } from './noon-import.entity';
 import { NoonTransaction } from './noon-transaction.entity';
 import { NoonRow, parseNoonReport } from './noon-report.parser';
@@ -15,7 +14,8 @@ export interface ImportResult {
   rowsInFile: number;
   rowsInserted: number;
   rowsSkipped: number;
-  productsDiscovered: number;
+  /** Partner SKUs in this file with no matching product yet — need mapping. */
+  unmappedListings: number;
   periodStart: string | null;
   periodEnd: string | null;
 }
@@ -30,6 +30,10 @@ export class NoonImportService {
    * Import a noon settlement export. Safe to call repeatedly: the same file is
    * recognised by its hash, and an overlapping export is deduplicated row by
    * row, so only genuinely new lines are stored.
+   *
+   * Products are never created here. noon can only sell what already exists in
+   * our own catalogue (Mega today); a partner SKU with no matching listing
+   * stays unmapped and is reported back rather than fabricated into a stub.
    */
   async import(filename: string, bytes: Buffer): Promise<ImportResult> {
     const fileHash = createHash('sha256').update(bytes).digest('hex');
@@ -46,7 +50,8 @@ export class NoonImportService {
 
     return this.db.transaction(async (tx) => {
       const listingBySku = await this.resolveListings(tx, rows);
-      const discovered = [...listingBySku.values()].filter((l) => l.created).length;
+      const skusInFile = new Set(rows.map((r) => r.partnerSku).filter((s): s is string => !!s));
+      const unmapped = [...skusInFile].filter((sku) => !listingBySku.has(sku)).length;
 
       const fresh = await this.rejectKnownRows(tx, rows);
       const dates = rows.map((r) => r.transactionDate).filter((d): d is string => !!d).sort();
@@ -59,7 +64,7 @@ export class NoonImportService {
         rowsInFile: rows.length,
         rowsInserted: fresh.length,
         rowsSkipped: rows.length - fresh.length,
-        productsDiscovered: discovered,
+        unmappedListings: unmapped,
         periodStart: dates[0] ?? null,
         periodEnd: dates[dates.length - 1] ?? null,
       });
@@ -72,64 +77,83 @@ export class NoonImportService {
           fresh.slice(i, i + 500).map((r) => ({
             ...r,
             importId: record.id,
-            listingId: r.partnerSku ? (listingBySku.get(r.partnerSku)?.id ?? null) : null,
+            listingId: r.partnerSku ? (listingBySku.get(r.partnerSku)?.listingId ?? null) : null,
           })),
         );
       }
 
+      await this.applyStockMovements(tx, fresh, listingBySku);
+
       this.log.log(
-        `${filename}: ${fresh.length} new, ${rows.length - fresh.length} skipped, ${discovered} products discovered`,
+        `${filename}: ${fresh.length} new, ${rows.length - fresh.length} skipped, ${unmapped} unmapped`,
       );
       return { ...this.describe(record), alreadyImported: false };
     });
   }
 
-  /**
-   * Map every partner SKU in the file to a listing, creating a stub Product for
-   * any we have never seen. This is what lets a report be imported before the
-   * catalogue exists — the catalogue falls out of the data.
-   */
+  /** Look up an existing listing for every partner SKU in the file. Creates nothing. */
   private async resolveListings(
     tx: EntityManager,
     rows: NoonRow[],
-  ): Promise<Map<string, { id: string; created: boolean }>> {
-    const wanted = new Map<string, NoonRow>();
-    for (const r of rows) if (r.partnerSku) wanted.set(r.partnerSku, r);
+  ): Promise<Map<string, { listingId: string; variantId: string }>> {
+    const wanted = new Set(rows.map((r) => r.partnerSku).filter((s): s is string => !!s));
     if (!wanted.size) return new Map();
 
     const existing = await tx.find(ChannelListing, {
-      where: { channel: 'noon', partnerSku: In([...wanted.keys()]) },
+      where: { channel: 'noon', partnerSku: In([...wanted]) },
     });
 
-    const out = new Map<string, { id: string; created: boolean }>();
-    for (const l of existing) if (l.partnerSku) out.set(l.partnerSku, { id: l.id, created: false });
-
-    for (const [partnerSku, row] of wanted) {
-      if (out.has(partnerSku)) continue;
-
-      const product = await tx.save(Product, {
-        name: row.title || partnerSku,
-        discovered: true,
-        category: null,
-      });
-      // A discovered product still gets its default variant, so stock and
-      // orders can attach to it without a later migration.
-      const variant = await tx.save(ProductVariant, {
-        productId: product.id,
-        name: 'Default',
-        attributes: {},
-      });
-      const listing = await tx.save(ChannelListing, {
-        channel: 'noon' as const,
-        externalId: row.noonSku ?? partnerSku,
-        externalVariantId: '',
-        partnerSku,
-        title: row.title || null,
-        variantId: variant.id,
-      });
-      out.set(partnerSku, { id: listing.id, created: true });
+    const out = new Map<string, { listingId: string; variantId: string }>();
+    for (const l of existing) {
+      if (l.partnerSku) out.set(l.partnerSku, { listingId: l.id, variantId: l.variantId });
     }
     return out;
+  }
+
+  /**
+   * One stock movement per unit sold or returned, for rows newly inserted this
+   * import only. Historical rows already imported before this feature existed
+   * are deliberately not backfilled: whatever physical stock count is entered
+   * as the opening baseline already nets out sales that happened before it was
+   * taken, so replaying old rows on top would double-count them.
+   *
+   * Evidence-based, not a guess: `order` rows are one unit each (no quantity
+   * column exists — see docs/evidence). `order_update` rows are mostly fee
+   * adjustments, not returns; only the ones with negative net proceeds reverse
+   * real value, so only those move stock back in.
+   */
+  private async applyStockMovements(
+    tx: EntityManager,
+    fresh: NoonRow[],
+    listingBySku: Map<string, { listingId: string; variantId: string }>,
+  ) {
+    const movements: Array<Partial<StockMovement>> = [];
+    for (const r of fresh) {
+      if (!r.partnerSku) continue;
+      const listing = listingBySku.get(r.partnerSku);
+      if (!listing) continue; // unmapped: no product to move stock on
+
+      if (r.transactionType === 'order' && r.itemNr) {
+        movements.push({
+          variantId: listing.variantId,
+          quantity: -1,
+          reason: 'SALE',
+          sourceType: 'noon_transaction',
+          sourceId: r.fingerprint,
+          occurredAt: r.transactionDate ? new Date(r.transactionDate) : new Date(),
+        });
+      } else if (r.transactionType === 'order_update' && Number(r.netProceeds) < 0) {
+        movements.push({
+          variantId: listing.variantId,
+          quantity: 1,
+          reason: 'RETURN',
+          sourceType: 'noon_transaction',
+          sourceId: r.fingerprint,
+          occurredAt: r.transactionDate ? new Date(r.transactionDate) : new Date(),
+        });
+      }
+    }
+    if (movements.length) await tx.insert(StockMovement, movements);
   }
 
   /** Drop rows already stored from an earlier overlapping export. */
@@ -155,7 +179,7 @@ export class NoonImportService {
       rowsInFile: i.rowsInFile,
       rowsInserted: i.rowsInserted,
       rowsSkipped: i.rowsSkipped,
-      productsDiscovered: i.productsDiscovered,
+      unmappedListings: i.unmappedListings,
       periodStart: i.periodStart,
       periodEnd: i.periodEnd,
     };

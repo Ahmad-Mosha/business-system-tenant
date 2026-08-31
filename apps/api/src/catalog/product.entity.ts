@@ -1,15 +1,27 @@
-import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, Unique, UpdateDateColumn } from 'typeorm';
 import { ProductVariant } from './product-variant.entity';
+
+/**
+ * The business's fixed category vocabulary. A plain `text` column rather than
+ * a Postgres enum — adding a category should never need a migration — but
+ * validated against this list everywhere a category is written, so the value
+ * space stays exactly these four rather than drifting into free text.
+ */
+export const PRODUCT_CATEGORIES = ['COSMETICS', 'HOME', 'ELECTRONICS', 'TV_SHOP'] as const;
+export type ProductCategory = (typeof PRODUCT_CATEGORIES)[number];
 
 /**
  * The internal identity of a real thing Prime Market sells. Stable across
  * channels: marketplace SKUs point at this, never the other way round.
  *
- * Products are usually born from an import rather than typed in — the first
- * time a marketplace SKU is seen, a stub is created and flagged `discovered`
- * so someone can enrich it later.
+ * Products originate from our own inventory system (Mega export today, manual
+ * entry otherwise) — never auto-created from a sales channel. A channel's
+ * listing must be attached to an existing product; it does not get to invent
+ * one. `megaId` is Mega's own internal row id, kept only so a later Mega
+ * export can be re-imported as an upsert instead of creating duplicates.
  */
 @Entity('product')
+@Unique('uq_product_mega_id', ['megaId'])
 export class Product {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -18,9 +30,18 @@ export class Product {
   name: string;
 
   @Column({ type: 'text', nullable: true })
-  category: string | null;
+  category: ProductCategory | null;
 
-  /** True while the product is an unenriched stub created by an importer. */
+  /** Mega's internal product id. Null for products created manually. */
+  @Column({ type: 'text', nullable: true })
+  megaId: string | null;
+
+  /**
+   * True while the product is an unenriched stub. Nothing creates these any
+   * more (see class doc), kept only so a genuinely orphaned channel listing
+   * has somewhere to point rather than being silently dropped, and so a badge
+   * built for it stays meaningful if that ever changes.
+   */
   @Column({ type: 'boolean', default: false })
   discovered: boolean;
 

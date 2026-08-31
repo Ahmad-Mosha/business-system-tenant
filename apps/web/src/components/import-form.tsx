@@ -147,7 +147,7 @@ function Outcome({ state }: { state: Extract<UploadState, { status: 'done' }> })
           { label: 'Rows read', value: r.rowsInFile },
           { label: 'New', value: r.rowsInserted },
           { label: 'Already held', value: r.rowsSkipped },
-          { label: 'Products found', value: r.productsDiscovered },
+          { label: 'Unmapped SKUs', value: r.unmappedListings },
         ].map((cell) => (
           <div key={cell.label} className="bg-background px-5 py-3.5">
             <dt className="text-[11px] tracking-[0.06em] text-muted-foreground uppercase">
