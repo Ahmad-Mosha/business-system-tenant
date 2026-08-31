@@ -1,3 +1,5 @@
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -133,4 +135,186 @@ export function StatusStrip({ children }: { children: ReactNode }) {
       {children}
     </footer>
   );
+}
+
+/**
+ * The page's title card: what this screen is, and its primary action. A screen
+ * gets one, at the top of its content — replacing headline figures crammed into
+ * the chrome, which read as decoration rather than something you could act on.
+ */
+export function PageCard({
+  title,
+  description,
+  actions,
+}: {
+  title: string;
+  description?: ReactNode;
+  actions?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border px-5 py-4">
+      <div className="min-w-0">
+        <h1 className="text-xl font-semibold tracking-[-0.02em]">{title}</h1>
+        {description ? (
+          <p className="mt-0.5 text-[13px] text-muted-foreground">{description}</p>
+        ) : null}
+      </div>
+      {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
+    </div>
+  );
+}
+
+/** A bordered card that fills the remaining height and clips its own overflow. */
+export function Panel({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border">
+      {children}
+    </div>
+  );
+}
+
+/**
+ * The panel's footer: what you are looking at, and how to move. Pagination is
+ * how a list stays on one screen — the alternative is a page that grows without
+ * limit and buries everything below it.
+ */
+export function Pagination({
+  from,
+  to,
+  total,
+  noun,
+  prevHref,
+  nextHref,
+}: {
+  from: number;
+  to: number;
+  total: number;
+  noun: string;
+  prevHref: string | null;
+  nextHref: string | null;
+}) {
+  const step =
+    'inline-flex size-8 items-center justify-center rounded-md border border-border transition-colors';
+  return (
+    <div className="flex shrink-0 items-center justify-between gap-4 border-t border-border px-4 py-2.5">
+      <p className="text-[13px] text-muted-foreground">
+        {total === 0 ? (
+          `No ${noun}`
+        ) : (
+          <>
+            Showing <span className="tabular-nums text-foreground">{from}</span> to{' '}
+            <span className="tabular-nums text-foreground">{to}</span> of{' '}
+            <span className="tabular-nums text-foreground">{total}</span> {noun}
+          </>
+        )}
+      </p>
+      <div className="flex items-center gap-1.5">
+        <Step href={prevHref} label={`Previous page of ${noun}`} className={step}>
+          <ChevronLeft className="size-4" />
+        </Step>
+        <Step href={nextHref} label={`Next page of ${noun}`} className={step}>
+          <ChevronRight className="size-4" />
+        </Step>
+      </div>
+    </div>
+  );
+}
+
+function Step({
+  href,
+  label,
+  className,
+  children,
+}: {
+  href: string | null;
+  label: string;
+  className: string;
+  children: ReactNode;
+}) {
+  if (!href) {
+    return (
+      <span aria-disabled className={cn(className, 'cursor-not-allowed text-muted-foreground/30')}>
+        {children}
+      </span>
+    );
+  }
+  return (
+    <Link
+      href={href}
+      scroll={false}
+      aria-label={label}
+      className={cn(
+        className,
+        'text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+      )}
+    >
+      {children}
+    </Link>
+  );
+}
+
+/**
+ * A headline figure as a card. Passing `href` makes it the filter for what it
+ * counts — the number stops being decoration you can only look at.
+ */
+export function MetricCard({
+  label,
+  value,
+  hint,
+  href,
+  active = false,
+  tone,
+}: {
+  label: string;
+  value: ReactNode;
+  hint?: string;
+  href?: string;
+  active?: boolean;
+  tone?: 'default' | 'warning' | 'destructive' | 'success';
+}) {
+  const body = (
+    <>
+      <p className="text-[11px] font-medium tracking-[0.07em] text-muted-foreground uppercase">
+        {label}
+      </p>
+      <p
+        className={cn(
+          'mt-1.5 text-[22px] leading-none font-semibold tabular-nums',
+          tone === 'warning' && 'text-warning',
+          tone === 'destructive' && 'text-destructive',
+          tone === 'success' && 'text-success',
+        )}
+      >
+        {value}
+      </p>
+      {hint ? <p className="mt-1.5 text-[11px] text-muted-foreground">{hint}</p> : null}
+    </>
+  );
+
+  const shell = cn(
+    'rounded-xl border px-4 py-3 transition-colors',
+    active ? 'border-foreground bg-accent' : 'border-border',
+  );
+
+  if (!href) return <div className={shell}>{body}</div>;
+
+  return (
+    <Link
+      href={href}
+      scroll={false}
+      aria-pressed={active}
+      className={cn(
+        shell,
+        'block focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+        !active && 'hover:border-foreground/30 hover:bg-accent/50',
+      )}
+    >
+      {body}
+    </Link>
+  );
+}
+
+/** The metric row. Equal columns so the cards read as one band, not five objects. */
+export function MetricRow({ children }: { children: ReactNode }) {
+  return <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{children}</div>;
 }
