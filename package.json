@@ -10,7 +10,8 @@
     "typecheck": "pnpm -r typecheck",
     "migrate": "pnpm --filter @prime/api migrate",
     "generate": "pnpm --filter @prime/api generate",
-    "seed": "pnpm --filter @prime/api seed"
+    "seed": "pnpm --filter @prime/api seed",
+    "seed:catalogue": "pnpm --filter @prime/api seed:catalogue"
   },
   "packageManager": "pnpm@10.6.3"
 }
