@@ -1,110 +1,170 @@
-@import 'tailwindcss';
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-/*
- * Prime Market design tokens.
- *
- * Monochrome ground, one accent, semantic colour for state only. Colour that
- * appears in this interface means something happened — it is never identity,
- * category or decoration.
- */
-@theme {
-  /* Ground — cool-tinted neutrals, not pure grey. */
-  --color-canvas: #f6f8fb;
-  --color-surface: #ffffff;
-  --color-raised: #f0f4f9;
-  --color-sunken: #eaeff6;
+@custom-variant dark (&:is(.dark *));
 
-  /* Ink */
-  --color-ink: #0d1a26;
-  --color-ink-soft: #4a5764;
-  --color-ink-faint: #7b8794;
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-destructive-subtle: var(--destructive-subtle);
+  --color-success: var(--success);
+  --color-success-subtle: var(--success-subtle);
+  --color-warning: var(--warning);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
 
-  /* Structure */
-  --color-line: #dfe5ec;
-  --color-line-strong: #c3ccd8;
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.625rem;
+  /* Semantic only — never decorative. The UI must stay legible with these
+     collapsed to the monochrome scale. */
+  --success: oklch(0.52 0.13 152);
+  --success-subtle: oklch(0.96 0.02 152);
+  --warning: oklch(0.62 0.14 72);
+  --warning-subtle: oklch(0.96 0.03 82);
+  --destructive-subtle: oklch(0.96 0.02 27);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
 
-  /* The single accent. Focus rings, the active nav rail, current selection.
-     Never a fill on something that is merely present. */
-  --color-accent: #0d7368;
-  --color-accent-soft: #e2f1ef;
-
-  /* State. Applied to what happened, never to what a thing is. */
-  --color-good: #1a7245;
-  --color-good-soft: #e4f2ea;
-  --color-warn: #8a5a12;
-  --color-warn-soft: #f8efdc;
-  --color-bad: #a52820;
-  --color-bad-soft: #fbe8e6;
-
-  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
-  /* Every product name in this system is Arabic and Geist has no Arabic
-     coverage. Without this the names fall back to whatever the OS supplies,
-     which is exactly how the previous build's Arabic looked wrong. */
-  --font-arabic: var(--font-arabic-sans), 'Segoe UI', Tahoma, sans-serif;
-
-  /* Density. The previous build was rejected on size — these are the numbers
-     that fix it. */
-  --spacing-row: 2.25rem; /* 36px table row */
-  --spacing-control: 2.125rem; /* 34px input and button */
-
-  --text-data: 0.8125rem; /* 13px — table body, the working size */
-  --text-data--line-height: 1.25rem;
-  --text-label: 0.6875rem; /* 11px — uppercase column and field labels */
-  --text-label--line-height: 1rem;
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.922 0 0);
+  --sidebar-primary-foreground: oklch(0.205 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+  --success: oklch(0.72 0.15 152);
+  --success-subtle: oklch(0.27 0.04 152);
+  --warning: oklch(0.78 0.14 78);
+  --warning-subtle: oklch(0.28 0.04 78);
+  --destructive-subtle: oklch(0.28 0.05 27);
 }
 
 @layer base {
   * {
-    border-color: var(--color-line);
+    @apply border-border outline-ring/50;
   }
-
-  html {
-    background: var(--color-canvas);
-    color: var(--color-ink);
-    /* Numbers line up in columns everywhere, not only where remembered. */
-    font-variant-numeric: tabular-nums;
-    -webkit-font-smoothing: antialiased;
-  }
-
   body {
-    font-size: 0.875rem;
-    line-height: 1.5;
+    @apply bg-background text-foreground;
   }
-
-  /* Arabic text keeps its own face wherever it appears. */
-  :lang(ar),
-  [dir='rtl'] {
-    font-family: var(--font-arabic);
+  html {
+    @apply font-sans;
   }
-
-  /* One visible focus treatment for the whole application. */
-  :focus-visible {
-    outline: 2px solid var(--color-accent);
-    outline-offset: 1px;
-    border-radius: 3px;
+}
+@layer base {
+  /* The palette is deliberately flat, so typography and spacing carry the
+     hierarchy. Tighter tracking on headings, lining figures in tables. */
+  h1, h2, h3 {
+    letter-spacing: -0.018em;
+    text-wrap: balance;
   }
-
+  /* Financial columns must align digit-for-digit. */
+  table {
+    font-variant-numeric: tabular-nums;
+  }
   ::selection {
-    background: var(--color-accent-soft);
+    background: var(--foreground);
+    color: var(--background);
   }
 }
 
-@layer utilities {
-  /* Column headers, field labels, metadata. */
-  .label-caps {
-    font-size: var(--text-label);
-    line-height: var(--text-label--line-height);
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--color-ink-faint);
-  }
-
-  /* Money and counts. Always right-aligned, always monospaced. */
-  .figure {
-    font-family: var(--font-mono);
-    font-variant-numeric: tabular-nums;
-    text-align: right;
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }

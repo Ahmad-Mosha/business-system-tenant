@@ -2,47 +2,57 @@
 
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { TOKEN_COOKIE } from '@/lib/session';
+import { SESSION_COOKIE } from '@/lib/session';
 
-const BASE = process.env.API_URL ?? 'http://localhost:3001';
+const API = process.env.API_URL ?? 'http://localhost:3001';
 
-export async function login(_prev: string | null, formData: FormData): Promise<string | null> {
-  const email = String(formData.get('email') ?? '');
+export type LoginState = { status: 'idle' } | { status: 'error'; message: string };
+
+export async function signIn(_previous: LoginState, formData: FormData): Promise<LoginState> {
+  const email = String(formData.get('email') ?? '').trim();
   const password = String(formData.get('password') ?? '');
 
-  const res = await fetch(`${BASE}/api/auth/login`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-    cache: 'no-store',
-  }).catch(() => null);
-
-  if (!res) return 'Cannot reach the API. Is it running?';
-
-  if (!res.ok) {
-    const body = (await res.json().catch(() => null)) as { message?: string | string[] } | null;
-    const message = Array.isArray(body?.message) ? body.message[0] : body?.message;
-    return message ?? 'Sign in failed';
+  if (!email || !password) {
+    return { status: 'error', message: 'Enter your email and password.' };
   }
 
-  const { accessToken, expiresIn } = (await res.json()) as {
-    accessToken: string;
-    expiresIn: number;
-  };
+  let res: Response;
+  try {
+    res = await fetch(`${API}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+  } catch {
+    return { status: 'error', message: 'Could not reach the server.' };
+  }
 
-  // httpOnly: the token is never readable by a script on the page.
-  (await cookies()).set(TOKEN_COOKIE, accessToken, {
+  if (!res.ok) {
+    const detail = await res.json().catch(() => null);
+    return { status: 'error', message: detail?.message ?? 'Incorrect email or password.' };
+  }
+
+  const data = await res.json().catch(() => null);
+  const isModerator = data?.user?.role === 'MODERATOR';
+
+  // The API issues the token on its own origin; re-set it on this one so the
+  // browser never needs to talk to the API directly.
+  const setCookie = res.headers.get('set-cookie') ?? '';
+  const token = /pm_session=([^;]+)/.exec(setCookie)?.[1];
+  if (!token) return { status: 'error', message: 'The server did not return a session.' };
+
+  (await cookies()).set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
+    maxAge: 12 * 60 * 60,
     path: '/',
-    maxAge: expiresIn,
   });
 
-  redirect('/');
+  redirect(isModerator ? '/orders' : '/');
 }
 
-export async function logout() {
-  (await cookies()).delete(TOKEN_COOKIE);
+export async function signOut() {
+  (await cookies()).delete(SESSION_COOKIE);
   redirect('/login');
 }
