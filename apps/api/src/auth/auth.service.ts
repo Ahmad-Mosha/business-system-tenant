@@ -6,10 +6,27 @@ import { hashPassword, verifyPassword } from './password';
 import { User, type UserRole } from './user.entity';
 import type { SessionUser } from './auth.guard';
 
-/** Development accounts, created on boot only when the table is empty. */
+/**
+ * The two named accounts, created on boot only when the table is empty.
+ * Passwords come from the environment so a publicly reachable deployment
+ * never boots with the known dev defaults still live — set
+ * ADMIN_SEED_PASSWORD / MODERATOR_SEED_PASSWORD in production. Only read
+ * once, at the moment of seeding; changing them later has no effect on an
+ * account that already exists.
+ */
 const SEED_USERS: Array<{ email: string; password: string; name: string; role: UserRole }> = [
-  { email: 'admin@admin.com', password: 'admin123', name: 'Admin', role: 'ADMIN' },
-  { email: 'moderator@moderator.com', password: 'moderator123', name: 'Moderator', role: 'MODERATOR' },
+  {
+    email: 'admin@admin.com',
+    password: process.env.ADMIN_SEED_PASSWORD ?? 'admin123',
+    name: 'Admin',
+    role: 'ADMIN',
+  },
+  {
+    email: 'moderator@moderator.com',
+    password: process.env.MODERATOR_SEED_PASSWORD ?? 'moderator123',
+    name: 'Moderator',
+    role: 'MODERATOR',
+  },
 ];
 
 @Injectable()
@@ -27,6 +44,12 @@ export class AuthService {
    */
   async seedDevUsers(): Promise<void> {
     if ((await this.users.count()) > 0) return;
+    if (process.env.NODE_ENV === 'production' && !process.env.ADMIN_SEED_PASSWORD) {
+      this.log.error(
+        'production boot with an empty user table and no ADMIN_SEED_PASSWORD set — ' +
+          'seeding the known dev password anyway. Set it and restart before this is public.',
+      );
+    }
     for (const u of SEED_USERS) {
       await this.users.save(
         this.users.create({
