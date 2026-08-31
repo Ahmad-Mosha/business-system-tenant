@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { authHeaders } from '@/lib/session';
 
 const API = process.env.API_URL ?? 'http://localhost:3001';
@@ -9,35 +10,65 @@ async function send(path: string, method: string, body: unknown) {
   const res = await fetch(`${API}${path}`, {
     method,
     headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-    body: JSON.stringify(body),
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!res.ok) {
     const detail = await res.json().catch(() => null);
     throw new Error(detail?.message ?? `Request failed (${res.status})`);
   }
-  return res.json();
+  return res.status === 204 ? null : res.json();
 }
 
 export type FormState = { status: 'idle' } | { status: 'ok'; message: string } | { status: 'error'; message: string };
 
-export async function addProduct(_prev: FormState, formData: FormData): Promise<FormState> {
+export type CreateProductState = { status: 'idle' } | { status: 'error'; message: string };
+
+/** Creates a product and lands on its detail page — matches the order form. */
+export async function addProduct(
+  _prev: CreateProductState,
+  formData: FormData,
+): Promise<CreateProductState> {
   const openingStock = String(formData.get('openingStock') ?? '').trim();
-  const channels = formData.getAll('channels') as string[];
+  let created: { id: string };
   try {
-    await send('/catalog/products', 'POST', {
+    created = await send('/catalog/products', 'POST', {
       name: formData.get('name'),
       category: formData.get('category') || undefined,
       sku: formData.get('sku') || undefined,
       unitCost: String(formData.get('unitCost') ?? '').trim() || undefined,
       sellingPrice: String(formData.get('sellingPrice') ?? '').trim() || undefined,
       openingStock: openingStock ? Number(openingStock) : undefined,
-      channels: channels.length > 0 ? channels : undefined,
     });
   } catch (e) {
     return { status: 'error', message: e instanceof Error ? e.message : 'Could not add product' };
   }
   revalidatePath('/inventory');
-  return { status: 'ok', message: 'Product added.' };
+  redirect(`/inventory/${created.id}`);
+}
+
+export async function updateProduct(
+  productId: string,
+  patch: { name?: string; category?: string | null },
+) {
+  try {
+    await send(`/catalog/products/${productId}`, 'PATCH', patch);
+  } catch (e) {
+    return { ok: false as const, message: e instanceof Error ? e.message : 'Could not save' };
+  }
+  revalidatePath('/inventory');
+  revalidatePath(`/inventory/${productId}`);
+  return { ok: true as const };
+}
+
+/** Archives (soft-deletes) a product, then sends the caller back to the list. */
+export async function archiveProduct(productId: string) {
+  try {
+    await send(`/catalog/products/${productId}`, 'DELETE', undefined);
+  } catch (e) {
+    return { ok: false as const, message: e instanceof Error ? e.message : 'Could not delete' };
+  }
+  revalidatePath('/inventory');
+  redirect('/inventory');
 }
 
 export async function recordStock(
