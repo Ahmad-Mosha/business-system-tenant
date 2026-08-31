@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { sql } from 'drizzle-orm';
 import { Pool } from 'pg';
-import * as schema from './schema';
+import * as schema from './schema.js';
 
 export type Tx = NodePgDatabase<typeof schema>;
 
@@ -20,13 +20,11 @@ export class DbService implements OnModuleDestroy {
     this.pool = new Pool({
       connectionString: config.getOrThrow<string>('DATABASE_URL'),
       max: 10,
-    });
-
-    // The connection string authenticates as the database owner, who bypasses
-    // row-level security. Dropping to prime_app on every connection is what
-    // makes the policies apply at all.
-    this.pool.on('connect', (client) => {
-      void client.query('SET ROLE prime_app');
+      // The connection string authenticates as the database owner, who
+      // bypasses row-level security. Postgres applies this at connection
+      // time, so every query the API makes runs as prime_app and every
+      // policy applies. There is no window where it does not.
+      options: '-c role=prime_app',
     });
 
     this.db = drizzle(this.pool, { schema, casing: 'snake_case' });
