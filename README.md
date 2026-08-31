@@ -18,26 +18,35 @@ were expensive to derive; the open decisions in it must not be guessed.
 ## Running it
 
 ```bash
-cp .env.example .env      # then fill in JWT_SECRET
-npm install
-npm run db:up             # Postgres 17 on 5434
-npm run migrate
-npm run seed              # creates the tenant and the first admin
-npm run dev               # API on :3001, docs at /docs
+cp .env.example .env       # then fill in JWT_SECRET
+pnpm install
+pnpm db:up                 # Postgres 17 on 5434
+pnpm migrate
+pnpm seed                  # tenant and first admin
+pnpm seed:catalogue        # the real 135 products
+pnpm dev                   # API on :3001, web on :3000
 ```
 
-Open **http://localhost:3001/docs**, log in through `POST /api/auth/login`, paste
-the token into **Authorize**, and every endpoint is usable from that page.
+- **App** — http://localhost:3000 (sign in with the seeded admin)
+- **API docs** — http://localhost:3001/docs. Log in through `POST /api/auth/login`,
+  paste the token into **Authorize**, and every endpoint is usable from that page.
 
 ## Layout
 
 ```
-apps/api           NestJS API — the whole backend
-  src/db           schema, migrations, tenant resolution
+apps/api           NestJS API
+  src/db           schema, migrations, tenant resolution, seeds
   src/auth         login, token, role guard
+  src/catalogue    products, variants, channel listings
   drizzle/         migration SQL, applied in order
+apps/web           Next.js interface
+  src/app          routes; (app) is everything behind sign-in
+  src/components   shell and the UI primitives
 docs/              business, architecture, roadmap, evidence
+ui-ux/             design reference — direction only, never copied
 ```
+
+The package manager is **pnpm**.
 
 ## Two version notes
 
