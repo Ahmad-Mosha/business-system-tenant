@@ -44,6 +44,24 @@ export const ALL_ORDER_STATUSES: OrderStatus[] = [
   'RETURNED',
 ];
 
+/**
+ * Mirrors ALLOWED_TRANSITIONS in the API. The API remains the authority; this
+ * only avoids offering a move that would be refused. One definition — it was
+ * previously copied into both the list menu and the detail workflow.
+ */
+export const NEXT_STATUSES: Record<OrderStatus, OrderStatus[]> = {
+  NEW: ['ASSIGNED', 'CONFIRMED', 'CANCELLED'],
+  ASSIGNED: ['CONFIRMED', 'CANCELLED'],
+  CONFIRMED: ['SHIPPED', 'CANCELLED'],
+  SHIPPED: ['DELIVERED', 'RETURNED'],
+  DELIVERED: ['RETURNED'],
+  CANCELLED: [],
+  RETURNED: [],
+};
+
+/** A move that undoes rather than advances — styled as destructive. */
+export const isReverse = (s: OrderStatus) => s === 'CANCELLED' || s === 'RETURNED';
+
 const PAYMENT_STYLES: Record<PaymentStatus, string> = {
   UNPAID: 'border-border bg-transparent text-muted-foreground',
   PAID: 'border-success/30 bg-success-subtle text-success',
