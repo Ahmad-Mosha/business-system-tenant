@@ -4,7 +4,7 @@ import { Check, ChevronDown, Loader2 } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { setOrderStatus } from '@/app/(app)/orders/actions';
-import { StatusBadge, STATUS_LABELS } from '@/components/order-status';
+import { isReverse, NEXT_STATUSES, StatusBadge, STATUS_LABELS } from '@/components/order-status';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,20 +15,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import type { OrderStatus } from '@/lib/api';
 import { cn } from '@/lib/utils';
-
-/**
- * Mirrors ALLOWED_TRANSITIONS in the API. The API remains the authority; this
- * only avoids offering a move that would be refused.
- */
-const NEXT_STATUSES: Record<OrderStatus, OrderStatus[]> = {
-  NEW: ['ASSIGNED', 'CONFIRMED', 'CANCELLED'],
-  ASSIGNED: ['CONFIRMED', 'CANCELLED'],
-  CONFIRMED: ['SHIPPED', 'CANCELLED'],
-  SHIPPED: ['DELIVERED', 'RETURNED'],
-  DELIVERED: ['RETURNED'],
-  CANCELLED: [],
-  RETURNED: [],
-};
 
 /**
  * Changes an order's status straight from the list, so a moderator working a
@@ -103,7 +89,7 @@ export function OrderStatusMenu({
             }}
             className={cn(
               'text-sm',
-              (s === 'CANCELLED' || s === 'RETURNED') &&
+              isReverse(s) &&
                 'text-destructive focus:bg-destructive-subtle focus:text-destructive',
             )}
           >
