@@ -18,10 +18,11 @@ import { cn } from "@/lib/utils";
 
 /**
  * A page of rows has to *fit* — the point of paginating is that you never
- * scroll to see the rest. Ten rows clear the header card, the metrics, the
- * filters and the footer on a 900px laptop with room to spare.
+ * scroll to see the rest. Eight rows clear the header card, the metrics, the
+ * filters and the footer on a 900px laptop with margin to spare, even on a
+ * shorter window.
  */
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 8;
 
 export default async function OrdersPage({
   searchParams,
