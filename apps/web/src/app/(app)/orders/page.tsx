@@ -17,12 +17,12 @@ import { requireSession } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
 /**
- * A page of rows has to *fit* — the point of paginating is that you never
- * scroll to see the rest. Eight rows clear the header card, the metrics, the
- * filters and the footer on a 900px laptop with margin to spare, even on a
- * shorter window.
+ * 8 was tuned to a ~900px window and left a dead gap under the table on
+ * anything taller — the panel has no more rows to show, so the empty space
+ * just sits there instead of being filled. 20 fills or slightly overflows
+ * (scrolling inside the panel, never the page) on realistic screen heights.
  */
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 20;
 
 export default async function OrdersPage({
   searchParams,
