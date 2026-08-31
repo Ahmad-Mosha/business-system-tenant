@@ -1,19 +1,29 @@
 'use client';
 
-import { AlertCircle, Loader2, Plus, Search, Trash2 } from 'lucide-react';
+import { AlertCircle, Loader2, Plus, Search, Trash2, X } from 'lucide-react';
+import Link from 'next/link';
 import { useActionState, useEffect, useRef, useState } from 'react';
 import { createOrder, searchVariants, type CreateOrderState } from '@/app/(app)/orders/actions';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import {
+  ContextBar,
+  DetailPane,
+  ListPane,
+  Screen,
+  Scroller,
+  Split,
+  StatusStrip,
+} from '@/components/shell';
 import { GOVERNORATES } from '@/lib/governorates';
 import { money } from '@/lib/format';
+import { cn } from '@/lib/utils';
 
 const INITIAL: CreateOrderState = { status: 'idle' };
 
 /** Mirrors EGYPT_PHONE on the API — checked here too so the mod sees the
  * problem while typing, not after a round trip. */
 const EGYPT_PHONE = /^(?:\+?20|0)?1[0125]\d{8}$/;
-const isEgyptianPhone = (raw: string) => EGYPT_PHONE.test(raw.replace(/[\s-]/g, '').replace(/^00/, '+'));
+const isEgyptianPhone = (raw: string) =>
+  EGYPT_PHONE.test(raw.replace(/[\s-]/g, '').replace(/^00/, '+'));
 
 interface Line {
   key: string;
@@ -27,10 +37,17 @@ interface Line {
 
 type Hit = Awaited<ReturnType<typeof searchVariants>>[number];
 
+const field =
+  'h-[var(--control-h)] w-full rounded-md border border-border bg-background px-2.5 text-[13px] focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-60';
+
 /**
- * Built around what a moderator actually does: they are on a call, they know
- * the product and the price, and they need the order recorded quickly. Product
- * lookup is optional — an unlisted item can still be typed in.
+ * The moderator is on a call. They know the customer, the product and the
+ * price, and the order has to be recorded before the call ends.
+ *
+ * Three columns, no page scroll: who is buying on the left, what they are
+ * buying in the middle, what it comes to on the right. The old version stacked
+ * all three down a single page, which put the submit button below the fold as
+ * soon as a second item was added.
  */
 export function NewOrderForm({ assignsToSelf }: { assignsToSelf: boolean }) {
   const [state, submit, pending] = useActionState(createOrder, INITIAL);
@@ -42,10 +59,7 @@ export function NewOrderForm({ assignsToSelf }: { assignsToSelf: boolean }) {
   const [searching, setSearching] = useState(false);
   const seq = useRef(0);
 
-  // Debounced lookup, so typing does not fire a request per keystroke. The
-  // empty-term clear lives inside the timeout too, not the effect body
-  // directly — a setState as the first synchronous act of an effect is what
-  // triggers cascading renders.
+  // Debounced lookup, so typing does not fire a request per keystroke.
   useEffect(() => {
     const t = setTimeout(async () => {
       if (!term.trim()) {
@@ -81,18 +95,21 @@ export function NewOrderForm({ assignsToSelf }: { assignsToSelf: boolean }) {
   const patch = (key: string, next: Partial<Line>) =>
     setLines((l) => l.map((x) => (x.key === key ? { ...x, ...next } : x)));
 
-  const subtotal = lines.reduce((n, l) => n + (Number(l.unitPrice) || 0) * l.quantity, 0);
+  const lineTotal = (l: Line) => (Number(l.unitPrice) || 0) * l.quantity;
+  const subtotal = lines.reduce((n, l) => n + lineTotal(l), 0);
   const total = subtotal + (Number(shipping) || 0);
+  const units = lines.reduce((n, l) => n + l.quantity, 0);
+
   const phoneOk = isEgyptianPhone(phone);
-  const stockOk = lines.every((l) => l.onHand === undefined || l.quantity <= l.onHand);
-  const ready =
-    lines.length > 0 &&
-    lines.every((l) => l.title.trim() && Number(l.unitPrice) > 0) &&
-    phoneOk &&
-    stockOk;
+  const overStock = lines.filter((l) => l.onHand !== undefined && l.quantity > l.onHand);
+  const belowCost = lines.filter(
+    (l) => l.unitCost && Number(l.unitPrice) > 0 && Number(l.unitPrice) < Number(l.unitCost),
+  );
+  const unpriced = lines.filter((l) => !l.title.trim() || !(Number(l.unitPrice) > 0));
+  const ready = lines.length > 0 && !unpriced.length && phoneOk && !overStock.length;
 
   return (
-    <form action={submit} className="space-y-6">
+    <form action={submit} className="contents">
       <input
         type="hidden"
         name="items"
@@ -106,269 +123,314 @@ export function NewOrderForm({ assignsToSelf }: { assignsToSelf: boolean }) {
         )}
       />
 
-      <section>
-        <h2 className="mb-3 text-sm font-medium">Customer</h2>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Labelled label="Name" htmlFor="customerName">
-            <Input id="customerName" name="customerName" required disabled={pending} />
-          </Labelled>
-          <Labelled label="Phone" htmlFor="customerPhone">
-            <Input
-              id="customerPhone"
-              name="customerPhone"
-              required
-              inputMode="tel"
-              placeholder="010 1234 5678"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              aria-invalid={phone.length > 0 && !phoneOk}
-              disabled={pending}
-            />
-            {phone.length > 0 && !phoneOk && (
-              <p className="text-[11px] text-destructive">Not a valid Egyptian mobile number</p>
-            )}
-          </Labelled>
-          <Labelled label="Governorate" htmlFor="governorate">
-            <select
-              id="governorate"
-              name="governorate"
-              required
-              defaultValue=""
-              disabled={pending}
-              className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      <Screen>
+        <ContextBar
+          title="New order"
+          meta={assignsToSelf ? 'assigned to you' : 'unassigned until an admin assigns it'}
+          actions={
+            <Link
+              href="/orders"
+              className="inline-flex h-[var(--control-h)] items-center gap-1.5 rounded-md px-2.5 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             >
-              <option value="" disabled>
-                Select governorate
-              </option>
-              {GOVERNORATES.map((g) => (
-                <option key={g} value={g}>
-                  {g}
-                </option>
-              ))}
-            </select>
-          </Labelled>
-          <Labelled label="Payment method" htmlFor="paymentMethod">
-            <select
-              id="paymentMethod"
-              name="paymentMethod"
-              disabled={pending}
-              defaultValue="COD"
-              className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-            >
-              <option value="COD">Cash on delivery</option>
-              <option value="INSTAPAY">InstaPay</option>
-              <option value="WALLET">Mobile wallet</option>
-            </select>
-          </Labelled>
-          <div className="sm:col-span-2">
-            <Labelled label="Address" htmlFor="address">
-              <Input id="address" name="address" disabled={pending} />
-            </Labelled>
-          </div>
-        </div>
-      </section>
+              <X className="size-3.5" />
+              Cancel
+            </Link>
+          }
+        />
 
-      <section>
-        <h2 className="mb-3 text-sm font-medium">Items</h2>
+        <Split>
+          {/* Who is buying. Fixed width — these fields never need more. */}
+          <aside className="flex w-[300px] shrink-0 flex-col overflow-hidden border-e border-border">
+            <Scroller className="space-y-3 p-4">
+              <Legend>Customer</Legend>
+              <Labelled label="Name" htmlFor="customerName">
+                <input id="customerName" name="customerName" required disabled={pending} className={field} />
+              </Labelled>
+              <Labelled label="Phone" htmlFor="customerPhone">
+                <input
+                  id="customerPhone"
+                  name="customerPhone"
+                  required
+                  inputMode="tel"
+                  placeholder="010 1234 5678"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  aria-invalid={phone.length > 0 && !phoneOk}
+                  disabled={pending}
+                  className={cn(field, phone.length > 0 && !phoneOk && 'border-destructive')}
+                />
+                {phone.length > 0 && !phoneOk && (
+                  <p className="mt-1 text-[11px] text-destructive">Not a valid Egyptian mobile</p>
+                )}
+              </Labelled>
+              <Labelled label="Governorate" htmlFor="governorate">
+                <select id="governorate" name="governorate" required defaultValue="" disabled={pending} className={field}>
+                  <option value="" disabled>
+                    Select…
+                  </option>
+                  {GOVERNORATES.map((g) => (
+                    <option key={g} value={g}>
+                      {g}
+                    </option>
+                  ))}
+                </select>
+              </Labelled>
+              <Labelled label="Address" htmlFor="address">
+                <input id="address" name="address" disabled={pending} className={field} />
+              </Labelled>
 
-        <div className="relative mb-3">
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={term}
-            onChange={(e) => setTerm(e.target.value)}
-            placeholder="Search inventory by name or SKU"
-            disabled={pending}
-            className="pl-9"
-          />
-          {(hits.length > 0 || searching) && (
-            <ul className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-border bg-popover shadow-md">
-              {searching && !hits.length ? (
-                <li className="px-3 py-2.5 text-sm text-muted-foreground">Searching…</li>
-              ) : (
-                hits.map((h) => {
-                  const outOfStock = h.onHand <= 0;
-                  return (
-                    <li key={h.id}>
-                      <button
-                        type="button"
-                        onClick={() => addLine(h)}
-                        disabled={outOfStock}
-                        className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors enabled:hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <span className="min-w-0 flex-1 truncate">{h.label}</span>
-                        <span
-                          className={`shrink-0 text-xs ${outOfStock ? 'text-destructive' : 'text-muted-foreground'}`}
-                        >
-                          {outOfStock ? 'Out of stock' : `${h.onHand} in stock`}
-                        </span>
-                        {h.unitCost && (
-                          <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                            cost {money(h.unitCost)}
-                          </span>
-                        )}
-                        {h.sellingPrice && (
-                          <span className="shrink-0 text-xs tabular-nums">
-                            {money(h.sellingPrice)}
-                          </span>
-                        )}
-                      </button>
-                    </li>
-                  );
-                })
+              <Legend className="pt-2">Payment</Legend>
+              <Labelled label="Method" htmlFor="paymentMethod">
+                <select id="paymentMethod" name="paymentMethod" defaultValue="COD" disabled={pending} className={field}>
+                  <option value="COD">Cash on delivery</option>
+                  <option value="INSTAPAY">InstaPay</option>
+                  <option value="WALLET">Mobile wallet</option>
+                </select>
+              </Labelled>
+
+              <Legend className="pt-2">Notes</Legend>
+              <textarea
+                id="notes"
+                name="notes"
+                rows={3}
+                placeholder="Anything the team should know"
+                disabled={pending}
+                className="w-full resize-none rounded-md border border-border bg-background px-2.5 py-2 text-[13px] focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-60"
+              />
+            </Scroller>
+          </aside>
+
+          {/* What they are buying. Takes the remaining width and does the scrolling. */}
+          <ListPane>
+            <div className="relative shrink-0 border-b border-border p-3">
+              <Search className="pointer-events-none absolute top-1/2 left-6 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={term}
+                onChange={(e) => setTerm(e.target.value)}
+                placeholder="Search inventory by name or SKU"
+                disabled={pending}
+                className={cn(field, 'pl-8')}
+              />
+              {(hits.length > 0 || searching) && (
+                <ul className="absolute inset-x-3 z-30 mt-1 max-h-72 overflow-y-auto rounded-md border border-border bg-popover shadow-md">
+                  {searching && !hits.length ? (
+                    <li className="px-3 py-2 text-[13px] text-muted-foreground">Searching…</li>
+                  ) : (
+                    hits.map((h) => {
+                      const out = h.onHand <= 0;
+                      return (
+                        <li key={h.id}>
+                          <button
+                            type="button"
+                            onClick={() => addLine(h)}
+                            disabled={out}
+                            className="flex w-full items-center gap-3 px-3 py-2 text-left text-[13px] transition-colors enabled:hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <span className="min-w-0 flex-1 truncate">{h.label}</span>
+                            <span className={cn('shrink-0 text-[11px]', out ? 'text-destructive' : 'text-muted-foreground')}>
+                              {out ? 'Out of stock' : `${h.onHand} in stock`}
+                            </span>
+                            {h.sellingPrice && (
+                              <span className="w-16 shrink-0 text-right tabular-nums">{money(h.sellingPrice)}</span>
+                            )}
+                          </button>
+                        </li>
+                      );
+                    })
+                  )}
+                </ul>
               )}
-            </ul>
-          )}
-        </div>
+            </div>
 
-        {lines.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-border px-5 py-6 text-center text-sm text-muted-foreground">
-            Search above to add a product, or add a free-text line.
-          </p>
-        ) : (
-          <ul className="overflow-hidden rounded-xl border border-border">
-            {lines.map((l, i) => {
-              const belowCost =
-                l.unitCost && Number(l.unitPrice) > 0 && Number(l.unitPrice) < Number(l.unitCost);
-              const overStock = l.onHand !== undefined && l.quantity > l.onHand;
-              return (
-                <li
-                  key={l.key}
-                  className={`flex flex-wrap items-end gap-3 px-4 py-3 ${i > 0 ? 'border-t border-border' : ''}`}
-                >
-                  <div className="min-w-[180px] flex-1 space-y-1">
-                    <label className="text-[11px] text-muted-foreground">Item</label>
-                    <Input
-                      value={l.title}
-                      onChange={(e) => patch(l.key, { title: e.target.value })}
-                      placeholder="Item name"
-                      disabled={pending}
-                    />
-                    {l.variantId ? (
-                      <p className="text-[11px] text-muted-foreground">
-                        {l.onHand} in stock{l.unitCost ? ` · cost ${money(l.unitCost)}` : ''}
-                      </p>
-                    ) : (
-                      <p className="text-[11px] text-warning">Not linked to inventory</p>
-                    )}
-                  </div>
-                  <div className="w-20 space-y-1">
-                    <label className="text-[11px] text-muted-foreground">Qty</label>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={l.onHand}
-                      value={l.quantity}
-                      onChange={(e) => patch(l.key, { quantity: Math.max(1, Number(e.target.value)) })}
-                      aria-invalid={overStock}
-                      disabled={pending}
-                      className="tabular-nums"
-                    />
-                  </div>
-                  <div className="w-28 space-y-1">
-                    <label className="text-[11px] text-muted-foreground">Price</label>
-                    <Input
-                      inputMode="decimal"
-                      value={l.unitPrice}
-                      onChange={(e) => patch(l.key, { unitPrice: e.target.value })}
-                      aria-invalid={Boolean(belowCost)}
-                      disabled={pending}
-                      className="tabular-nums"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setLines((x) => x.filter((y) => y.key !== l.key))}
-                    aria-label="Remove item"
+            <Scroller>
+              {lines.length === 0 ? (
+                <p className="p-10 text-center text-sm text-muted-foreground">
+                  Search above to add a product, or add a line by hand.
+                </p>
+              ) : (
+                <table className="w-full border-collapse text-[13px]">
+                  <thead className="sticky top-0 z-10 bg-background">
+                    <tr className="border-b border-border text-[11px] tracking-[0.05em] text-muted-foreground uppercase">
+                      <th className="px-3 py-2 text-left font-medium">Item</th>
+                      <th className="w-[76px] px-3 py-2 text-right font-medium">Qty</th>
+                      <th className="w-[110px] px-3 py-2 text-right font-medium">Unit price</th>
+                      <th className="w-[110px] px-3 py-2 text-right font-medium">Line total</th>
+                      <th className="w-10 px-2" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lines.map((l) => {
+                      const over = l.onHand !== undefined && l.quantity > l.onHand;
+                      const under =
+                        l.unitCost && Number(l.unitPrice) > 0 && Number(l.unitPrice) < Number(l.unitCost);
+                      return (
+                        <tr key={l.key} className="border-b border-border/60 align-middle">
+                          <td className="px-3 py-1.5">
+                            <input
+                              value={l.title}
+                              onChange={(e) => patch(l.key, { title: e.target.value })}
+                              placeholder="Item name"
+                              disabled={pending}
+                              className={cn(field, 'border-transparent px-1.5 hover:border-border')}
+                            />
+                            <p className="mt-0.5 px-1.5 text-[11px] text-muted-foreground">
+                              {l.variantId ? (
+                                <>
+                                  {l.onHand} in stock
+                                  {l.unitCost ? ` · cost ${money(l.unitCost)}` : ''}
+                                  {under ? <span className="text-warning"> · below cost</span> : null}
+                                </>
+                              ) : (
+                                <span className="text-warning">not linked to inventory</span>
+                              )}
+                            </p>
+                          </td>
+                          <td className="px-3 py-1.5 align-top">
+                            <input
+                              type="number"
+                              min={1}
+                              value={l.quantity}
+                              onChange={(e) => patch(l.key, { quantity: Math.max(1, Number(e.target.value)) })}
+                              aria-invalid={over}
+                              disabled={pending}
+                              className={cn(field, 'text-right tabular-nums', over && 'border-destructive')}
+                            />
+                            {over && (
+                              <p className="mt-0.5 text-right text-[11px] text-destructive">max {l.onHand}</p>
+                            )}
+                          </td>
+                          <td className="px-3 py-1.5 align-top">
+                            <input
+                              inputMode="decimal"
+                              value={l.unitPrice}
+                              onChange={(e) => patch(l.key, { unitPrice: e.target.value })}
+                              disabled={pending}
+                              className={cn(field, 'text-right tabular-nums', under && 'border-warning')}
+                            />
+                          </td>
+                          <td className="px-3 py-1.5 text-right align-top font-medium tabular-nums leading-8">
+                            {money(lineTotal(l))}
+                          </td>
+                          <td className="px-2 py-1.5 align-top">
+                            <button
+                              type="button"
+                              onClick={() => setLines((x) => x.filter((y) => y.key !== l.key))}
+                              aria-label={`Remove ${l.title || 'item'}`}
+                              disabled={pending}
+                              className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive-subtle hover:text-destructive"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+
+              <button
+                type="button"
+                onClick={() => addLine()}
+                disabled={pending}
+                className="flex w-full items-center justify-center gap-1.5 border-b border-border py-2 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                <Plus className="size-3.5" />
+                Custom item
+              </button>
+            </Scroller>
+
+            <StatusStrip>
+              <span>
+                {lines.length} {lines.length === 1 ? 'line' : 'lines'} · {units}{' '}
+                {units === 1 ? 'unit' : 'units'}
+              </span>
+              <span>Stock leaves when the order is dispatched</span>
+            </StatusStrip>
+          </ListPane>
+
+          {/* What it comes to. Always in view — this is what the previous
+              version pushed below the fold. */}
+          <DetailPane className="w-[300px]">
+            <Scroller className="p-4">
+              <Legend>Summary</Legend>
+              <dl className="mt-2 space-y-1.5 text-[13px]">
+                <SummaryRow label={`Subtotal (${units} ${units === 1 ? 'unit' : 'units'})`} value={money(subtotal)} />
+                <div className="flex items-center justify-between gap-3">
+                  <label htmlFor="shippingCost" className="text-muted-foreground">
+                    Shipping
+                  </label>
+                  <input
+                    id="shippingCost"
+                    name="shippingCost"
+                    inputMode="decimal"
+                    value={shipping}
+                    onChange={(e) => setShipping(e.target.value)}
                     disabled={pending}
-                    className="mb-1 inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive-subtle hover:text-destructive"
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
-                  {overStock && (
-                    <p className="w-full text-[11px] text-destructive">
-                      Only {l.onHand} in stock — reduce the quantity.
-                    </p>
+                    className={cn(field, 'w-24 text-right tabular-nums')}
+                  />
+                </div>
+              </dl>
+
+              {(overStock.length > 0 || belowCost.length > 0 || (phone.length > 0 && !phoneOk)) && (
+                <ul className="mt-4 space-y-1.5 text-[11px]">
+                  {overStock.map((l) => (
+                    <li key={l.key} className="rounded-md border border-destructive/30 bg-destructive-subtle px-2 py-1.5 text-destructive">
+                      Only {l.onHand} of <bdi>{l.title}</bdi> in stock.
+                    </li>
+                  ))}
+                  {belowCost.map((l) => (
+                    <li key={l.key} className="rounded-md border border-warning/30 bg-warning-subtle px-2 py-1.5 text-warning">
+                      <bdi>{l.title}</bdi> is priced below its {money(l.unitCost)} cost.
+                    </li>
+                  ))}
+                  {phone.length > 0 && !phoneOk && (
+                    <li className="rounded-md border border-destructive/30 bg-destructive-subtle px-2 py-1.5 text-destructive">
+                      The phone number is not a valid Egyptian mobile.
+                    </li>
                   )}
-                  {!overStock && belowCost && (
-                    <p className="w-full text-[11px] text-warning">
-                      Below cost ({money(l.unitCost)}) — selling at a loss.
-                    </p>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
+                </ul>
+              )}
 
-        <button
-          type="button"
-          onClick={() => addLine()}
-          disabled={pending}
-          className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-        >
-          <Plus className="size-3.5" />
-          Add a line manually
-        </button>
-      </section>
+              {state.status === 'error' && (
+                <p
+                  role="alert"
+                  className="mt-4 flex items-start gap-1.5 rounded-md border border-destructive/30 bg-destructive-subtle px-2 py-1.5 text-[11px] text-destructive"
+                >
+                  <AlertCircle className="mt-px size-3.5 shrink-0" strokeWidth={2} />
+                  {state.message}
+                </p>
+              )}
+            </Scroller>
 
-      <section className="rounded-xl border border-border px-5 py-4">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div className="w-32 space-y-1">
-            <label htmlFor="shippingCost" className="text-[11px] text-muted-foreground">
-              Shipping
-            </label>
-            <Input
-              id="shippingCost"
-              name="shippingCost"
-              inputMode="decimal"
-              value={shipping}
-              onChange={(e) => setShipping(e.target.value)}
-              disabled={pending}
-              className="tabular-nums"
-            />
-          </div>
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground">
-              Subtotal {money(subtotal)} + shipping {money(shipping || 0)}
-            </p>
-            <p className="text-2xl font-semibold tracking-[-0.02em] tabular-nums">{money(total)}</p>
-          </div>
-        </div>
-      </section>
-
-      <div className="space-y-1.5">
-        <label htmlFor="notes" className="text-xs font-medium text-muted-foreground">
-          Notes
-        </label>
-        <Input id="notes" name="notes" placeholder="Anything the team should know" disabled={pending} />
-      </div>
-
-      {state.status === 'error' && (
-        <p
-          role="alert"
-          className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive-subtle px-3 py-2 text-sm text-destructive"
-        >
-          <AlertCircle className="mt-0.5 size-4 shrink-0" strokeWidth={2} />
-          {state.message}
-        </p>
-      )}
-
-      <div className="flex items-center gap-3">
-        <Button type="submit" disabled={!ready || pending} className="min-w-[132px]">
-          {pending ? (
-            <>
-              <Loader2 className="size-4 animate-spin" />
-              Creating
-            </>
-          ) : (
-            'Create order'
-          )}
-        </Button>
-        <p className="text-xs text-muted-foreground">
-          {assignsToSelf ? 'This order will be assigned to you.' : 'An admin can assign it after.'}
-        </p>
-      </div>
+            <div className="shrink-0 border-t border-border p-4">
+              <div className="mb-3 flex items-baseline justify-between gap-3">
+                <span className="text-[11px] font-medium tracking-[0.07em] text-muted-foreground uppercase">
+                  Total
+                </span>
+                <span className="text-xl font-semibold tabular-nums">{money(total)}</span>
+              </div>
+              <button
+                type="submit"
+                disabled={!ready || pending}
+                className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-md bg-foreground text-[13px] font-medium text-background transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-40"
+              >
+                {pending && <Loader2 className="size-4 animate-spin" />}
+                {pending ? 'Creating' : 'Create order'}
+              </button>
+            </div>
+          </DetailPane>
+        </Split>
+      </Screen>
     </form>
+  );
+}
+
+function Legend({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <p className={cn('text-[11px] font-medium tracking-[0.07em] text-muted-foreground uppercase', className)}>
+      {children}
+    </p>
   );
 }
 
@@ -382,11 +444,20 @@ function Labelled({
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-1.5">
-      <label htmlFor={htmlFor} className="text-xs font-medium text-muted-foreground">
+    <div>
+      <label htmlFor={htmlFor} className="mb-1 block text-[11px] text-muted-foreground">
         {label}
       </label>
       {children}
+    </div>
+  );
+}
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="tabular-nums">{value}</dd>
     </div>
   );
 }
