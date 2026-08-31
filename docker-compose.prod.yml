@@ -1,0 +1,71 @@
+# Production stack — API, web, Postgres and Caddy (automatic HTTPS).
+# Not exposed to the host except through Caddy on 80/443; api and web talk to
+# each other and to db over the compose network by service name.
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Needs a .env next to this file — see .env.prod.example.
+services:
+  db:
+    image: postgres:17-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      API_PORT: 3001
+      JWT_SECRET: ${JWT_SECRET}
+      # Real credentials for the two named accounts — never left at the dev
+      # defaults on a publicly reachable box. See auth.service.ts.
+      ADMIN_SEED_PASSWORD: ${ADMIN_SEED_PASSWORD}
+      MODERATOR_SEED_PASSWORD: ${MODERATOR_SEED_PASSWORD}
+      EASY_ORDER_KEY: ${EASY_ORDER_KEY}
+      BOSTA_KEY: ${BOSTA_KEY}
+      EASYORDERS_WEBHOOK_SECRET: ${EASYORDERS_WEBHOOK_SECRET}
+      EASYORDERS_STORE_ID: ${EASYORDERS_STORE_ID}
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: always
+    depends_on: [api]
+    environment:
+      NODE_ENV: production
+      # Server-side only — the browser never calls the API directly, so this
+      # never needs to be a NEXT_PUBLIC_ var or reachable from outside Docker.
+      API_URL: http://api:3001
+
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    depends_on: [api, web]
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,17 @@
+{$DOMAIN} {
+	# Caddy provisions and renews the Let's Encrypt certificate on its own —
+	# nothing to configure here beyond pointing the domain's A record at the
+	# instance and opening 80 (ACME challenge) and 443.
+
+	# The browser never calls the API directly (see main.ts), so only one
+	# public route needs to reach it: Easy Orders' webhook. Give the API this
+	# whole path prefix rather than one route, so anything under it — new
+	# endpoints, retries — keeps working without touching this file again.
+	handle_path /api/* {
+		reverse_proxy api:3001
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+}
