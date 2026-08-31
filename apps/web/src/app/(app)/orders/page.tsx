@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Plus, X } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { OrderDetail } from '@/components/order-detail';
 import { OrderFilters } from '@/components/order-filters';
 import { PaymentBadge, StatusBadge } from '@/components/order-status';
@@ -172,15 +172,7 @@ export default async function OrdersPage({
                the detail floats over the list instead of squeezing it. */
             className="fixed inset-y-0 right-0 z-30 w-[400px] bg-background shadow-xl xl:static xl:z-auto xl:w-[var(--detail-w)] xl:shadow-none"
           >
-            <Link
-              href={rowHref(null)}
-              scroll={false}
-              aria-label="Close order details"
-              className="absolute end-2 top-2 z-10 inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground xl:hidden"
-            >
-              <X className="size-4" />
-            </Link>
-            <OrderDetail id={selected} user={user} />
+            <OrderDetail id={selected} user={user} closeHref={rowHref(null)} />
           </DetailPane>
         )}
       </Split>
