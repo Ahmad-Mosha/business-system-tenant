@@ -4,12 +4,13 @@ services:
     environment:
       POSTGRES_USER: prime
       POSTGRES_PASSWORD: prime
-      POSTGRES_DB: prime_market
-    ports: ["5433:5432"]
-    volumes: ["pgdata:/var/lib/postgresql/data"]
+      POSTGRES_DB: primemarket
+    # 5434 — the previous build's database is still on 5433 and is left alone.
+    ports: ["5434:5432"]
+    volumes: ["pmdata:/var/lib/postgresql/data"]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U prime -d prime_market"]
+      test: ["CMD-SHELL", "pg_isready -U prime -d primemarket"]
       interval: 5s
       retries: 10
 volumes:
-  pgdata:
+  pmdata:
