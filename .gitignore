@@ -12,3 +12,6 @@ files/
 ui-ux/
 *.log
 .DS_Store
+
+# Build artefact — regenerated on every typecheck.
+apps/web/tsconfig.tsbuildinfo
