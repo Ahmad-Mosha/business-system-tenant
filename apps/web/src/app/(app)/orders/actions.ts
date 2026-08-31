@@ -100,7 +100,42 @@ export async function createOrder(
   }
 
   revalidatePath('/orders');
-  redirect(`/orders?selected=${created.id}`);
+  redirect(`/orders/${created.id}`);
+}
+
+/** Edit an existing order — same payload as creation, applied in place. */
+export async function updateOrder(
+  orderId: string,
+  _previous: CreateOrderState,
+  formData: FormData,
+): Promise<CreateOrderState> {
+  const items = JSON.parse(String(formData.get('items') ?? '[]')) as Array<{
+    variantId?: string;
+    title?: string;
+    quantity: number;
+    unitPrice: string;
+  }>;
+
+  if (!items.length) return { status: 'error', message: 'Add at least one item.' };
+
+  try {
+    await send(`/orders/${orderId}`, 'PATCH', {
+      customerName: formData.get('customerName'),
+      customerPhone: formData.get('customerPhone'),
+      governorate: formData.get('governorate'),
+      address: formData.get('address'),
+      paymentMethod: formData.get('paymentMethod') || 'COD',
+      shippingCost: String(formData.get('shippingCost') || '0'),
+      notes: formData.get('notes'),
+      items,
+    });
+  } catch (e) {
+    return { status: 'error', message: e instanceof Error ? e.message : 'Could not save the order' };
+  }
+
+  revalidatePath('/orders');
+  revalidatePath(`/orders/${orderId}`);
+  redirect(`/orders/${orderId}`);
 }
 
 /** Product lookup for the manual order form. */

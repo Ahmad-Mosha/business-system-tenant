@@ -15,8 +15,14 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useActionState, useEffect, useRef, useState } from 'react';
-import { createOrder, searchVariants, type CreateOrderState } from '@/app/(app)/orders/actions';
+import {
+  createOrder,
+  searchVariants,
+  updateOrder,
+  type CreateOrderState,
+} from '@/app/(app)/orders/actions';
 import { Screen } from '@/components/shell';
+import type { OrderDetail } from '@/lib/api';
 import { GOVERNORATES } from '@/lib/governorates';
 import { money } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -51,19 +57,38 @@ const field =
   'h-9 w-full rounded-md border border-border bg-card px-3 text-[13px] focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-60';
 
 /**
- * Manual order entry.
+ * Manual order entry, and the edit screen for an existing one — the same form
+ * either way, because they collect exactly the same thing.
  *
- * Laid out as a fixed grid rather than a stack of sections: the two short forms
- * sit side by side, the item table takes the space that is left, and the whole
- * screen fits a laptop. Nothing here scrolls except the item rows once there
- * are more than the table can show.
+ * Laid out as a grid of cards rather than a stack of sections: the two short
+ * forms sit side by side, the item table is capped, and the whole screen fits a
+ * laptop without scrolling.
  */
-export function NewOrderForm({ assignsToSelf }: { assignsToSelf: boolean }) {
-  const [state, submit, pending] = useActionState(createOrder, INITIAL);
-  const [lines, setLines] = useState<Line[]>([]);
-  const [shipping, setShipping] = useState('0');
-  const [phone, setPhone] = useState('');
-  const [method, setMethod] = useState<string>('COD');
+export function OrderForm({
+  assignsToSelf,
+  order,
+}: {
+  assignsToSelf?: boolean;
+  order?: OrderDetail;
+}) {
+  const editing = !!order;
+  const [state, submit, pending] = useActionState(
+    editing ? updateOrder.bind(null, order.id) : createOrder,
+    INITIAL,
+  );
+  const [lines, setLines] = useState<Line[]>(
+    () =>
+      order?.items.map((i, ix) => ({
+        key: `e${ix}`,
+        variantId: i.variantId ?? undefined,
+        title: i.title,
+        quantity: i.quantity,
+        unitPrice: i.unitPrice,
+      })) ?? [],
+  );
+  const [shipping, setShipping] = useState(order?.shippingCost ?? '0');
+  const [phone, setPhone] = useState(order?.customerPhone ?? '');
+  const [method, setMethod] = useState<string>(order?.paymentMethod ?? 'COD');
   const [term, setTerm] = useState('');
   const [hits, setHits] = useState<Hit[]>([]);
   const [searching, setSearching] = useState(false);
@@ -136,18 +161,24 @@ export function NewOrderForm({ assignsToSelf }: { assignsToSelf: boolean }) {
       <Screen>
         <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-card px-5">
           <Link
-            href="/orders"
-            aria-label="Back to orders"
+            href={editing ? `/orders/${order.id}` : '/orders'}
+            aria-label={editing ? 'Back to the order' : 'Back to orders'}
             className="-ms-2 inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           >
             <ArrowLeft className="size-4.5" />
           </Link>
-          <h1 className="text-lg font-semibold tracking-[-0.02em]">Manual Order Entry</h1>
+          <h1 className="text-lg font-semibold tracking-[-0.02em]">
+            {editing ? `Edit ${order.orderNumber}` : 'Manual Order Entry'}
+          </h1>
           <span className="text-xs text-muted-foreground">
-            {assignsToSelf ? 'assigned to you' : 'unassigned until an admin assigns it'}
+            {editing
+              ? 'changing the items adjusts stock'
+              : assignsToSelf
+                ? 'assigned to you'
+                : 'unassigned until an admin assigns it'}
           </span>
           <Link
-            href="/orders"
+            href={editing ? `/orders/${order.id}` : '/orders'}
             className="ms-auto inline-flex h-9 items-center rounded-md border border-border bg-card px-4 text-[13px] font-medium transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           >
             Cancel
@@ -166,6 +197,7 @@ export function NewOrderForm({ assignsToSelf }: { assignsToSelf: boolean }) {
                       id="customerName"
                       name="customerName"
                       required
+                      defaultValue={order?.customerName ?? ''}
                       placeholder="e.g. أحمد جمال"
                       disabled={pending}
                       className={field}
@@ -200,7 +232,7 @@ export function NewOrderForm({ assignsToSelf }: { assignsToSelf: boolean }) {
                       id="governorate"
                       name="governorate"
                       required
-                      defaultValue=""
+                      defaultValue={order?.governorate ?? ''}
                       disabled={pending}
                       className={field}
                     >
@@ -218,6 +250,7 @@ export function NewOrderForm({ assignsToSelf }: { assignsToSelf: boolean }) {
                     <input
                       id="address"
                       name="address"
+                      defaultValue={order?.address ?? ''}
                       placeholder="Street, building, apartment, landmark"
                       disabled={pending}
                       className={field}
@@ -318,13 +351,17 @@ export function NewOrderForm({ assignsToSelf }: { assignsToSelf: boolean }) {
                                   )}
                                 />
                                 <p className="px-2 text-[11px] text-muted-foreground">
-                                  {l.variantId ? (
+                                  {!l.variantId ? (
+                                    <span className="text-warning">not linked to inventory</span>
+                                  ) : l.onHand === undefined ? (
+                                    // Loaded from a saved order — we know it is
+                                    // linked, but not what stock stands at now.
+                                    'linked to inventory'
+                                  ) : (
                                     <>
                                       {l.onHand} in stock
                                       {l.unitCost ? ` · cost ${money(l.unitCost)}` : ''}
                                     </>
-                                  ) : (
-                                    <span className="text-warning">not linked to inventory</span>
                                   )}
                                 </p>
                               </td>
@@ -428,6 +465,7 @@ export function NewOrderForm({ assignsToSelf }: { assignsToSelf: boolean }) {
                   id="notes"
                   name="notes"
                   rows={2}
+                  defaultValue={order?.notes ?? ''}
                   placeholder="Any special instructions…"
                   disabled={pending}
                   className="w-full resize-none rounded-md border border-border bg-card px-3 py-2 text-[13px] focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-60"
@@ -472,15 +510,17 @@ export function NewOrderForm({ assignsToSelf }: { assignsToSelf: boolean }) {
                 </span>
               </div>
 
-              <label className="mt-4 flex cursor-pointer items-start gap-2.5 text-[13px]">
-                <input
-                  type="checkbox"
-                  name="paymentCollected"
-                  disabled={pending}
-                  className="mt-0.5 size-3.5 accent-[var(--foreground)]"
-                />
-                <span>Payment already collected manually</span>
-              </label>
+              {!editing && (
+                <label className="mt-4 flex cursor-pointer items-start gap-2.5 text-[13px]">
+                  <input
+                    type="checkbox"
+                    name="paymentCollected"
+                    disabled={pending}
+                    className="mt-0.5 size-3.5 accent-[var(--foreground)]"
+                  />
+                  <span>Payment already collected manually</span>
+                </label>
+              )}
 
               <button
                 type="submit"
@@ -492,7 +532,7 @@ export function NewOrderForm({ assignsToSelf }: { assignsToSelf: boolean }) {
                 ) : (
                   <CheckCircle2 className="size-4" />
                 )}
-                {pending ? 'Creating' : 'Create Order'}
+                {pending ? 'Saving' : editing ? 'Save Changes' : 'Create Order'}
               </button>
 
               {(overStock.length > 0 || belowCost.length > 0 || state.status === 'error') && (

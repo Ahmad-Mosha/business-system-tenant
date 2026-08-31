@@ -9,7 +9,13 @@ import {
 } from 'typeorm';
 import { Order } from './order.entity';
 
-export type OrderEventType = 'CREATED' | 'ASSIGNED' | 'STATUS_CHANGED' | 'PAYMENT_CHANGED' | 'NOTE';
+export type OrderEventType =
+  | 'CREATED'
+  | 'EDITED'
+  | 'ASSIGNED'
+  | 'STATUS_CHANGED'
+  | 'PAYMENT_CHANGED'
+  | 'NOTE';
 
 /**
  * Append-only trail of what happened to an order and who did it.

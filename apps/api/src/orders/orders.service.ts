@@ -262,6 +262,92 @@ export class OrdersService implements OnModuleInit {
     return order;
   }
 
+  /**
+   * Which states an order may still be edited in. Once it is with the courier
+   * the goods have physically left, so changing what was in the box would make
+   * the stock ledger describe something that never happened.
+   */
+  private static readonly EDITABLE: OrderStatus[] = ['NEW', 'ASSIGNED', 'CONFIRMED'];
+
+  /**
+   * Edit a manual order in place. Stock is not patched — the old lines are
+   * credited back and the new ones debited, so the movement history keeps
+   * saying what actually happened rather than being rewritten.
+   */
+  async update(user: SessionUser, orderId: string, input: CreateOrderInput) {
+    if (!input.customerName?.trim()) throw new BadRequestException('customer name is required');
+
+    const phone = (input.customerPhone ?? '').replace(/[\s-]/g, '').replace(/^00/, '+');
+    if (!EGYPT_PHONE.test(phone)) {
+      throw new BadRequestException('enter a valid Egyptian mobile number, e.g. 010 1234 5678');
+    }
+
+    const governorate = input.governorate?.trim() ?? '';
+    if (!GOVERNORATES.has(governorate)) throw new BadRequestException('choose a governorate');
+
+    if (!input.items?.length) throw new BadRequestException('an order needs at least one item');
+    for (const item of input.items) {
+      if (!Number.isInteger(item.quantity) || item.quantity < 1) {
+        throw new BadRequestException('every item needs a whole quantity of at least 1');
+      }
+      if (!/^\d+(\.\d{1,2})?$/.test(item.unitPrice ?? '') || Number(item.unitPrice) <= 0) {
+        throw new BadRequestException('every item needs a price greater than 0');
+      }
+    }
+
+    return this.db.transaction(async (tx) => {
+      const order = await tx.findOne(Order, {
+        where: user.role === 'ADMIN' ? { id: orderId } : { id: orderId, assignedToId: user.id },
+      });
+      if (!order) throw new NotFoundException('order not found');
+
+      if (!OrdersService.EDITABLE.includes(order.status)) {
+        throw new BadRequestException(
+          `a ${order.status.toLowerCase()} order can no longer be edited — it has left the warehouse`,
+        );
+      }
+
+      // Put the old lines' stock back before asking whether the new ones fit,
+      // so re-saving an unchanged order never trips its own availability check.
+      await OrdersService.creditStockForOrder(tx, orderId, 'EDITED');
+      await tx.delete(OrderItem, { orderId });
+      await this.assertStockAvailable(tx, input.items);
+
+      const variantIds = input.items.map((i) => i.variantId).filter(Boolean) as string[];
+      const titles = await this.titlesFor(tx, variantIds);
+
+      const items = input.items.map((i) =>
+        tx.create(OrderItem, {
+          orderId,
+          variantId: i.variantId ?? null,
+          title: i.title?.trim() || titles.get(i.variantId ?? '') || 'Item',
+          quantity: i.quantity,
+          unitPrice: i.unitPrice,
+          lineTotal: (Number(i.unitPrice) * i.quantity).toFixed(2),
+        }),
+      );
+      await tx.save(OrderItem, items);
+
+      const subtotal = items.reduce((n, i) => n + Number(i.lineTotal), 0);
+      const shipping = Number(input.shippingCost ?? 0);
+
+      order.customerName = input.customerName.trim();
+      order.customerPhone = phone;
+      order.governorate = governorate;
+      order.address = input.address?.trim() || null;
+      order.paymentMethod = input.paymentMethod ?? order.paymentMethod;
+      order.notes = input.notes?.trim() || null;
+      order.subtotal = subtotal.toFixed(2);
+      order.shippingCost = shipping.toFixed(2);
+      order.total = (subtotal + shipping).toFixed(2);
+      await tx.save(order);
+
+      await OrdersService.debitStockForOrder(tx, items, orderId);
+      await this.record(tx, orderId, 'EDITED', null, order.total, user);
+      return order;
+    });
+  }
+
   async updateStatus(user: SessionUser, orderId: string, next: OrderStatus) {
     return this.db.transaction(async (tx) => {
       const order = await tx.findOne(Order, {
@@ -405,7 +491,7 @@ export class OrdersService implements OnModuleInit {
   static async creditStockForOrder(
     tx: EntityManager,
     orderId: string,
-    reason: 'CANCELLED' | 'RETURNED',
+    reason: 'CANCELLED' | 'RETURNED' | 'EDITED',
   ): Promise<void> {
     const items = await tx.find(OrderItem, { where: { orderId } });
     const movements = items
@@ -416,7 +502,12 @@ export class OrdersService implements OnModuleInit {
         reason: reason === 'RETURNED' ? ('RETURN' as const) : ('ADJUSTMENT' as const),
         sourceType: 'order',
         sourceId: orderId,
-        note: reason === 'RETURNED' ? 'order returned' : 'order cancelled',
+        note:
+          reason === 'RETURNED'
+            ? 'order returned'
+            : reason === 'EDITED'
+              ? 'order edited — previous lines reversed'
+              : 'order cancelled',
       }));
     if (movements.length) await tx.insert(StockMovement, movements);
   }

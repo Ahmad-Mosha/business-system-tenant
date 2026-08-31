@@ -67,6 +67,16 @@ export class OrdersController {
     return this.orders.create(this.user(req), body);
   }
 
+  /** Both roles edit; a moderator only the orders assigned to them. */
+  @Patch(':id')
+  update(
+    @Req() req: Request,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: CreateOrderInput,
+  ) {
+    return this.orders.update(this.user(req), id, body);
+  }
+
   /** Assignment is an admin responsibility. */
   @Roles('ADMIN')
   @Patch(':id/assignment')
