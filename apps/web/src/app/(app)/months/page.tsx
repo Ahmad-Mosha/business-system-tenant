@@ -20,7 +20,7 @@ export default async function MonthsPage() {
   if (!periods.length) {
     return (
       <>
-        <PageHeader title="Months" description="Each settlement period on its own" />
+        <PageHeader title="Months" />
         <PageBody>
           <NoDataYet />
         </PageBody>
@@ -32,10 +32,7 @@ export default async function MonthsPage() {
 
   return (
     <>
-      <PageHeader
-        title="Months"
-        description="Each month on its own, and the balance carried between them"
-      />
+      <PageHeader title="Months" />
 
       <PageBody>
         <section>

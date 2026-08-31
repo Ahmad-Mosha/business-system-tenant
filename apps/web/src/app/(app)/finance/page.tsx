@@ -21,7 +21,7 @@ export default async function FinancePage() {
 
   return (
     <>
-      <PageHeader title="Finance" description="Cash on hand, and what it's built into — stock." />
+      <PageHeader title="Finance" />
       <PageBody>
         {anchored ? (
           <section className="grid grid-cols-1 gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-3">

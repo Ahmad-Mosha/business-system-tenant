@@ -34,10 +34,7 @@ export default async function ShipmentsPage() {
 
   return (
     <>
-      <PageHeader
-        title="Shipments"
-        description="Live courier tracking, delivery states, and AWB lookups via Bosta"
-      />
+      <PageHeader title="Shipments" />
 
       <PageBody>
         {loadError && (

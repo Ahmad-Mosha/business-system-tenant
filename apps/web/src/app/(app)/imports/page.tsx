@@ -16,10 +16,7 @@ export default async function ImportsPage() {
 
   return (
     <>
-      <PageHeader
-        title="Imports"
-        description="Upload a noon settlement export to update revenue, fees and products"
-      />
+      <PageHeader title="Imports" />
 
       <PageBody>
         <section className="max-w-3xl">

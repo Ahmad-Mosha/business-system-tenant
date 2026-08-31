@@ -21,19 +21,19 @@ export default async function MonthPage({
     <>
       <PageHeader
         title={monthLabel(period.month)}
-        description={
-          <>
-            noon settlement · {date(period.from)} – {date(period.to)}
-          </>
-        }
         actions={
-          <Link
-            href="/months"
-            className="inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-          >
-            <ArrowLeft className="size-4" />
-            All months
-          </Link>
+          <>
+            <p className="text-xs text-muted-foreground">
+              noon settlement · {date(period.from)} – {date(period.to)}
+            </p>
+            <Link
+              href="/months"
+              className="inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            >
+              <ArrowLeft className="size-4" />
+              All months
+            </Link>
+          </>
         }
       />
       <PageBody>
