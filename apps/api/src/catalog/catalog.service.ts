@@ -101,6 +101,7 @@ export class CatalogService {
               stock.on_hand                                     AS "onHand",
               stock.unit_cost                                   AS "unitCost",
               stock.selling_price                               AS "sellingPrice",
+              COALESCE(held.open, 0)::int                       AS "inOrders",
               COALESCE(ch.channels, '{}')                       AS channels,
               count(*) OVER()::int                              AS "totalCount"
        FROM product p
@@ -116,6 +117,17 @@ export class CatalogService {
          LEFT JOIN stock_movement m ON m.variant_id = v.id
          WHERE v.product_id = p.id
        ) stock ON TRUE
+       -- Units already off on-hand (stock leaves at order creation — there is
+       -- no reserved state) but sitting in an order that hasn't shipped,
+       -- delivered or reversed yet. Context on "why is on-hand this number",
+       -- not a second pool of stock.
+       LEFT JOIN LATERAL (
+         SELECT SUM(i.quantity) AS open
+         FROM order_item i
+         JOIN product_variant v ON v.id = i.variant_id
+         JOIN customer_order o ON o.id = i.order_id
+         WHERE v.product_id = p.id AND o.status NOT IN ('CANCELLED', 'RETURNED')
+       ) held ON TRUE
        LEFT JOIN LATERAL (
          SELECT array_agg(DISTINCT l.channel) AS channels
          FROM channel_listing l
@@ -213,8 +225,18 @@ export class CatalogService {
         throw new BadRequestException(`${field} must be an amount like 120.50`);
       }
     }
-    if (input.openingStock !== undefined && !Number.isInteger(input.openingStock)) {
-      throw new BadRequestException('opening stock must be a whole number');
+    if (input.openingStock !== undefined) {
+      if (!Number.isInteger(input.openingStock)) {
+        throw new BadRequestException('opening stock must be a whole number');
+      }
+      if (input.openingStock < 0) {
+        throw new BadRequestException('opening stock cannot be negative');
+      }
+    }
+    const sku = input.sku?.trim();
+    if (sku) {
+      const clash = await this.db.getRepository(ProductVariant).findOne({ where: { sku } });
+      if (clash) throw new BadRequestException(`SKU "${sku}" is already in use`);
     }
 
     return this.db.transaction(async (tx) => {
