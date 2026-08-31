@@ -259,6 +259,9 @@ export interface ProductRow {
   active: boolean;
   variantCount: number;
   onHand: number;
+  /** Units already off on-hand but sitting in an order that hasn't shipped,
+   *  delivered or reversed — context, not a second pool of stock. */
+  inOrders: number;
   unitCost: string | null;
   sellingPrice: string | null;
   channels: string[];
