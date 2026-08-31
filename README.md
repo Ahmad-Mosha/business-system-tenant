@@ -1,76 +1,89 @@
 # Prime Market
 
-Internal operations platform for an Egyptian multi-channel reseller — inventory,
-orders, cash and profit across noon, Amazon, the Easy Orders website, and
-social/manual sales.
-
-**Read [`docs/`](docs/README.md) before writing code.** The business facts in it
-were expensive to derive; the open decisions in it must not be guessed.
-
-| | |
-|---|---|
-| What it is | [docs/BRIEF.md](docs/BRIEF.md) |
-| How it is designed | [docs/architecture.md](docs/architecture.md) |
-| What gets built, in what order | [docs/roadmap.md](docs/roadmap.md) |
-| Interface direction | [docs/ui-ux.md](docs/ui-ux.md) |
-| Deploying it | [docs/deployment.md](docs/deployment.md) |
+Operations and commerce platform for Prime Market. Currently one working slice:
+turning noon settlement exports into per-product answers.
 
 ## Running it
 
 ```bash
-cp .env.example .env       # then fill in JWT_SECRET
-pnpm install
-pnpm db:up                 # Postgres 17 on 5434
-pnpm migrate
-pnpm seed                  # tenant and first admin
-pnpm seed:catalogue        # the real 135 products
-pnpm dev                   # API on :3001, web on :3000
+npm install
+npm run db:up          # postgres 17 via docker
+cp .env.example .env
+npm run dev            # api on :3001, ui on :3000
 ```
 
-- **App** — http://localhost:3000 (sign in with the seeded admin)
-- **API docs** — http://localhost:3001/docs. Log in through `POST /api/auth/login`,
-  paste the token into **Authorize**, and every endpoint is usable from that page.
+Without Docker, point `DATABASE_URL` at any Postgres 14+ and create the database.
+
+```bash
+npm test               # parser tests
+npm run typecheck
+```
+
+## The noon slice
+
+```bash
+curl -X POST localhost:3001/noon/imports -F "file=@noon_export.csv"
+curl "localhost:3001/noon/statement?from=2026-07-01&to=2026-07-31&openingBalance=22147.44"
+curl "localhost:3001/noon/products?from=2026-07-01&to=2026-07-31"
+curl "localhost:3001/noon/unattributed?from=2026-07-01&to=2026-07-31"
+```
+
+Verified against the real July 2026 export: 924 rows, 84 products discovered,
+net proceeds and payouts reproduce noon's portal exactly.
+
+### Two things worth knowing
+
+**Products are discovered, not seeded.** A report can be imported before any
+catalogue exists. Each `Partner SKU` we have not seen creates a stub `Product`
+flagged `discovered`, which someone enriches later with cost and category.
+Marketplace SKUs point at products, never the reverse — so the same item sold on
+noon, Amazon and the website resolves to one product and one pool of stock.
+
+**Imports are idempotent, twice over.** An identical file is recognised by its
+hash. An *overlapping* export is deduplicated row by row against a SHA-256
+fingerprint of the raw line, so re-uploading a wider date range inserts only
+what is genuinely new.
+
+## Interface
+
+Three screens: **Overview** (statement, fee breakdown, best performers),
+**Products** (per-product performance), **Imports** (upload and history).
+
+Monochrome by design — colour carries meaning or is absent. Semantic tokens
+(`--success`, `--warning`, `--destructive`) live in `globals.css`; nothing
+hard-codes a hex. The UI stays legible with all of them collapsed to grey.
+
+Pages are server components that fetch and render on the server. The only
+client code is the sidebar (needs the current path) and the import form (needs
+upload state). Uploads go through a server action, so the API origin stays
+private and the browser never needs CORS.
 
 ## Layout
 
 ```
-apps/api           NestJS API
-  src/db           schema, migrations, tenant resolution, seeds
-  src/auth         login, token, role guard
-  src/catalogue    products, variants, channel listings
-  drizzle/         migration SQL, applied in order
-apps/web           Next.js interface
-  src/app          routes; (app) is everything behind sign-in
-  src/components   shell and the UI primitives
-docs/              business, architecture, roadmap, evidence
-ui-ux/             design reference — direction only, never copied
+apps/api/src/
+  catalog/     product identity and channel SKU mapping
+  noon/        settlement export: parser, import, endpoints
+  reporting/   read models (SQL aggregates, nothing cached)
+  database/    naming strategy
+apps/web/src/
+  app/         routes (server components)
+  components/  sidebar, page chrome, import form
+  lib/         api client, formatting
+docs/evidence/ what the source reports actually contain
 ```
 
-The package manager is **pnpm**.
+Money is `numeric(14,2)` and crosses into TypeScript as a string; all arithmetic
+happens in Postgres so nothing is routed through a float.
 
-## Two version notes
+## Known gaps
 
-- **NestJS 12 is ESM-only.** The API is `"type": "module"` and relative imports
-  carry a `.js` extension. This is not optional.
-- **TypeScript is pinned to 6.** TypeScript 7.0 ships `tsc` without the
-  programmatic compiler API the Nest CLI needs; the CLI refuses to start on it.
-  It is expected back in 7.1 — upgrade then, not before.
-
-## Database
-
-`docker compose up -d` starts Postgres on **5434**.
-
-The previous build's database is a separate volume (`dashboard_pgdata`) and is
-left alone — it holds four months of imported noon settlements used to validate
-the new import. A dump is kept outside the repo at
-`../prime-market-legacy-dump.sql.gz`.
-
-## Previous versions
-
-| Tag | What it holds |
-|---|---|
-| `legacy-v1` | Complete previous system — NestJS + Next.js, noon import, Bosta, Easy Orders, inventory, orders, cash |
-| `pre-reset` | The build before that |
-
-Both were rejected wholesale, on UI/UX and backend structure. Reference for what
-the integrations proved, never precedent for how to build.
+- **Cost is absent from every marketplace report**, so margin stays null until
+  purchasing data is entered. `unitCost` on `Product` is the placeholder.
+- Fees reconcile to within **1.99 EGP** of noon's portal on the July export.
+  The gap is in noon's own CSV, not in this code — see `docs/evidence/`.
+- Schema is `synchronize: true`. Needs migrations before real data lands.
+- No auth yet. Do not expose this.
+- Three products appear twice under different Partner SKUs (one uses an older
+  `CCC-0014` convention). They may be duplicate listings or genuine variants —
+  merging them is a business decision, and there is no merge action yet.

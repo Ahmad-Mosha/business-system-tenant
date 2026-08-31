@@ -1,27 +1,25 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono, IBM_Plex_Sans_Arabic } from 'next/font/google';
+import { Geist, Geist_Mono } from 'next/font/google';
+import { Toaster } from '@/components/ui/sonner';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import './globals.css';
 
-const geist = Geist({ subsets: ['latin'], variable: '--font-geist' });
-const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono' });
-
-// Product names are Arabic and stay Arabic. Loaded here so they render in a
-// real Arabic face rather than an OS fallback.
-const arabic = IBM_Plex_Sans_Arabic({
-  subsets: ['arabic'],
-  weight: ['400', '500', '600'],
-  variable: '--font-arabic-sans',
-});
+// Named to match the `--font-sans` token the theme reads.
+const geistSans = Geist({ variable: '--font-sans', subsets: ['latin'] });
+const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'Prime Market',
-  description: 'Inventory, orders, money and channels — one reconciled source of truth.',
+  description: 'Operations and commerce platform',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${geist.variable} ${geistMono.variable} ${arabic.variable}`}>
-      <body className="font-sans">{children}</body>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+      <body className="min-h-full bg-background text-foreground">
+        <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
+        <Toaster position="bottom-right" />
+      </body>
     </html>
   );
 }
