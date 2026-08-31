@@ -7,7 +7,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  --font-sans: var(--font-latin), var(--font-arabic), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -78,6 +78,14 @@
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
   --radius: 0.625rem;
+  /* Density. docs/ui-ux.md asks for 36px rows and 34px inputs; the shell is
+     built on these so a change here moves every screen at once. */
+  --row-h: 34px;
+  --control-h: 32px;
+  --bar-h: 48px;
+  --strip-h: 30px;
+  --rail-w: 216px;
+  --detail-w: 420px;
   /* Semantic only — never decorative. The UI must stay legible with these
      collapsed to the monochrome scale. */
   --success: oklch(0.52 0.13 152);
