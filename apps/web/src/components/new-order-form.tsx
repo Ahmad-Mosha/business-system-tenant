@@ -16,7 +16,7 @@ import {
 import Link from 'next/link';
 import { useActionState, useEffect, useRef, useState } from 'react';
 import { createOrder, searchVariants, type CreateOrderState } from '@/app/(app)/orders/actions';
-import { Screen, Scroller } from '@/components/shell';
+import { Screen } from '@/components/shell';
 import { GOVERNORATES } from '@/lib/governorates';
 import { money } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -48,14 +48,15 @@ const PAYMENT_METHODS = [
 ] as const;
 
 const field =
-  'h-9 w-full rounded-md border border-border bg-background px-3 text-[13px] focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-60';
+  'h-9 w-full rounded-md border border-border bg-card px-3 text-[13px] focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-60';
 
 /**
- * Manual order entry, for the orders a moderator takes over social.
+ * Manual order entry.
  *
- * Numbered sections down the work column, and an order summary that stays put:
- * the total and the create button are visible the whole time, whatever the
- * section list is doing. Only the work column scrolls.
+ * Laid out as a fixed grid rather than a stack of sections: the two short forms
+ * sit side by side, the item table takes the space that is left, and the whole
+ * screen fits a laptop. Nothing here scrolls except the item rows once there
+ * are more than the table can show.
  */
 export function NewOrderForm({ assignsToSelf }: { assignsToSelf: boolean }) {
   const [state, submit, pending] = useActionState(createOrder, INITIAL);
@@ -133,7 +134,7 @@ export function NewOrderForm({ assignsToSelf }: { assignsToSelf: boolean }) {
       />
 
       <Screen>
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border px-5">
+        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-card px-5">
           <Link
             href="/orders"
             aria-label="Back to orders"
@@ -147,18 +148,19 @@ export function NewOrderForm({ assignsToSelf }: { assignsToSelf: boolean }) {
           </span>
           <Link
             href="/orders"
-            className="ms-auto inline-flex h-9 items-center rounded-md border border-border px-4 text-[13px] font-medium transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            className="ms-auto inline-flex h-9 items-center rounded-md border border-border bg-card px-4 text-[13px] font-medium transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           >
             Cancel
           </Link>
         </header>
 
-        <div className="flex min-h-0 flex-1">
-          {/* The work column — the only thing that scrolls. */}
-          <Scroller className="px-6 py-6">
-            <div className="mx-auto max-w-[760px] space-y-8">
-              <Section icon={User} step="1" title="Customer Information">
-                <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_340px] items-start gap-4 overflow-y-auto p-4">
+          {/* The work column: two short forms side by side, then the item table
+              taking whatever height is left. */}
+          <div className="grid content-start gap-4">
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Card icon={User} step="1" title="Customer Information">
+                <div className="grid gap-3 sm:grid-cols-2">
                   <Labelled label="Full Name" htmlFor="customerName">
                     <input
                       id="customerName"
@@ -182,79 +184,117 @@ export function NewOrderForm({ assignsToSelf }: { assignsToSelf: boolean }) {
                       disabled={pending}
                       className={cn(field, phone.length > 0 && !phoneOk && 'border-destructive')}
                     />
-                    {phone.length > 0 && !phoneOk && (
-                      <p className="mt-1 text-[11px] text-destructive">
-                        Not a valid Egyptian mobile number
-                      </p>
-                    )}
                   </Labelled>
                 </div>
-              </Section>
+                {phone.length > 0 && !phoneOk && (
+                  <p className="mt-1.5 text-[11px] text-destructive">
+                    Not a valid Egyptian mobile number
+                  </p>
+                )}
+              </Card>
 
-              <Section icon={ShoppingBag} step="2" title="Order Items">
-                <div className="relative mb-3">
-                  <Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    value={term}
-                    onChange={(e) => setTerm(e.target.value)}
-                    placeholder="Search products by name or SKU"
-                    disabled={pending}
-                    className={cn(field, 'pl-8.5')}
-                  />
-                  {(hits.length > 0 || searching) && (
-                    <ul className="absolute inset-x-0 z-30 mt-1 max-h-72 overflow-y-auto rounded-md border border-border bg-popover shadow-md">
-                      {searching && !hits.length ? (
-                        <li className="px-3 py-2 text-[13px] text-muted-foreground">Searching…</li>
-                      ) : (
-                        hits.map((h) => {
-                          const out = h.onHand <= 0;
-                          return (
-                            <li key={h.id}>
-                              <button
-                                type="button"
-                                onClick={() => addLine(h)}
-                                disabled={out}
-                                className="flex w-full items-center gap-3 px-3 py-2 text-left text-[13px] transition-colors enabled:hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                              >
-                                <span className="min-w-0 flex-1 truncate">{h.label}</span>
-                                <span
-                                  className={cn(
-                                    'shrink-0 text-[11px]',
-                                    out ? 'text-destructive' : 'text-muted-foreground',
-                                  )}
-                                >
-                                  {out ? 'Out of stock' : `${h.onHand} in stock`}
-                                </span>
-                                {h.sellingPrice && (
-                                  <span className="w-16 shrink-0 text-right tabular-nums">
-                                    {money(h.sellingPrice)}
-                                  </span>
-                                )}
-                              </button>
-                            </li>
-                          );
-                        })
-                      )}
-                    </ul>
-                  )}
+              <Card icon={Truck} step="2" title="Shipping Details">
+                <div className="grid gap-3 sm:grid-cols-[150px_minmax(0,1fr)]">
+                  <Labelled label="Governorate" htmlFor="governorate">
+                    <select
+                      id="governorate"
+                      name="governorate"
+                      required
+                      defaultValue=""
+                      disabled={pending}
+                      className={field}
+                    >
+                      <option value="" disabled>
+                        Select…
+                      </option>
+                      {GOVERNORATES.map((g) => (
+                        <option key={g} value={g}>
+                          {g}
+                        </option>
+                      ))}
+                    </select>
+                  </Labelled>
+                  <Labelled label="Street Address" htmlFor="address">
+                    <input
+                      id="address"
+                      name="address"
+                      placeholder="Street, building, apartment, landmark"
+                      disabled={pending}
+                      className={field}
+                    />
+                  </Labelled>
                 </div>
+              </Card>
+            </div>
 
-                <div className="overflow-hidden rounded-lg border border-border">
+            <Card icon={ShoppingBag} step="3" title="Order Items">
+              <div className="relative mb-3 shrink-0">
+                <Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  value={term}
+                  onChange={(e) => setTerm(e.target.value)}
+                  placeholder="Search products by name or SKU"
+                  disabled={pending}
+                  className={cn(field, 'pl-8.5')}
+                />
+                {(hits.length > 0 || searching) && (
+                  <ul className="absolute inset-x-0 z-30 mt-1 max-h-64 overflow-y-auto rounded-md border border-border bg-popover shadow-lg">
+                    {searching && !hits.length ? (
+                      <li className="px-3 py-2 text-[13px] text-muted-foreground">Searching…</li>
+                    ) : (
+                      hits.map((h) => {
+                        const out = h.onHand <= 0;
+                        return (
+                          <li key={h.id}>
+                            <button
+                              type="button"
+                              onClick={() => addLine(h)}
+                              disabled={out}
+                              className="flex w-full items-center gap-3 px-3 py-2 text-left text-[13px] transition-colors enabled:hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <span className="min-w-0 flex-1 truncate">{h.label}</span>
+                              <span
+                                className={cn(
+                                  'shrink-0 text-[11px]',
+                                  out ? 'text-destructive' : 'text-muted-foreground',
+                                )}
+                              >
+                                {out ? 'Out of stock' : `${h.onHand} in stock`}
+                              </span>
+                              {h.sellingPrice && (
+                                <span className="w-16 shrink-0 text-right tabular-nums">
+                                  {money(h.sellingPrice)}
+                                </span>
+                              )}
+                            </button>
+                          </li>
+                        );
+                      })
+                    )}
+                  </ul>
+                )}
+              </div>
+
+              <div className="flex flex-col overflow-hidden rounded-lg border border-border">
+                <div className="max-h-[264px] overflow-y-auto">
                   <table className="w-full border-collapse text-[13px]">
-                    <thead>
-                      <tr className="border-b border-border bg-muted/40 text-[11px] tracking-[0.06em] text-muted-foreground uppercase">
+                    <thead className="sticky top-0 z-10 bg-muted/60 backdrop-blur">
+                      <tr className="border-b border-border text-[11px] tracking-[0.06em] text-muted-foreground uppercase">
                         <th className="px-3 py-2 text-left font-medium">Item</th>
-                        <th className="w-[84px] px-3 py-2 text-right font-medium">Qty</th>
-                        <th className="w-[120px] px-3 py-2 text-right font-medium">Unit Price</th>
-                        <th className="w-[110px] px-3 py-2 text-right font-medium">Total</th>
-                        <th className="w-11 px-2" />
+                        <th className="w-[80px] px-3 py-2 text-right font-medium">Qty</th>
+                        <th className="w-[110px] px-3 py-2 text-right font-medium">Unit Price</th>
+                        <th className="w-[100px] px-3 py-2 text-right font-medium">Total</th>
+                        <th className="w-10 px-2" />
                       </tr>
                     </thead>
                     <tbody>
                       {lines.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">
-                            No items yet. Search above, or add a custom item.
+                          <td
+                            colSpan={5}
+                            className="px-3 py-6 text-center text-[13px] text-muted-foreground"
+                          >
+                            No items yet — search above, or add a custom item.
                           </td>
                         </tr>
                       ) : (
@@ -266,15 +306,18 @@ export function NewOrderForm({ assignsToSelf }: { assignsToSelf: boolean }) {
                             Number(l.unitPrice) < Number(l.unitCost);
                           return (
                             <tr key={l.key} className="border-b border-border/60">
-                              <td className="px-3 py-2">
+                              <td className="px-3 py-1.5">
                                 <input
                                   value={l.title}
                                   onChange={(e) => patch(l.key, { title: e.target.value })}
                                   placeholder="Item name"
                                   disabled={pending}
-                                  className={cn(field, 'h-8 border-transparent px-2 hover:border-border')}
+                                  className={cn(
+                                    field,
+                                    'h-8 border-transparent bg-transparent px-2 hover:border-border',
+                                  )}
                                 />
-                                <p className="mt-0.5 px-2 text-[11px] text-muted-foreground">
+                                <p className="px-2 text-[11px] text-muted-foreground">
                                   {l.variantId ? (
                                     <>
                                       {l.onHand} in stock
@@ -285,11 +328,12 @@ export function NewOrderForm({ assignsToSelf }: { assignsToSelf: boolean }) {
                                   )}
                                 </p>
                               </td>
-                              <td className="px-3 py-2 align-top">
+                              <td className="px-3 py-1.5 align-top">
                                 <input
                                   type="number"
                                   min={1}
                                   value={l.quantity}
+                                  onFocus={(e) => e.currentTarget.select()}
                                   onChange={(e) =>
                                     patch(l.key, { quantity: Math.max(1, Number(e.target.value)) })
                                   }
@@ -302,10 +346,11 @@ export function NewOrderForm({ assignsToSelf }: { assignsToSelf: boolean }) {
                                   )}
                                 />
                               </td>
-                              <td className="px-3 py-2 align-top">
+                              <td className="px-3 py-1.5 align-top">
                                 <input
                                   inputMode="decimal"
                                   value={l.unitPrice}
+                                  onFocus={(e) => e.currentTarget.select()}
                                   onChange={(e) => patch(l.key, { unitPrice: e.target.value })}
                                   disabled={pending}
                                   className={cn(
@@ -315,10 +360,10 @@ export function NewOrderForm({ assignsToSelf }: { assignsToSelf: boolean }) {
                                   )}
                                 />
                               </td>
-                              <td className="px-3 py-2 text-right align-top font-medium tabular-nums leading-8">
+                              <td className="px-3 py-1.5 text-right align-top font-medium tabular-nums leading-8">
                                 {money(lineTotal(l))}
                               </td>
-                              <td className="px-2 py-2 align-top">
+                              <td className="px-2 py-1.5 align-top">
                                 <button
                                   type="button"
                                   onClick={() => setLines((x) => x.filter((y) => y.key !== l.key))}
@@ -333,102 +378,69 @@ export function NewOrderForm({ assignsToSelf }: { assignsToSelf: boolean }) {
                           );
                         })
                       )}
-                      <tr>
-                        <td colSpan={5} className="p-0">
-                          <button
-                            type="button"
-                            onClick={() => addLine()}
-                            disabled={pending}
-                            className="flex w-full items-center justify-center gap-1.5 py-2.5 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                          >
-                            <Plus className="size-3.5" />
-                            Custom Item
-                          </button>
-                        </td>
-                      </tr>
                     </tbody>
                   </table>
                 </div>
-              </Section>
+                <button
+                  type="button"
+                  onClick={() => addLine()}
+                  disabled={pending}
+                  className="flex shrink-0 items-center justify-center gap-1.5 border-t border-border py-2 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  <Plus className="size-3.5" />
+                  Custom Item
+                </button>
+              </div>
+            </Card>
 
-              <Section icon={CreditCard} title="Payment Method">
+            <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
+              <Card icon={CreditCard} title="Payment Method">
                 <input type="hidden" name="paymentMethod" value={method} />
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div
+                  role="radiogroup"
+                  aria-label="Payment method"
+                  className="flex rounded-md border border-border p-0.5"
+                >
                   {PAYMENT_METHODS.map((m) => (
-                    <label
+                    <button
                       key={m.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={method === m.value}
+                      onClick={() => setMethod(m.value)}
+                      disabled={pending}
                       className={cn(
-                        'flex h-11 cursor-pointer items-center gap-2.5 rounded-lg border px-3 text-[13px] transition-colors',
+                        'h-8 flex-1 rounded-[5px] text-[12.5px] transition-colors',
+                        'focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
                         method === m.value
-                          ? 'border-foreground bg-accent font-medium'
-                          : 'border-border hover:bg-accent/50',
+                          ? 'bg-foreground font-medium text-background'
+                          : 'text-muted-foreground hover:text-foreground',
                       )}
                     >
-                      <input
-                        type="radio"
-                        name="paymentMethodChoice"
-                        value={m.value}
-                        checked={method === m.value}
-                        onChange={() => setMethod(m.value)}
-                        disabled={pending}
-                        className="size-3.5 accent-[var(--foreground)]"
-                      />
                       {m.label}
-                    </label>
+                    </button>
                   ))}
                 </div>
-              </Section>
+              </Card>
 
-              <Section icon={AlignLeft} title="Notes">
+              <Card icon={AlignLeft} title="Notes">
                 <textarea
                   id="notes"
                   name="notes"
-                  rows={3}
-                  placeholder="Add any special instructions or notes here…"
+                  rows={2}
+                  placeholder="Any special instructions…"
                   disabled={pending}
-                  className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-[13px] focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-60"
+                  className="w-full resize-none rounded-md border border-border bg-card px-3 py-2 text-[13px] focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-60"
                 />
-              </Section>
-
-              <Section icon={Truck} step="3" title="Shipping Details">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Labelled label="Governorate" htmlFor="governorate">
-                    <select
-                      id="governorate"
-                      name="governorate"
-                      required
-                      defaultValue=""
-                      disabled={pending}
-                      className={field}
-                    >
-                      <option value="" disabled>
-                        Select governorate
-                      </option>
-                      {GOVERNORATES.map((g) => (
-                        <option key={g} value={g}>
-                          {g}
-                        </option>
-                      ))}
-                    </select>
-                  </Labelled>
-                  <Labelled label="Street Address" htmlFor="address">
-                    <input
-                      id="address"
-                      name="address"
-                      placeholder="Street, building, apartment"
-                      disabled={pending}
-                      className={field}
-                    />
-                  </Labelled>
-                </div>
-              </Section>
+              </Card>
             </div>
-          </Scroller>
+          </div>
 
-          {/* Order Summary — stays put while the work column scrolls. */}
-          <aside className="flex w-[340px] shrink-0 flex-col overflow-hidden border-s border-border">
-            <Scroller className="p-5">
+          {/* Order Summary — a card, sized to its contents, with the button in it. */}
+          <aside className="min-h-0">
+            <div className="rounded-xl border border-border bg-card p-5 shadow-xs">
               <h2 className="text-[15px] font-semibold">Order Summary</h2>
+
               <div className="mt-4 space-y-2.5 border-t border-border pt-4 text-[13px]">
                 <div className="flex items-baseline justify-between gap-3">
                   <span className="text-muted-foreground">
@@ -445,34 +457,45 @@ export function NewOrderForm({ assignsToSelf }: { assignsToSelf: boolean }) {
                     name="shippingCost"
                     inputMode="decimal"
                     value={shipping}
+                    onFocus={(e) => e.currentTarget.select()}
                     onChange={(e) => setShipping(e.target.value)}
                     disabled={pending}
-                    className={cn(field, 'h-8 w-28 px-2 text-right tabular-nums')}
+                    className={cn(field, 'h-8 w-24 px-2 text-right tabular-nums')}
                   />
                 </div>
               </div>
 
               <div className="mt-4 flex items-baseline justify-between gap-3 border-t border-border pt-4">
                 <span className="text-[15px] font-semibold">Total</span>
-                <span className="text-xl font-semibold tabular-nums">{money(total)}</span>
+                <span className="text-2xl font-semibold tracking-[-0.02em] tabular-nums">
+                  {money(total)}
+                </span>
               </div>
 
-              <label className="mt-5 flex cursor-pointer items-start gap-2.5 rounded-md border border-border px-3 py-2.5 text-[13px]">
+              <label className="mt-4 flex cursor-pointer items-start gap-2.5 text-[13px]">
                 <input
                   type="checkbox"
                   name="paymentCollected"
                   disabled={pending}
                   className="mt-0.5 size-3.5 accent-[var(--foreground)]"
                 />
-                <span>
-                  Payment already collected
-                  <span className="block text-[11px] text-muted-foreground">
-                    Marks the order paid on creation.
-                  </span>
-                </span>
+                <span>Payment already collected manually</span>
               </label>
 
-              {(overStock.length > 0 || belowCost.length > 0) && (
+              <button
+                type="submit"
+                disabled={!ready || pending}
+                className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-foreground text-sm font-medium text-background transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-40"
+              >
+                {pending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="size-4" />
+                )}
+                {pending ? 'Creating' : 'Create Order'}
+              </button>
+
+              {(overStock.length > 0 || belowCost.length > 0 || state.status === 'error') && (
                 <ul className="mt-4 space-y-1.5 text-[11px]">
                   {overStock.map((l) => (
                     <li
@@ -490,32 +513,16 @@ export function NewOrderForm({ assignsToSelf }: { assignsToSelf: boolean }) {
                       <bdi>{l.title}</bdi> is priced below its {money(l.unitCost)} cost.
                     </li>
                   ))}
+                  {state.status === 'error' && (
+                    <li
+                      role="alert"
+                      className="rounded-md border border-destructive/30 bg-destructive-subtle px-2 py-1.5 text-destructive"
+                    >
+                      {state.message}
+                    </li>
+                  )}
                 </ul>
               )}
-
-              {state.status === 'error' && (
-                <p
-                  role="alert"
-                  className="mt-4 rounded-md border border-destructive/30 bg-destructive-subtle px-2 py-1.5 text-[11px] text-destructive"
-                >
-                  {state.message}
-                </p>
-              )}
-            </Scroller>
-
-            <div className="shrink-0 border-t border-border p-5">
-              <button
-                type="submit"
-                disabled={!ready || pending}
-                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-foreground text-sm font-medium text-background transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-40"
-              >
-                {pending ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="size-4" />
-                )}
-                {pending ? 'Creating' : 'Create Order'}
-              </button>
             </div>
           </aside>
         </div>
@@ -524,7 +531,7 @@ export function NewOrderForm({ assignsToSelf }: { assignsToSelf: boolean }) {
   );
 }
 
-function Section({
+function Card({
   icon: Icon,
   step,
   title,
@@ -536,9 +543,9 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section>
-      <h2 className="mb-3 flex items-center gap-2 text-[15px] font-semibold tracking-[-0.01em]">
-        <Icon className="size-4.5 text-muted-foreground" strokeWidth={1.9} />
+    <section className="rounded-xl border border-border bg-card p-4 shadow-xs">
+      <h2 className="mb-3 flex shrink-0 items-center gap-2 text-[14px] font-semibold tracking-[-0.01em]">
+        <Icon className="size-4 text-muted-foreground" strokeWidth={1.9} />
         {step ? `${step}. ` : ''}
         {title}
       </h2>

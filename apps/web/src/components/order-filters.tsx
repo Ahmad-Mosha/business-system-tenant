@@ -55,7 +55,7 @@ export function OrderFilters() {
   }, [search]);
 
   const control =
-    'inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[13px] transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none';
+    'inline-flex h-9 items-center gap-1.5 rounded-md border bg-card px-3 text-[13px] transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none';
 
   return (
     <div className={cn('flex flex-wrap items-center gap-2', pending && 'opacity-70')}>
@@ -91,7 +91,7 @@ export function OrderFilters() {
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search orders…"
           aria-label="Search orders"
-          className="h-9 w-[240px] rounded-md border border-border bg-background pr-8 pl-8.5 text-[13px] placeholder:text-muted-foreground/70 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          className="h-9 w-[240px] rounded-md border border-border bg-card pr-8 pl-8.5 text-[13px] placeholder:text-muted-foreground/70 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         />
         {search && (
           <button
