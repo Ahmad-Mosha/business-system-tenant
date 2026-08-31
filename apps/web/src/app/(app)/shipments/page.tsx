@@ -1,8 +1,6 @@
 import { AlertTriangle } from 'lucide-react';
-import { PageBody, PageHeader } from '@/components/page-header';
-import { ShipmentTrackerView } from '@/components/shipment-tracker-view';
 import { ShipmentsView } from '@/components/shipments-view';
-import { Stat, StatCell, StatGrid } from '@/components/stat';
+import { MetricCard, MetricRow, PageCard, Screen, Scroller } from '@/components/shell';
 import { getBostaShipments } from '@/lib/api';
 import { money } from '@/lib/format';
 import { requireSession } from '@/lib/session';
@@ -33,57 +31,44 @@ export default async function ShipmentsPage() {
   const uncollectedValue = uncollected.reduce((n, s) => n + (s.cod?.amount ?? 0), 0);
 
   return (
-    <>
-      <PageHeader title="Shipments" />
+    <Screen>
+      <Scroller className="p-4">
+        <div className="space-y-4">
+          <PageCard title="Shipments" description="Every live Bosta delivery, in one place." />
 
-      <PageBody>
-        {loadError && (
-          <div className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive-subtle px-4 py-3 text-sm text-destructive">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0" strokeWidth={2} />
-            <div>
-              <p className="font-medium">Could not load shipments from Bosta.</p>
-              <p className="mt-0.5 text-destructive/80">{loadError}</p>
+          {loadError && (
+            <div className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive-subtle px-4 py-3 text-[13px] text-destructive">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0" strokeWidth={2} />
+              <div>
+                <p className="font-medium">Could not load shipments from Bosta.</p>
+                <p className="mt-0.5 text-destructive/80">{loadError}</p>
+              </div>
             </div>
-          </div>
-        )}
-        <StatGrid>
-          <StatCell>
-            <Stat
+          )}
+
+          <MetricRow>
+            <MetricCard
               label="Live shipments"
-              value={String(shipments.length)}
+              value={shipments.length}
               hint="active Bosta deliveries"
             />
-          </StatCell>
-          <StatCell>
-            <Stat label="Delivered" value={String(deliveredCount)} hint="successfully received" />
-          </StatCell>
-          <StatCell>
-            <Stat
+            <MetricCard label="Delivered" value={deliveredCount} hint="successfully received" />
+            <MetricCard
               label="In transit"
-              value={String(inTransitCount)}
+              value={inTransitCount}
               hint="with courier / out for delivery"
             />
-          </StatCell>
-          <StatCell>
-            <Stat
+            <MetricCard
               label="COD to collect"
               value={money(uncollectedValue)}
+              tone={uncollected.length > 0 ? 'warning' : 'default'}
               hint={`${uncollected.length} delivered, cash not remitted`}
             />
-          </StatCell>
-        </StatGrid>
+          </MetricRow>
 
-        <section>
           <ShipmentsView initialShipments={shipments} />
-        </section>
-
-        {/* Bosta has no "list my deliveries" endpoint — it only answers about a
-            tracking number you already know. This is how a shipment that is not
-            yet recorded against an order can still be looked up. */}
-        <section>
-          <ShipmentTrackerView />
-        </section>
-      </PageBody>
-    </>
+        </div>
+      </Scroller>
+    </Screen>
   );
 }
