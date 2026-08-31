@@ -1,16 +1,18 @@
-import { redirect } from 'next/navigation';
-import { Sidebar } from '@/components/sidebar';
-import { getSession } from '@/lib/session';
+import { AppSidebar } from '@/components/app-sidebar';
+import { requireSession } from '@/lib/session';
 
-/** The gate for every signed-in page. */
+/**
+ * The signed-in shell. Every page inside this group has a session, so pages
+ * never repeat the check — though the API enforces it independently.
+ */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const session = await getSession();
-  if (!session) redirect('/login');
+  const user = await requireSession();
 
   return (
-    <div className="flex h-dvh overflow-hidden">
-      <Sidebar role={session.role} />
-      <div className="flex min-w-0 flex-1 flex-col">{children}</div>
+    <div className="flex min-h-svh">
+      <AppSidebar user={user} />
+      {/* pt-14 clears the mobile bar; the sidebar is in flow from lg up. */}
+      <main className="min-w-0 flex-1 pt-14 lg:pt-0">{children}</main>
     </div>
   );
 }

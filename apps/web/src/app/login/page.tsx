@@ -1,64 +1,31 @@
-'use client';
+import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
+import { LoginForm } from '@/components/login-form';
+import { getSession } from '@/lib/session';
 
-import { useActionState } from 'react';
-import { useFormStatus } from 'react-dom';
-import { Button } from '@/components/ui/button';
-import { Field, Input } from '@/components/ui/field';
-import { login } from './actions';
+export const metadata: Metadata = { title: 'Sign in · Prime Market' };
 
-function Submit() {
-  const { pending } = useFormStatus();
-  return (
-    <Button type="submit" variant="primary" disabled={pending} className="w-full">
-      {pending ? 'Signing in…' : 'Sign in'}
-    </Button>
-  );
-}
-
-export default function LoginPage() {
-  const [error, action] = useActionState(login, null);
+export default async function LoginPage() {
+  if (await getSession()) redirect('/');
 
   return (
-    <main className="grid min-h-dvh place-items-center px-6">
-      <div className="w-full max-w-[19rem]">
-        <div className="mb-7">
-          <h1 className="text-base font-semibold tracking-tight text-ink">Prime Market</h1>
-          <p className="mt-0.5 text-xs text-ink-faint">Commerce operations</p>
+    <div className="flex min-h-svh items-center justify-center px-6 py-12">
+      <div className="w-full max-w-[360px]">
+        <div className="mb-9 flex flex-col items-center text-center">
+          <span className="mb-5 flex size-10 items-center justify-center rounded-[10px] bg-foreground text-base font-semibold text-background">
+            P
+          </span>
+          <h1 className="text-xl font-semibold tracking-[-0.02em]">Prime Market</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Sign in to continue</p>
         </div>
 
-        <form action={action} className="flex flex-col gap-3">
-          <Field label="Email">
-            <Input
-              name="email"
-              type="email"
-              autoComplete="username"
-              autoFocus
-              required
-              aria-invalid={!!error}
-            />
-          </Field>
+        <LoginForm />
 
-          <Field label="Password">
-            <Input
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              aria-invalid={!!error}
-            />
-          </Field>
-
-          {error && (
-            <p role="alert" className="text-xs text-bad">
-              {error}
-            </p>
-          )}
-
-          <div className="pt-1">
-            <Submit />
-          </div>
-        </form>
+        <p className="mt-8 text-center text-xs text-muted-foreground">
+          Development accounts: admin@admin.com / admin123 ·
+          moderator@moderator.com / moderator123
+        </p>
       </div>
-    </main>
+    </div>
   );
 }

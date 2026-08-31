@@ -11,7 +11,9 @@ const KEY_LENGTH = 64;
 
 /**
  * scrypt from node's own crypto — memory-hard and built in, so no password
- * hashing dependency is needed at this scale. Stored as `salt:hash`, both hex.
+ * hashing dependency is needed at this scale.
+ *
+ * Stored as `salt:hash`, both hex.
  */
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16);
