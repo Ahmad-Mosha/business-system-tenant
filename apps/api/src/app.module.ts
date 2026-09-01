@@ -18,6 +18,7 @@ import { CashTransaction } from './finance/cash-transaction.entity';
 import { FinanceController } from './finance/finance.controller';
 import { FinanceService } from './finance/finance.service';
 import { LedgerAccount } from './finance/ledger-account.entity';
+import { LedgerEntry } from './finance/ledger-entry.entity';
 import { LedgerService } from './finance/ledger.service';
 import { EasyOrdersController } from './integrations/easyorders/easyorders.controller';
 import { EasyOrdersEvent } from './integrations/easyorders/easyorders-event.entity';
@@ -54,6 +55,7 @@ const ENTITIES = [
   CashAccount,
   CashTransaction,
   LedgerAccount,
+  LedgerEntry,
 ];
 
 @Module({
