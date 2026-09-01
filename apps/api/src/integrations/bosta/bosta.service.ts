@@ -237,7 +237,12 @@ export class BostaService {
     const stateValue = raw.state?.value || raw.maskedState || 'New';
     const statusCode = raw.state?.code ?? 10;
 
-    const normalizedStatus = this.mapBostaStatus(stateValue, statusCode, raw.type?.value);
+    const normalizedStatus = this.mapBostaStatus(
+      stateValue,
+      statusCode,
+      raw.type?.value,
+      raw.pendingPickup,
+    );
     const timeline = this.buildTimeline(raw);
     const attempts = this.buildAttempts(raw);
 
@@ -288,8 +293,11 @@ export class BostaService {
       : hasCashoutRecord
         ? 'UNPAID'
         : 'PENDING';
+    // PENDING = Bosta hasn't computed a cashout for this shipment yet (it isn't
+    // delivered, or the payout run hasn't happened). Bosta's dashboard labels
+    // that column "قيد التنفيذ".
     const collectionStatusLabel =
-      collectionStatus === 'PAID' ? 'مدفوع' : collectionStatus === 'UNPAID' ? 'غير مدفوع' : 'غير متوفر';
+      collectionStatus === 'PAID' ? 'مدفوع' : collectionStatus === 'UNPAID' ? 'غير مدفوع' : 'قيد التنفيذ';
 
     const pType = raw.specs?.packageType || '';
     const typeAr =
@@ -347,44 +355,70 @@ export class BostaService {
     };
   }
 
+  /**
+   * Bosta's API only ever sends the delivery state in English (`state.value` /
+   * `state.code`); the Arabic on its dashboard is its own front-end
+   * translation. This is the same translation, keyed on our normalised status.
+   * A state we don't recognise falls back to Bosta's raw English text rather
+   * than a guessed Arabic label.
+   */
+  private static readonly STATUS_LABEL_AR: Record<string, string> = {
+    NEW: 'جديد',
+    AWAITING_PICKUP: 'في انتظار الاستلام',
+    PICKED_UP: 'تم الاستلام',
+    IN_TRANSIT: 'في الطريق',
+    OUT_FOR_DELIVERY: 'خرج للتوصيل',
+    DELIVERED: 'تم التوصيل',
+    RETURNED: 'مُرتجع',
+    CANCELLED: 'ملغى',
+  };
+
   private mapBostaStatus(
     stateValue: string,
     code: number,
     typeValue?: string,
+    pendingPickup?: string | null,
   ): { key: string; label: string } {
     const val = stateValue.toLowerCase();
+    const at = (key: string) => ({
+      key,
+      label: BostaService.STATUS_LABEL_AR[key] ?? stateValue,
+    });
+
     // The direction (forward delivery vs. return-to-origin) lives in `type`,
     // not `state` — Bosta reuses the "Delivered" state label for a package
     // delivered *back* to us. Checked first, or a real return (real example:
     // cod 0, type "Return to Origin", state "Delivered") reads as a normal
     // successful sale instead of تم الاسترجاع.
     if ((typeValue ?? '').toLowerCase().includes('return')) {
-      return { key: 'RETURNED', label: 'Returned to Origin' };
+      return at('RETURNED');
     }
-    if (code === 45 || val.includes('deliver') && !val.includes('out') && !val.includes('failed')) {
-      return { key: 'DELIVERED', label: 'Delivered' };
+    if (code === 45 || (val.includes('deliver') && !val.includes('out') && !val.includes('failed'))) {
+      return at('DELIVERED');
     }
     if (code === 41 || val.includes('out for delivery') || val.includes('delivering')) {
-      return { key: 'OUT_FOR_DELIVERY', label: 'Out for Delivery' };
+      return at('OUT_FOR_DELIVERY');
     }
     if (code === 30 || val.includes('transit') || val.includes('received at warehouse') || val.includes('hub')) {
-      return { key: 'IN_TRANSIT', label: 'In Transit' };
+      return at('IN_TRANSIT');
     }
     // `code === 10` covers "Pickup requested" / "Awaiting pickup" — a brand-new
     // shipment the courier has NOT collected yet. Must be checked before the
     // picked-up branch, and that branch must not match the word "pickup" alone
     // (it appears in "Pickup requested"), only the completed "picked up".
     if (code === 10 || val.includes('new') || val.includes('created') || val.includes('pickup requested') || val.includes('awaiting pickup')) {
-      return { key: 'NEW', label: 'Created' };
+      // Bosta splits this into "جديد" and "في انتظار الاستلام" by whether a
+      // pickup has actually been requested — `pendingPickup` is that timestamp.
+      return at(pendingPickup ? 'AWAITING_PICKUP' : 'NEW');
     }
     if (code === 21 || val.includes('picked up')) {
-      return { key: 'PICKED_UP', label: 'Picked Up' };
+      return at('PICKED_UP');
     }
     if (val.includes('return') || val.includes('rto')) {
-      return { key: 'RETURNED', label: 'Returned' };
+      return at('RETURNED');
     }
     if (val.includes('cancel')) {
-      return { key: 'CANCELLED', label: 'Cancelled' };
+      return at('CANCELLED');
     }
     if (val.includes('fail') || val.includes('exception') || val.includes('delayed')) {
       return { key: 'EXCEPTION', label: stateValue || 'Exception' };
