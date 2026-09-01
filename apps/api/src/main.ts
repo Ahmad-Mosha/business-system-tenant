@@ -2,7 +2,14 @@ import 'reflect-metadata';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
+import { types } from 'pg';
 import { AppModule } from './app.module';
+
+// A `date` column is a calendar day, not an instant. Postgres' driver parses it
+// into a JS Date at local midnight, which shifts to the previous day once
+// serialised to UTC — so "this month" filters and the like silently miss rows.
+// Keep dates as plain `YYYY-MM-DD` strings everywhere.
+types.setTypeParser(types.builtins.DATE, (v) => v);
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
