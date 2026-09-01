@@ -7,6 +7,7 @@ import { StockMovement } from '../inventory/stock-movement.entity';
 import { allocateExtraCosts, movingAverage, round2, round4 } from './costing';
 import {
   type CostAllocation,
+  paidStatusOf,
   PurchaseInvoice,
   PurchaseInvoiceLine,
   type PurchasePayment,
@@ -15,6 +16,7 @@ import { Supplier } from './supplier.entity';
 
 const MONEY = /^\d+(\.\d{1,2})?$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const money = (n: number) => n.toFixed(2);
 
 export interface InvoiceLineInput {
   variantId: string;
@@ -95,34 +97,101 @@ export class PurchasingService {
       take: 100,
     });
     const payments = await this.ledger.entries({ kind: 'SUPPLIER_PAYMENT', supplierId: id, limit: 100 });
-    return { ...supplier, balance, invoices, payments: payments.entries };
+    return {
+      ...supplier,
+      balance,
+      invoices: invoices.map((i) => ({ ...i, paidStatus: paidStatusOf(i) })),
+      payments: payments.entries,
+    };
   }
 
-  /** Pay a supplier some or all of what they are owed. */
-  async recordSupplierPayment(supplierId: string, amount: string, memo: string | undefined, userId: string) {
+  /**
+   * Records a payment to a supplier and marks it against their invoices.
+   * `invoiceId` pays one invoice; without it the money pays down the oldest
+   * unpaid credit invoices first. Either way it can never exceed what is owed —
+   * that is the guard against recording the same payment twice.
+   */
+  async recordSupplierPayment(
+    supplierId: string,
+    amount: string,
+    memo: string | undefined,
+    userId: string,
+    invoiceId?: string,
+  ) {
     if (!MONEY.test(amount)) throw new BadRequestException('amount must be like 1000.00');
-    const supplier = await this.db.getRepository(Supplier).findOneBy({ id: supplierId });
-    if (!supplier) throw new NotFoundException('supplier not found');
-    return this.ledger.post({
-      amount,
-      debit: 'SUPPLIER_PAYABLE',
-      credit: 'CASH',
-      kind: 'SUPPLIER_PAYMENT',
-      memo: memo?.trim() || `Payment to ${supplier.name}`,
-      supplierId,
-      sourceType: 'supplier',
-      sourceId: supplierId,
-      actorId: userId,
+    const value = Number(amount);
+    if (value <= 0) throw new BadRequestException('amount must be greater than zero');
+
+    return this.db.transaction(async (tx) => {
+      const supplier = await tx.findOneBy(Supplier, { id: supplierId });
+      if (!supplier) throw new NotFoundException('supplier not found');
+
+      const outstanding = Number(
+        await this.ledger.balanceOf('SUPPLIER_PAYABLE', { supplierId }, tx),
+      );
+      if (outstanding <= 0) {
+        throw new BadRequestException(`nothing is owed to ${supplier.name}`);
+      }
+      if (value > outstanding + 0.005) {
+        throw new BadRequestException(
+          `only ${money(outstanding)} is owed to ${supplier.name} — cannot pay ${money(value)}`,
+        );
+      }
+
+      // Decide which invoice(s) this payment settles.
+      const targets = invoiceId
+        ? await tx.find(PurchaseInvoice, { where: { id: invoiceId, supplierId } })
+        : await tx.find(PurchaseInvoice, {
+            where: { supplierId, status: 'POSTED', payment: 'CREDIT' },
+            order: { invoiceDate: 'ASC', createdAt: 'ASC' },
+          });
+      if (invoiceId && !targets.length) throw new NotFoundException('invoice not found');
+
+      let left = value;
+      for (const inv of targets) {
+        if (left <= 0.005) break;
+        const remaining = Number(inv.landedTotal) - Number(inv.settledAmount);
+        if (remaining <= 0.005) continue;
+        const apply = Math.min(left, remaining);
+        await tx.update(
+          PurchaseInvoice,
+          { id: inv.id },
+          { settledAmount: money(Number(inv.settledAmount) + apply) },
+        );
+        left -= apply;
+      }
+      if (invoiceId && left > 0.005) {
+        const inv = targets[0];
+        throw new BadRequestException(
+          `only ${money(Number(inv.landedTotal) - Number(inv.settledAmount))} is left on this invoice`,
+        );
+      }
+
+      return this.ledger.post(
+        {
+          amount,
+          debit: 'SUPPLIER_PAYABLE',
+          credit: 'CASH',
+          kind: 'SUPPLIER_PAYMENT',
+          memo: memo?.trim() || `Payment to ${supplier.name}`,
+          supplierId,
+          sourceType: invoiceId ? 'purchase_invoice' : 'supplier',
+          sourceId: invoiceId ?? supplierId,
+          actorId: userId,
+        },
+        tx,
+      );
     });
   }
 
   // ── Purchase invoices ──────────────────────────────────────────────────
 
-  listInvoices() {
-    return this.db.query(
+  async listInvoices() {
+    const rows = await this.db.query(
       `SELECT i.id, i.invoice_no AS "invoiceNo", i.invoice_date AS "invoiceDate",
               i.status, i.payment, i.goods_total AS "goodsTotal",
               i.extra_costs AS "extraCosts", i.landed_total AS "landedTotal",
+              i.settled_amount AS "settledAmount",
               i.posted_at AS "postedAt", s.name AS "supplierName",
               (SELECT count(*)::int FROM purchase_invoice_line l WHERE l.invoice_id = i.id) AS "lineCount"
        FROM purchase_invoice i
@@ -130,6 +199,7 @@ export class PurchasingService {
        ORDER BY i.invoice_date DESC, i.created_at DESC
        LIMIT 100`,
     );
+    return rows.map((r: Parameters<typeof paidStatusOf>[0]) => ({ ...r, paidStatus: paidStatusOf(r) }));
   }
 
   async getInvoice(id: string) {
@@ -149,7 +219,7 @@ export class PurchasingService {
        ORDER BY p.name`,
       [id],
     );
-    return { ...invoice, lines };
+    return { ...invoice, paidStatus: paidStatusOf(invoice), lines };
   }
 
   /** Creates a DRAFT invoice — no stock or money moves until it is posted. */
@@ -269,7 +339,16 @@ export class PurchasingService {
         tx,
       );
 
-      await tx.update(PurchaseInvoice, { id }, { status: 'POSTED', postedAt: new Date() });
+      await tx.update(
+        PurchaseInvoice,
+        { id },
+        {
+          status: 'POSTED',
+          postedAt: new Date(),
+          // A cash invoice is paid the moment it posts.
+          settledAmount: invoice.payment === 'CASH' ? invoice.landedTotal : '0',
+        },
+      );
       this.log.log(`purchase invoice ${id} posted: ${invoice.lines.length} lines, ${invoice.landedTotal}`);
     });
     return this.getInvoice(id);
