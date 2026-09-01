@@ -1,12 +1,11 @@
 import Link from 'next/link';
 import { Plus } from 'lucide-react';
-import { MetricCard, MetricRow, PageCard, Panel, Screen, Scroller } from '@/components/shell';
+import { ContextBar, Figure, Panel, Screen, Scroller } from '@/components/shell';
 import { getPurchases } from '@/lib/api';
 import { date, money } from '@/lib/format';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
 
-/** First day of the current month, ISO. */
 function monthStart() {
   const d = new Date();
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)).toISOString().slice(0, 10);
@@ -18,42 +17,38 @@ export default async function PurchasesPage() {
 
   const since = monthStart();
   const postedThisMonth = invoices.filter(
-    (i) => i.status === 'POSTED' && i.invoiceDate >= since,
+    (i) => i.status === 'POSTED' && String(i.invoiceDate).slice(0, 10) >= since,
   );
   const monthTotal = postedThisMonth.reduce((n, i) => n + Number(i.landedTotal), 0);
   const drafts = invoices.filter((i) => i.status === 'DRAFT').length;
 
   return (
     <Screen>
-      <div className="flex min-h-0 flex-1 flex-col gap-4 p-4">
-        <PageCard
-          title="Purchases"
-          description="Every فاتورة شراء. Posting one brings goods into stock at landed cost."
-          actions={
-            <Link
-              href="/money/purchases/new"
-              className="inline-flex h-9 items-center gap-1.5 rounded-md bg-foreground px-3.5 text-[13px] font-medium text-background transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-            >
-              <Plus className="size-4" /> New invoice
-            </Link>
-          }
-        />
+      <ContextBar
+        title="Purchases"
+        meta="فاتورة شراء"
+        figures={
+          <>
+            <Figure label="This month" value={money(monthTotal)} />
+            <Figure label="Drafts" value={drafts} tone={drafts > 0 ? 'warning' : 'default'} />
+          </>
+        }
+        actions={
+          <Link
+            href="/money/purchases/new"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-foreground px-3 text-[13px] font-medium text-background transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          >
+            <Plus className="size-4" /> New invoice
+          </Link>
+        }
+      />
 
-        <MetricRow>
-          <MetricCard label="Invoices" value={invoices.length} hint="all time" />
-          <MetricCard
-            label="This month"
-            value={money(monthTotal)}
-            hint={`${postedThisMonth.length} posted`}
-          />
-          <MetricCard label="Drafts" value={drafts} tone={drafts > 0 ? 'warning' : 'default'} hint="not posted" />
-        </MetricRow>
-
+      <div className="flex min-h-0 flex-1 flex-col p-4">
         <Panel>
           <Scroller>
             {invoices.length === 0 ? (
               <p className="p-12 text-center text-sm text-muted-foreground">
-                No purchase invoices yet.
+                No purchase invoices yet. Create one to bring stock in at cost.
               </p>
             ) : (
               <table className="w-full border-collapse text-[13px]">
@@ -64,7 +59,7 @@ export default async function PurchasesPage() {
                     <th className="px-4 py-2.5 text-left font-medium">Date</th>
                     <th className="px-4 py-2.5 text-left font-medium">Payment</th>
                     <th className="px-4 py-2.5 text-left font-medium">Status</th>
-                    <th className="px-4 py-2.5 text-right font-medium">Landed total</th>
+                    <th className="px-4 py-2.5 text-right font-medium">Total</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -110,6 +105,9 @@ export default async function PurchasesPage() {
               </table>
             )}
           </Scroller>
+          <div className="shrink-0 border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
+            {invoices.length} invoice{invoices.length === 1 ? '' : 's'}
+          </div>
         </Panel>
       </div>
     </Screen>
