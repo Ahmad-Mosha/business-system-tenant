@@ -265,3 +265,27 @@ Small commits, pushed each step.
 
 **E — cleanup**
 15. Delete `/finance` route + components; dark-mode and density pass across the new screens
+
+---
+
+## 4. Status — BUILT (2026-09-01)
+
+All of A–E shipped, plus three rounds of testing fixes, in **PRs #26–#33**
+(merged to `main`). Current-state summary, DB state, and what's still open:
+[../handoff.md](../handoff.md).
+
+Notable decisions that landed differently from the spec above:
+
+- Supplier "owed" is derived from invoices — `SUM(landedTotal − settledAmount)`
+  over posted CREDIT invoices — **not** the `SUPPLIER_PAYABLE` ledger balance.
+  During testing the two drifted; invoices are now the single source, and a
+  payment is capped by invoice remaining so `settledAmount` and the ledger move
+  together. `paidStatusOf()` short-circuits `payment === 'CASH'` → PAID.
+- Invoice paid axis: `settledAmount` column + derived `DRAFT / UNPAID / PARTIAL
+  / PAID` (`paidStatusOf` in `purchase-invoice.entity.ts`). FIFO payment
+  allocation across invoices is the pure `allocateOldestFirst()` in `costing.ts`.
+- pg `date` columns are parsed as plain `YYYY-MM-DD` strings
+  (`main.ts` + `pg.d.ts`) to stop a timezone day-shift.
+
+All money-module test data was **wiped 2026-09-01** for a fresh test (see
+handoff). The 14 `ledger_account` rows stay — re-seeded on boot regardless.
