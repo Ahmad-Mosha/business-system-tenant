@@ -4,6 +4,7 @@ import {
   BarChart3,
   BookText,
   CalendarRange,
+  ClipboardList,
   LayoutGrid,
   LogOut,
   Menu,
@@ -12,6 +13,7 @@ import {
   ShoppingBag,
   Truck,
   Upload,
+  Users,
   Wallet,
   X,
 } from 'lucide-react';
@@ -50,6 +52,8 @@ const NAVIGATION: Array<{ label: string; items: NavItem[] }> = [
     items: [
       { href: '/money', label: 'Overview', icon: Wallet, roles: ['ADMIN'], exact: true },
       { href: '/money/treasury', label: 'Treasury', icon: Receipt, roles: ['ADMIN'] },
+      { href: '/money/purchases', label: 'Purchases', icon: ClipboardList, roles: ['ADMIN'] },
+      { href: '/money/suppliers', label: 'Suppliers', icon: Users, roles: ['ADMIN'] },
       { href: '/money/ledger', label: 'Ledger', icon: BookText, roles: ['ADMIN'] },
     ],
   },

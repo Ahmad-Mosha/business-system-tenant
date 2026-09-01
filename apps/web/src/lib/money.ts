@@ -46,3 +46,33 @@ export function groupAccounts(accounts: AccountBalance[]) {
 
 export const accountByCode = (accounts: AccountBalance[], code: string) =>
   accounts.find((a) => a.code === code);
+
+/**
+ * Client-side preview of how extra costs land on each line. The server
+ * (purchasing/costing.ts) is the source of truth on posting — this only needs
+ * to be close enough to show the operator what they're about to commit.
+ */
+export function previewLanded(
+  lines: Array<{ quantity: number; unitCost: number }>,
+  extra: number,
+  method: 'BY_VALUE' | 'PER_UNIT',
+) {
+  const withTotals = lines.map((l) => ({ ...l, lineTotal: l.quantity * l.unitCost }));
+  const totalValue = withTotals.reduce((s, l) => s + l.lineTotal, 0);
+  const totalUnits = withTotals.reduce((s, l) => s + l.quantity, 0);
+  return withTotals.map((l) => {
+    const basis =
+      method === 'BY_VALUE'
+        ? totalValue > 0
+          ? l.lineTotal / totalValue
+          : 0
+        : totalUnits > 0
+          ? l.quantity / totalUnits
+          : 0;
+    const landedLineTotal = l.lineTotal + extra * basis;
+    return {
+      lineTotal: l.lineTotal,
+      landedUnitCost: l.quantity > 0 ? landedLineTotal / l.quantity : 0,
+    };
+  });
+}
