@@ -36,14 +36,18 @@ export default async function TreasuryPage() {
       <ContextBar
         title={
           <>
-            Treasury <span className="font-normal text-muted-foreground" dir="rtl">الخزينة</span>
+            Treasury <bdi className="font-normal text-muted-foreground">الخزينة</bdi>
           </>
         }
         figures={
           <>
             <Figure label="Cash on hand" value={money(cash)} />
             <Figure label="In this month" value={money(monthIn)} tone="success" />
-            <Figure label="Out this month" value={money(monthOut)} />
+            <Figure
+              label="Out this month"
+              value={money(Math.abs(monthOut))}
+              tone={monthOut < 0 ? 'destructive' : 'default'}
+            />
           </>
         }
       />
@@ -85,14 +89,14 @@ export default async function TreasuryPage() {
                           <span className="font-medium">{kindLabel(m.kind)}</span>
                           <span className="text-muted-foreground">
                             {' · '}
-                            <span dir="rtl">{other}</span>
+                            <bdi>{other}</bdi>
                             {m.memo ? ` · ${m.memo}` : ''}
                           </span>
                         </td>
-                        <td className="px-4 text-right tabular-nums text-success">
+                        <td className="px-4 text-right font-medium tabular-nums text-success">
                           {inflow ? money(m.amount) : ''}
                         </td>
-                        <td className="px-4 text-right tabular-nums">
+                        <td className="px-4 text-right font-medium tabular-nums text-destructive">
                           {!inflow ? money(m.amount) : ''}
                         </td>
                         <td
