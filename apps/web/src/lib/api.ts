@@ -343,18 +343,61 @@ export interface FinanceOverview {
   openingAsOf: string | null;
 }
 
-export interface CashTransactionRow {
+export type LedgerAccountKind = 'ASSET' | 'LIABILITY' | 'EQUITY' | 'INCOME' | 'EXPENSE';
+
+export interface AccountBalance {
+  code: string;
+  nameAr: string;
+  nameEn: string;
+  kind: LedgerAccountKind;
+  balance: string;
+}
+
+export interface LedgerRow {
   id: string;
+  occurredAt: string;
   amount: string;
-  reason: string;
-  note: string | null;
+  kind: string;
+  memo: string | null;
+  debitCode: string;
+  creditCode: string;
+  debitAr: string;
+  creditAr: string;
+  supplierId: string | null;
   sourceType: string | null;
   sourceId: string | null;
-  occurredAt: string;
+  reversesId: string | null;
+  actorId: string | null;
+}
+
+/** A ledger row seen from one account: its signed effect and the balance after. */
+export interface AccountLedgerRow extends LedgerRow {
+  effect: string;
+  runningBalance: string;
+}
+
+export interface ChequeRow {
+  id: string;
+  amount: string;
+  fromParty: string;
+  receivedDate: string;
+  dueDate: string | null;
+  status: 'PENDING' | 'CLEARED' | 'BOUNCED';
+  clearedDate: string | null;
+  memo: string | null;
+  createdAt: string;
 }
 
 export const getFinanceOverview = () => get<FinanceOverview>('/finance/overview');
-export const getFinanceHistory = () => get<CashTransactionRow[]>('/finance/history');
+export const getMoneyAccounts = () => get<AccountBalance[]>('/finance/accounts');
+export const getAccountLedger = (code: string, limit = 100) =>
+  get<AccountLedgerRow[]>(`/finance/accounts/${code}/ledger?limit=${limit}`);
+export const getLedger = (query = '') =>
+  get<{ entries: LedgerRow[]; total: number; limit: number; offset: number }>(
+    `/finance/ledger${query ? `?${query}` : ''}`,
+  );
+export const getCheques = (status?: string) =>
+  get<ChequeRow[]>(`/finance/cheques${status ? `?status=${status}` : ''}`);
 
 
 
