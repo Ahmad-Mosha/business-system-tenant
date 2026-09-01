@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { PaidChip } from '@/components/paid-chip';
 import { PaySupplier } from '@/components/pay-supplier';
 import { PostInvoiceButton } from '@/components/post-invoice-button';
 import { ContextBar, Panel, Screen, Scroller } from '@/components/shell';
@@ -18,12 +19,12 @@ export default async function PurchaseDetailPage({
   const invoice = await getPurchase(id).catch(() => null);
   if (!invoice) notFound();
 
-  const supplier =
-    invoice.status === 'POSTED' && invoice.payment === 'CREDIT'
-      ? await getSupplier(invoice.supplierId).catch(() => null)
-      : null;
+  const isCredit = invoice.status === 'POSTED' && invoice.payment === 'CREDIT';
+  const supplier = isCredit ? await getSupplier(invoice.supplierId).catch(() => null) : null;
 
   const draft = invoice.status === 'DRAFT';
+  const remaining = Number(invoice.landedTotal) - Number(invoice.settledAmount);
+  const canPay = isCredit && invoice.paidStatus !== 'PAID' && remaining > 0.005;
 
   return (
     <Screen>
@@ -32,24 +33,21 @@ export default async function PurchaseDetailPage({
         title={`Invoice ${invoice.invoiceNo ?? '(no ref)'}`}
         meta={
           <>
-            <span dir="rtl">{invoice.supplier.name}</span> · {date(invoice.invoiceDate)} ·{' '}
-            {invoice.payment === 'CASH' ? 'paid cash' : 'on credit'} ·{' '}
-            <span className={draft ? 'text-warning' : ''}>{invoice.status}</span>
+            <bdi>{invoice.supplier.name}</bdi> · {date(invoice.invoiceDate)} ·{' '}
+            {invoice.payment === 'CASH' ? 'paid cash' : 'on credit'}
           </>
         }
+        figures={<PaidChip status={invoice.paidStatus} />}
         actions={
           draft ? (
             <PostInvoiceButton id={invoice.id} />
-          ) : supplier && Number(supplier.balance) > 0 ? (
+          ) : canPay && supplier ? (
             <PaySupplier
               supplierId={invoice.supplierId}
               owed={supplier.balance}
-              defaultAmount={
-                Number(invoice.landedTotal) <= Number(supplier.balance)
-                  ? invoice.landedTotal
-                  : supplier.balance
-              }
-              hint={`${invoice.supplier.name} is owed ${money(supplier.balance)} in total. Paying reduces that.`}
+              invoiceId={invoice.id}
+              defaultAmount={remaining.toFixed(2)}
+              hint={`This invoice has ${money(remaining)} left. ${invoice.supplier.name} is owed ${money(supplier.balance)} across all invoices.`}
               trigger={<Button size="lg">Record payment</Button>}
             />
           ) : undefined
@@ -72,8 +70,8 @@ export default async function PurchaseDetailPage({
               <tbody>
                 {invoice.lines.map((l) => (
                   <tr key={l.id} className="border-b border-border/60 last:border-b-0">
-                    <td className="px-4 py-2.5" dir="rtl">
-                      {l.label}
+                    <td className="px-4 py-2.5">
+                      <bdi>{l.label}</bdi>
                     </td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{l.quantity}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{money(l.unitCost)}</td>
@@ -99,6 +97,17 @@ export default async function PurchaseDetailPage({
               muted
             />
             <Row label="Landed into stock" value={money(invoice.landedTotal)} strong />
+            {!draft && invoice.payment === 'CREDIT' && (
+              <>
+                <Row label="Paid so far" value={money(invoice.settledAmount)} muted />
+                <Row
+                  label="Still owed on this invoice"
+                  value={money(remaining)}
+                  strong
+                  tone={remaining > 0.005 ? 'warn' : 'ok'}
+                />
+              </>
+            )}
           </div>
 
           <div className="rounded-xl border border-border bg-card px-4 py-3 text-[12px] text-muted-foreground">
@@ -106,14 +115,17 @@ export default async function PurchaseDetailPage({
               <>Not posted yet. Posting adds {money(invoice.landedTotal)} of stock and books the money.</>
             ) : invoice.payment === 'CASH' ? (
               <>
-                Posted {date(invoice.postedAt)}. {money(invoice.landedTotal)} came out of cash;{' '}
-                {invoice.lines.length} stock receipt{invoice.lines.length === 1 ? '' : 's'} added.
+                Posted {date(invoice.postedAt)}. {money(invoice.landedTotal)} came out of cash —
+                this invoice is settled.
+              </>
+            ) : invoice.paidStatus === 'PAID' ? (
+              <>
+                Posted {date(invoice.postedAt)} on credit, and <b className="text-success">fully paid</b>.
               </>
             ) : (
               <>
-                Posted {date(invoice.postedAt)} on credit. Added {money(invoice.landedTotal)} to{' '}
-                <span dir="rtl">{invoice.supplier.name}</span>’s balance
-                {supplier ? <> — now {money(supplier.balance)} owed in total</> : null}. Use{' '}
+                Posted {date(invoice.postedAt)} on credit. {money(remaining)} still owed to{' '}
+                <bdi>{invoice.supplier.name}</bdi>. Use{' '}
                 <b className="text-foreground">Record payment</b> above when you pay them.
               </>
             )}
@@ -129,11 +141,13 @@ function Row({
   value,
   muted,
   strong,
+  tone,
 }: {
   label: string;
   value: string;
   muted?: boolean;
   strong?: boolean;
+  tone?: 'warn' | 'ok';
 }) {
   return (
     <div
@@ -143,7 +157,15 @@ function Row({
       )}
     >
       <span className={cn(muted && 'text-muted-foreground')}>{label}</span>
-      <span className="tabular-nums">{value}</span>
+      <span
+        className={cn(
+          'tabular-nums',
+          tone === 'warn' && 'text-warning',
+          tone === 'ok' && 'text-success',
+        )}
+      >
+        {value}
+      </span>
     </div>
   );
 }

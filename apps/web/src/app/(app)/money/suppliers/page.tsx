@@ -46,10 +46,9 @@ export default async function SuppliersPage() {
                       <td className="px-4">
                         <Link
                           href={`/money/suppliers/${s.id}`}
-                          dir="rtl"
                           className="font-medium after:absolute after:inset-0 focus-visible:underline focus-visible:outline-none"
                         >
-                          {s.name}
+                          <bdi>{s.name}</bdi>
                         </Link>
                       </td>
                       <td className="px-4 tabular-nums text-muted-foreground">

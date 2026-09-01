@@ -39,6 +39,17 @@ export const isNegative = (v: string | number | null | undefined) =>
   v !== null && v !== undefined && v !== '' && Number(v) < 0;
 
 /**
+ * The colour a signed figure gets everywhere: money out / negative is
+ * destructive-red, money in / positive is success-green, zero is neutral.
+ */
+export function signedTone(v: string | number | null | undefined): string {
+  const n = Number(v ?? 0);
+  if (n < 0) return 'text-destructive';
+  if (n > 0) return 'text-success';
+  return '';
+}
+
+/**
  * Money split into a bold whole part and a de-emphasised `.dd` — so a big
  * figure like `1,259,411.00` reads as "one-and-a-quarter million" at a glance
  * instead of trailing zeros that look like extra digits.
