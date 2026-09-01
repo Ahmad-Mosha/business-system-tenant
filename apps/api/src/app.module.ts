@@ -17,6 +17,8 @@ import { CashAccount } from './finance/cash-account.entity';
 import { CashTransaction } from './finance/cash-transaction.entity';
 import { FinanceController } from './finance/finance.controller';
 import { FinanceService } from './finance/finance.service';
+import { LedgerAccount } from './finance/ledger-account.entity';
+import { LedgerService } from './finance/ledger.service';
 import { EasyOrdersController } from './integrations/easyorders/easyorders.controller';
 import { EasyOrdersEvent } from './integrations/easyorders/easyorders-event.entity';
 import { EasyOrdersService } from './integrations/easyorders/easyorders.service';
@@ -51,6 +53,7 @@ const ENTITIES = [
   EasyOrdersEvent,
   CashAccount,
   CashTransaction,
+  LedgerAccount,
 ];
 
 @Module({
@@ -96,12 +99,17 @@ const ENTITIES = [
     BostaClient,
     BostaService,
     FinanceService,
+    LedgerService,
   ],
 })
 export class AppModule implements OnModuleInit {
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly ledger: LedgerService,
+  ) {}
 
-  onModuleInit() {
-    return this.auth.seedDevUsers();
+  async onModuleInit() {
+    await this.auth.seedDevUsers();
+    await this.ledger.seedAccounts();
   }
 }
