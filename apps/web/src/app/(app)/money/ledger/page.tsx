@@ -1,11 +1,12 @@
 import { LedgerFilters } from '@/components/ledger-filters';
-import { PageCard, Pagination, Panel, Screen, Scroller } from '@/components/shell';
+import { ContextBar, Pagination, Panel, Screen, Scroller } from '@/components/shell';
 import { getLedger, getMoneyAccounts } from '@/lib/api';
 import { dateTime, money } from '@/lib/format';
 import { kindLabel } from '@/lib/money';
 import { requireAdmin } from '@/lib/session';
 
 const PAGE_SIZE = 30;
+const ISO = /^\d{4}-\d{2}-\d{2}$/;
 
 export default async function LedgerPage({
   searchParams,
@@ -15,11 +16,15 @@ export default async function LedgerPage({
   await requireAdmin();
   const params = await searchParams;
   const code = params.code;
+  const from = params.from && ISO.test(params.from) ? params.from : undefined;
+  const to = params.to && ISO.test(params.to) ? params.to : undefined;
   const page = Math.max(Number(params.page) || 1, 1);
   const offset = (page - 1) * PAGE_SIZE;
 
   const query = new URLSearchParams();
   if (code) query.set('code', code);
+  if (from) query.set('from', from);
+  if (to) query.set('to', to);
   query.set('limit', String(PAGE_SIZE));
   query.set('offset', String(offset));
 
@@ -29,9 +34,12 @@ export default async function LedgerPage({
   ]);
 
   const lastPage = Math.max(Math.ceil(total / PAGE_SIZE), 1);
+  const keep = new URLSearchParams();
+  if (code) keep.set('code', code);
+  if (from) keep.set('from', from);
+  if (to) keep.set('to', to);
   const pageHref = (p: number) => {
-    const next = new URLSearchParams();
-    if (code) next.set('code', code);
+    const next = new URLSearchParams(keep);
     if (p > 1) next.set('page', String(p));
     const qs = next.toString();
     return qs ? `/money/ledger?${qs}` : '/money/ledger';
@@ -39,18 +47,15 @@ export default async function LedgerPage({
 
   return (
     <Screen>
-      <div className="flex min-h-0 flex-1 flex-col gap-4 p-4">
-        <PageCard
-          title="Ledger"
-          description="Every recorded movement of value. A mistake is corrected with a new entry, never an edit."
-        />
+      <ContextBar title="Ledger" meta="every recorded movement of value" />
+      <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
         <LedgerFilters accounts={accounts} />
 
         <Panel>
           <Scroller>
             {entries.length === 0 ? (
               <p className="p-12 text-center text-sm text-muted-foreground">
-                Nothing recorded for this view yet.
+                Nothing recorded for this view.
               </p>
             ) : (
               <table className="w-full border-collapse text-[13px]">

@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, ChevronDown } from 'lucide-react';
+import { Check, ChevronDown, X } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useTransition } from 'react';
 import {
@@ -13,7 +13,7 @@ import {
 import type { AccountBalance } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
-/** Account filter for the Ledger screen — lives in the URL so views are shareable. */
+/** Account + date filters for the Ledger — all in the URL so views are shareable. */
 export function LedgerFilters({ accounts }: { accounts: AccountBalance[] }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -21,15 +21,23 @@ export function LedgerFilters({ accounts }: { accounts: AccountBalance[] }) {
   const [pending, start] = useTransition();
 
   const code = params.get('code');
+  const from = params.get('from') ?? '';
+  const to = params.get('to') ?? '';
   const current = accounts.find((a) => a.code === code);
+  const dirty = !!(code || from || to);
 
-  const pick = (value: string | null) => {
+  const set = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams(params.toString());
-    if (value) next.set('code', value);
-    else next.delete('code');
+    for (const [k, v] of Object.entries(patch)) {
+      if (v) next.set(k, v);
+      else next.delete(k);
+    }
     next.delete('page');
     start(() => router.push(`${pathname}?${next.toString()}`, { scroll: false }));
   };
+
+  const dateField =
+    'h-9 rounded-md border border-border bg-card px-2.5 text-[13px] text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring';
 
   return (
     <div className={cn('flex flex-wrap items-center gap-2', pending && 'opacity-70')}>
@@ -49,13 +57,13 @@ export function LedgerFilters({ accounts }: { accounts: AccountBalance[] }) {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="max-h-[60vh] w-56 overflow-y-auto">
-          <DropdownMenuItem onSelect={() => pick(null)} className="text-sm">
+          <DropdownMenuItem onSelect={() => set({ code: null })} className="text-sm">
             {!code && <Check className="size-3.5" />}
             All accounts
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           {accounts.map((a) => (
-            <DropdownMenuItem key={a.code} onSelect={() => pick(a.code)} className="text-sm">
+            <DropdownMenuItem key={a.code} onSelect={() => set({ code: a.code })} className="text-sm">
               {code === a.code && <Check className="size-3.5" />}
               <span className="flex-1">{a.nameEn}</span>
               <span dir="rtl" className="text-[11px] text-muted-foreground">
@@ -65,6 +73,37 @@ export function LedgerFilters({ accounts }: { accounts: AccountBalance[] }) {
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <label className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+        From
+        <input
+          type="date"
+          value={from}
+          max={to || undefined}
+          onChange={(e) => set({ from: e.target.value })}
+          className={dateField}
+        />
+      </label>
+      <label className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+        To
+        <input
+          type="date"
+          value={to}
+          min={from || undefined}
+          onChange={(e) => set({ to: e.target.value })}
+          className={dateField}
+        />
+      </label>
+
+      {dirty && (
+        <button
+          type="button"
+          onClick={() => set({ code: null, from: null, to: null })}
+          className="inline-flex h-9 items-center gap-1 rounded-md px-2 text-[12px] text-muted-foreground hover:text-foreground"
+        >
+          <X className="size-3.5" /> Clear
+        </button>
+      )}
     </div>
   );
 }
