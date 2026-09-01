@@ -6,11 +6,18 @@ import { dateTime, money, moneyWhole } from '@/lib/format';
 import { requireAdmin } from '@/lib/session';
 
 const REASON_LABEL: Record<string, string> = {
-  CAPITAL_INJECTION: 'Owner added cash',
+  OPENING_BALANCE: 'Opening balance',
+  CASH_DEPOSIT: 'Owner added cash',
   CAPITAL_WITHDRAWAL: 'Owner withdrew cash',
+  CHEQUE_DEPOSIT: 'Cheque received',
+  CHEQUE_CLEAR: 'Cheque cleared',
+  PAYMENT_IN: 'Money in',
+  PAYMENT_OUT: 'Money out',
   PURCHASE: 'Stock purchased',
+  SUPPLIER_PAYMENT: 'Paid a supplier',
   NOON_PAYOUT: 'noon payout',
-  ORDER_PAYMENT: 'Order paid',
+  ORDER_SALE: 'Order paid',
+  BOSTA_PAYOUT: 'Bosta payout',
   ADJUSTMENT: 'Correction',
 };
 
