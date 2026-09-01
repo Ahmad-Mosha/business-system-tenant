@@ -339,7 +339,7 @@ export class BostaService {
       notes: raw.notes || null,
       whatsAppConfirmation,
       flexShipFee,
-      flexShipStatusLabel: flexShipFee ? 'غير مستحق بعد' : null,
+      flexShipStatusLabel: flexShipFee != null ? 'غير مستحق بعد' : 'غير مُطبَّق',
       scheduledDeliveryDate: raw.scheduledDate || raw.nextWorkingDayAfterScheduledAt || raw.promisedDate || null,
       deliveredAt,
       createdAt: raw.createdAt || null,
@@ -370,11 +370,15 @@ export class BostaService {
     if (code === 30 || val.includes('transit') || val.includes('received at warehouse') || val.includes('hub')) {
       return { key: 'IN_TRANSIT', label: 'In Transit' };
     }
-    if (code === 21 || val.includes('picked up') || val.includes('pickup')) {
-      return { key: 'PICKED_UP', label: 'Picked Up' };
-    }
-    if (code === 10 || val.includes('new') || val.includes('created')) {
+    // `code === 10` covers "Pickup requested" / "Awaiting pickup" — a brand-new
+    // shipment the courier has NOT collected yet. Must be checked before the
+    // picked-up branch, and that branch must not match the word "pickup" alone
+    // (it appears in "Pickup requested"), only the completed "picked up".
+    if (code === 10 || val.includes('new') || val.includes('created') || val.includes('pickup requested') || val.includes('awaiting pickup')) {
       return { key: 'NEW', label: 'Created' };
+    }
+    if (code === 21 || val.includes('picked up')) {
+      return { key: 'PICKED_UP', label: 'Picked Up' };
     }
     if (val.includes('return') || val.includes('rto')) {
       return { key: 'RETURNED', label: 'Returned' };
@@ -448,22 +452,4 @@ export class BostaService {
       list,
     };
   }
-}
-
-/** Runs `worker` over `items`, at most `limit` in flight at any time. */
-async function mapWithConcurrency<T, R>(
-  items: T[],
-  limit: number,
-  worker: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let next = 0;
-  const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (next < items.length) {
-      const index = next++;
-      results[index] = await worker(items[index]);
-    }
-  });
-  await Promise.all(runners);
-  return results;
 }

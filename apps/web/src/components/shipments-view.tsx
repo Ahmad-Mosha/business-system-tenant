@@ -237,7 +237,7 @@ export function ShipmentsView({
                     {/* FlexShip Fee */}
                     <td className="px-4 py-3 text-right tabular-nums">
                       <p className="font-medium text-foreground">
-                        {s.flexShipFee ? money(s.flexShipFee) : '0.00 EGP'}
+                        {s.flexShipFee ? money(s.flexShipFee) : '—'}
                       </p>
                       <p className="text-[10px] text-muted-foreground">
                         {s.flexShipStatusLabel || 'غير مستحق بعد'}
