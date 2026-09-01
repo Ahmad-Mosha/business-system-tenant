@@ -237,6 +237,43 @@ export class LedgerService {
     return { entries: rows, total: rows[0]?.totalCount ?? 0, limit, offset };
   }
 
+  /**
+   * One account's movements, newest first, each with its signed effect on that
+   * account and the running balance after it. Capped rather than paged — the
+   * full, filterable history is the Ledger screen's job.
+   *
+   * ponytail: last `limit` movements only; the running balance is exact for
+   * those because the window runs over every entry for the account.
+   */
+  async accountLedger(code: LedgerAccountCode, limit = 100, tx: EntityManager = this.db.manager) {
+    const capped = Math.min(Math.max(limit, 1), 500);
+    return tx.query(
+      `WITH moves AS (
+         SELECT le.*,
+                CASE WHEN a.kind IN ('ASSET', 'EXPENSE')
+                     THEN CASE WHEN le.debit_code = a.code THEN le.amount ELSE -le.amount END
+                     ELSE CASE WHEN le.credit_code = a.code THEN le.amount ELSE -le.amount END
+                END AS effect
+         FROM ledger_entry le
+         JOIN ledger_account a ON a.code = $1
+         WHERE le.debit_code = $1 OR le.credit_code = $1
+       )
+       SELECT m.id, m.occurred_at AS "occurredAt", m.amount, m.kind, m.memo,
+              m.debit_code AS "debitCode", m.credit_code AS "creditCode",
+              d.name_ar AS "debitAr", c.name_ar AS "creditAr",
+              m.supplier_id AS "supplierId", m.source_type AS "sourceType",
+              m.source_id AS "sourceId", m.reverses_id AS "reversesId", m.actor_id AS "actorId",
+              m.effect,
+              SUM(m.effect) OVER (ORDER BY m.occurred_at, m.created_at)::text AS "runningBalance"
+       FROM moves m
+       JOIN ledger_account d ON d.code = m.debit_code
+       JOIN ledger_account c ON c.code = m.credit_code
+       ORDER BY m.occurred_at DESC, m.created_at DESC
+       LIMIT ${capped}`,
+      [code],
+    );
+  }
+
   private normaliseAmount(value: string | number): string {
     const str = typeof value === 'number' ? value.toFixed(2) : value.trim();
     if (!MONEY.test(str) || Number(str) <= 0) {
