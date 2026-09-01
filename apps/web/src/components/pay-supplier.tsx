@@ -23,6 +23,7 @@ export function PaySupplier({
   supplierId,
   owed,
   defaultAmount,
+  invoiceId,
   trigger,
   hint,
 }: {
@@ -30,6 +31,8 @@ export function PaySupplier({
   owed: string;
   /** Prefill (e.g. one invoice's total); falls back to the whole balance. */
   defaultAmount?: string;
+  /** When set, the payment settles this invoice specifically. */
+  invoiceId?: string;
   trigger?: ReactNode;
   hint?: string;
 }) {
@@ -62,6 +65,7 @@ export function PaySupplier({
         </DialogHeader>
         <form action={submit} className="grid gap-3">
           <input type="hidden" name="id" value={supplierId} />
+          {invoiceId && <input type="hidden" name="invoiceId" value={invoiceId} />}
           <label className="grid gap-1.5">
             <span className="text-[11px] font-medium tracking-[0.03em] text-muted-foreground uppercase">
               Amount (EGP)

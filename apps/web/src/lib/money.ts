@@ -25,6 +25,17 @@ export const KIND_LABEL: Record<string, string> = {
 
 export const kindLabel = (kind: string) => KIND_LABEL[kind] ?? kind;
 
+/** How an invoice's paid state reads, and its chip colour. */
+export const PAID_STATUS: Record<
+  string,
+  { label: string; tone: 'ok' | 'warn' | 'muted' }
+> = {
+  DRAFT: { label: 'Draft', tone: 'warn' },
+  UNPAID: { label: 'Unpaid', tone: 'warn' },
+  PARTIAL: { label: 'Partly paid', tone: 'warn' },
+  PAID: { label: 'Paid', tone: 'ok' },
+};
+
 /** The counter-accounts a hand-entered voucher can move cash against. */
 export const VOUCHER_COUNTERS = [
   { code: 'OTHER_EXPENSE', label: 'General expense' },

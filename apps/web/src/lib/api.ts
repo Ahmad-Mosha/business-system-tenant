@@ -409,6 +409,8 @@ export interface SupplierRow {
   createdAt: string;
 }
 
+export type PaidStatus = 'DRAFT' | 'UNPAID' | 'PARTIAL' | 'PAID';
+
 export interface PurchaseInvoiceRow {
   id: string;
   invoiceNo: string | null;
@@ -418,6 +420,8 @@ export interface PurchaseInvoiceRow {
   goodsTotal: string;
   extraCosts: string;
   landedTotal: string;
+  settledAmount: string;
+  paidStatus: PaidStatus;
   postedAt: string | null;
   supplierName: string;
   lineCount: number;
@@ -450,6 +454,8 @@ export interface PurchaseInvoiceDetail {
   goodsTotal: string;
   extraCosts: string;
   landedTotal: string;
+  settledAmount: string;
+  paidStatus: PaidStatus;
   postedAt: string | null;
   lines: PurchaseInvoiceLine[];
 }
