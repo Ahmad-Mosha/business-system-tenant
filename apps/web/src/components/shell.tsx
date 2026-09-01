@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { Children, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
@@ -27,16 +27,28 @@ export function ContextBar({
   meta,
   figures,
   actions,
+  back,
   children,
 }: {
   title: ReactNode;
   meta?: ReactNode;
   figures?: ReactNode;
   actions?: ReactNode;
+  /** A path to go back to — renders a small arrow before the title. */
+  back?: string;
   children?: ReactNode;
 }) {
   return (
     <header className="flex h-[var(--bar-h)] shrink-0 items-center gap-3 border-b border-border px-4">
+      {back ? (
+        <Link
+          href={back}
+          aria-label="Back"
+          className="-ml-1 inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        >
+          <ArrowLeft className="size-4" />
+        </Link>
+      ) : null}
       <div className="flex min-w-0 shrink-0 items-baseline gap-2">
         <h1 className="truncate text-[15px] font-semibold tracking-[-0.015em]">{title}</h1>
         {meta ? <span className="truncate text-xs text-muted-foreground">{meta}</span> : null}

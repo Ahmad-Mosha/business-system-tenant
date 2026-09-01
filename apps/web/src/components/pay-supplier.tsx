@@ -1,9 +1,10 @@
 'use client';
 
 import { Loader2 } from 'lucide-react';
-import { useActionState, useEffect, useState } from 'react';
+import { useActionState, useEffect, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { paySupplier, type FormState } from '@/app/(app)/money/actions';
+import { MoneyInput } from '@/components/money-input';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -18,7 +19,20 @@ import { Input } from '@/components/ui/input';
 
 const INITIAL: FormState = { status: 'idle' };
 
-export function PaySupplier({ supplierId, owed }: { supplierId: string; owed: string }) {
+export function PaySupplier({
+  supplierId,
+  owed,
+  defaultAmount,
+  trigger,
+  hint,
+}: {
+  supplierId: string;
+  owed: string;
+  /** Prefill (e.g. one invoice's total); falls back to the whole balance. */
+  defaultAmount?: string;
+  trigger?: ReactNode;
+  hint?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [state, submit, pending] = useActionState(paySupplier, INITIAL);
 
@@ -33,14 +47,18 @@ export function PaySupplier({ supplierId, owed }: { supplierId: string; owed: st
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="lg" disabled={Number(owed) <= 0}>
-          Record payment
-        </Button>
+        {trigger ?? (
+          <Button size="lg" disabled={Number(owed) <= 0}>
+            Record payment
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Pay supplier</DialogTitle>
-          <DialogDescription>Moves cash out and clears what we owe them.</DialogDescription>
+          <DialogDescription>
+            {hint ?? 'Moves cash out and clears what we owe them.'}
+          </DialogDescription>
         </DialogHeader>
         <form action={submit} className="grid gap-3">
           <input type="hidden" name="id" value={supplierId} />
@@ -48,14 +66,7 @@ export function PaySupplier({ supplierId, owed }: { supplierId: string; owed: st
             <span className="text-[11px] font-medium tracking-[0.03em] text-muted-foreground uppercase">
               Amount (EGP)
             </span>
-            <Input
-              name="amount"
-              inputMode="decimal"
-              defaultValue={owed}
-              className="tabular-nums"
-              autoFocus
-              required
-            />
+            <MoneyInput name="amount" defaultValue={defaultAmount ?? owed} autoFocus required />
           </label>
           <label className="grid gap-1.5">
             <span className="text-[11px] font-medium tracking-[0.03em] text-muted-foreground uppercase">

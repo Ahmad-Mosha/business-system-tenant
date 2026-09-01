@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { SupplierForm } from '@/components/supplier-form';
-import { PageCard, Panel, Screen, Scroller } from '@/components/shell';
+import { ContextBar, Figure, Panel, Screen, Scroller } from '@/components/shell';
 import { getSuppliers } from '@/lib/api';
 import { date, money } from '@/lib/format';
 import { requireAdmin } from '@/lib/session';
@@ -13,17 +13,14 @@ export default async function SuppliersPage() {
 
   return (
     <Screen>
-      <div className="flex min-h-0 flex-1 flex-col gap-4 p-4">
-        <PageCard
-          title="Suppliers"
-          description={
-            owed > 0
-              ? `${money(owed)} owed across ${suppliers.filter((s) => Number(s.balance) > 0).length} supplier(s).`
-              : 'Everyone we buy stock from.'
-          }
-          actions={<SupplierForm />}
-        />
+      <ContextBar
+        title="Suppliers"
+        meta="everyone we buy stock from"
+        figures={<Figure label="Owed" value={money(owed)} tone={owed > 0 ? 'warning' : 'default'} />}
+        actions={<SupplierForm />}
+      />
 
+      <div className="flex min-h-0 flex-1 flex-col p-4">
         <Panel>
           <Scroller>
             {suppliers.length === 0 ? (
