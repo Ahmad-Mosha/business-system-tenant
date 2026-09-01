@@ -103,3 +103,114 @@ export async function setAnchor(_prev: FormState, form: FormData): Promise<FormS
   if (!ISO_DATE.test(openingAsOf)) return { status: 'error', message: 'Enter the date as YYYY-MM-DD' };
   return send('/finance/anchor', 'PATCH', { openingBalance, openingAsOf });
 }
+
+// ── Suppliers & purchases ────────────────────────────────────────────────
+
+function revalidatePurchasing() {
+  revalidateMoney();
+  revalidatePath('/money/suppliers');
+  revalidatePath('/money/purchases');
+  revalidatePath('/inventory');
+}
+
+export async function createSupplier(_prev: FormState, form: FormData): Promise<FormState> {
+  const name = String(form.get('name') ?? '').trim();
+  if (!name) return { status: 'error', message: 'Enter the supplier name' };
+  const state = await send('/suppliers', 'POST', {
+    name,
+    phone: String(form.get('phone') ?? '').trim() || undefined,
+    note: String(form.get('note') ?? '').trim() || undefined,
+  });
+  if (state.status === 'saved') revalidatePath('/money/suppliers');
+  return state;
+}
+
+export async function paySupplier(_prev: FormState, form: FormData): Promise<FormState> {
+  const id = String(form.get('id') ?? '');
+  const amount = String(form.get('amount') ?? '').trim();
+  if (!id) return { status: 'error', message: 'Missing supplier' };
+  if (!MONEY.test(amount)) return { status: 'error', message: 'Enter an amount, e.g. 10000.00' };
+  const state = await send(`/suppliers/${id}/payments`, 'POST', {
+    amount,
+    memo: String(form.get('memo') ?? '').trim() || undefined,
+  });
+  if (state.status === 'saved') {
+    revalidatePurchasing();
+    revalidatePath(`/money/suppliers/${id}`);
+  }
+  return state;
+}
+
+export interface InvoiceLinePayload {
+  variantId: string;
+  quantity: number;
+  unitCost: string;
+}
+export interface InvoicePayload {
+  supplierId: string;
+  invoiceNo?: string;
+  invoiceDate: string;
+  payment: 'CASH' | 'CREDIT';
+  allocation: 'BY_VALUE' | 'PER_UNIT';
+  extraCosts: string;
+  lines: InvoiceLinePayload[];
+}
+
+export type InvoiceResult = { ok: true; id: string } | { ok: false; message: string };
+
+async function call(path: string, method: 'POST', body?: unknown): Promise<InvoiceResult> {
+  let res: Response;
+  try {
+    res = await fetch(`${API}${path}`, {
+      method,
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch {
+    return { ok: false, message: 'Could not reach the API.' };
+  }
+  const data = await res.json().catch(() => null);
+  if (!res.ok) return { ok: false, message: data?.message ?? 'Could not save.' };
+  return { ok: true, id: data.id as string };
+}
+
+/** Creates the invoice, and posts it too unless `asDraft`. */
+export async function saveInvoice(input: InvoicePayload, asDraft: boolean): Promise<InvoiceResult> {
+  if (!input.supplierId) return { ok: false, message: 'Choose a supplier' };
+  if (!ISO_DATE.test(input.invoiceDate)) return { ok: false, message: 'Enter the invoice date' };
+  if (!input.lines.length) return { ok: false, message: 'Add at least one product' };
+  for (const l of input.lines) {
+    if (!l.variantId) return { ok: false, message: 'Every line needs a product' };
+    if (!Number.isInteger(l.quantity) || l.quantity < 1) {
+      return { ok: false, message: 'Every line needs a whole quantity' };
+    }
+    if (!MONEY.test(l.unitCost) || Number(l.unitCost) <= 0) {
+      return { ok: false, message: 'Every line needs a unit cost' };
+    }
+  }
+  if (input.extraCosts && !MONEY.test(input.extraCosts)) {
+    return { ok: false, message: 'Extra costs must be an amount like 5000.00' };
+  }
+
+  const created = await call('/purchases', 'POST', input);
+  if (!created.ok) return created;
+
+  if (asDraft) {
+    revalidatePurchasing();
+    return created;
+  }
+  const posted = await call(`/purchases/${created.id}/post`, 'POST');
+  revalidatePurchasing();
+  return posted.ok ? created : posted;
+}
+
+export async function postInvoice(_prev: FormState, form: FormData): Promise<FormState> {
+  const id = String(form.get('id') ?? '');
+  if (!id) return { status: 'error', message: 'Missing invoice' };
+  const state = await send(`/purchases/${id}/post`, 'POST', undefined);
+  if (state.status === 'saved') {
+    revalidatePurchasing();
+    revalidatePath(`/money/purchases/${id}`);
+  }
+  return state;
+}

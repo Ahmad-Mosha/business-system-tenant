@@ -399,5 +399,65 @@ export const getLedger = (query = '') =>
 export const getCheques = (status?: string) =>
   get<ChequeRow[]>(`/finance/cheques${status ? `?status=${status}` : ''}`);
 
+export interface SupplierRow {
+  id: string;
+  name: string;
+  phone: string | null;
+  note: string | null;
+  active: boolean;
+  balance: string;
+  createdAt: string;
+}
+
+export interface PurchaseInvoiceRow {
+  id: string;
+  invoiceNo: string | null;
+  invoiceDate: string;
+  status: 'DRAFT' | 'POSTED';
+  payment: 'CASH' | 'CREDIT';
+  goodsTotal: string;
+  extraCosts: string;
+  landedTotal: string;
+  postedAt: string | null;
+  supplierName: string;
+  lineCount: number;
+}
+
+export interface SupplierDetail extends SupplierRow {
+  invoices: PurchaseInvoiceRow[];
+  payments: LedgerRow[];
+}
+
+export interface PurchaseInvoiceLine {
+  id: string;
+  variantId: string;
+  quantity: number;
+  unitCost: string;
+  landedUnitCost: string | null;
+  lineTotal: string;
+  label: string;
+}
+
+export interface PurchaseInvoiceDetail {
+  id: string;
+  supplierId: string;
+  supplier: { id: string; name: string; phone: string | null };
+  invoiceNo: string | null;
+  invoiceDate: string;
+  status: 'DRAFT' | 'POSTED';
+  payment: 'CASH' | 'CREDIT';
+  allocation: 'BY_VALUE' | 'PER_UNIT';
+  goodsTotal: string;
+  extraCosts: string;
+  landedTotal: string;
+  postedAt: string | null;
+  lines: PurchaseInvoiceLine[];
+}
+
+export const getSuppliers = () => get<SupplierRow[]>('/suppliers');
+export const getSupplier = (id: string) => get<SupplierDetail>(`/suppliers/${id}`);
+export const getPurchases = () => get<PurchaseInvoiceRow[]>('/purchases');
+export const getPurchase = (id: string) => get<PurchaseInvoiceDetail>(`/purchases/${id}`);
+
 
 
