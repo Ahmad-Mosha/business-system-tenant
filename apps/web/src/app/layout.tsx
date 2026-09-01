@@ -37,7 +37,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="h-full overflow-hidden bg-background text-foreground">
         <ThemeProvider>
           <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
-          <Toaster position="bottom-right" />
+          {/* Top so a toast never sits on a bottom-right action bar. */}
+          <Toaster position="top-center" />
         </ThemeProvider>
       </body>
     </html>
