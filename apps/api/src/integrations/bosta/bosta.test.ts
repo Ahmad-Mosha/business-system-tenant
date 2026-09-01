@@ -1,7 +1,37 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { BostaService } from './bosta.service';
-import type { BostaDeliveryRaw } from './bosta.client';
+import { collectPages, type BostaDeliveryRaw } from './bosta.client';
+
+test('collectPages stops on the first short page', async () => {
+  const pages = [Array(100).fill(0), Array(100).fill(0), Array(37).fill(0)];
+  const seen: number[] = [];
+  const all = await collectPages(100, async (page) => {
+    seen.push(page);
+    return pages[page - 1] ?? [];
+  });
+  assert.deepEqual(seen, [1, 2, 3]); // did not ask for page 4
+  assert.equal(all.length, 237);
+});
+
+test('collectPages gives up at maxPages instead of looping forever', async () => {
+  let calls = 0;
+  const all = await collectPages(
+    10,
+    async () => {
+      calls++;
+      return Array(10).fill(0); // never a short page
+    },
+    5,
+  );
+  assert.equal(calls, 5);
+  assert.equal(all.length, 50);
+});
+
+test('collectPages handles an empty first page', async () => {
+  const all = await collectPages(100, async () => []);
+  assert.deepEqual(all, []);
+});
 
 // Sample real delivery response structure from Bosta API
 const SAMPLE_DELIVERED_RAW: BostaDeliveryRaw = {
@@ -146,6 +176,36 @@ test('normalizes real Bosta delivered payload into Prime Market domain DTO', () 
   assert.equal(dto.attempts.list.length, 1);
   assert.equal(dto.attempts.list[0].driverName, 'Alaa Mohamed Abdelaziz');
   assert.equal(dto.attempts.list[0].succeeded, true);
+});
+
+test('"Pickup requested" (code 10) is NEW, not picked up', () => {
+  const service = new BostaService(null as any, null as any);
+  const dto = service.normalizeBostaDelivery({
+    trackingNumber: '9482725368',
+    state: { value: 'Pickup requested', code: 10 },
+    type: { code: 10, value: 'Send' },
+    cod: 510,
+    receiver: { fullName: 'العساف', phone: '+201042812537' },
+  });
+  assert.equal(dto.status, 'NEW');
+  assert.equal(dto.statusLabel, 'Created');
+  // No cashout record yet → collection is pending, not unpaid.
+  assert.equal(dto.cod.collectionStatus, 'PENDING');
+});
+
+test('a delivered shipment with a cashout record but no payout is UNPAID', () => {
+  const service = new BostaService(null as any, null as any);
+  const dto = service.normalizeBostaDelivery({
+    trackingNumber: '684744877',
+    state: { value: 'Delivered', code: 45 },
+    type: { code: 10, value: 'Send' },
+    cod: 4260,
+    cashoutInfo: { expectedCashoutDate: '2026-09-09T00:00:00.000Z' },
+    receiver: { fullName: 'شريهان', phone: '+201552711456' },
+  });
+  assert.equal(dto.status, 'DELIVERED');
+  assert.equal(dto.cod.collectionStatus, 'UNPAID');
+  assert.equal(dto.cod.collectionStatusLabel, 'غير مدفوع');
 });
 
 test('normalizes an in-transit Bosta delivery correctly', () => {
