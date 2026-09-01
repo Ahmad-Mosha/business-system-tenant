@@ -54,11 +54,6 @@ export class FinanceController {
     return this.ledger.periodSummary(f, t);
   }
 
-  @Get('history')
-  history(@Query('limit') limit?: string) {
-    return this.finance.history(limit ? Number(limit) : undefined);
-  }
-
   /** The full ledger, filtered — where every "trace" link lands. */
   @Get('ledger')
   ledger_(
@@ -154,18 +149,5 @@ export class FinanceController {
       throw new BadRequestException('status must be CLEARED or BOUNCED');
     }
     return this.finance.settleCheque(id, body.status, body.clearedDate, req.user!.id);
-  }
-
-  /** Kept for the current form; `vouchers` supersedes it. */
-  @Post('capital')
-  recordCapital(
-    @Req() req: Request,
-    @Body() body: { amount?: string; direction?: 'IN' | 'OUT'; note?: string },
-  ) {
-    const direction = body?.direction;
-    if (direction !== 'IN' && direction !== 'OUT') {
-      throw new BadRequestException('direction must be IN or OUT');
-    }
-    return this.finance.recordCapital(body.amount ?? '', direction, body.note, req.user!.id);
   }
 }
