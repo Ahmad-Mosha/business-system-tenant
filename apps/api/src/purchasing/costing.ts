@@ -17,6 +17,21 @@ export function movingAverage(
   return round4((onHand * oldAvg + qtyIn * costIn) / (onHand + qtyIn));
 }
 
+/**
+ * Spreads a payment across invoice remainders, oldest first. Returns how much
+ * each one receives; the sum equals `amount` as long as `amount` does not
+ * exceed the total remainder (the caller guarantees that).
+ */
+export function allocateOldestFirst(remainders: number[], amount: number): number[] {
+  let left = round2(amount);
+  return remainders.map((r) => {
+    if (left <= 0.005 || r <= 0.005) return 0;
+    const apply = round2(Math.min(left, r));
+    left = round2(left - apply);
+    return apply;
+  });
+}
+
 export interface AllocatableLine {
   lineTotal: number;
   quantity: number;

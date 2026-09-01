@@ -20,10 +20,12 @@ export type PaidStatus = 'DRAFT' | 'UNPAID' | 'PARTIAL' | 'PAID';
 /** Where an invoice sits on the paid axis, derived from `settledAmount`. */
 export function paidStatusOf(i: {
   status: PurchaseStatus;
+  payment: PurchasePayment;
   landedTotal: string | number;
   settledAmount: string | number;
 }): PaidStatus {
   if (i.status === 'DRAFT') return 'DRAFT';
+  if (i.payment === 'CASH') return 'PAID'; // paid the moment it posts
   const settled = Number(i.settledAmount);
   const total = Number(i.landedTotal);
   if (settled >= total - 0.005) return 'PAID';

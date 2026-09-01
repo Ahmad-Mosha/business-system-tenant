@@ -1,6 +1,22 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { allocateExtraCosts, movingAverage, round2 } from './costing';
+import { allocateExtraCosts, allocateOldestFirst, movingAverage, round2 } from './costing';
+
+test('a payment fills the oldest invoice remainders first', () => {
+  // three invoices owing 2000, 5000, 1000; pay 6000
+  assert.deepEqual(allocateOldestFirst([2000, 5000, 1000], 6000), [2000, 4000, 0]);
+});
+
+test('a payment that clears everything allocates it all', () => {
+  const owed = [527.85, 2500, 6600];
+  const applied = allocateOldestFirst(owed, 9627.85);
+  assert.deepEqual(applied, [527.85, 2500, 6600]);
+  assert.equal(round2(applied.reduce((a, b) => a + b, 0)), 9627.85);
+});
+
+test('an already-settled invoice in the list is skipped', () => {
+  assert.deepEqual(allocateOldestFirst([0, 3000], 2500), [0, 2500]);
+});
 
 test('moving average blends the incoming cost by quantity', () => {
   // 100 @ 10.00, then receive 50 @ 12.00 → (1000 + 600) / 150 = 10.6667
