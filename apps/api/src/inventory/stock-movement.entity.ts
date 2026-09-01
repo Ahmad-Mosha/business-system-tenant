@@ -46,9 +46,14 @@ export class StockMovement {
   @Column({ type: 'text' })
   reason: StockReason;
 
-  /** Cost per unit at the time, when known. Null for movements without one. */
+  /** Cost per unit this movement applied — landed cost on a receipt, the
+   *  average cost at the time on a sale (which is COGS). Null when unknown. */
   @Column({ type: 'numeric', precision: 14, scale: 2, nullable: true })
   unitCost: string | null;
+
+  /** The variant's moving-average cost right after this movement. Receipts only. */
+  @Column({ name: 'avg_cost_after', type: 'numeric', precision: 14, scale: 4, nullable: true })
+  avgCostAfter: string | null;
 
   /** What caused this, e.g. `order` / an order id. Kept loose on purpose. */
   @Column({ type: 'text', nullable: true })
