@@ -10,7 +10,7 @@ import {
   getMoneyAccounts,
   getPeriodSummary,
 } from '@/lib/api';
-import { date, money, moneyParts } from '@/lib/format';
+import { date, money, moneyParts, signedTone } from '@/lib/format';
 import { accountByCode, groupAccounts, kindLabel } from '@/lib/money';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
@@ -142,10 +142,10 @@ export default async function MoneyOverviewPage() {
                     <span
                       className={cn(
                         'w-28 shrink-0 text-right font-medium tabular-nums',
-                        Number(e.effect) >= 0 ? 'text-success' : 'text-foreground',
+                        signedTone(e.effect),
                       )}
                     >
-                      {Number(e.effect) >= 0 ? '+' : ''}
+                      {Number(e.effect) > 0 ? '+' : ''}
                       {money(e.effect)}
                     </span>
                     <span className="min-w-0 flex-1 truncate">

@@ -1,10 +1,10 @@
 import Link from 'next/link';
 import { Plus } from 'lucide-react';
+import { PaidChip } from '@/components/paid-chip';
 import { ContextBar, Figure, Panel, Screen, Scroller } from '@/components/shell';
 import { getPurchases } from '@/lib/api';
 import { date, money } from '@/lib/format';
 import { requireAdmin } from '@/lib/session';
-import { cn } from '@/lib/utils';
 
 function monthStart() {
   const d = new Date();
@@ -77,8 +77,8 @@ export default async function PurchasesPage() {
                         </Link>
                         <span className="ms-2 text-[11px] text-muted-foreground">{i.lineCount} lines</span>
                       </td>
-                      <td className="px-4" dir="rtl">
-                        {i.supplierName}
+                      <td className="px-4">
+                        <bdi>{i.supplierName}</bdi>
                       </td>
                       <td className="px-4 whitespace-nowrap text-muted-foreground">
                         {date(i.invoiceDate)}
@@ -87,16 +87,7 @@ export default async function PurchasesPage() {
                         {i.payment === 'CASH' ? 'Paid cash' : 'On credit'}
                       </td>
                       <td className="px-4">
-                        <span
-                          className={cn(
-                            'rounded border px-1.5 py-0.5 text-[10px] tracking-wide uppercase',
-                            i.status === 'POSTED'
-                              ? 'border-border text-muted-foreground'
-                              : 'border-warning/40 text-warning',
-                          )}
-                        >
-                          {i.status}
-                        </span>
+                        <PaidChip status={i.paidStatus} />
                       </td>
                       <td className="px-4 text-right font-medium tabular-nums">{money(i.landedTotal)}</td>
                     </tr>

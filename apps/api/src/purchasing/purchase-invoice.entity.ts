@@ -15,6 +15,21 @@ import { Supplier } from './supplier.entity';
 export type PurchaseStatus = 'DRAFT' | 'POSTED';
 export type PurchasePayment = 'CASH' | 'CREDIT';
 export type CostAllocation = 'BY_VALUE' | 'PER_UNIT';
+export type PaidStatus = 'DRAFT' | 'UNPAID' | 'PARTIAL' | 'PAID';
+
+/** Where an invoice sits on the paid axis, derived from `settledAmount`. */
+export function paidStatusOf(i: {
+  status: PurchaseStatus;
+  landedTotal: string | number;
+  settledAmount: string | number;
+}): PaidStatus {
+  if (i.status === 'DRAFT') return 'DRAFT';
+  const settled = Number(i.settledAmount);
+  const total = Number(i.landedTotal);
+  if (settled >= total - 0.005) return 'PAID';
+  if (settled > 0.005) return 'PARTIAL';
+  return 'UNPAID';
+}
 
 /**
  * A purchase invoice — فاتورة شراء. While `DRAFT` it is just a plan; posting it
@@ -63,6 +78,14 @@ export class PurchaseInvoice {
   /** `goodsTotal + extraCosts` — what actually reaches inventory. */
   @Column({ type: 'numeric', precision: 14, scale: 2, default: 0 })
   landedTotal: string;
+
+  /**
+   * How much of this invoice has been paid. A cash invoice is settled in full
+   * on posting; a credit one accrues payments (invoice-specific, or spilled
+   * over from a general supplier payment, oldest invoice first).
+   */
+  @Column({ type: 'numeric', precision: 14, scale: 2, default: 0 })
+  settledAmount: string;
 
   @Column({ type: 'timestamptz', nullable: true })
   postedAt: Date | null;

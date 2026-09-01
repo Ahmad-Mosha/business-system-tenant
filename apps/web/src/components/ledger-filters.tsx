@@ -66,9 +66,7 @@ export function LedgerFilters({ accounts }: { accounts: AccountBalance[] }) {
             <DropdownMenuItem key={a.code} onSelect={() => set({ code: a.code })} className="text-sm">
               {code === a.code && <Check className="size-3.5" />}
               <span className="flex-1">{a.nameEn}</span>
-              <span dir="rtl" className="text-[11px] text-muted-foreground">
-                {a.nameAr}
-              </span>
+              <bdi className="text-[11px] text-muted-foreground">{a.nameAr}</bdi>
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>
