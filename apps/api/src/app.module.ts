@@ -13,6 +13,7 @@ import { ChannelListing } from './catalog/channel-listing.entity';
 import { ProductVariant } from './catalog/product-variant.entity';
 import { Product } from './catalog/product.entity';
 import { SnakeNamingStrategy } from './database/snake-naming.strategy';
+import { Cheque } from './finance/cheque.entity';
 import { FinanceController } from './finance/finance.controller';
 import { FinanceService } from './finance/finance.service';
 import { LedgerAccount } from './finance/ledger-account.entity';
@@ -52,6 +53,7 @@ const ENTITIES = [
   EasyOrdersEvent,
   LedgerAccount,
   LedgerEntry,
+  Cheque,
 ];
 
 @Module({
