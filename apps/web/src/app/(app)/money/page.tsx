@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
 import { BreakdownBar, CashAreaChart, Sparkline } from '@/components/charts';
 import { MoneyAnchorForm } from '@/components/money-anchor-form';
-import { PageBody, PageHeader } from '@/components/page-header';
+import { ContextBar, Screen } from '@/components/shell';
 import {
   getCashSeries,
   getFinanceOverview,
@@ -10,7 +10,7 @@ import {
   getMoneyAccounts,
   getPeriodSummary,
 } from '@/lib/api';
-import { date, money, moneyWhole } from '@/lib/format';
+import { date, money, moneyParts } from '@/lib/format';
 import { accountByCode, groupAccounts, kindLabel } from '@/lib/money';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
@@ -22,9 +22,9 @@ export default async function MoneyOverviewPage() {
 
   if (!anchored) {
     return (
-      <>
-        <PageHeader title="Money" description="Cash, what we're owed, and what the business is worth." />
-        <PageBody>
+      <Screen>
+        <ContextBar title="Money" />
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">
           <section className="max-w-xl rounded-xl border border-dashed border-border bg-card px-5 py-6">
             <h2 className="text-sm font-medium">Start the ledger</h2>
             <p className="mt-1 mb-4 text-[13px] text-muted-foreground">
@@ -33,8 +33,8 @@ export default async function MoneyOverviewPage() {
             </p>
             <MoneyAnchorForm openingBalance={overview.openingBalance} openingAsOf={overview.openingAsOf} />
           </section>
-        </PageBody>
-      </>
+        </div>
+      </Screen>
     );
   }
 
@@ -60,37 +60,35 @@ export default async function MoneyOverviewPage() {
   const margin = rev > 0 ? (Number(summary.grossProfit) / rev) * 100 : null;
 
   return (
-    <>
-      <PageHeader
+    <Screen>
+      <ContextBar
         title="Money"
-        description="Every figure built from recorded events — open any of them to the movements beneath."
+        meta="every figure built from recorded events"
       />
-      <PageBody>
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
         <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <Verdict href="/money/ledger?code=CASH" label="Cash on hand" value={money(bal('CASH'))} sub="الخزينة">
+          <Verdict href="/money/ledger?code=CASH" label="Cash on hand" value={bal('CASH')} sub="الخزينة">
             <Sparkline points={spark} />
           </Verdict>
-          <Verdict href="/money/ledger?code=NOON_RECEIVABLE" label="noon owes us" value={moneyWhole(bal('NOON_RECEIVABLE'))} sub="not yet paid out" />
-          <Verdict href="/money/ledger?code=BOSTA_COD" label="Bosta holding" value={moneyWhole(bal('BOSTA_COD'))} sub="COD not transferred" />
+          <Verdict href="/money/ledger?code=NOON_RECEIVABLE" label="noon owes us" value={bal('NOON_RECEIVABLE')} sub="not yet paid out" />
+          <Verdict href="/money/ledger?code=BOSTA_COD" label="Bosta holding" value={bal('BOSTA_COD')} sub="COD not transferred" />
           <Verdict
             href="/money/treasury"
             label="Cheques pending"
-            value={moneyWhole(bal('CHEQUES_PENDING'))}
+            value={bal('CHEQUES_PENDING')}
             sub="not yet cleared"
             warn={Number(bal('CHEQUES_PENDING')) > 0}
           />
-          <Verdict href="/inventory" label="Stock value" value={moneyWhole(overview.stockValue)} sub="at cost" />
+          <Verdict href="/inventory" label="Stock value" value={overview.stockValue} sub="at cost" />
         </section>
 
         <section className="grid gap-4 lg:grid-cols-3">
           <div className="rounded-xl border border-border bg-card lg:col-span-2">
             <div className="flex items-baseline justify-between border-b border-border px-4 py-2.5">
               <h2 className="text-[13px] font-semibold">Cash — last 90 days</h2>
-              <span className="text-[12px] text-muted-foreground">
-                now {moneyWhole(bal('CASH'))}
-              </span>
+              <span className="text-[12px] text-muted-foreground">now {money(bal('CASH'))}</span>
             </div>
-            <div className="h-[220px] px-2 py-2">
+            <div className="h-[200px] px-2 py-2">
               <CashAreaChart series={series} />
             </div>
           </div>
@@ -106,24 +104,13 @@ export default async function MoneyOverviewPage() {
                 </p>
               ) : (
                 <>
-                  <div>
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-[12px] text-muted-foreground">Revenue</span>
-                      <span className="tabular-nums font-medium">{money(summary.revenue)}</span>
-                    </div>
-                    <div className="mt-1 flex items-baseline justify-between">
-                      <span className="text-[12px] text-muted-foreground">
-                        Gross profit{margin !== null ? ` · ${margin.toFixed(1)}%` : ''}
-                      </span>
-                      <span
-                        className={cn(
-                          'tabular-nums font-medium',
-                          Number(summary.grossProfit) < 0 && 'text-destructive',
-                        )}
-                      >
-                        {money(summary.grossProfit)}
-                      </span>
-                    </div>
+                  <div className="space-y-1">
+                    <Row label="Revenue" value={money(summary.revenue)} strong />
+                    <Row
+                      label={`Gross profit${margin !== null ? ` · ${margin.toFixed(1)}%` : ''}`}
+                      value={money(summary.grossProfit)}
+                      negative={Number(summary.grossProfit) < 0}
+                    />
                   </div>
                   <BreakdownBar revenue={rev} segments={seg} />
                 </>
@@ -189,8 +176,8 @@ export default async function MoneyOverviewPage() {
             </div>
           </div>
         </section>
-      </PageBody>
-    </>
+      </div>
+    </Screen>
   );
 }
 
@@ -209,17 +196,39 @@ function Verdict({
   warn?: boolean;
   children?: React.ReactNode;
 }) {
+  const p = moneyParts(value);
   return (
     <Link
       href={href}
-      className="group rounded-xl border border-border bg-card px-4 py-3 shadow-xs transition-colors hover:border-foreground/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      className="group rounded-xl border border-border bg-card px-4 py-3 shadow-xs transition-colors hover:border-foreground/25 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
     >
       <p className="text-[11px] font-medium tracking-[0.07em] text-muted-foreground uppercase">{label}</p>
       <p className={cn('mt-1.5 text-[22px] leading-none font-semibold tabular-nums', warn && 'text-warning')}>
-        {value}
+        {p.sign}
+        {p.whole}
+        <span className="text-[0.62em] font-medium text-muted-foreground">{p.frac}</span>
       </p>
       {children ? <div className="mt-2">{children}</div> : <p className="mt-1.5 text-[11px] text-muted-foreground">{sub}</p>}
     </Link>
+  );
+}
+
+function Row({
+  label,
+  value,
+  strong,
+  negative,
+}: {
+  label: string;
+  value: string;
+  strong?: boolean;
+  negative?: boolean;
+}) {
+  return (
+    <div className="flex items-baseline justify-between">
+      <span className={cn('text-[12px]', strong ? 'text-foreground' : 'text-muted-foreground')}>{label}</span>
+      <span className={cn('tabular-nums font-medium', negative && 'text-destructive')}>{value}</span>
+    </div>
   );
 }
 

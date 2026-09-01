@@ -4,6 +4,7 @@ import { ArrowDownLeft, ArrowUpRight, Banknote, FileText, Loader2 } from 'lucide
 import { useActionState, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { recordCheque, recordVoucher, type FormState } from '@/app/(app)/money/actions';
+import { MoneyInput } from '@/components/money-input';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -112,7 +113,7 @@ function VoucherDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="Amount (EGP)">
-              <Input name="amount" inputMode="decimal" placeholder="0.00" className="tabular-nums" autoFocus required />
+              <MoneyInput name="amount" autoFocus required />
             </Field>
             <Field label="Date">
               <Input name="occurredAt" type="date" defaultValue={todayISO()} />
@@ -172,7 +173,7 @@ function ChequeDialog({ trigger }: { trigger: React.ReactNode }) {
         <form action={submit} className="grid gap-3">
           <div className="grid grid-cols-2 gap-3">
             <Field label="Amount (EGP)">
-              <Input name="amount" inputMode="decimal" placeholder="0.00" className="tabular-nums" autoFocus required />
+              <MoneyInput name="amount" autoFocus required />
             </Field>
             <Field label="From">
               <Input name="fromParty" placeholder="e.g. الشريك أحمد" required />
