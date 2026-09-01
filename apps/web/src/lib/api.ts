@@ -454,6 +454,20 @@ export interface PurchaseInvoiceDetail {
   lines: PurchaseInvoiceLine[];
 }
 
+export interface PeriodSummary {
+  revenue: string;
+  cogs: string;
+  channelFees: string;
+  shipping: string;
+  otherExpense: string;
+  grossProfit: string;
+  netProfit: string;
+}
+
+export const getCashSeries = (days = 90) =>
+  get<Array<{ date: string; balance: string }>>(`/finance/cash-series?days=${days}`);
+export const getPeriodSummary = () => get<PeriodSummary>('/finance/summary');
+
 export const getSuppliers = () => get<SupplierRow[]>('/suppliers');
 export const getSupplier = (id: string) => get<SupplierDetail>(`/suppliers/${id}`);
 export const getPurchases = () => get<PurchaseInvoiceRow[]>('/purchases');
