@@ -89,6 +89,12 @@ export interface BostaDeliveryRaw {
   scheduledDate?: string;
   nextWorkingDayAfterScheduledAt?: string;
   lastChanceToDeliverDate?: string;
+  /**
+   * Set (to a timestamp) once a pickup has actually been requested for a
+   * still-unpicked shipment. This is what Bosta's dashboard uses to split
+   * "جديد" (absent) from "في انتظار الاستلام" (present).
+   */
+  pendingPickup?: string | null;
   flexShippingInfo?: {
     isOrderEligible?: boolean;
     isAmountCollected?: boolean;
