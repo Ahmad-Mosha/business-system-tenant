@@ -36,6 +36,24 @@ export class FinanceController {
     return this.ledger.accountLedger(code as LedgerAccountCode, limit ? Number(limit) : undefined);
   }
 
+  /** Daily cash balance for the overview chart. `days` back from today, max 365. */
+  @Get('cash-series')
+  cashSeries(@Query('days') days?: string) {
+    const n = Math.min(Math.max(Number(days) || 90, 7), 365);
+    const from = new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
+    return this.ledger.dailyBalance('CASH', from);
+  }
+
+  /** Revenue and cost components for a period — the overview's "this month" panel. */
+  @Get('summary')
+  summary(@Query('from') from?: string, @Query('to') to?: string) {
+    const today = new Date().toISOString().slice(0, 10);
+    const first = today.slice(0, 8) + '01';
+    const f = from && ISO_DATE.test(from) ? from : first;
+    const t = to && ISO_DATE.test(to) ? to : today;
+    return this.ledger.periodSummary(f, t);
+  }
+
   @Get('history')
   history(@Query('limit') limit?: string) {
     return this.finance.history(limit ? Number(limit) : undefined);
