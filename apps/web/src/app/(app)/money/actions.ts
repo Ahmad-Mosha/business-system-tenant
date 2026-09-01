@@ -158,6 +158,32 @@ export interface InvoicePayload {
 
 export type InvoiceResult = { ok: true; id: string } | { ok: false; message: string };
 
+/**
+ * Creates a product + its default variant so an invoice can receive stock for
+ * something not in the catalogue yet. Cost comes from the invoice line, so none
+ * is set here.
+ */
+export async function createProductForInvoice(input: {
+  name: string;
+  category?: string;
+}): Promise<{ ok: true; variantId: string; label: string } | { ok: false; message: string }> {
+  if (!input.name.trim()) return { ok: false, message: 'Enter a product name' };
+  let res: Response;
+  try {
+    res = await fetch(`${API}/catalog/products`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+      body: JSON.stringify({ name: input.name.trim(), category: input.category || undefined }),
+    });
+  } catch {
+    return { ok: false, message: 'Could not reach the API.' };
+  }
+  const data = await res.json().catch(() => null);
+  if (!res.ok) return { ok: false, message: data?.message ?? 'Could not create the product.' };
+  revalidatePath('/inventory');
+  return { ok: true, variantId: data.variantId as string, label: input.name.trim() };
+}
+
 async function call(path: string, method: 'POST', body?: unknown): Promise<InvoiceResult> {
   let res: Response;
   try {
