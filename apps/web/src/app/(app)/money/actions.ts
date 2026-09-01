@@ -128,10 +128,12 @@ export async function createSupplier(_prev: FormState, form: FormData): Promise<
 export async function paySupplier(_prev: FormState, form: FormData): Promise<FormState> {
   const id = String(form.get('id') ?? '');
   const amount = String(form.get('amount') ?? '').trim();
+  const invoiceId = String(form.get('invoiceId') ?? '').trim() || undefined;
   if (!id) return { status: 'error', message: 'Missing supplier' };
   if (!MONEY.test(amount)) return { status: 'error', message: 'Enter an amount, e.g. 10000.00' };
   const state = await send(`/suppliers/${id}/payments`, 'POST', {
     amount,
+    invoiceId,
     memo: String(form.get('memo') ?? '').trim() || undefined,
   });
   if (state.status === 'saved') {

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { PaidChip } from '@/components/paid-chip';
 import { PaySupplier } from '@/components/pay-supplier';
 import { ContextBar, Figure, Panel, Screen, Scroller } from '@/components/shell';
 import { getSupplier } from '@/lib/api';
@@ -25,7 +26,7 @@ export default async function SupplierDetailPage({
     <Screen>
       <ContextBar
         back="/money/suppliers"
-        title={<span dir="rtl">{supplier.name}</span>}
+        title={<bdi>{supplier.name}</bdi>}
         meta={supplier.phone ?? undefined}
         figures={
           <>
@@ -68,16 +69,7 @@ export default async function SupplierDetailPage({
                         </span>
                       </td>
                       <td className="px-4 py-2.5">
-                        <span
-                          className={cn(
-                            'rounded border px-1.5 py-0.5 text-[10px] tracking-wide uppercase',
-                            i.status === 'POSTED'
-                              ? 'border-border text-muted-foreground'
-                              : 'border-warning/40 text-warning',
-                          )}
-                        >
-                          {i.status}
-                        </span>
+                        <PaidChip status={i.paidStatus} />
                       </td>
                       <td className="px-4 py-2.5 text-right font-medium tabular-nums">
                         {money(i.landedTotal)}
@@ -102,8 +94,8 @@ export default async function SupplierDetailPage({
                     key={p.id}
                     className={cn('flex items-center gap-3 px-4 py-2.5 text-[13px]', i > 0 && 'border-t border-border/60')}
                   >
-                    <span className="w-24 shrink-0 text-right font-medium tabular-nums">
-                      {money(p.amount)}
+                    <span className="w-24 shrink-0 text-right font-medium tabular-nums text-destructive">
+                      −{money(p.amount)}
                     </span>
                     <span className="min-w-0 flex-1 truncate text-muted-foreground">
                       {p.memo ?? 'Payment'}
