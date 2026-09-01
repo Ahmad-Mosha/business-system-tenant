@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { createHash } from 'node:crypto';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource, EntityManager, IsNull } from 'typeorm';
 import { FinanceService } from '../../finance/finance.service';
 import { OrderItem } from '../../orders/order-item.entity';
 import { Order } from '../../orders/order.entity';
@@ -233,10 +233,13 @@ export class EasyOrdersService {
     });
   }
 
-  /** Deliveries that could not be turned into an order. */
+  /**
+   * Deliveries that could not be turned into an order: `processedAt` stays null
+   * on failure (only `error` is set), so an unprocessed row is a failed one.
+   */
   failures(tx: EntityManager = this.db.manager) {
     return tx.find(EasyOrdersEvent, {
-      where: { processedAt: undefined },
+      where: { processedAt: IsNull() },
       order: { receivedAt: 'DESC' },
       take: 50,
     });
