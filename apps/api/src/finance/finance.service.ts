@@ -2,34 +2,39 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
 import { CashAccount } from './cash-account.entity';
-import { CashTransaction, type CashReason } from './cash-transaction.entity';
+import { LedgerService } from './ledger.service';
 
 const MONEY = /^\d+(\.\d{1,2})?$/;
 
+/**
+ * The money read models the current finance screen needs, now backed entirely
+ * by the double-entry ledger. `recordX` helpers are what the rest of the system
+ * calls when an event has a cash consequence — each posts one balanced entry.
+ */
 @Injectable()
 export class FinanceService {
-  constructor(@InjectDataSource() private readonly db: DataSource) {}
+  constructor(
+    @InjectDataSource() private readonly db: DataSource,
+    private readonly ledger: LedgerService,
+  ) {}
 
   private async account(): Promise<CashAccount> {
     const repo = this.db.getRepository(CashAccount);
-    return (await repo.findOneBy({ id: 'default' })) ?? repo.create({ id: 'default', openingBalance: '0', openingAsOf: null });
+    return (
+      (await repo.findOneBy({ id: 'default' })) ??
+      repo.create({ id: 'default', openingBalance: '0', openingAsOf: null })
+    );
   }
 
   /**
-   * Cash on hand, plus what it's built from — the same "Assets = Cash +
-   * Inventory" identity a balance sheet uses, made concrete: money either
-   * sits as cash or it's been converted into stock. Nothing here is a stored
-   * number; both halves are derived every time, same as everything else of
-   * consequence in this system.
+   * Cash on hand and what it's built from. Cash is the anchor figure plus every
+   * ledger movement of the CASH account since; stock value is still derived
+   * from the stock ledger at current unit cost (valuation layers replace that
+   * in a later step).
    */
   async overview() {
     const acct = await this.account();
-    const [{ moved }] = acct.openingAsOf
-      ? await this.db.query(
-          `SELECT COALESCE(SUM(amount), 0) AS moved FROM cash_transaction WHERE occurred_at::date >= $1`,
-          [acct.openingAsOf],
-        )
-      : [{ moved: '0' }];
+    const moved = await this.ledger.balanceOf('CASH');
     const cash = acct.openingAsOf ? Number(acct.openingBalance) + Number(moved) : null;
 
     const [{ stockValue }] = await this.db.query(
@@ -52,16 +57,37 @@ export class FinanceService {
     };
   }
 
+  /** Cash movements, newest first, shaped for the current history list. */
   async history(limit = 100) {
-    return this.db.getRepository(CashTransaction).find({
-      order: { occurredAt: 'DESC' },
-      take: Math.min(Math.max(limit, 1), 200),
-    });
+    const { entries } = await this.ledger.entries({ code: 'CASH', limit });
+    return entries.map(
+      (e: {
+        id: string;
+        amount: string;
+        kind: string;
+        memo: string | null;
+        debitCode: string;
+        sourceType: string | null;
+        sourceId: string | null;
+        occurredAt: string;
+      }) => ({
+        id: e.id,
+        // CASH debited = cash in; CASH credited = cash out.
+        amount: e.debitCode === 'CASH' ? e.amount : `-${e.amount}`,
+        reason: e.kind,
+        note: e.memo,
+        sourceType: e.sourceType,
+        sourceId: e.sourceId,
+        occurredAt: e.occurredAt,
+      }),
+    );
   }
 
   /** Sets the anchor cash was true at before the ledger started. */
   async setAnchor(openingBalance: string, openingAsOf: string) {
-    if (!MONEY.test(openingBalance)) throw new BadRequestException('openingBalance must be an amount like 1000.00');
+    if (!MONEY.test(openingBalance)) {
+      throw new BadRequestException('openingBalance must be an amount like 1000.00');
+    }
     const repo = this.db.getRepository(CashAccount);
     const current = (await repo.findOneBy({ id: 'default' })) ?? repo.create({ id: 'default' });
     current.openingBalance = openingBalance;
@@ -69,7 +95,7 @@ export class FinanceService {
     return repo.save(current);
   }
 
-  /** Owner adds or removes funds — the only manually-entered movement. */
+  /** Owner adds or removes funds — a hand-entered movement between cash and capital. */
   async recordCapital(
     amount: string,
     direction: 'IN' | 'OUT',
@@ -77,41 +103,59 @@ export class FinanceService {
     userId: string,
   ) {
     if (!MONEY.test(amount)) throw new BadRequestException('amount must be like 1000.00');
-    return this.db.getRepository(CashTransaction).save({
-      amount: direction === 'IN' ? amount : `-${amount}`,
-      reason: direction === 'IN' ? 'CAPITAL_INJECTION' : 'CAPITAL_WITHDRAWAL',
-      note: note?.trim() || null,
-      createdById: userId,
+    return this.ledger.post({
+      amount,
+      debit: direction === 'IN' ? 'CASH' : 'OWNER_CAPITAL',
+      credit: direction === 'IN' ? 'OWNER_CAPITAL' : 'CASH',
+      kind: direction === 'IN' ? 'CASH_DEPOSIT' : 'CAPITAL_WITHDRAWAL',
+      memo: note?.trim() || null,
+      sourceType: 'manual',
+      actorId: userId,
     });
   }
 
-  /** A stock purchase converts cash into inventory — record the cash side. */
+  /** A stock purchase converts cash into inventory. */
   recordPurchase(tx: EntityManager, amount: string, sourceId: string) {
-    return tx.insert(CashTransaction, {
-      amount: `-${amount}`,
-      reason: 'PURCHASE' as CashReason,
-      sourceType: 'stock_movement',
-      sourceId,
-    });
+    return this.ledger.post(
+      {
+        amount,
+        debit: 'INVENTORY',
+        credit: 'CASH',
+        kind: 'PURCHASE',
+        sourceType: 'stock_movement',
+        sourceId,
+      },
+      tx,
+    );
   }
 
-  /** A real noon bank transfer landed — this is actual cash, not proceeds. */
+  /** A real noon bank transfer landed — receivable becomes actual cash. */
   recordNoonPayout(tx: EntityManager, amount: string, sourceId: string) {
-    return tx.insert(CashTransaction, {
-      amount,
-      reason: 'NOON_PAYOUT' as CashReason,
-      sourceType: 'noon_transaction',
-      sourceId,
-    });
+    return this.ledger.post(
+      {
+        amount,
+        debit: 'CASH',
+        credit: 'NOON_RECEIVABLE',
+        kind: 'NOON_PAYOUT',
+        sourceType: 'noon_transaction',
+        sourceId,
+      },
+      tx,
+    );
   }
 
-  /** An order was marked paid — the money is now actually in hand. */
+  /** An order was marked paid — money is now in hand, booked against revenue. */
   recordOrderPayment(tx: EntityManager, orderId: string, amount: string) {
-    return tx.insert(CashTransaction, {
-      amount,
-      reason: 'ORDER_PAYMENT' as CashReason,
-      sourceType: 'order',
-      sourceId: orderId,
-    });
+    return this.ledger.post(
+      {
+        amount,
+        debit: 'CASH',
+        credit: 'SALES',
+        kind: 'ORDER_SALE',
+        sourceType: 'order',
+        sourceId: orderId,
+      },
+      tx,
+    );
   }
 }
