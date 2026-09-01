@@ -90,7 +90,7 @@ Any registrar works. For a free option, DuckDNS plus Caddy's automatic HTTPS
 gets a real Let's Encrypt certificate on a `*.duckdns.org` subdomain — enough
 for Easy Orders to deliver to.
 
-Once the domain is live, the Easy Orders dashboard needs two things: the
-webhook URL re-pointed at it, and the **order status update** webhook
-registered alongside the existing order-created one. Without the second,
-payment status on website orders goes stale silently.
+Once the domain is live, register both Easy Orders webhooks (order created +
+order status update) against that URL, then copy the secret Easy Orders
+generates into `EASYORDERS_WEBHOOK_SECRET` on the box and `up -d api`. Full
+procedure: [evidence/integrations.md](evidence/integrations.md) → Easy Orders.
