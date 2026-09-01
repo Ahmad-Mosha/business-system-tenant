@@ -286,7 +286,7 @@ export function ShipmentsView({
                             'border-border bg-muted text-muted-foreground',
                         )}
                       >
-                        {s.cod?.collectionStatusLabel ?? 'قيد التحصيل'}
+                        {s.cod?.collectionStatusLabel ?? 'قيد التنفيذ'}
                       </span>
                     </td>
 
@@ -531,7 +531,7 @@ export function ShipmentsView({
                           'text-muted-foreground',
                       )}
                     >
-                      {selectedShipment.cod?.collectionStatusLabel ?? 'قيد التحصيل'}
+                      {selectedShipment.cod?.collectionStatusLabel ?? 'قيد التنفيذ'}
                     </span>
                   </div>
                   <div className="flex justify-between">
