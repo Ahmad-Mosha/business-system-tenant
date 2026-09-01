@@ -1,14 +1,22 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
-import { CashAccount } from './cash-account.entity';
 import { LedgerService } from './ledger.service';
 
 const MONEY = /^\d+(\.\d{1,2})?$/;
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** The one live opening-balance entry: not itself a reversal, not reversed. */
+const LIVE_OPENING = `
+  SELECT id, amount, occurred_at::date::text AS "asOf"
+  FROM ledger_entry e
+  WHERE e.source_type = 'opening' AND e.source_id = 'cash'
+    AND e.reverses_id IS NULL
+    AND NOT EXISTS (SELECT 1 FROM ledger_entry r WHERE r.reverses_id = e.id)`;
 
 /**
- * The money read models the current finance screen needs, now backed entirely
- * by the double-entry ledger. `recordX` helpers are what the rest of the system
+ * The money read models the current finance screen needs, backed entirely by
+ * the double-entry ledger. `recordX` helpers are what the rest of the system
  * calls when an event has a cash consequence — each posts one balanced entry.
  */
 @Injectable()
@@ -18,24 +26,14 @@ export class FinanceService {
     private readonly ledger: LedgerService,
   ) {}
 
-  private async account(): Promise<CashAccount> {
-    const repo = this.db.getRepository(CashAccount);
-    return (
-      (await repo.findOneBy({ id: 'default' })) ??
-      repo.create({ id: 'default', openingBalance: '0', openingAsOf: null })
-    );
-  }
-
   /**
-   * Cash on hand and what it's built from. Cash is the anchor figure plus every
-   * ledger movement of the CASH account since; stock value is still derived
-   * from the stock ledger at current unit cost (valuation layers replace that
-   * in a later step).
+   * Cash on hand and what it's built from. Cash is the CASH account's ledger
+   * balance (the opening entry included); stock value is still derived from the
+   * stock ledger at current unit cost — valuation layers replace that later.
    */
   async overview() {
-    const acct = await this.account();
-    const moved = await this.ledger.balanceOf('CASH');
-    const cash = acct.openingAsOf ? Number(acct.openingBalance) + Number(moved) : null;
+    const [opening] = await this.db.query(LIVE_OPENING);
+    const cash = opening ? await this.ledger.balanceOf('CASH') : null;
 
     const [{ stockValue }] = await this.db.query(
       `SELECT COALESCE(SUM(stock.on_hand * COALESCE(v.unit_cost, 0)), 0) AS "stockValue"
@@ -49,11 +47,11 @@ export class FinanceService {
     );
 
     return {
-      cash: cash === null ? null : cash.toFixed(2),
+      cash: cash === null ? null : cash,
       stockValue: Number(stockValue).toFixed(2),
-      totalAssets: cash === null ? null : (cash + Number(stockValue)).toFixed(2),
-      openingBalance: acct.openingBalance,
-      openingAsOf: acct.openingAsOf,
+      totalAssets: cash === null ? null : (Number(cash) + Number(stockValue)).toFixed(2),
+      openingBalance: opening?.amount ?? '0',
+      openingAsOf: opening?.asOf ?? null,
     };
   }
 
@@ -83,16 +81,38 @@ export class FinanceService {
     );
   }
 
-  /** Sets the anchor cash was true at before the ledger started. */
+  /**
+   * Sets what cash was before the ledger started tracking it — recorded as an
+   * `OPENING_BALANCE` entry (CASH ← opening equity). Re-running it reverses the
+   * previous opening entry and posts a fresh one, so the anchor stays a single
+   * traceable line rather than a mutable field.
+   */
   async setAnchor(openingBalance: string, openingAsOf: string) {
     if (!MONEY.test(openingBalance)) {
       throw new BadRequestException('openingBalance must be an amount like 1000.00');
     }
-    const repo = this.db.getRepository(CashAccount);
-    const current = (await repo.findOneBy({ id: 'default' })) ?? repo.create({ id: 'default' });
-    current.openingBalance = openingBalance;
-    current.openingAsOf = openingAsOf;
-    return repo.save(current);
+    if (!ISO_DATE.test(openingAsOf)) {
+      throw new BadRequestException('openingAsOf must be YYYY-MM-DD');
+    }
+
+    return this.db.transaction(async (tx) => {
+      const [prior] = await tx.query(LIVE_OPENING);
+      if (prior) await this.ledger.reverse(prior.id, null, tx);
+
+      return this.ledger.post(
+        {
+          amount: openingBalance,
+          debit: 'CASH',
+          credit: 'OPENING_EQUITY',
+          kind: 'OPENING_BALANCE',
+          occurredAt: new Date(`${openingAsOf}T00:00:00Z`),
+          memo: 'Opening cash balance',
+          sourceType: 'opening',
+          sourceId: 'cash',
+        },
+        tx,
+      );
+    });
   }
 
   /** Owner adds or removes funds — a hand-entered movement between cash and capital. */
