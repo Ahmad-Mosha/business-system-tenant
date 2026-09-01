@@ -20,43 +20,77 @@ copy secret values into documentation.**
 
 ## Bosta — live, working
 
-The courier. Real credentials, verified against real shipments.
+The courier. Real credentials, verified against real shipments and against the
+Bosta dashboard row-by-row (2026-09-01). Base host `https://api.bosta.co`, key
+`BOSTA_KEY` sent as a bare `Authorization` header (no `Bearer`).
 
-### The endpoint trap
+### Use `POST /api/v2/deliveries/search` for everything
 
-**Listing deliveries is `/api/v0/deliveries`**, or `POST /api/v0/deliveries/search`
-(also available on `v2`).
+Body `{ "limit": <=100, "page": N }` — real pagination. Its objects carry
+`cashoutInfo` (the COD payout signal). The response's `count` is **always 0** —
+page until a page returns fewer than `limit`. Single-tracking lookup: same
+endpoint, body `{ "trackingNumbers": ["<tn>"] }` → identical object shape, so a
+list row and a single-tracking refresh can never disagree.
 
-**`/api/v1/` has no list route at all** — only per-AWB lookup. Posting to it
-expecting a list returns a misleading `400 "Delivery not found"`, which reads
-like a data problem and is actually a wrong-endpoint problem. This cost
-significant debugging time; do not rediscover it.
+Endpoints **not** to use, and why (each cost real debugging time):
 
-There is also no "list everything, unfiltered" convenience — only search or list
-scoped to the account.
+- `GET /api/v0/deliveries` — silently caps every page at **10**, ignoring
+  `limit`. This is why "only 10 of 24 shipments showed" recurred three times.
+  (`?perPage=` and `?page=` do work on it, and its `count` is accurate — but v2
+  search is the documented path.)
+- `GET /api/v1/deliveries/{tn}` — returns `cashoutInfo: null` for **every**
+  delivery, even paid ones. Its unique extras (`timeline[]`, `attempts[]` driver
+  names, `wallet.cashCycle` fee/VAT/deposit breakdown) are not in the v2 object;
+  fetch it only when the money module needs the fee breakdown.
+- `GET /api/v1/deliveries` (the old SDK list route, `pageNumber`/`limit`) — dead,
+  `Cannot GET`.
+
+### Status mapping — verified against the dashboard
+
+Bosta's API only ever sends the state in **English** (`state.value` /
+`state.code`); the Arabic on its dashboard is Bosta's own front-end
+translation. `bosta.service.ts` `STATUS_LABEL_AR` redoes that map, keyed on our
+normalised status; an unrecognised state falls back to Bosta's raw English text,
+never a guessed Arabic label.
+
+| Shown | Driven by (per row) |
+|---|---|
+| جديد | `state.code == 10` and `pendingPickup` empty |
+| في انتظار الاستلام | `state.code == 10` and `pendingPickup` set (a timestamp) |
+| تم التوصيل / تم بنجاح | `state.code == 45` |
+| مُرتجع / تم الاسترجاع | `type.value` contains "return" (Bosta reuses `state "Delivered"` for RTO — check `type` first) |
+| في الطريق / خرج للتوصيل / تم الاستلام | `state.code` 30 / 41 / 21 — **wording not yet checked against a live row** |
+
+### COD collection (`حالة المبلغ المحصل`) — verified against the dashboard
+
+The signal is `cashoutInfo` on the delivery object (list/search only — `v1`
+detail always has it null):
+
+| Shown | Driven by |
+|---|---|
+| مدفوع | `cashoutInfo.oracleTransactionId` present (an executed payout) |
+| غير مدفوع | `cashoutInfo` present, no `oracleTransactionId` (payout scheduled, not run) |
+| قيد التنفيذ | no `cashoutInfo` on the row (not delivered / nothing computed) |
+
+**Delivered ≠ paid, and `cod == 0` ≠ paid.** A delivered COD shipment and a
+returned (cod 0) shipment both routinely show غير مدفوع on the dashboard. Only
+an executed payout is paid. `wallet.cashCycle.deposited_at` does **not** track
+this — a shipment can have it set and still be unpaid. This is the evidence
+behind keeping fulfilment state and payment state as two separate fields.
 
 ### FlexShip is Bosta
 
 `flexShippingInfo` appears in Bosta's own responses. "رسوم فليكس شيب" (FlexShip
-fees) seen on a courier dashboard was previously an open question about whether
-a second courier existed. **It does not.** FlexShip is a Bosta feature. Bosta is
-the only courier.
-
-### Delivered ≠ paid — proven
-
-A real Bosta shipment came back with status `DELIVERED` and COD state
-**غير مدفوع** (unpaid).
-
-This is the direct evidence behind the rule that fulfilment state and payment
-state are two separate things. A single combined status field cannot express
-"delivered but not yet paid", which is the default case for a COD-heavy
-business.
+fees) was once an open question about whether a second courier existed. **It
+does not.** FlexShip is a Bosta feature. Bosta is the only courier. When
+`flexShippingInfo` is absent the row is labelled "غير مُطبَّق".
 
 ### Practical notes
 
-Bosta calls should be defensively wrapped — timeouts and a short cache are
-warranted, and concurrency should be capped when looking up many shipments at
-once. It is an external dependency in the path of screens the team uses daily.
+Bosta calls are wrapped with an 8s timeout and a 60s in-process cache
+(`bosta.client.ts`); the list call warms the per-AWB cache so opening one costs
+nothing. It is an external dependency in the path of screens the team uses
+daily.
 
 ---
 
