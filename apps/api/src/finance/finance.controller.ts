@@ -1,6 +1,7 @@
 import { BadRequestException, Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import { Roles } from '../auth/auth.guard';
+import type { ChequeStatus } from './cheque.entity';
 import type { LedgerAccountCode } from './ledger-account.entity';
 import type { LedgerEntryKind } from './ledger-entry.entity';
 import { LedgerService } from './ledger.service';
@@ -90,6 +91,44 @@ export class FinanceController {
       occurredAt: body.occurredAt,
       userId: req.user!.id,
     });
+  }
+
+  @Get('cheques')
+  cheques(@Query('status') status?: ChequeStatus) {
+    return this.finance.listCheques(
+      status === 'PENDING' || status === 'CLEARED' || status === 'BOUNCED' ? status : undefined,
+    );
+  }
+
+  /** إيداع سندي — a received cheque, held pending until it clears. */
+  @Post('cheques')
+  createCheque(
+    @Req() req: Request,
+    @Body()
+    body: { amount?: string; fromParty?: string; receivedDate?: string; dueDate?: string; memo?: string },
+  ) {
+    return this.finance.createCheque(
+      {
+        amount: body?.amount ?? '',
+        fromParty: body?.fromParty ?? '',
+        receivedDate: body?.receivedDate ?? '',
+        dueDate: body?.dueDate,
+        memo: body?.memo,
+      },
+      req.user!.id,
+    );
+  }
+
+  @Patch('cheques/:id')
+  settleCheque(
+    @Req() req: Request,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { status?: 'CLEARED' | 'BOUNCED'; clearedDate?: string },
+  ) {
+    if (body?.status !== 'CLEARED' && body?.status !== 'BOUNCED') {
+      throw new BadRequestException('status must be CLEARED or BOUNCED');
+    }
+    return this.finance.settleCheque(id, body.status, body.clearedDate, req.user!.id);
   }
 
   /** Kept for the current form; `vouchers` supersedes it. */
