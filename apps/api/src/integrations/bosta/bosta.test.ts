@@ -129,7 +129,7 @@ test('normalizes real Bosta delivered payload into Prime Market domain DTO', () 
   assert.equal(dto.trackingNumber, '8755006904');
   assert.equal(dto.carrier, 'BOSTA');
   assert.equal(dto.status, 'DELIVERED');
-  assert.equal(dto.statusLabel, 'Delivered');
+  assert.equal(dto.statusLabel, 'تم التوصيل');
   assert.equal(dto.statusCode, 45);
   assert.equal(dto.isDelayed, false);
 
@@ -178,7 +178,7 @@ test('normalizes real Bosta delivered payload into Prime Market domain DTO', () 
   assert.equal(dto.attempts.list[0].succeeded, true);
 });
 
-test('"Pickup requested" (code 10) is NEW, not picked up', () => {
+test('"Pickup requested" with no pickup yet is جديد (NEW), pending collection', () => {
   const service = new BostaService(null as any, null as any);
   const dto = service.normalizeBostaDelivery({
     trackingNumber: '9482725368',
@@ -188,9 +188,24 @@ test('"Pickup requested" (code 10) is NEW, not picked up', () => {
     receiver: { fullName: 'العساف', phone: '+201042812537' },
   });
   assert.equal(dto.status, 'NEW');
-  assert.equal(dto.statusLabel, 'Created');
-  // No cashout record yet → collection is pending, not unpaid.
+  assert.equal(dto.statusLabel, 'جديد');
+  // No cashout record yet → collection is pending, labelled like Bosta's board.
   assert.equal(dto.cod.collectionStatus, 'PENDING');
+  assert.equal(dto.cod.collectionStatusLabel, 'قيد التنفيذ');
+});
+
+test('a pending pickup flips the same state to في انتظار الاستلام', () => {
+  const service = new BostaService(null as any, null as any);
+  const dto = service.normalizeBostaDelivery({
+    trackingNumber: '2311372924',
+    state: { value: 'Pickup requested', code: 10 },
+    type: { code: 10, value: 'Send' },
+    cod: 510,
+    pendingPickup: '2026-09-01T11:47:29.106Z',
+    receiver: { fullName: 'شاهي جلال', phone: '+201099001723' },
+  });
+  assert.equal(dto.status, 'AWAITING_PICKUP');
+  assert.equal(dto.statusLabel, 'في انتظار الاستلام');
 });
 
 test('a delivered shipment with a cashout record but no payout is UNPAID', () => {
@@ -206,6 +221,17 @@ test('a delivered shipment with a cashout record but no payout is UNPAID', () =>
   assert.equal(dto.status, 'DELIVERED');
   assert.equal(dto.cod.collectionStatus, 'UNPAID');
   assert.equal(dto.cod.collectionStatusLabel, 'غير مدفوع');
+});
+
+test('an unrecognised state keeps Bosta\'s own English text, not a guessed label', () => {
+  const service = new BostaService(null as any, null as any);
+  const dto = service.normalizeBostaDelivery({
+    trackingNumber: '1',
+    state: { value: 'On hold at customs', code: 99 },
+    cod: 0,
+    receiver: { fullName: 'x', phone: '1' },
+  });
+  assert.equal(dto.statusLabel, 'On hold at customs');
 });
 
 test('normalizes an in-transit Bosta delivery correctly', () => {
@@ -235,7 +261,7 @@ test('normalizes an in-transit Bosta delivery correctly', () => {
 
   const dto = service.normalizeBostaDelivery(inTransitRaw);
   assert.equal(dto.status, 'IN_TRANSIT');
-  assert.equal(dto.statusLabel, 'In Transit');
+  assert.equal(dto.statusLabel, 'في الطريق');
   assert.equal(dto.isDelayed, true);
   assert.equal(dto.receiver.name, 'Ahmed Ali');
   assert.equal(dto.timeline[2].isDone, true);
