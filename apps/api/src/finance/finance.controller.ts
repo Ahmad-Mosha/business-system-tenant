@@ -29,6 +29,13 @@ export class FinanceController {
     return this.ledger.balances();
   }
 
+  /** One account's recent movements with a running balance — drives the Treasury screen. */
+  @Get('accounts/:code/ledger')
+  accountLedger(@Param('code') code: string, @Query('limit') limit?: string) {
+    if (!/^[A-Z_]+$/.test(code)) throw new BadRequestException('unknown account');
+    return this.ledger.accountLedger(code as LedgerAccountCode, limit ? Number(limit) : undefined);
+  }
+
   @Get('history')
   history(@Query('limit') limit?: string) {
     return this.finance.history(limit ? Number(limit) : undefined);
