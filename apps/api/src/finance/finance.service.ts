@@ -69,32 +69,6 @@ export class FinanceService {
     };
   }
 
-  /** Cash movements, newest first, shaped for the current history list. */
-  async history(limit = 100) {
-    const { entries } = await this.ledger.entries({ code: 'CASH', limit });
-    return entries.map(
-      (e: {
-        id: string;
-        amount: string;
-        kind: string;
-        memo: string | null;
-        debitCode: string;
-        sourceType: string | null;
-        sourceId: string | null;
-        occurredAt: string;
-      }) => ({
-        id: e.id,
-        // CASH debited = cash in; CASH credited = cash out.
-        amount: e.debitCode === 'CASH' ? e.amount : `-${e.amount}`,
-        reason: e.kind,
-        note: e.memo,
-        sourceType: e.sourceType,
-        sourceId: e.sourceId,
-        occurredAt: e.occurredAt,
-      }),
-    );
-  }
-
   /**
    * Sets what cash was before the ledger started tracking it — recorded as an
    * `OPENING_BALANCE` entry (CASH ← opening equity). Re-running it reverses the
@@ -166,25 +140,6 @@ export class FinanceService {
       occurredAt: input.occurredAt ? new Date(`${input.occurredAt}T00:00:00Z`) : undefined,
       sourceType: 'voucher',
       actorId: input.userId,
-    });
-  }
-
-  /** Owner adds or removes funds — a hand-entered movement between cash and capital. */
-  async recordCapital(
-    amount: string,
-    direction: 'IN' | 'OUT',
-    note: string | undefined,
-    userId: string,
-  ) {
-    if (!MONEY.test(amount)) throw new BadRequestException('amount must be like 1000.00');
-    return this.ledger.post({
-      amount,
-      debit: direction === 'IN' ? 'CASH' : 'OWNER_CAPITAL',
-      credit: direction === 'IN' ? 'OWNER_CAPITAL' : 'CASH',
-      kind: direction === 'IN' ? 'CASH_DEPOSIT' : 'CAPITAL_WITHDRAWAL',
-      memo: note?.trim() || null,
-      sourceType: 'manual',
-      actorId: userId,
     });
   }
 
