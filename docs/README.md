@@ -10,6 +10,12 @@ owner, and facts about noon / Bosta / Easy Orders / the legacy Mega system that
 were derived from real data and real API calls. Re-deriving any of it costs
 hours.
 
+## Continuing the build
+
+| File | What it gives you |
+|---|---|
+| [handoff.md](handoff.md) | **Start here.** What is actually built and running now (money module, Bosta), the real toolchain, DB state, and what's still open. Updated per session. |
+
 ## Read in this order
 
 | # | File | What it gives you |
