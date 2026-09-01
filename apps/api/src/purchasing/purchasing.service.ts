@@ -1,10 +1,10 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, In } from 'typeorm';
+import { DataSource, EntityManager, In } from 'typeorm';
 import { ProductVariant } from '../catalog/product-variant.entity';
 import { LedgerService } from '../finance/ledger.service';
 import { StockMovement } from '../inventory/stock-movement.entity';
-import { allocateExtraCosts, movingAverage, round2, round4 } from './costing';
+import { allocateExtraCosts, allocateOldestFirst, movingAverage, round2, round4 } from './costing';
 import {
   type CostAllocation,
   paidStatusOf,
@@ -45,22 +45,32 @@ export class PurchasingService {
 
   // ── Suppliers ──────────────────────────────────────────────────────────
 
+  /**
+   * What a supplier is owed = the unpaid remainder across their posted credit
+   * invoices. This is the single source of truth; a payment is capped by it, so
+   * the `SUPPLIER_PAYABLE` ledger balance stays in lockstep and the per-invoice
+   * status can never contradict the supplier total.
+   */
+  private async owedBySupplier(
+    tx: DataSource | EntityManager = this.db,
+  ): Promise<Map<string, number>> {
+    const rows: Array<{ supplierId: string; owed: string }> = await tx.query(
+      `SELECT supplier_id AS "supplierId",
+              COALESCE(SUM(GREATEST(landed_total - settled_amount, 0)), 0) AS owed
+       FROM purchase_invoice
+       WHERE status = 'POSTED' AND payment = 'CREDIT'
+       GROUP BY supplier_id`,
+    );
+    return new Map(rows.map((r) => [r.supplierId, Number(r.owed)]));
+  }
+
   async listSuppliers() {
     const suppliers = await this.db.getRepository(Supplier).find({
       where: { active: true },
       order: { name: 'ASC' },
     });
-    const owed = await this.db.query(
-      `SELECT e.supplier_id AS "supplierId",
-              COALESCE(SUM(CASE WHEN e.credit_code = 'SUPPLIER_PAYABLE' THEN e.amount
-                                WHEN e.debit_code  = 'SUPPLIER_PAYABLE' THEN -e.amount
-                                ELSE 0 END), 0) AS balance
-       FROM ledger_entry e
-       WHERE e.supplier_id IS NOT NULL
-       GROUP BY e.supplier_id`,
-    );
-    const byId = new Map<string, string>(owed.map((r: { supplierId: string; balance: string }) => [r.supplierId, r.balance]));
-    return suppliers.map((s) => ({ ...s, balance: Number(byId.get(s.id) ?? 0).toFixed(2) }));
+    const owed = await this.owedBySupplier();
+    return suppliers.map((s) => ({ ...s, balance: (owed.get(s.id) ?? 0).toFixed(2) }));
   }
 
   async createSupplier(input: { name: string; phone?: string; note?: string }) {
@@ -90,12 +100,12 @@ export class PurchasingService {
   async supplierDetail(id: string) {
     const supplier = await this.db.getRepository(Supplier).findOneBy({ id });
     if (!supplier) throw new NotFoundException('supplier not found');
-    const balance = await this.ledger.balanceOf('SUPPLIER_PAYABLE', { supplierId: id });
     const invoices = await this.db.getRepository(PurchaseInvoice).find({
       where: { supplierId: id },
       order: { invoiceDate: 'DESC', createdAt: 'DESC' },
       take: 100,
     });
+    const balance = ((await this.owedBySupplier()).get(id) ?? 0).toFixed(2);
     const payments = await this.ledger.entries({ kind: 'SUPPLIER_PAYMENT', supplierId: id, limit: 100 });
     return {
       ...supplier,
@@ -107,9 +117,10 @@ export class PurchasingService {
 
   /**
    * Records a payment to a supplier and marks it against their invoices.
-   * `invoiceId` pays one invoice; without it the money pays down the oldest
-   * unpaid credit invoices first. Either way it can never exceed what is owed —
-   * that is the guard against recording the same payment twice.
+   * `invoiceId` settles that one invoice; without it, the oldest unpaid credit
+   * invoices first. The amount is capped by what those invoices still owe — so
+   * a payment can never be recorded twice, and the `SUPPLIER_PAYABLE` ledger
+   * balance stays exactly equal to the sum of unpaid remainders.
    */
   async recordSupplierPayment(
     supplierId: string,
@@ -119,57 +130,51 @@ export class PurchasingService {
     invoiceId?: string,
   ) {
     if (!MONEY.test(amount)) throw new BadRequestException('amount must be like 1000.00');
-    const value = Number(amount);
+    const value = round2(Number(amount));
     if (value <= 0) throw new BadRequestException('amount must be greater than zero');
 
     return this.db.transaction(async (tx) => {
       const supplier = await tx.findOneBy(Supplier, { id: supplierId });
       if (!supplier) throw new NotFoundException('supplier not found');
 
-      const outstanding = Number(
-        await this.ledger.balanceOf('SUPPLIER_PAYABLE', { supplierId }, tx),
-      );
-      if (outstanding <= 0) {
-        throw new BadRequestException(`nothing is owed to ${supplier.name}`);
-      }
-      if (value > outstanding + 0.005) {
-        throw new BadRequestException(
-          `only ${money(outstanding)} is owed to ${supplier.name} — cannot pay ${money(value)}`,
-        );
-      }
-
-      // Decide which invoice(s) this payment settles.
       const targets = invoiceId
-        ? await tx.find(PurchaseInvoice, { where: { id: invoiceId, supplierId } })
+        ? await tx.find(PurchaseInvoice, {
+            where: { id: invoiceId, supplierId, status: 'POSTED', payment: 'CREDIT' },
+          })
         : await tx.find(PurchaseInvoice, {
             where: { supplierId, status: 'POSTED', payment: 'CREDIT' },
             order: { invoiceDate: 'ASC', createdAt: 'ASC' },
           });
-      if (invoiceId && !targets.length) throw new NotFoundException('invoice not found');
-
-      let left = value;
-      for (const inv of targets) {
-        if (left <= 0.005) break;
-        const remaining = Number(inv.landedTotal) - Number(inv.settledAmount);
-        if (remaining <= 0.005) continue;
-        const apply = Math.min(left, remaining);
-        await tx.update(
-          PurchaseInvoice,
-          { id: inv.id },
-          { settledAmount: money(Number(inv.settledAmount) + apply) },
-        );
-        left -= apply;
+      if (invoiceId && !targets.length) {
+        throw new BadRequestException('this invoice cannot take a payment');
       }
-      if (invoiceId && left > 0.005) {
-        const inv = targets[0];
-        throw new BadRequestException(
-          `only ${money(Number(inv.landedTotal) - Number(inv.settledAmount))} is left on this invoice`,
-        );
+
+      const owed = round2(
+        targets.reduce((s, i) => s + Math.max(0, Number(i.landedTotal) - Number(i.settledAmount)), 0),
+      );
+      const scope = invoiceId ? 'left on this invoice' : `owed to ${supplier.name}`;
+      if (owed <= 0.005) throw new BadRequestException(`nothing is ${scope}`);
+      if (value > owed + 0.005) {
+        throw new BadRequestException(`only ${money(owed)} is ${scope} — you tried to pay ${money(value)}`);
+      }
+
+      const applied = allocateOldestFirst(
+        targets.map((i) => Number(i.landedTotal) - Number(i.settledAmount)),
+        value,
+      );
+      for (const [i, inv] of targets.entries()) {
+        if (applied[i] > 0) {
+          await tx.update(
+            PurchaseInvoice,
+            { id: inv.id },
+            { settledAmount: money(Number(inv.settledAmount) + applied[i]) },
+          );
+        }
       }
 
       return this.ledger.post(
         {
-          amount,
+          amount: money(value),
           debit: 'SUPPLIER_PAYABLE',
           credit: 'CASH',
           kind: 'SUPPLIER_PAYMENT',
