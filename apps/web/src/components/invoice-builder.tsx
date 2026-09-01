@@ -155,10 +155,10 @@ export function InvoiceBuilder({
                   <tbody>
                     {lines.map((l, i) => (
                       <tr key={l.key} className="border-b border-border/60 last:border-b-0">
-                        <td className="px-3 py-1.5" dir="rtl">
-                          {l.label}
+                        <td className="px-3 py-1.5">
+                          <bdi>{l.label}</bdi>
                           {l.onHand !== null && (
-                            <span className="ms-2 text-[11px] text-muted-foreground" dir="ltr">
+                            <span className="ms-2 text-[11px] text-muted-foreground">
                               {l.onHand} on hand
                             </span>
                           )}
@@ -247,7 +247,7 @@ export function InvoiceBuilder({
                 ) : (
                   <>
                     On posting, <b className="text-foreground">{money(total)} is added to what you owe{' '}
-                    {supplier ? <span dir="rtl">{supplier.name}</span> : 'the supplier'}</b>. Record the
+                    {supplier ? <bdi>{supplier.name}</bdi> : 'the supplier'}</b>. Record the
                     payment from their page when you pay them.
                   </>
                 )}{' '}
@@ -385,9 +385,7 @@ function ProductPicker({
                       }}
                       className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-[13px] hover:bg-accent disabled:opacity-40"
                     >
-                      <span dir="rtl" className="truncate">
-                        {h.label}
-                      </span>
+                      <bdi className="truncate">{h.label}</bdi>
                       <span className="shrink-0 text-[11px] text-muted-foreground">
                         {taken ? 'added' : `${h.onHand} on hand`}
                       </span>
@@ -408,12 +406,12 @@ function ProductPicker({
               )}
             >
               <Plus className="size-3.5" />
-              Add “<span dir="rtl">{term.trim()}</span>” as a new product
+              Add “<bdi>{term.trim()}</bdi>” as a new product
             </button>
           ) : (
             <div className="border-t border-border p-3">
               <p className="mb-2 text-[12px] text-muted-foreground">
-                New product: <span dir="rtl" className="text-foreground">{term.trim()}</span>. Its cost
+                New product: <bdi className="text-foreground">{term.trim()}</bdi>. Its cost
                 comes from the line below.
               </p>
               <div className="mb-2 flex flex-wrap gap-1.5">

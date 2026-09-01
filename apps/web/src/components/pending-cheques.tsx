@@ -28,7 +28,7 @@ export function PendingCheques({ cheques }: { cheques: ChequeRow[] }) {
           >
             <span className="w-24 shrink-0 text-right font-medium tabular-nums">{money(c.amount)}</span>
             <span className="min-w-0 flex-1 truncate">
-              <span dir="rtl">{c.fromParty}</span>
+              <bdi>{c.fromParty}</bdi>
               {c.memo ? <span className="text-muted-foreground"> · {c.memo}</span> : null}
             </span>
             <span className="shrink-0 text-[11px] text-muted-foreground">

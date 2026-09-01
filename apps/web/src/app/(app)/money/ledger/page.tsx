@@ -86,9 +86,9 @@ export default async function LedgerPage({
                         {e.memo ? <span className="text-muted-foreground"> · {e.memo}</span> : null}
                       </td>
                       <td className="px-4 whitespace-nowrap text-muted-foreground">
-                        <span dir="rtl">{e.creditAr}</span>
+                        <bdi>{e.creditAr}</bdi>
                         <span className="mx-1.5 opacity-50">→</span>
-                        <span dir="rtl">{e.debitAr}</span>
+                        <bdi>{e.debitAr}</bdi>
                       </td>
                       <td className="px-4 text-right font-medium tabular-nums">{money(e.amount)}</td>
                     </tr>
