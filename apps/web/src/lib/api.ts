@@ -343,18 +343,135 @@ export interface FinanceOverview {
   openingAsOf: string | null;
 }
 
-export interface CashTransactionRow {
+export type LedgerAccountKind = 'ASSET' | 'LIABILITY' | 'EQUITY' | 'INCOME' | 'EXPENSE';
+
+export interface AccountBalance {
+  code: string;
+  nameAr: string;
+  nameEn: string;
+  kind: LedgerAccountKind;
+  balance: string;
+}
+
+export interface LedgerRow {
   id: string;
+  occurredAt: string;
   amount: string;
-  reason: string;
-  note: string | null;
+  kind: string;
+  memo: string | null;
+  debitCode: string;
+  creditCode: string;
+  debitAr: string;
+  creditAr: string;
+  supplierId: string | null;
   sourceType: string | null;
   sourceId: string | null;
-  occurredAt: string;
+  reversesId: string | null;
+  actorId: string | null;
+}
+
+/** A ledger row seen from one account: its signed effect and the balance after. */
+export interface AccountLedgerRow extends LedgerRow {
+  effect: string;
+  runningBalance: string;
+}
+
+export interface ChequeRow {
+  id: string;
+  amount: string;
+  fromParty: string;
+  receivedDate: string;
+  dueDate: string | null;
+  status: 'PENDING' | 'CLEARED' | 'BOUNCED';
+  clearedDate: string | null;
+  memo: string | null;
+  createdAt: string;
 }
 
 export const getFinanceOverview = () => get<FinanceOverview>('/finance/overview');
-export const getFinanceHistory = () => get<CashTransactionRow[]>('/finance/history');
+export const getMoneyAccounts = () => get<AccountBalance[]>('/finance/accounts');
+export const getAccountLedger = (code: string, limit = 100) =>
+  get<AccountLedgerRow[]>(`/finance/accounts/${code}/ledger?limit=${limit}`);
+export const getLedger = (query = '') =>
+  get<{ entries: LedgerRow[]; total: number; limit: number; offset: number }>(
+    `/finance/ledger${query ? `?${query}` : ''}`,
+  );
+export const getCheques = (status?: string) =>
+  get<ChequeRow[]>(`/finance/cheques${status ? `?status=${status}` : ''}`);
+
+export interface SupplierRow {
+  id: string;
+  name: string;
+  phone: string | null;
+  note: string | null;
+  active: boolean;
+  balance: string;
+  createdAt: string;
+}
+
+export interface PurchaseInvoiceRow {
+  id: string;
+  invoiceNo: string | null;
+  invoiceDate: string;
+  status: 'DRAFT' | 'POSTED';
+  payment: 'CASH' | 'CREDIT';
+  goodsTotal: string;
+  extraCosts: string;
+  landedTotal: string;
+  postedAt: string | null;
+  supplierName: string;
+  lineCount: number;
+}
+
+export interface SupplierDetail extends SupplierRow {
+  invoices: PurchaseInvoiceRow[];
+  payments: LedgerRow[];
+}
+
+export interface PurchaseInvoiceLine {
+  id: string;
+  variantId: string;
+  quantity: number;
+  unitCost: string;
+  landedUnitCost: string | null;
+  lineTotal: string;
+  label: string;
+}
+
+export interface PurchaseInvoiceDetail {
+  id: string;
+  supplierId: string;
+  supplier: { id: string; name: string; phone: string | null };
+  invoiceNo: string | null;
+  invoiceDate: string;
+  status: 'DRAFT' | 'POSTED';
+  payment: 'CASH' | 'CREDIT';
+  allocation: 'BY_VALUE' | 'PER_UNIT';
+  goodsTotal: string;
+  extraCosts: string;
+  landedTotal: string;
+  postedAt: string | null;
+  lines: PurchaseInvoiceLine[];
+}
+
+export interface PeriodSummary {
+  revenue: string;
+  cogs: string;
+  channelFees: string;
+  shipping: string;
+  otherExpense: string;
+  grossProfit: string;
+  netProfit: string;
+}
+
+export const getCashSeries = (days = 90) =>
+  get<Array<{ date: string; balance: string }>>(`/finance/cash-series?days=${days}`);
+export const getPeriodSummary = () => get<PeriodSummary>('/finance/summary');
+
+export const getSuppliers = () => get<SupplierRow[]>('/suppliers');
+export const getSupplier = (id: string) => get<SupplierDetail>(`/suppliers/${id}`);
+export const getPurchases = () => get<PurchaseInvoiceRow[]>('/purchases');
+export const getPurchase = (id: string) => get<PurchaseInvoiceDetail>(`/purchases/${id}`);
 
 
 

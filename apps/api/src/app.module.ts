@@ -13,6 +13,7 @@ import { ChannelListing } from './catalog/channel-listing.entity';
 import { ProductVariant } from './catalog/product-variant.entity';
 import { Product } from './catalog/product.entity';
 import { SnakeNamingStrategy } from './database/snake-naming.strategy';
+import { Cheque } from './finance/cheque.entity';
 import { FinanceController } from './finance/finance.controller';
 import { FinanceService } from './finance/finance.service';
 import { LedgerAccount } from './finance/ledger-account.entity';
@@ -35,6 +36,10 @@ import { OrderItem } from './orders/order-item.entity';
 import { Order } from './orders/order.entity';
 import { OrdersController } from './orders/orders.controller';
 import { OrdersService } from './orders/orders.service';
+import { PurchaseInvoice, PurchaseInvoiceLine } from './purchasing/purchase-invoice.entity';
+import { PurchasesController, SuppliersController } from './purchasing/purchasing.controller';
+import { PurchasingService } from './purchasing/purchasing.service';
+import { Supplier } from './purchasing/supplier.entity';
 import { NoonReportingService } from './reporting/noon-reporting.service';
 
 const ENTITIES = [
@@ -52,6 +57,10 @@ const ENTITIES = [
   EasyOrdersEvent,
   LedgerAccount,
   LedgerEntry,
+  Cheque,
+  Supplier,
+  PurchaseInvoice,
+  PurchaseInvoiceLine,
 ];
 
 @Module({
@@ -83,6 +92,8 @@ const ENTITIES = [
     EasyOrdersController,
     BostaController,
     FinanceController,
+    SuppliersController,
+    PurchasesController,
   ],
   providers: [
     // Every endpoint requires a session unless it opts out with @Public(),
@@ -98,6 +109,7 @@ const ENTITIES = [
     BostaService,
     FinanceService,
     LedgerService,
+    PurchasingService,
   ],
 })
 export class AppModule implements OnModuleInit {
