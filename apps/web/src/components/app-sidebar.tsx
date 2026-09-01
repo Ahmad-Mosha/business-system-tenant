@@ -2,11 +2,13 @@
 
 import {
   BarChart3,
+  BookText,
   CalendarRange,
   LayoutGrid,
   LogOut,
   Menu,
   Package,
+  Receipt,
   ShoppingBag,
   Truck,
   Upload,
@@ -26,6 +28,8 @@ interface NavItem {
   label: string;
   icon: typeof LayoutGrid;
   roles?: Role[];
+  /** Match the path exactly, for a section root that has children. */
+  exact?: boolean;
 }
 
 /**
@@ -39,7 +43,14 @@ const NAVIGATION: Array<{ label: string; items: NavItem[] }> = [
       { href: '/orders', label: 'Orders', icon: ShoppingBag },
       { href: '/shipments', label: 'Shipments', icon: Truck },
       { href: '/inventory', label: 'Inventory', icon: Package, roles: ['ADMIN'] },
-      { href: '/finance', label: 'Finance', icon: Wallet, roles: ['ADMIN'] },
+    ],
+  },
+  {
+    label: 'Money',
+    items: [
+      { href: '/money', label: 'Overview', icon: Wallet, roles: ['ADMIN'], exact: true },
+      { href: '/money/treasury', label: 'Treasury', icon: Receipt, roles: ['ADMIN'] },
+      { href: '/money/ledger', label: 'Ledger', icon: BookText, roles: ['ADMIN'] },
     ],
   },
   {
@@ -111,9 +122,9 @@ export function AppSidebar({ user }: { user: SessionUser }) {
                 {group.label}
               </p>
               <ul className="flex flex-col gap-0.5">
-                {group.items.map(({ href, label, icon: Icon }) => {
+                {group.items.map(({ href, label, icon: Icon, exact }) => {
                   const active =
-                    href === '/' ? pathname === '/' : pathname.startsWith(href);
+                    href === '/' || exact ? pathname === href : pathname.startsWith(href);
                   return (
                     <li key={href}>
                       <Link
