@@ -1,10 +1,22 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
+import type { LedgerAccountCode } from './ledger-account.entity';
 import { LedgerService } from './ledger.service';
 
 const MONEY = /^\d+(\.\d{1,2})?$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * The accounts a hand-entered voucher may move cash against. Anything else is
+ * the consequence of a real event (a sale, a payout) and is not typed in.
+ */
+export const VOUCHER_ACCOUNTS: readonly LedgerAccountCode[] = [
+  'SHIPPING',
+  'CHANNEL_FEES',
+  'OTHER_EXPENSE',
+  'OWNER_CAPITAL',
+];
 
 /** The one live opening-balance entry: not itself a reversal, not reversed. */
 const LIVE_OPENING = `
@@ -112,6 +124,46 @@ export class FinanceService {
         },
         tx,
       );
+    });
+  }
+
+  /**
+   * A hand-entered cash voucher: سند قبض (money in) or سند صرف (money out),
+   * moving cash against one permitted counter-account. إيداع نقدي is just this
+   * with the counter set to owner capital.
+   */
+  async recordVoucher(input: {
+    direction: 'IN' | 'OUT';
+    counter: LedgerAccountCode;
+    amount: string;
+    memo?: string;
+    occurredAt?: string;
+    userId: string;
+  }) {
+    if (!MONEY.test(input.amount)) throw new BadRequestException('amount must be like 1000.00');
+    if (!VOUCHER_ACCOUNTS.includes(input.counter)) {
+      throw new BadRequestException(`counter must be one of: ${VOUCHER_ACCOUNTS.join(', ')}`);
+    }
+    if (input.occurredAt && !ISO_DATE.test(input.occurredAt)) {
+      throw new BadRequestException('occurredAt must be YYYY-MM-DD');
+    }
+
+    const capital = input.counter === 'OWNER_CAPITAL';
+    return this.ledger.post({
+      amount: input.amount,
+      debit: input.direction === 'IN' ? 'CASH' : input.counter,
+      credit: input.direction === 'IN' ? input.counter : 'CASH',
+      kind: capital
+        ? input.direction === 'IN'
+          ? 'CASH_DEPOSIT'
+          : 'CAPITAL_WITHDRAWAL'
+        : input.direction === 'IN'
+          ? 'PAYMENT_IN'
+          : 'PAYMENT_OUT',
+      memo: input.memo?.trim() || null,
+      occurredAt: input.occurredAt ? new Date(`${input.occurredAt}T00:00:00Z`) : undefined,
+      sourceType: 'voucher',
+      actorId: input.userId,
     });
   }
 
