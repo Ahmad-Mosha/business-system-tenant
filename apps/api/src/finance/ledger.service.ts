@@ -274,6 +274,84 @@ export class LedgerService {
     );
   }
 
+  /**
+   * Daily closing balance of one account across a window — for the overview
+   * chart. Every day in the range gets a point, carried forward on quiet days.
+   */
+  async dailyBalance(
+    code: LedgerAccountCode,
+    fromDate: string,
+    tx: EntityManager = this.db.manager,
+  ): Promise<Array<{ date: string; balance: string }>> {
+    return tx.query(
+      `WITH signed AS (
+         SELECT e.occurred_at::date AS d,
+                CASE WHEN a.kind IN ('ASSET', 'EXPENSE')
+                     THEN CASE WHEN e.debit_code = a.code THEN e.amount ELSE -e.amount END
+                     ELSE CASE WHEN e.credit_code = a.code THEN e.amount ELSE -e.amount END
+                END AS effect
+         FROM ledger_entry e
+         JOIN ledger_account a ON a.code = $1
+         WHERE e.debit_code = $1 OR e.credit_code = $1
+       ),
+       opening AS (
+         SELECT COALESCE(SUM(effect), 0) AS bal FROM signed WHERE d < $2::date
+       ),
+       per_day AS (
+         SELECT d, SUM(effect) AS delta FROM signed WHERE d >= $2::date GROUP BY d
+       )
+       SELECT g::date::text AS date,
+              ((SELECT bal FROM opening)
+                + COALESCE(SUM(p.delta) OVER (ORDER BY g), 0))::text AS balance
+       FROM generate_series($2::date, CURRENT_DATE, '1 day') g
+       LEFT JOIN per_day p ON p.d = g
+       ORDER BY g`,
+      [code, fromDate],
+    );
+  }
+
+  /**
+   * Revenue and cost components for a period, from the profit accounts. The
+   * gross/net split is a choice of which of these to subtract — open decision
+   * #6 — so the raw components are returned and the interpretation stays thin.
+   */
+  async periodSummary(
+    from: string,
+    to: string,
+    tx: EntityManager = this.db.manager,
+  ): Promise<Record<string, string>> {
+    const acct = (code: string) =>
+      `COALESCE(SUM(amount) FILTER (WHERE credit_code = '${code}'), 0)
+       - COALESCE(SUM(amount) FILTER (WHERE debit_code = '${code}'), 0)`;
+    const expense = (code: string) =>
+      `COALESCE(SUM(amount) FILTER (WHERE debit_code = '${code}'), 0)
+       - COALESCE(SUM(amount) FILTER (WHERE credit_code = '${code}'), 0)`;
+
+    const [r] = await tx.query(
+      `SELECT ${acct('SALES')}          AS revenue,
+              ${expense('COGS')}         AS cogs,
+              ${expense('CHANNEL_FEES')} AS "channelFees",
+              ${expense('SHIPPING')}     AS shipping,
+              ${expense('OTHER_EXPENSE')} AS "otherExpense"
+       FROM ledger_entry
+       WHERE occurred_at::date BETWEEN $1 AND $2`,
+      [from, to],
+    );
+
+    const n = (v: string) => Number(v);
+    const grossProfit = n(r.revenue) - n(r.cogs) - n(r.channelFees);
+    const netProfit = grossProfit - n(r.shipping) - n(r.otherExpense);
+    return {
+      revenue: n(r.revenue).toFixed(2),
+      cogs: n(r.cogs).toFixed(2),
+      channelFees: n(r.channelFees).toFixed(2),
+      shipping: n(r.shipping).toFixed(2),
+      otherExpense: n(r.otherExpense).toFixed(2),
+      grossProfit: grossProfit.toFixed(2),
+      netProfit: netProfit.toFixed(2),
+    };
+  }
+
   private normaliseAmount(value: string | number): string {
     const str = typeof value === 'number' ? value.toFixed(2) : value.trim();
     if (!MONEY.test(str) || Number(str) <= 0) {
