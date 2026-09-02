@@ -15,6 +15,8 @@ export interface CreateProductInput {
   unitCost?: string;
   sellingPrice?: string;
   openingStock?: number;
+  /** Channel SKUs to link on creation — same as adding them from the product screen after. */
+  listings?: Array<{ channel: string; externalId: string }>;
 }
 
 export interface ProductFilters {
@@ -277,11 +279,13 @@ export class CatalogService {
         );
       }
 
-      // No fabricated channel listings here: a channel listing means "this is
-      // literally how noon/Easy Orders refer to this item," and an invented
-      // external id would never match a real transaction — it would just look
-      // connected without being connected. Real listings come from an import
-      // (noon) or a catalogue sync (Easy Orders) matching genuine identifiers.
+      // Channel SKUs, when the person entering the product already has them —
+      // these are real identifiers they typed, not fabricated ones. A blank
+      // field is skipped; a clash rolls the whole product back with the reason.
+      for (const l of input.listings ?? []) {
+        if (!l?.externalId?.trim()) continue;
+        await this.insertListing(tx, variant.id, l.channel, l.externalId);
+      }
 
       return { ...product, variantId: variant.id };
     });
@@ -361,15 +365,6 @@ export class CatalogService {
     productId: string,
     input: { channel?: string; externalId?: string; variantId?: string },
   ) {
-    const channel = (input.channel ?? '').trim().toLowerCase();
-    if (!(CatalogService.LISTING_CHANNELS as readonly string[]).includes(channel)) {
-      throw new BadRequestException(
-        `channel must be one of: ${CatalogService.LISTING_CHANNELS.join(', ')}`,
-      );
-    }
-    const externalId = (input.externalId ?? '').trim();
-    if (!externalId) throw new BadRequestException('the channel SKU is required');
-
     const product = await this.db.getRepository(Product).findOne({
       where: { id: productId },
       relations: { variants: true },
@@ -378,13 +373,33 @@ export class CatalogService {
 
     const variantId = await this.resolveListingVariant(product, input.variantId);
 
-    // noon's settlement import resolves a row to a listing by its Partner SKU,
-    // so for noon that column has to carry the same value as externalId.
-    const partnerSku = channel === 'noon' ? externalId : null;
+    return this.db.transaction((tx) =>
+      this.insertListing(tx, variantId, input.channel ?? '', input.externalId ?? ''),
+    );
+  }
 
-    const clash = await this.db.getRepository(ChannelListing).findOne({
+  /**
+   * Validates a channel/SKU pair and links it to a variant. The clash check and
+   * the insert share one transaction so two adds can't both slip a duplicate
+   * past it. Shared by `addListing` and product creation.
+   */
+  private async insertListing(
+    tx: EntityManager,
+    variantId: string,
+    channelRaw: string,
+    externalIdRaw: string,
+  ) {
+    const channel = channelRaw.trim().toLowerCase();
+    if (!(CatalogService.LISTING_CHANNELS as readonly string[]).includes(channel)) {
+      throw new BadRequestException(
+        `channel must be one of: ${CatalogService.LISTING_CHANNELS.join(', ')}`,
+      );
+    }
+    const externalId = externalIdRaw.trim();
+    if (!externalId) throw new BadRequestException('the channel SKU is required');
+
+    const clash = await tx.findOne(ChannelListing, {
       where: { channel: channel as ChannelListing['channel'], externalId, externalVariantId: '' },
-      relations: { variant: true },
     });
     if (clash) {
       throw new BadRequestException(
@@ -392,11 +407,13 @@ export class CatalogService {
       );
     }
 
-    return this.db.getRepository(ChannelListing).save({
+    return tx.save(ChannelListing, {
       channel: channel as ChannelListing['channel'],
       externalId,
       externalVariantId: '',
-      partnerSku,
+      // noon's settlement import resolves a row by its Partner SKU, so for noon
+      // that column has to carry the same value as externalId.
+      partnerSku: channel === 'noon' ? externalId : null,
       variantId,
     });
   }
