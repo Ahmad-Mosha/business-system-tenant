@@ -345,6 +345,118 @@ export class CatalogService {
     return repo.save(variant);
   }
 
+  /**
+   * The channels a listing can be added for. `social` is deliberately not here
+   * — a social sale is keyed as a manual order against a variant directly, it
+   * never needs an external identifier to resolve.
+   */
+  private static readonly LISTING_CHANNELS = ['noon', 'amazon', 'easyorders'] as const;
+
+  /**
+   * Links one of our variants to how a sales channel refers to it, so a sale
+   * on that channel decrements this stock. Everything is optional per product:
+   * a product sold only on social has no listings at all.
+   */
+  async addListing(
+    productId: string,
+    input: { channel?: string; externalId?: string; variantId?: string },
+  ) {
+    const channel = (input.channel ?? '').trim().toLowerCase();
+    if (!(CatalogService.LISTING_CHANNELS as readonly string[]).includes(channel)) {
+      throw new BadRequestException(
+        `channel must be one of: ${CatalogService.LISTING_CHANNELS.join(', ')}`,
+      );
+    }
+    const externalId = (input.externalId ?? '').trim();
+    if (!externalId) throw new BadRequestException('the channel SKU is required');
+
+    const product = await this.db.getRepository(Product).findOne({
+      where: { id: productId },
+      relations: { variants: true },
+    });
+    if (!product) throw new NotFoundException('product not found');
+
+    const variantId = await this.resolveListingVariant(product, input.variantId);
+
+    // noon's settlement import resolves a row to a listing by its Partner SKU,
+    // so for noon that column has to carry the same value as externalId.
+    const partnerSku = channel === 'noon' ? externalId : null;
+
+    const clash = await this.db.getRepository(ChannelListing).findOne({
+      where: { channel: channel as ChannelListing['channel'], externalId, externalVariantId: '' },
+      relations: { variant: true },
+    });
+    if (clash) {
+      throw new BadRequestException(
+        `${channel} "${externalId}" is already linked to another product`,
+      );
+    }
+
+    return this.db.getRepository(ChannelListing).save({
+      channel: channel as ChannelListing['channel'],
+      externalId,
+      externalVariantId: '',
+      partnerSku,
+      variantId,
+    });
+  }
+
+  /** Correct the identifier on a listing — a mistyped SKU, nothing structural. */
+  async updateListing(listingId: string, patch: { externalId?: string }) {
+    const repo = this.db.getRepository(ChannelListing);
+    const listing = await repo.findOneBy({ id: listingId });
+    if (!listing) throw new NotFoundException('listing not found');
+
+    const externalId = (patch.externalId ?? '').trim();
+    if (!externalId) throw new BadRequestException('the channel SKU is required');
+
+    if (externalId !== listing.externalId) {
+      const clash = await repo.findOne({
+        where: {
+          channel: listing.channel,
+          externalId,
+          externalVariantId: listing.externalVariantId,
+        },
+      });
+      if (clash) {
+        throw new BadRequestException(
+          `${listing.channel} "${externalId}" is already linked to another product`,
+        );
+      }
+    }
+
+    listing.externalId = externalId;
+    if (listing.channel === 'noon') listing.partnerSku = externalId;
+    return repo.save(listing);
+  }
+
+  /**
+   * Unlinks a channel from a product. Hard delete on purpose: a listing is a
+   * mapping, not history. Any noon transactions resolved through it fall back
+   * to unmapped (`listing_id` is `ON DELETE SET NULL`); stock movements already
+   * recorded are untouched.
+   */
+  async removeListing(listingId: string) {
+    const result = await this.db.getRepository(ChannelListing).delete({ id: listingId });
+    if (!result.affected) throw new NotFoundException('listing not found');
+  }
+
+  /** A single-variant product takes the listing automatically; otherwise say which. */
+  private async resolveListingVariant(product: Product, variantId?: string): Promise<string> {
+    const active = (product.variants ?? []).filter((v) => v.active);
+    if (variantId?.trim()) {
+      const wanted = variantId.trim();
+      if (!active.some((v) => v.id === wanted)) {
+        throw new BadRequestException('that variant does not belong to this product');
+      }
+      return wanted;
+    }
+    if (active.length === 1) return active[0].id;
+    throw new BadRequestException(
+      'this product has more than one variant — say which one the listing is for',
+    );
+  }
+
   /** Records a stock change. Quantity on hand is always the sum of these. */
   async recordStock(
     variantId: string,

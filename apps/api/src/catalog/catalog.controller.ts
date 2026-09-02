@@ -103,6 +103,32 @@ export class CatalogController {
     await this.catalog.archiveProduct(id);
   }
 
+  /** Link a channel's SKU to this product so a sale there moves its stock. */
+  @Roles('ADMIN')
+  @Post('products/:id/listings')
+  addListing(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { channel?: string; externalId?: string; variantId?: string },
+  ) {
+    return this.catalog.addListing(id, body);
+  }
+
+  @Roles('ADMIN')
+  @Patch('listings/:id')
+  updateListing(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { externalId?: string },
+  ) {
+    return this.catalog.updateListing(id, body);
+  }
+
+  @Roles('ADMIN')
+  @Delete('listings/:id')
+  @HttpCode(204)
+  async removeListing(@Param('id', ParseUUIDPipe) id: string) {
+    await this.catalog.removeListing(id);
+  }
+
   @Roles('ADMIN')
   @Patch('variants/:id')
   updateVariant(
