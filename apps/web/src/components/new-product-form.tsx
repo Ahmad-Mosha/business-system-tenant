@@ -173,6 +173,31 @@ export function NewProductForm() {
                 product carries cost, not price.
               </p>
 
+              <div className="mt-5 border-t border-border pt-4">
+                <p className="text-[11px] text-muted-foreground">
+                  Also sold on (optional) — the SKU each channel uses. A sale there will move this
+                  product’s stock. Leave blank if you don’t sell it there; you can add these later
+                  from the product page.
+                </p>
+                <div className="mt-3 space-y-3">
+                  {[
+                    { name: 'sku_noon', label: 'noon', placeholder: 'Partner SKU, e.g. CCC-0001' },
+                    { name: 'sku_amazon', label: 'Amazon', placeholder: 'Seller SKU' },
+                    { name: 'sku_easyorders', label: 'Website', placeholder: 'Easy Orders product ID' },
+                  ].map((c) => (
+                    <div key={c.name} className="flex items-center gap-3">
+                      <span className="w-16 shrink-0 text-[11px] text-muted-foreground">{c.label}</span>
+                      <input
+                        name={c.name}
+                        placeholder={c.placeholder}
+                        disabled={pending}
+                        className={cn(field, 'font-mono')}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {state.status === 'error' && (
                 <p
                   role="alert"
