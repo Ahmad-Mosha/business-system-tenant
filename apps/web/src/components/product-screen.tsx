@@ -16,7 +16,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { ChannelBadge } from '@/components/order-status';
+import { ChannelListings } from '@/components/channel-listings';
 import { Screen, Scroller } from '@/components/shell';
 import { VariantPanel } from '@/components/variant-panel';
 import { CATEGORIES, categoryLabel } from '@/lib/categories';
@@ -237,37 +237,12 @@ export function ProductScreen({
 
           <section>
             <div className="mb-2 flex items-baseline justify-between">
-              <h2 className="text-[13px] font-medium">Channel listings</h2>
-              <span className="text-[11px] text-muted-foreground">how each channel refers to this product</span>
+              <h2 className="text-[13px] font-medium">Channels</h2>
+              <span className="text-[11px] text-muted-foreground">
+                the SKU each channel uses for this product — a sale there moves this stock
+              </span>
             </div>
-            {product.listings.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-border bg-card px-5 py-8 text-center text-[13px] text-muted-foreground">
-                Not listed on any channel yet. Listings are created when a report is imported or
-                the website catalogue is synced.
-              </p>
-            ) : (
-              <ul className="overflow-hidden rounded-xl border border-border bg-card shadow-xs">
-                {product.listings.map((l, i) => (
-                  <li
-                    key={l.id}
-                    className={cn(
-                      'flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2.5 text-[13px]',
-                      i > 0 && 'border-t border-border',
-                    )}
-                  >
-                    <span className="w-24 shrink-0">
-                      <ChannelBadge channel={l.channel} />
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-muted-foreground" title={l.title ?? ''}>
-                      {l.title ?? '—'}
-                    </span>
-                    <code className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
-                      {l.partnerSku ?? l.externalId}
-                    </code>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <ChannelListings product={product} />
           </section>
         </div>
       </Scroller>

@@ -99,6 +99,42 @@ export async function updateVariant(
   return { ok: true as const };
 }
 
+/** Links a channel's SKU to a product so a sale there decrements its stock. */
+export async function addListing(
+  productId: string,
+  channel: string,
+  externalId: string,
+  variantId?: string,
+) {
+  try {
+    await send(`/catalog/products/${productId}/listings`, 'POST', { channel, externalId, variantId });
+  } catch (e) {
+    return { ok: false as const, message: e instanceof Error ? e.message : 'Could not link the channel' };
+  }
+  revalidatePath(`/inventory/${productId}`);
+  return { ok: true as const };
+}
+
+export async function updateListing(productId: string, listingId: string, externalId: string) {
+  try {
+    await send(`/catalog/listings/${listingId}`, 'PATCH', { externalId });
+  } catch (e) {
+    return { ok: false as const, message: e instanceof Error ? e.message : 'Could not save' };
+  }
+  revalidatePath(`/inventory/${productId}`);
+  return { ok: true as const };
+}
+
+export async function removeListing(productId: string, listingId: string) {
+  try {
+    await send(`/catalog/listings/${listingId}`, 'DELETE', undefined);
+  } catch (e) {
+    return { ok: false as const, message: e instanceof Error ? e.message : 'Could not unlink' };
+  }
+  revalidatePath(`/inventory/${productId}`);
+  return { ok: true as const };
+}
+
 /** Pulls the live Easy Orders catalogue so website orders resolve to stock. */
 export async function syncEasyOrders() {
   try {
