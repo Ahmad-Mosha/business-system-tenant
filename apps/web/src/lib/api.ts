@@ -251,6 +251,19 @@ export interface Assignee {
   role: 'ADMIN' | 'MODERATOR';
 }
 
+export interface TeamMember {
+  id: string;
+  name: string;
+  email: string;
+  active: boolean;
+  assigned: number;
+  delivered: number;
+  cancelled: number;
+  deliveredValue: string;
+  /** delivered ÷ assigned, %, or null when they have no orders yet. */
+  deliveryRate: number | null;
+}
+
 export interface ProductRow {
   id: string;
   name: string;
@@ -315,6 +328,7 @@ export const getOrders = (query = '') =>
 export const getOrder = (id: string) => get<OrderDetail>(`/orders/${id}`);
 export const getOrderSummary = () => get<OrderSummary>('/orders/summary');
 export const getAssignees = () => get<Assignee[]>('/auth/users');
+export const getTeam = () => get<TeamMember[]>('/auth/team');
 export const getProductsCatalog = (query?: string) =>
   get<ProductRow[]>(`/catalog/products${query ? (query.startsWith('?') ? query : `?${query}`) : ''}`);
 export const getProductsSummary = (query?: string) =>

@@ -43,4 +43,17 @@ export class AuthController {
   users() {
     return this.auth.listAssignees();
   }
+
+  /** Moderators + their order KPIs, for the Team screen. */
+  @Roles('ADMIN')
+  @Get('team')
+  team() {
+    return this.auth.teamOverview();
+  }
+
+  @Roles('ADMIN')
+  @Post('moderators')
+  addModerator(@Body() body: { name?: string; email?: string; password?: string }) {
+    return this.auth.createModerator(body);
+  }
 }
