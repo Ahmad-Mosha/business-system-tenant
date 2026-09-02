@@ -13,6 +13,7 @@ import {
   ShoppingBag,
   Truck,
   Upload,
+  UserCog,
   Users,
   Wallet,
   X,
@@ -67,6 +68,10 @@ const NAVIGATION: Array<{ label: string; items: NavItem[] }> = [
       { href: '/products', label: 'Products', icon: BarChart3, roles: ['ADMIN'] },
       { href: '/imports', label: 'Imports', icon: Upload, roles: ['ADMIN'] },
     ],
+  },
+  {
+    label: 'Admin',
+    items: [{ href: '/team', label: 'Team', icon: UserCog, roles: ['ADMIN'] }],
   },
 ];
 
