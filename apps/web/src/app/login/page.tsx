@@ -21,10 +21,12 @@ export default async function LoginPage() {
 
         <LoginForm />
 
-        <p className="mt-8 text-center text-xs text-muted-foreground">
-          Development accounts: admin@admin.com / admin123 ·
-          moderator@moderator.com / moderator123
-        </p>
+        {process.env.NODE_ENV !== 'production' && (
+          <p className="mt-8 text-center text-xs text-muted-foreground">
+            Development accounts: admin@admin.com / admin123 ·
+            moderator@moderator.com / moderator123
+          </p>
+        )}
       </div>
     </div>
   );
