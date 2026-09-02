@@ -1,4 +1,4 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -83,12 +83,79 @@ export class AuthService {
     return { token: await this.jwt.signAsync(session), user: session };
   }
 
-  /** Moderators an admin can assign work to. */
+  /** Moderators an admin can assign work to — the admin is not one of them. */
   listAssignees() {
     return this.users.find({
-      where: { active: true },
+      where: { active: true, role: 'MODERATOR' },
       select: { id: true, name: true, email: true, role: true },
       order: { name: 'ASC' },
     });
+  }
+
+  private static readonly EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  /**
+   * Adds a moderator. After the one-time seed this is the only way an account
+   * is created — admin-only, enforced at the controller.
+   */
+  async createModerator(input: { name?: string; email?: string; password?: string }) {
+    const name = (input.name ?? '').trim();
+    const email = (input.email ?? '').trim().toLowerCase();
+    const password = input.password ?? '';
+
+    if (!name) throw new BadRequestException('name is required');
+    if (!AuthService.EMAIL.test(email)) throw new BadRequestException('enter a valid email address');
+    if (password.length < 6) throw new BadRequestException('password must be at least 6 characters');
+
+    if (await this.users.findOne({ where: { email } })) {
+      throw new BadRequestException(`${email} is already in use`);
+    }
+
+    const user = await this.users.save(
+      this.users.create({
+        name,
+        email,
+        role: 'MODERATOR',
+        passwordHash: await hashPassword(password),
+      }),
+    );
+    return { id: user.id, name: user.name, email: user.email, role: user.role, active: user.active };
+  }
+
+  /**
+   * Every moderator with headline numbers over the orders assigned to them.
+   * One grouped query — the list stays a single round trip however many
+   * moderators there are.
+   */
+  async teamOverview() {
+    const rows: Array<{
+      id: string;
+      name: string;
+      email: string;
+      active: boolean;
+      assigned: number;
+      delivered: number;
+      cancelled: number;
+      deliveredValue: string;
+    }> = await this.users.manager.query(
+      `SELECT u.id, u.name, u.email, u.active,
+              count(o.id)::int                                             AS assigned,
+              count(o.id) FILTER (WHERE o.status = 'DELIVERED')::int        AS delivered,
+              count(o.id) FILTER (WHERE o.status = 'CANCELLED')::int        AS cancelled,
+              COALESCE(SUM(o.total) FILTER (WHERE o.status = 'DELIVERED'), 0) AS "deliveredValue"
+       FROM app_user u
+       LEFT JOIN customer_order o ON o.assigned_to_id = u.id
+       WHERE u.role = 'MODERATOR'
+       GROUP BY u.id, u.name, u.email, u.active
+       ORDER BY u.active DESC, u.name ASC`,
+    );
+
+    return rows.map((r) => ({
+      ...r,
+      deliveredValue: String(r.deliveredValue),
+      // Null, not 0%, when they have no orders yet — "0%" would read as a bad
+      // score rather than "nothing to measure".
+      deliveryRate: r.assigned > 0 ? Math.round((r.delivered / r.assigned) * 100) : null,
+    }));
   }
 }
