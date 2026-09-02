@@ -36,11 +36,18 @@ always there; nothing could *create* a mapping. Now: `POST
 editable "Channels" block on the product screen — one optional field per channel
 (noon Partner SKU / Amazon Seller SKU / Website id). noon's `partnerSku` is
 mirrored to `externalId` (what the settlement importer matches on).
+The **Add Product** form also carries the three optional SKU fields now (PR #41)
+— `createProduct` links them in the same transaction, rolling the product back
+on a clash. So a product + its channel SKUs is one step.
 **Not done, on purpose:** the 3,173 historical noon rows / 132 SKUs are still
 unmapped and there's no bulk-map tool — Ahmad is rebuilding the catalogue by
-hand with the owner and entering real SKUs from that screen. Follow-ups: SKU
-fields on the new-product form, multi-variant channel mapping, an Easy Orders
-picker.
+hand with the owner. Follow-ups: multi-variant channel mapping, an Easy Orders
+catalogue picker.
+
+**Deploy note:** there is no CI/CD. Production (AWS EC2) only updates when
+someone SSHes in and runs `git pull && docker compose -f docker-compose.prod.yml
+up -d --build`. Everything since 2026-09-02 (Bosta fixes, channel listings) is on
+`main` but **not deployed** until that's run.
 
 ---
 
