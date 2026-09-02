@@ -91,6 +91,23 @@ product `اختبار منتج` deleted). `/money` shows the "set opening balanc
 
 ---
 
+## Moderators & the Team screen — BUILT 2026-09-02 (PR #43)
+
+- **Roles:** `ADMIN` sees everything; `MODERATOR` sees only Orders + Shipments,
+  and only the orders assigned to them (enforced in the query, not just the UI).
+- **A moderator's manual order auto-assigns to them** on creation, status
+  `ASSIGNED` (`OrdersService.create` — was already there).
+- **`POST /auth/moderators`** (admin) — the only account-creation path after the
+  one-time seed. `GET /auth/users` (the "assign to" dropdown) now returns
+  moderators only. `GET /auth/team` — per-moderator KPIs (assigned / delivered /
+  cancelled / delivered sales value / delivery rate).
+- **`/team`** screen (Admin nav section) — moderator cards + "Add moderator".
+- Order lifecycle (`NEW→ASSIGNED→CONFIRMED→SHIPPED→DELIVERED`, +`CANCELLED`/
+  `RETURNED`) is unchanged — Ahmad is settling it with the owners.
+- Seed moderators created on the **dev** DB only: `aya` / `nada` / `ahmed`,
+  `@prime.com`, password `mod123`. **Production needs them re-created** — either
+  via the Team screen or a manual step after deploy.
+
 ## Bosta integration — REWORKED this session
 
 Bosta is the only courier (FlexShip is a Bosta feature, not a second courier).
