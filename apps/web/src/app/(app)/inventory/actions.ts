@@ -29,6 +29,9 @@ export async function addProduct(
   formData: FormData,
 ): Promise<CreateProductState> {
   const openingStock = String(formData.get('openingStock') ?? '').trim();
+  const listings = (['noon', 'amazon', 'easyorders'] as const)
+    .map((channel) => ({ channel, externalId: String(formData.get(`sku_${channel}`) ?? '').trim() }))
+    .filter((l) => l.externalId);
   let created: { id: string };
   try {
     created = await send('/catalog/products', 'POST', {
@@ -38,6 +41,7 @@ export async function addProduct(
       unitCost: String(formData.get('unitCost') ?? '').trim() || undefined,
       sellingPrice: String(formData.get('sellingPrice') ?? '').trim() || undefined,
       openingStock: openingStock ? Number(openingStock) : undefined,
+      listings: listings.length ? listings : undefined,
     });
   } catch (e) {
     return { status: 'error', message: e instanceof Error ? e.message : 'Could not add product' };
