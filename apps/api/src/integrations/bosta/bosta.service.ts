@@ -102,11 +102,14 @@ export class BostaService {
   }
 
   /**
-   * Lists all live Bosta shipments for Prime Market.
-   * Automatically aggregates known business shipments and any order-linked shipments.
+   * Lists every live Bosta shipment on the account.
+   *
+   * ponytail: no per-moderator scoping — everyone sees the whole board, same as
+   * the admin. It was scoped to "orders assigned to me" before; Ahmad pulled
+   * that pending a decision on what a moderator should actually see here. Add
+   * the `SessionUser` filter back when that's settled.
    */
   async listDeliveries(
-    user: SessionUser,
     query?: { search?: string; status?: string },
   ): Promise<ShipmentTrackingDto[]> {
     // One call returns every delivery on the account, so the page costs a
@@ -122,18 +125,6 @@ export class BostaService {
         }
       })
       .filter((r): r is ShipmentTrackingDto => r !== null);
-
-    // A moderator sees only shipments belonging to orders assigned to them.
-    // An admin sees the whole account, including shipments not yet linked to
-    // an order — those still need chasing.
-    if (user.role !== 'ADMIN') {
-      const own = await this.db.getRepository(Order).find({
-        where: { assignedToId: user.id },
-        select: { trackingNumber: true },
-      });
-      const allowed = new Set(own.map((o) => o.trackingNumber).filter(Boolean) as string[]);
-      list = list.filter((s) => allowed.has(s.trackingNumber));
-    }
 
     if (query?.search) {
       const s = query.search.toLowerCase().trim();

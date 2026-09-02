@@ -26,10 +26,8 @@ export class BostaController {
    * Open to both ADMIN and MODERATOR.
    */
   @Get('shipments')
-  async listShipments(
-    @Req() req: Request,
-  ) {
-    return this.bostaService.listDeliveries(this.user(req));
+  async listShipments() {
+    return this.bostaService.listDeliveries();
   }
 
   /**
