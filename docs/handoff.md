@@ -144,11 +144,15 @@ when the money module needs it.
 
 ---
 
-## Easy Orders — parked
+## Easy Orders — webhook going live (2026-09-01)
 
-Webhook-only (no orders API). The registered webhook URL is invalid (`*`), and
-tunnel URLs die. Real fix is a fixed HTTPS domain. See
-[evidence/integrations.md](evidence/integrations.md).
+Webhook-only (no orders API). The receiver is deployed and reachable at
+`https://prime-market.duckdns.org/api/integrations/easyorders/webhook`.
+Remaining work is on the Easy Orders dashboard: register the two webhooks
+(order created + order status update) against that URL, then copy the generated
+secret into `EASYORDERS_WEBHOOK_SECRET` in the `.env` on the EC2 box and restart
+`api`. Full procedure and diagnostics in
+[evidence/integrations.md](evidence/integrations.md) → Easy Orders.
 
 ## noon — reports, no API
 
