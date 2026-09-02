@@ -27,9 +27,20 @@ Last updated: 2026-09-01.
 ## How the build actually went
 
 Breadth-first, not the phased roadmap. Catalogue, inventory, noon import,
-orders, and Bosta all exist at some depth. The core gap is **`channel_listing`
-is empty** — noon/Amazon SKU → product mapping is deferred; the owner is
-entering inventory + listings manually first. Don't build the mapping layer.
+orders, and Bosta all exist at some depth.
+
+**Channel mapping (`channel_listing`) — CRUD + screen built 2026-09-02 (PR #39).**
+The table and its resolvers (noon import, Easy Orders webhook, order→stock) were
+always there; nothing could *create* a mapping. Now: `POST
+/catalog/products/:id/listings`, `PATCH`/`DELETE /catalog/listings/:id`, and an
+editable "Channels" block on the product screen — one optional field per channel
+(noon Partner SKU / Amazon Seller SKU / Website id). noon's `partnerSku` is
+mirrored to `externalId` (what the settlement importer matches on).
+**Not done, on purpose:** the 3,173 historical noon rows / 132 SKUs are still
+unmapped and there's no bulk-map tool — Ahmad is rebuilding the catalogue by
+hand with the owner and entering real SKUs from that screen. Follow-ups: SKU
+fields on the new-product form, multi-variant channel mapping, an Easy Orders
+picker.
 
 ---
 
