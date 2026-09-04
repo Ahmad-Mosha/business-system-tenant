@@ -5,17 +5,12 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { searchVariants } from '@/app/(app)/orders/actions';
-import {
-  createProductForInvoice,
-  saveInvoice,
-  type InvoicePayload,
-} from '@/app/(app)/money/actions';
+import { saveInvoice, type InvoicePayload } from '@/app/(app)/money/actions';
+import { AddProductDialog } from '@/components/add-product-dialog';
 import { ContextBar, Screen } from '@/components/shell';
 import { Button } from '@/components/ui/button';
 import type { SupplierRow } from '@/lib/api';
-import { CATEGORIES } from '@/lib/categories';
 import { money } from '@/lib/format';
-import { previewLanded } from '@/lib/money';
 import { cn } from '@/lib/utils';
 
 interface Line {
@@ -46,16 +41,10 @@ export function InvoiceBuilder({
   const [invoiceNo, setInvoiceNo] = useState('');
   const [invoiceDate, setInvoiceDate] = useState(todayISO());
   const [payment, setPayment] = useState<'CASH' | 'CREDIT'>('CREDIT');
-  const [allocation, setAllocation] = useState<'BY_VALUE' | 'PER_UNIT'>('BY_VALUE');
-  const [extraCosts, setExtraCosts] = useState('');
   const [lines, setLines] = useState<Line[]>([]);
 
   const supplier = suppliers.find((s) => s.id === supplierId);
-  const numeric = lines.map((l) => ({ quantity: l.quantity, unitCost: Number(l.unitCost) || 0 }));
-  const goods = numeric.reduce((s, l) => s + l.quantity * l.unitCost, 0);
-  const extra = Number(extraCosts) || 0;
-  const total = goods + extra;
-  const landed = previewLanded(numeric, extra, allocation);
+  const total = lines.reduce((s, l) => s + l.quantity * (Number(l.unitCost) || 0), 0);
 
   const removeLine = (key: string) => setLines((ls) => ls.filter((l) => l.key !== key));
   const patchLine = (key: string, patch: Partial<Line>) =>
@@ -74,8 +63,11 @@ export function InvoiceBuilder({
       invoiceNo: invoiceNo.trim() || undefined,
       invoiceDate,
       payment,
-      allocation,
-      extraCosts: extraCosts.trim() || '0',
+      // Shipping/customs allocation is off for now — every invoice is goods
+      // only. The backend and its costing math still take these two fields;
+      // turning it back on is re-adding the two inputs, nothing more.
+      allocation: 'BY_VALUE',
+      extraCosts: '0',
       lines: lines.map((l) => ({ variantId: l.variantId, quantity: l.quantity, unitCost: l.unitCost })),
     };
     start(async () => {
@@ -147,13 +139,12 @@ export function InvoiceBuilder({
                       <th className="px-3 py-1.5 text-left font-medium">Product</th>
                       <th className="px-2 py-1.5 text-right font-medium">Qty</th>
                       <th className="px-2 py-1.5 text-right font-medium">Unit cost</th>
-                      <th className="px-2 py-1.5 text-right font-medium">Landed</th>
                       <th className="px-2 py-1.5 text-right font-medium">Line</th>
                       <th className="w-7" />
                     </tr>
                   </thead>
                   <tbody>
-                    {lines.map((l, i) => (
+                    {lines.map((l) => (
                       <tr key={l.key} className="border-b border-border/60 last:border-b-0">
                         <td className="px-3 py-1.5">
                           <bdi>{l.label}</bdi>
@@ -183,9 +174,6 @@ export function InvoiceBuilder({
                             className="h-7 w-20 rounded border border-border bg-card px-1.5 text-right tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           />
                         </td>
-                        <td className="px-2 py-1.5 text-right tabular-nums text-muted-foreground">
-                          {landed[i] ? money(landed[i].landedUnitCost) : '—'}
-                        </td>
                         <td className="px-2 py-1.5 text-right tabular-nums">
                           {money(l.quantity * (Number(l.unitCost) || 0))}
                         </td>
@@ -207,36 +195,12 @@ export function InvoiceBuilder({
             )}
           </div>
 
-          {/* Extra costs */}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="grid gap-1.5">
-              <Lbl>Shipping, customs &amp; clearance (EGP)</Lbl>
-              <input
-                inputMode="decimal"
-                className={cn(field, 'text-right tabular-nums')}
-                value={extraCosts}
-                onChange={(e) => setExtraCosts(e.target.value)}
-                placeholder="0.00"
-              />
-            </label>
-            <label className="grid gap-1.5">
-              <Lbl>Spread across the goods</Lbl>
-              <select
-                className={field}
-                value={allocation}
-                onChange={(e) => setAllocation(e.target.value as 'BY_VALUE' | 'PER_UNIT')}
-              >
-                <option value="BY_VALUE">By value (recommended)</option>
-                <option value="PER_UNIT">Evenly per unit</option>
-              </select>
-            </label>
-          </div>
-
           {/* Money summary — the point of the whole screen */}
           <div className="rounded-lg border border-border bg-card px-4 py-3 text-[13px]">
-            <SummaryRow label="Goods" value={money(goods)} muted />
-            <SummaryRow label="Shipping & customs" value={money(extra)} muted />
-            <SummaryRow label="Total for this invoice" value={money(total)} strong />
+            <div className="flex items-baseline justify-between font-semibold">
+              <span>Total for this invoice</span>
+              <span className="tabular-nums">{money(total)}</span>
+            </div>
             {lines.length > 0 && (
               <p className="mt-2 border-t border-border pt-2 text-[12px] text-muted-foreground">
                 {payment === 'CASH' ? (
@@ -282,30 +246,6 @@ function Lbl({ children }: { children: React.ReactNode }) {
   );
 }
 
-function SummaryRow({
-  label,
-  value,
-  muted,
-  strong,
-}: {
-  label: string;
-  value: string;
-  muted?: boolean;
-  strong?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        'flex items-baseline justify-between py-1',
-        strong && 'mt-1 border-t border-border pt-2 font-semibold',
-      )}
-    >
-      <span className={cn(muted && 'text-muted-foreground')}>{label}</span>
-      <span className="tabular-nums">{value}</span>
-    </div>
-  );
-}
-
 function ProductPicker({
   chosen,
   onExisting,
@@ -319,8 +259,6 @@ function ProductPicker({
   const [hits, setHits] = useState<Hit[]>([]);
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [category, setCategory] = useState<string>('');
-  const [busy, setBusy] = useState(false);
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -340,19 +278,6 @@ function ProductPicker({
     return () => document.removeEventListener('mousedown', close);
   }, []);
 
-  const create = async () => {
-    setBusy(true);
-    const res = await createProductForInvoice({ name: term.trim(), category });
-    setBusy(false);
-    if (!res.ok) return toast.error(res.message);
-    toast.success('Product created.');
-    onNew(res.variantId, res.label, 0);
-    setTerm('');
-    setCreating(false);
-    setCategory('');
-    setOpen(false);
-  };
-
   return (
     <div ref={box} className="relative">
       <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -361,7 +286,6 @@ function ProductPicker({
         onChange={(e) => {
           setTerm(e.target.value);
           setOpen(true);
-          setCreating(false);
         }}
         onFocus={() => setOpen(true)}
         placeholder="Search products by Arabic name or SKU…"
@@ -396,53 +320,32 @@ function ProductPicker({
             </ul>
           )}
 
-          {!creating ? (
-            <button
-              type="button"
-              onClick={() => setCreating(true)}
-              className={cn(
-                'flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] hover:bg-accent',
-                hits.length > 0 && 'border-t border-border',
-              )}
-            >
-              <Plus className="size-3.5" />
-              Add “<bdi>{term.trim()}</bdi>” as a new product
-            </button>
-          ) : (
-            <div className="border-t border-border p-3">
-              <p className="mb-2 text-[12px] text-muted-foreground">
-                New product: <bdi className="text-foreground">{term.trim()}</bdi>. Its cost
-                comes from the line below.
-              </p>
-              <div className="mb-2 flex flex-wrap gap-1.5">
-                {CATEGORIES.map((c) => (
-                  <button
-                    key={c.value}
-                    type="button"
-                    onClick={() => setCategory(category === c.value ? '' : c.value)}
-                    className={cn(
-                      'h-7 rounded-md border px-2.5 text-[12px] transition-colors',
-                      category === c.value
-                        ? 'border-foreground bg-foreground font-medium text-background'
-                        : 'border-border text-muted-foreground hover:bg-accent',
-                    )}
-                  >
-                    {c.label}
-                  </button>
-                ))}
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button type="button" size="sm" variant="ghost" onClick={() => setCreating(false)} disabled={busy}>
-                  Cancel
-                </Button>
-                <Button type="button" size="sm" onClick={create} disabled={busy}>
-                  {busy ? <Loader2 className="size-3.5 animate-spin" /> : 'Create & add'}
-                </Button>
-              </div>
-            </div>
-          )}
+          <button
+            type="button"
+            onClick={() => {
+              setCreating(true);
+              setOpen(false);
+            }}
+            className={cn(
+              'flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] hover:bg-accent',
+              hits.length > 0 && 'border-t border-border',
+            )}
+          >
+            <Plus className="size-3.5" />
+            Add “<bdi>{term.trim()}</bdi>” as a new product
+          </button>
         </div>
       )}
+
+      <AddProductDialog
+        open={creating}
+        onOpenChange={setCreating}
+        initialName={term.trim()}
+        onCreated={(variantId, label) => {
+          onNew(variantId, label, 0);
+          setTerm('');
+        }}
+      />
     </div>
   );
 }
