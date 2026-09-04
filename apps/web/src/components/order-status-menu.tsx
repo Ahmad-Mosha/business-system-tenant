@@ -4,7 +4,13 @@ import { Check, ChevronDown, Loader2 } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { setOrderStatus } from '@/app/(app)/orders/actions';
-import { isReverse, NEXT_STATUSES, StatusBadge, STATUS_LABELS } from '@/components/order-status';
+import {
+  ALL_ORDER_STATUSES,
+  isReverse,
+  NEXT_STATUSES,
+  StatusBadge,
+  STATUS_LABELS,
+} from '@/components/order-status';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,20 +28,30 @@ import { cn } from '@/lib/utils';
  *
  * The row is a link, so every interactive part here stops propagation —
  * otherwise choosing a status would also navigate.
+ *
+ * `canRevert` (admin only) lifts the guided forward-only path: every status
+ * becomes reachable, grouped under "Other statuses" below the usual next
+ * steps, so a mistake (confirmed by accident, say) can be undone from here —
+ * the API enforces the same rule, this only decides what's offered.
  */
 export function OrderStatusMenu({
   orderId,
   status,
+  canRevert = false,
 }: {
   orderId: string;
   status: OrderStatus;
+  canRevert?: boolean;
 }) {
   const [pending, start] = useTransition();
   const [open, setOpen] = useState(false);
   const next = NEXT_STATUSES[status];
+  const other = canRevert
+    ? ALL_ORDER_STATUSES.filter((s) => s !== status && !next.includes(s))
+    : [];
 
-  // A final state has nowhere to go; render the badge alone.
-  if (!next.length) return <StatusBadge status={status} />;
+  // A final state with no revert power has nowhere to go; render the badge alone.
+  if (!next.length && !other.length) return <StatusBadge status={status} />;
 
   const move = (to: OrderStatus) =>
     start(async () => {
@@ -72,30 +88,58 @@ export function OrderStatusMenu({
 
       <DropdownMenuContent
         align="start"
-        className="w-44"
+        className="w-48"
         onClick={(e) => e.stopPropagation()}
       >
-        <DropdownMenuLabel className="text-[11px] font-medium tracking-[0.06em] text-muted-foreground uppercase">
-          Move to
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {next.map((s) => (
-          <DropdownMenuItem
-            key={s}
-            onSelect={(e) => {
-              e.preventDefault();
-              setOpen(false);
-              move(s);
-            }}
-            className={cn(
-              'text-sm',
-              isReverse(s) &&
-                'text-destructive focus:bg-destructive-subtle focus:text-destructive',
-            )}
-          >
-            {STATUS_LABELS[s]}
-          </DropdownMenuItem>
-        ))}
+        {next.length > 0 && (
+          <>
+            <DropdownMenuLabel className="text-[11px] font-medium tracking-[0.06em] text-muted-foreground uppercase">
+              Move to
+            </DropdownMenuLabel>
+            {next.map((s) => (
+              <DropdownMenuItem
+                key={s}
+                onSelect={(e) => {
+                  e.preventDefault();
+                  setOpen(false);
+                  move(s);
+                }}
+                className={cn(
+                  'text-sm',
+                  isReverse(s) &&
+                    'text-destructive focus:bg-destructive-subtle focus:text-destructive',
+                )}
+              >
+                {STATUS_LABELS[s]}
+              </DropdownMenuItem>
+            ))}
+          </>
+        )}
+        {other.length > 0 && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-[11px] font-medium tracking-[0.06em] text-muted-foreground uppercase">
+              Other statuses
+            </DropdownMenuLabel>
+            {other.map((s) => (
+              <DropdownMenuItem
+                key={s}
+                onSelect={(e) => {
+                  e.preventDefault();
+                  setOpen(false);
+                  move(s);
+                }}
+                className={cn(
+                  'text-sm',
+                  isReverse(s) &&
+                    'text-destructive focus:bg-destructive-subtle focus:text-destructive',
+                )}
+              >
+                {STATUS_LABELS[s]}
+              </DropdownMenuItem>
+            ))}
+          </>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem disabled className="text-xs text-muted-foreground">
           <Check className="size-3" />

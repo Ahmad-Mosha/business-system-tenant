@@ -68,11 +68,14 @@ const PAYMENT_STYLES: Record<PaymentStatus, string> = {
   REFUNDED: 'border-warning/30 bg-warning-subtle text-warning',
 };
 
-const PAYMENT_LABELS: Record<PaymentStatus, string> = {
+export const PAYMENT_LABELS: Record<PaymentStatus, string> = {
   UNPAID: 'Unpaid',
   PAID: 'Paid',
   REFUNDED: 'Refunded',
 };
+
+/** Payment direction was never a guided flow — any status can move to any other. */
+export const ALL_PAYMENT_STATUSES: PaymentStatus[] = ['UNPAID', 'PAID', 'REFUNDED'];
 
 const BASE =
   'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium whitespace-nowrap';
