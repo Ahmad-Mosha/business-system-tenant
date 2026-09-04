@@ -5,15 +5,11 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { searchVariants } from '@/app/(app)/orders/actions';
-import {
-  createProductForInvoice,
-  saveInvoice,
-  type InvoicePayload,
-} from '@/app/(app)/money/actions';
+import { saveInvoice, type InvoicePayload } from '@/app/(app)/money/actions';
+import { AddProductDialog } from '@/components/add-product-dialog';
 import { ContextBar, Screen } from '@/components/shell';
 import { Button } from '@/components/ui/button';
 import type { SupplierRow } from '@/lib/api';
-import { CATEGORIES } from '@/lib/categories';
 import { money } from '@/lib/format';
 import { previewLanded } from '@/lib/money';
 import { cn } from '@/lib/utils';
@@ -319,8 +315,6 @@ function ProductPicker({
   const [hits, setHits] = useState<Hit[]>([]);
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [category, setCategory] = useState<string>('');
-  const [busy, setBusy] = useState(false);
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -340,19 +334,6 @@ function ProductPicker({
     return () => document.removeEventListener('mousedown', close);
   }, []);
 
-  const create = async () => {
-    setBusy(true);
-    const res = await createProductForInvoice({ name: term.trim(), category });
-    setBusy(false);
-    if (!res.ok) return toast.error(res.message);
-    toast.success('Product created.');
-    onNew(res.variantId, res.label, 0);
-    setTerm('');
-    setCreating(false);
-    setCategory('');
-    setOpen(false);
-  };
-
   return (
     <div ref={box} className="relative">
       <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -361,7 +342,6 @@ function ProductPicker({
         onChange={(e) => {
           setTerm(e.target.value);
           setOpen(true);
-          setCreating(false);
         }}
         onFocus={() => setOpen(true)}
         placeholder="Search products by Arabic name or SKU…"
@@ -396,53 +376,32 @@ function ProductPicker({
             </ul>
           )}
 
-          {!creating ? (
-            <button
-              type="button"
-              onClick={() => setCreating(true)}
-              className={cn(
-                'flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] hover:bg-accent',
-                hits.length > 0 && 'border-t border-border',
-              )}
-            >
-              <Plus className="size-3.5" />
-              Add “<bdi>{term.trim()}</bdi>” as a new product
-            </button>
-          ) : (
-            <div className="border-t border-border p-3">
-              <p className="mb-2 text-[12px] text-muted-foreground">
-                New product: <bdi className="text-foreground">{term.trim()}</bdi>. Its cost
-                comes from the line below.
-              </p>
-              <div className="mb-2 flex flex-wrap gap-1.5">
-                {CATEGORIES.map((c) => (
-                  <button
-                    key={c.value}
-                    type="button"
-                    onClick={() => setCategory(category === c.value ? '' : c.value)}
-                    className={cn(
-                      'h-7 rounded-md border px-2.5 text-[12px] transition-colors',
-                      category === c.value
-                        ? 'border-foreground bg-foreground font-medium text-background'
-                        : 'border-border text-muted-foreground hover:bg-accent',
-                    )}
-                  >
-                    {c.label}
-                  </button>
-                ))}
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button type="button" size="sm" variant="ghost" onClick={() => setCreating(false)} disabled={busy}>
-                  Cancel
-                </Button>
-                <Button type="button" size="sm" onClick={create} disabled={busy}>
-                  {busy ? <Loader2 className="size-3.5 animate-spin" /> : 'Create & add'}
-                </Button>
-              </div>
-            </div>
-          )}
+          <button
+            type="button"
+            onClick={() => {
+              setCreating(true);
+              setOpen(false);
+            }}
+            className={cn(
+              'flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] hover:bg-accent',
+              hits.length > 0 && 'border-t border-border',
+            )}
+          >
+            <Plus className="size-3.5" />
+            Add “<bdi>{term.trim()}</bdi>” as a new product
+          </button>
         </div>
       )}
+
+      <AddProductDialog
+        open={creating}
+        onOpenChange={setCreating}
+        initialName={term.trim()}
+        onCreated={(variantId, label) => {
+          onNew(variantId, label, 0);
+          setTerm('');
+        }}
+      />
     </div>
   );
 }

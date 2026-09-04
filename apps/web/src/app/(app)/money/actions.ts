@@ -168,14 +168,23 @@ export type InvoiceResult = { ok: true; id: string } | { ok: false; message: str
 export async function createProductForInvoice(input: {
   name: string;
   category?: string;
+  sku?: string;
+  /** Channel SKUs to link on creation — blank ones are dropped before sending. */
+  listings?: Array<{ channel: string; externalId: string }>;
 }): Promise<{ ok: true; variantId: string; label: string } | { ok: false; message: string }> {
   if (!input.name.trim()) return { ok: false, message: 'Enter a product name' };
+  const listings = input.listings?.filter((l) => l.externalId.trim());
   let res: Response;
   try {
     res = await fetch(`${API}/catalog/products`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-      body: JSON.stringify({ name: input.name.trim(), category: input.category || undefined }),
+      body: JSON.stringify({
+        name: input.name.trim(),
+        category: input.category || undefined,
+        sku: input.sku?.trim() || undefined,
+        listings: listings?.length ? listings : undefined,
+      }),
     });
   } catch {
     return { ok: false, message: 'Could not reach the API.' };
