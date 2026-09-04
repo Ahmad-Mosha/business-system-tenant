@@ -288,4 +288,27 @@ export class FinanceService {
       tx,
     );
   }
+
+  /**
+   * Undoes the entry above when an order is un-marked PAID (moved to UNPAID or
+   * REFUNDED) — otherwise the cash it booked stays in the ledger as if the
+   * money were still in hand. A no-op if there's nothing live to reverse
+   * (e.g. the order predates this, or its total was never posted).
+   */
+  async reverseOrderPayment(
+    tx: EntityManager,
+    orderId: string,
+    actorId?: string | null,
+  ): Promise<void> {
+    const [entry] = await tx.query(
+      `SELECT e.id FROM ledger_entry e
+       WHERE e.source_type = 'order' AND e.source_id = $1 AND e.kind = 'ORDER_SALE'
+         AND e.reverses_id IS NULL
+         AND NOT EXISTS (SELECT 1 FROM ledger_entry r WHERE r.reverses_id = e.id)
+       ORDER BY e.occurred_at DESC, e.created_at DESC
+       LIMIT 1`,
+      [orderId],
+    );
+    if (entry) await this.ledger.reverse(entry.id, actorId ?? null, tx);
+  }
 }

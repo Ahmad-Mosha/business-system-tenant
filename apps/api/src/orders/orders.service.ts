@@ -348,6 +348,17 @@ export class OrdersService implements OnModuleInit {
     });
   }
 
+  /**
+   * Admins can move an order to any status — including undoing a mistake
+   * (Ahmad's own example: confirmed by accident, needs to go back). Moderators
+   * stay on the guided forward-only path in `ALLOWED_TRANSITIONS`, so someone
+   * without full context can't skip steps by accident.
+   *
+   * Stock only ever moves at the CANCELLED/RETURNED boundary, in either
+   * direction: entering credits it back (unchanged from before), and — new —
+   * *leaving* debits it again, so an admin un-cancelling an order doesn't
+   * silently leave the stock double-counted as both "returned" and "in stock".
+   */
   async updateStatus(user: SessionUser, orderId: string, next: OrderStatus) {
     return this.db.transaction(async (tx) => {
       const order = await tx.findOne(Order, {
@@ -355,28 +366,40 @@ export class OrdersService implements OnModuleInit {
       });
       if (!order) throw new NotFoundException('order not found');
 
-      const allowed = ALLOWED_TRANSITIONS[order.status] ?? [];
-      if (!allowed.includes(next)) {
-        throw new BadRequestException(
-          `cannot move an order from ${order.status} to ${next}` +
-            (allowed.length ? ` — allowed: ${allowed.join(', ')}` : ' — it is final'),
-        );
+      const from = order.status;
+      if (from === next) return order;
+
+      if (user.role !== 'ADMIN') {
+        const allowed = ALLOWED_TRANSITIONS[from] ?? [];
+        if (!allowed.includes(next)) {
+          throw new BadRequestException(
+            `cannot move an order from ${from} to ${next}` +
+              (allowed.length ? ` — allowed: ${allowed.join(', ')}` : ' — it is final'),
+          );
+        }
       }
 
-      const from = order.status;
       order.status = next;
       await tx.save(order);
       await this.record(tx, orderId, 'STATUS_CHANGED', from, next, user);
 
-      // Stock was reserved when the order was created; give it back the
-      // moment it stops being a live sale.
-      if (next === 'CANCELLED' || next === 'RETURNED') {
+      const wasOut = from === 'CANCELLED' || from === 'RETURNED';
+      const isOut = next === 'CANCELLED' || next === 'RETURNED';
+      if (!wasOut && isOut) {
         await OrdersService.creditStockForOrder(tx, orderId, next);
+      } else if (wasOut && !isOut) {
+        await OrdersService.debitStockForOrderId(tx, orderId, 'order reactivated — stock leaves again');
       }
       return order;
     });
   }
 
+  /**
+   * Free on both roles, as it always was — payment direction was never a
+   * guided flow. New: leaving PAID reverses the cash-in entry posted when it
+   * was marked paid, so un-marking a mistaken PAID doesn't leave phantom cash
+   * in the ledger.
+   */
   async updatePayment(user: SessionUser, orderId: string, next: PaymentStatus) {
     return this.db.transaction(async (tx) => {
       const order = await tx.findOne(Order, {
@@ -385,6 +408,8 @@ export class OrdersService implements OnModuleInit {
       if (!order) throw new NotFoundException('order not found');
 
       const from = order.paymentStatus;
+      if (from === next) return order;
+
       order.paymentStatus = next;
       await tx.save(order);
       await this.record(tx, orderId, 'PAYMENT_CHANGED', from, next, user);
@@ -393,6 +418,8 @@ export class OrdersService implements OnModuleInit {
       // every save, and not when it's already been counted once before.
       if (next === 'PAID' && from !== 'PAID') {
         await this.finance.recordOrderPayment(tx, orderId, order.total);
+      } else if (from === 'PAID' && next !== 'PAID') {
+        await this.finance.reverseOrderPayment(tx, orderId, user.id);
       }
       return order;
     });
@@ -508,6 +535,31 @@ export class OrdersService implements OnModuleInit {
             : reason === 'EDITED'
               ? 'order edited — previous lines reversed'
               : 'order cancelled',
+      }));
+    if (movements.length) await tx.insert(StockMovement, movements);
+  }
+
+  /**
+   * The mirror of `creditStockForOrder`: re-debits an order's existing lines.
+   * Used only when an admin reverts a CANCELLED/RETURNED order back to an
+   * active status — the stock that was credited back on cancellation has to
+   * leave again, or it would be double-counted as both "returned" and "sold".
+   */
+  static async debitStockForOrderId(
+    tx: EntityManager,
+    orderId: string,
+    note: string,
+  ): Promise<void> {
+    const items = await tx.find(OrderItem, { where: { orderId } });
+    const movements = items
+      .filter((i) => i.variantId)
+      .map((i) => ({
+        variantId: i.variantId as string,
+        quantity: -Math.abs(i.quantity),
+        reason: 'SALE' as const,
+        sourceType: 'order',
+        sourceId: orderId,
+        note,
       }));
     if (movements.length) await tx.insert(StockMovement, movements);
   }
