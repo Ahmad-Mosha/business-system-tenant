@@ -158,6 +158,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             status={order.status}
             paymentStatus={order.paymentStatus}
             assignedToId={order.assignedTo?.id ?? null}
+            assignedToName={order.assignedTo?.name ?? null}
             assignees={assignees.map((a) => ({ id: a.id, name: a.name }))}
             canAssign={isAdmin}
           />

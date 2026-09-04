@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
+import { AssignMenu } from "@/components/assign-menu";
 import { OrderFilters } from "@/components/order-filters";
-import { PaymentBadge, StatusBadge } from "@/components/order-status";
+import { OrderStatusMenu } from "@/components/order-status-menu";
+import { PaymentStatusMenu } from "@/components/payment-status-menu";
 import {
   MetricCard,
   MetricRow,
@@ -11,7 +13,7 @@ import {
   Screen,
   Scroller,
 } from "@/components/shell";
-import { getOrderSummary, getOrders } from "@/lib/api";
+import { getAssignees, getOrderSummary, getOrders } from "@/lib/api";
 import { date, money } from "@/lib/format";
 import { requireSession } from "@/lib/session";
 import { cn } from "@/lib/utils";
@@ -45,12 +47,13 @@ export default async function OrdersPage({
   listQuery.set("limit", String(PAGE_SIZE));
   listQuery.set("offset", String(offset));
 
-  const [{ orders, total }, summary] = await Promise.all([
+  const isAdmin = user.role === "ADMIN";
+
+  const [{ orders, total }, summary, assignees] = await Promise.all([
     getOrders(listQuery.toString()),
     getOrderSummary(),
+    isAdmin ? getAssignees() : Promise.resolve([]),
   ]);
-
-  const isAdmin = user.role === "ADMIN";
 
   /** Paging keeps the current filters, so it never resets the view. */
   const pageHref = (p: number) => {
@@ -160,7 +163,11 @@ export default async function OrdersPage({
                         {o.source === "EASYORDERS" ? "Website" : "Social"}
                       </Td>
                       <Td>
-                        <StatusBadge status={o.status} />
+                        <OrderStatusMenu
+                          orderId={o.id}
+                          status={o.status}
+                          canRevert={isAdmin}
+                        />
                         {o.unmappedCount > 0 && (
                           <span className="ms-1 text-[11px] text-warning">
                             {o.unmappedCount}
@@ -168,13 +175,16 @@ export default async function OrdersPage({
                         )}
                       </Td>
                       <Td>
-                        <PaymentBadge status={o.paymentStatus} />
+                        <PaymentStatusMenu orderId={o.id} status={o.paymentStatus} />
                       </Td>
                       {isAdmin && (
-                        <Td className="truncate text-muted-foreground">
-                          {o.assignedToName ?? (
-                            <span className="opacity-40">—</span>
-                          )}
+                        <Td className="max-w-0 text-muted-foreground">
+                          <AssignMenu
+                            orderId={o.id}
+                            assignedToId={o.assignedToId}
+                            assignedToName={o.assignedToName}
+                            assignees={assignees}
+                          />
                         </Td>
                       )}
                       <Td className="text-right font-medium tabular-nums">
