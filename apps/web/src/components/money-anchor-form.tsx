@@ -4,7 +4,7 @@ import { AlertTriangle } from 'lucide-react';
 import { useActionState } from 'react';
 import { toast } from 'sonner';
 import { setAnchor, type FormState } from '@/app/(app)/money/actions';
-import { DatePicker } from '@/components/date-picker';
+import { DatePicker, todayISO } from '@/components/date-picker';
 import { MoneyInput } from '@/components/money-input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -42,7 +42,7 @@ export function MoneyAnchorForm({
           <DatePicker
             id="openingAsOf"
             name="openingAsOf"
-            defaultValue={openingAsOf ?? new Date().toISOString().slice(0, 10)}
+            defaultValue={openingAsOf ?? todayISO()}
             disabled={pending}
           />
         </Field>
