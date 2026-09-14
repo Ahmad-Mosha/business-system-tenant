@@ -1,6 +1,6 @@
 'use client';
 
-import { History, Minus, Plus } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, History, Minus, Plus } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { recordStock, updateVariant } from '@/app/(app)/inventory/actions';
@@ -67,9 +67,18 @@ export interface Movement {
 /**
  * One variant's stock: the figure, its cost and price, a way to record a
  * movement, and every movement that produced the figure — no number without a
- * way into the events behind it.
+ * way into the events behind it. `single` means the page's figures already
+ * are this variant's, so the card doesn't repeat them.
  */
-export function VariantPanel({ variant, movements }: { variant: Variant; movements: Movement[] }) {
+export function VariantPanel({
+  variant,
+  movements,
+  single = false,
+}: {
+  variant: Variant;
+  movements: Movement[];
+  single?: boolean;
+}) {
   const [pending, start] = useTransition();
   const [qty, setQty] = useState('1');
   const [reason, setReason] = useState<string>('PURCHASE');
@@ -98,37 +107,44 @@ export function VariantPanel({ variant, movements }: { variant: Variant; movemen
 
   return (
     <Card className="pb-0">
-      <CardHeader>
-        <CardTitle className="flex flex-wrap items-center gap-2">
-          <bdi>{variant.name}</bdi>
-          {variant.sku ? (
-            <Badge variant="secondary" className="font-mono">
-              {variant.sku}
-            </Badge>
-          ) : null}
-        </CardTitle>
-        <CardDescription>
-          {variant.inOpenOrders > 0 ? (
-            <>
-              <span className="num">{variant.inOpenOrders}</span> in open orders — already off the
-              shelf count
-            </>
-          ) : (
-            'Nothing waiting in open orders'
-          )}
-        </CardDescription>
-        <CardAction className="text-right">
-          <p
-            className={cn(
-              'num text-[28px] leading-none font-semibold tracking-tight',
-              variant.onHand <= 0 && 'text-destructive',
+      {single ? (
+        <CardHeader>
+          <CardTitle>Stock and pricing</CardTitle>
+          <CardDescription>What it costs and sells for, and every unit in or out.</CardDescription>
+        </CardHeader>
+      ) : (
+        <CardHeader>
+          <CardTitle className="flex flex-wrap items-center gap-2">
+            <bdi>{variant.name}</bdi>
+            {variant.sku ? (
+              <Badge variant="secondary" className="font-mono">
+                {variant.sku}
+              </Badge>
+            ) : null}
+          </CardTitle>
+          <CardDescription>
+            {variant.inOpenOrders > 0 ? (
+              <>
+                <span className="num">{variant.inOpenOrders}</span> in open orders — already off the
+                shelf count
+              </>
+            ) : (
+              'Nothing waiting in open orders'
             )}
-          >
-            {variant.onHand}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">on hand</p>
-        </CardAction>
-      </CardHeader>
+          </CardDescription>
+          <CardAction className="text-right">
+            <p
+              className={cn(
+                'num text-xl leading-none font-semibold tracking-tight',
+                variant.onHand <= 0 && 'text-destructive',
+              )}
+            >
+              {variant.onHand}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">on hand</p>
+          </CardAction>
+        </CardHeader>
+      )}
 
       <CardContent className="grid gap-5 md:grid-cols-2">
         <FieldGroup className="gap-3">
@@ -205,36 +221,57 @@ export function VariantPanel({ variant, movements }: { variant: Variant; movemen
 
       <div className="mt-5 border-t">
         {movements.length ? (
-          <div className="max-h-72 overflow-y-auto [&_thead]:sticky [&_thead]:top-0 [&_[data-slot=table-container]]:overflow-visible">
+          <div className="max-h-96 overflow-y-auto [&_thead]:sticky [&_thead]:top-0 [&_[data-slot=table-container]]:overflow-visible">
+            {/* Read like the ledger: which way it went, why, then the count after it. */}
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Movement</TableHead>
                   <TableHead className="w-[90px] text-right">Change</TableHead>
-                  <TableHead>Reason</TableHead>
                   <TableHead className="w-[90px] text-right">Balance</TableHead>
-                  <TableHead className="w-[140px] text-right">When</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {movements.map((m) => (
-                  <TableRow key={m.id}>
-                    <TableCell
-                      className={cn(
-                        'num text-right font-medium',
-                        m.quantity > 0 ? 'text-success' : 'text-destructive',
-                      )}
-                    >
-                      {m.quantity > 0 ? '+' : ''}
-                      {m.quantity}
-                    </TableCell>
-                    <TableCell className="max-w-0 truncate">
-                      {REASON_LABEL[m.reason] ?? m.reason}
-                      {m.note ? <span className="text-muted-foreground"> · {m.note}</span> : null}
-                    </TableCell>
-                    <TableCell className="num text-right">{m.runningTotal}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">{dateTime(m.occurredAt)}</TableCell>
-                  </TableRow>
-                ))}
+                {movements.map((m) => {
+                  const inbound = m.quantity > 0;
+                  const Icon = inbound ? ArrowDownLeft : ArrowUpRight;
+                  return (
+                    <TableRow key={m.id}>
+                      <TableCell className="h-12 max-w-0">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <span
+                            title={inbound ? 'In' : 'Out'}
+                            className={cn(
+                              'flex size-7 shrink-0 items-center justify-center',
+                              inbound ? 'bg-success-subtle text-success' : 'bg-destructive-subtle text-destructive',
+                            )}
+                          >
+                            <Icon className="size-3.5" />
+                          </span>
+                          <div className="min-w-0">
+                            <p className="truncate font-medium">{REASON_LABEL[m.reason] ?? m.reason}</p>
+                            <p className="truncate text-xs text-muted-foreground">
+                              {dateTime(m.occurredAt)}
+                              {m.note ? (
+                                <>
+                                  {' · '}
+                                  <bdi>{m.note}</bdi>
+                                </>
+                              ) : null}
+                            </p>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell
+                        className={cn('num text-right font-semibold', inbound ? 'text-success' : 'text-destructive')}
+                      >
+                        {inbound ? '+' : '−'}
+                        {Math.abs(m.quantity)}
+                      </TableCell>
+                      <TableCell className="num text-right text-muted-foreground">{m.runningTotal}</TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
