@@ -110,7 +110,9 @@ export function VariantSearch({
                       }}
                     >
                       <bdi className="min-w-0 truncate">{h.label}</bdi>
-                      <span className="ms-auto shrink-0 ps-3 text-xs opacity-70">
+                      {/* The shortcut slot also hides the item's built-in
+                          check mark, which would otherwise split the row. */}
+                      <span data-slot="command-shortcut" className="ms-auto shrink-0 ps-3 text-xs opacity-70">
                         {reason ?? meta?.(h) ?? ''}
                       </span>
                     </CommandItem>
