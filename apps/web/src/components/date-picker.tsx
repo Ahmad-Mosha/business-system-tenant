@@ -15,6 +15,10 @@ const toDate = (iso: string | null | undefined) =>
 const toISO = (d: Date) => format(d, 'yyyy-MM-dd');
 const show = (d: Date) => format(d, 'd MMM yyyy');
 
+/** Today on the user's clock. `toISOString()` is UTC — between midnight and
+ *  3am in Cairo it still says yesterday. */
+export const todayISO = () => toISO(new Date());
+
 /**
  * A date field. Posts `yyyy-MM-dd` under `name` like the native input it
  * replaces, so server actions read it unchanged.

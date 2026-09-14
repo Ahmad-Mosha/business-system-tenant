@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { saveInvoice, type InvoicePayload } from '@/app/(app)/money/actions';
 import { AddProductDialog } from '@/components/add-product-dialog';
 import { Amount } from '@/components/amount';
-import { DatePicker } from '@/components/date-picker';
+import { DatePicker, todayISO } from '@/components/date-picker';
 import { Page, PageHeader } from '@/components/page';
 import { VariantSearch } from '@/components/variant-search';
 import {
@@ -62,7 +62,6 @@ interface Line {
   onHand: number | null;
 }
 
-const todayISO = () => new Date().toISOString().slice(0, 10);
 const cellInput =
   'h-8 border-transparent bg-transparent px-2 text-right shadow-none hover:border-input focus-visible:border-ring';
 

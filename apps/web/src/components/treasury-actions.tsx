@@ -2,7 +2,7 @@
 
 import { ArrowDownLeft, ArrowUpRight, Banknote, FileText } from 'lucide-react';
 import { recordCheque, recordVoucher } from '@/app/(app)/money/actions';
-import { DatePicker } from '@/components/date-picker';
+import { DatePicker, todayISO } from '@/components/date-picker';
 import { FormDialog } from '@/components/form-dialog';
 import { MoneyInput } from '@/components/money-input';
 import { Button } from '@/components/ui/button';
@@ -17,7 +17,6 @@ import {
 } from '@/components/ui/select';
 import { VOUCHER_COUNTERS } from '@/lib/money';
 
-const todayISO = () => new Date().toISOString().slice(0, 10);
 
 const VOUCHERS = {
   deposit: {
