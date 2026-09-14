@@ -146,6 +146,11 @@ export default async function ProductsPage({
           <TableEmpty
             icon={BarChart3}
             title={filtered ? 'No products match these filters' : 'No products yet'}
+            description={
+              filtered
+                ? undefined
+                : 'A noon sale lands on a product once its SKU is linked — open the product in Inventory and add its noon Partner SKU.'
+            }
             action={
               filtered ? (
                 <Button variant="outline" asChild>
