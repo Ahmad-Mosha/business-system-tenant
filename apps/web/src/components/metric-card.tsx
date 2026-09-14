@@ -65,12 +65,12 @@ export function MetricCard({
       </div>
       {/* Never truncated — a clipped amount is a wrong amount. The size steps
           down with the card instead. */}
-      <div className="num mt-1.5 text-lg leading-none font-semibold tracking-tight whitespace-nowrap @[11rem]/metric:text-xl @[15rem]/metric:text-2xl">
+      <div className="num mt-1 text-base leading-none font-semibold tracking-tight whitespace-nowrap @[10rem]/metric:text-lg @[13rem]/metric:text-xl">
         {value}
       </div>
       {children ? <div className="mt-2">{children}</div> : null}
       {hint || badge ? (
-        <div className={cn('mt-2 flex items-center gap-1.5 text-xs', TONE_TEXT[tone])}>
+        <div className={cn('mt-1.5 flex items-center gap-1.5 text-xs', TONE_TEXT[tone])}>
           {badge}
           {tone !== 'default' && !badge ? (
             <span aria-hidden className="size-1.5 shrink-0 bg-current" />
