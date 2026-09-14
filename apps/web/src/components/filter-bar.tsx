@@ -2,6 +2,7 @@
 
 import { SearchIcon, X } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState, useTransition, type ReactNode } from 'react';
 import { DateRangePicker } from '@/components/date-picker';
 import { Button } from '@/components/ui/button';
@@ -58,6 +59,7 @@ export function FilterBar({
   /** Right-aligned actions that belong to the list (sync, export…). */
   children?: ReactNode;
 }) {
+  const t = useTranslations('filters');
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -180,7 +182,7 @@ export function FilterBar({
           className="text-muted-foreground"
         >
           <X />
-          Reset
+          {t('reset')}
         </Button>
       ) : null}
 
@@ -204,6 +206,7 @@ function SearchField({
   placeholder: string;
   onSearch: (value: string) => void;
 }) {
+  const t = useTranslations('filters');
   const [value, setValue] = useState(initial);
   const pushed = useRef(initial);
 
@@ -238,7 +241,7 @@ function SearchField({
       />
       {value ? (
         <InputGroupAddon align="inline-end">
-          <InputGroupButton size="icon-xs" aria-label="Clear search" onClick={() => setValue('')}>
+          <InputGroupButton size="icon-xs" aria-label={t('clearSearch')} onClick={() => setValue('')}>
             <X />
           </InputGroupButton>
         </InputGroupAddon>

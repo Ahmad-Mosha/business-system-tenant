@@ -1,5 +1,6 @@
 import { ArrowRight, BookText } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { Fragment } from 'react';
 import { Amount } from '@/components/amount';
 import { FilterBar } from '@/components/filter-bar';
@@ -207,6 +208,7 @@ function Lens({
   marks: Record<Direction, Mark>;
   all: boolean;
 }) {
+  const t = useTranslations('ledger');
   // Filtered to one account, every entry touches it.
   const shown: Direction[] = all ? ['up', 'down', 'none'] : ['up', 'down'];
   return (
@@ -221,7 +223,7 @@ function Lens({
           return (
             <span key={d} className="inline-flex items-center gap-1">
               <mark.icon className={cn('size-3.5 rtl:-scale-x-100', mark.tone)} />
-              {mark.label}
+              {t(mark.label)}
             </span>
           );
         })}

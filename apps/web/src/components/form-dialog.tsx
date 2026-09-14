@@ -1,6 +1,7 @@
 'use client';
 
 import { AlertTriangle } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { useActionState, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -86,6 +87,7 @@ function FormBody<S extends DialogFormState>({
   onDone: () => void;
   children: ReactNode;
 }) {
+  const t = useTranslations('common');
   const [state, submit, pending] = useActionState<DialogFormState, FormData>(
     async (prev, form) => {
       const next = await action(prev as S, form);
@@ -113,7 +115,7 @@ function FormBody<S extends DialogFormState>({
       <DialogFooter>
         <DialogClose asChild>
           <Button type="button" variant="ghost" disabled={pending}>
-            Cancel
+            {t('cancel')}
           </Button>
         </DialogClose>
         <Button type="submit" disabled={pending} className="min-w-24">

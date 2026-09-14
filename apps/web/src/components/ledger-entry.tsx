@@ -7,10 +7,11 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { Badge } from '@/components/ui/badge';
 import { TableCell, TableRow } from '@/components/ui/table';
 import type { LedgerRow } from '@/lib/api';
-import { entryMemo, kindLabel, sourceHref } from '@/lib/money';
+import { entryMemo, isEntryKind, sourceHref } from '@/lib/money';
 import { cn } from '@/lib/utils';
 
 /** Whether an entry raised an account's balance, lowered it, or never touched it. */
@@ -19,18 +20,23 @@ export type Direction = 'up' | 'down' | 'none';
 export const directionOf = (effect: number | null): Direction =>
   effect === null ? 'none' : effect > 0 ? 'up' : 'down';
 
-/** How a direction reads: its icon and label, the amount's colour, the icon tile's. */
-export type Mark = { icon: LucideIcon; label: string; tone: string; tile: string };
+/** How a direction reads: its icon, its name (a `ledger.*` message), the amount's colour, the tile's. */
+export type Mark = {
+  icon: LucideIcon;
+  label: 'in' | 'out' | 'untouched' | 'grew' | 'shrank';
+  tone: string;
+  tile: string;
+};
 
 const QUIET = 'bg-muted text-muted-foreground';
-const UNTOUCHED: Mark = { icon: ArrowLeftRight, label: 'Between other accounts', tone: '', tile: QUIET };
+const UNTOUCHED: Mark = { icon: ArrowLeftRight, label: 'untouched', tone: '', tile: QUIET };
 
 /** An account that holds money or stock: its entries are money in and money out. */
 export const MONEY: Record<Direction, Mark> = {
-  up: { icon: ArrowDownLeft, label: 'In', tone: 'text-success', tile: 'bg-success-subtle text-success' },
+  up: { icon: ArrowDownLeft, label: 'in', tone: 'text-success', tile: 'bg-success-subtle text-success' },
   down: {
     icon: ArrowUpRight,
-    label: 'Out',
+    label: 'out',
     tone: 'text-destructive',
     tile: 'bg-destructive-subtle text-destructive',
   },
@@ -43,8 +49,8 @@ export const MONEY: Record<Direction, Mark> = {
  * owe, and what we owe goes down. No colour either: owing more isn't green news.
  */
 export const BALANCE: Record<Direction, Mark> = {
-  up: { icon: ArrowUp, label: 'Grew', tone: '', tile: QUIET },
-  down: { icon: ArrowDown, label: 'Shrank', tone: '', tile: QUIET },
+  up: { icon: ArrowUp, label: 'grew', tone: '', tile: QUIET },
+  down: { icon: ArrowDown, label: 'shrank', tone: '', tile: QUIET },
   none: UNTOUCHED,
 };
 
@@ -53,13 +59,14 @@ export const BALANCE: Record<Direction, Mark> = {
  * the order or invoice behind it when there is one — then when, and any note.
  */
 export function EntryCell({ entry, mark, when }: { entry: LedgerRow; mark: Mark; when?: string }) {
+  const t = useTranslations();
   const href = sourceHref(entry);
   const memo = entryMemo(entry);
-  const label = kindLabel(entry.kind);
+  const label = isEntryKind(entry.kind) ? t(`enums.entryKind.${entry.kind}`) : entry.kind;
   return (
     <div className="flex min-w-0 items-center gap-3">
       <span
-        title={mark.label}
+        title={t(`ledger.${mark.label}`)}
         className={cn('flex size-8 shrink-0 items-center justify-center', mark.tile)}
       >
         <mark.icon className="size-4 rtl:-scale-x-100" />
@@ -73,7 +80,7 @@ export function EntryCell({ entry, mark, when }: { entry: LedgerRow; mark: Mark;
           ) : (
             <span className="truncate font-medium">{label}</span>
           )}
-          {entry.reversesId ? <Badge variant="outline">Reversal</Badge> : null}
+          {entry.reversesId ? <Badge variant="outline">{t('ledger.reversal')}</Badge> : null}
         </div>
         {when || memo ? (
           <p className="mt-0.5 truncate text-xs text-muted-foreground">
@@ -103,6 +110,7 @@ export function AccountChip({
   href?: string;
   lens?: boolean;
 }) {
+  const t = useTranslations('ledger');
   const className = cn(
     'inline-flex h-6 min-w-0 items-center border px-2 text-[13px] font-medium transition-colors',
     lens ? 'border-highlight/30 bg-highlight/10 text-highlight' : 'border-border bg-muted/50 text-foreground',
@@ -110,7 +118,7 @@ export function AccountChip({
   );
   const label = <bdi className="truncate">{name}</bdi>;
   return href ? (
-    <Link href={href} title={title ? `${title} — open its ledger` : undefined} className={className}>
+    <Link href={href} title={title ? t('openAccount', { account: title }) : undefined} className={className}>
       {label}
     </Link>
   ) : (

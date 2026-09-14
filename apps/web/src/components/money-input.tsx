@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from '@/components/ui/input-group';
 import { groupDigits } from '@/lib/format';
@@ -24,6 +25,7 @@ export function MoneyInput({
   autoFocus?: boolean;
   disabled?: boolean;
 }) {
+  const t = useTranslations('common');
   const [display, setDisplay] = useState(() => (defaultValue ? groupDigits(defaultValue) : ''));
 
   return (
@@ -40,7 +42,7 @@ export function MoneyInput({
         className="num text-end"
       />
       <InputGroupAddon align="inline-end">
-        <InputGroupText>EGP</InputGroupText>
+        <InputGroupText>{t('egp')}</InputGroupText>
       </InputGroupAddon>
       {/* The unformatted value the server action reads. */}
       <input type="hidden" name={name} value={display.replace(/,/g, '')} />
