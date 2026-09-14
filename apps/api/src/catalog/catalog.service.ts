@@ -28,6 +28,19 @@ export interface ProductFilters {
 
 const MONEY = /^\d+(\.\d{1,2})?$/;
 
+/**
+ * Why a stock movement entered by hand can't happen, or null when it can. A
+ * hand-entered removal can take stock down to zero, never below — the shelf
+ * can't give up units it doesn't have. (Orders are another path: they can
+ * oversell, and on-hand going negative is how that shows.)
+ */
+export function removalError(onHand: number, quantity: number): string | null {
+  if (quantity >= 0 || onHand + quantity >= 0) return null;
+  return onHand > 0
+    ? `only ${onHand} on hand — you can remove up to ${onHand}`
+    : 'nothing on hand to remove';
+}
+
 @Injectable()
 export class CatalogService {
   private readonly log = new Logger(CatalogService.name);
@@ -489,6 +502,15 @@ export class CatalogService {
     if (!variant) throw new NotFoundException('variant not found');
 
     return this.db.transaction(async (tx) => {
+      // Lock the variant so two removals at once can't both pass the check.
+      await tx.query('SELECT id FROM product_variant WHERE id = $1 FOR UPDATE', [variantId]);
+      const [{ onHand }] = await tx.query(
+        'SELECT COALESCE(SUM(quantity), 0)::int AS "onHand" FROM stock_movement WHERE variant_id = $1',
+        [variantId],
+      );
+      const refused = removalError(onHand, quantity);
+      if (refused) throw new BadRequestException(refused);
+
       const result = await this.addMovement(tx, variantId, quantity, reason, userId, note, variant.unitCost);
       // A purchase converts cash into stock — record the cash side too, same
       // transaction, so the two ledgers can never drift apart. No cost on

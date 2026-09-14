@@ -44,6 +44,20 @@ export class FinanceController {
     return this.ledger.dailyBalance('CASH', from);
   }
 
+  /**
+   * Money into and out of the treasury between two dates — per `bucket` (day,
+   * week or month) and by where it came from and went. Drives the overview's
+   * cash-flow charts and Treasury's month totals.
+   */
+  @Get('cash-flow')
+  cashFlow(@Query('from') from?: string, @Query('to') to?: string, @Query('bucket') bucket?: string) {
+    if (!from || !to || !ISO_DATE.test(from) || !ISO_DATE.test(to) || from > to) {
+      throw new BadRequestException('from and to are required as YYYY-MM-DD, with from on or before to');
+    }
+    const b = bucket === 'week' || bucket === 'month' ? bucket : 'day';
+    return this.ledger.flow('CASH', from, to, b);
+  }
+
   /** Revenue and cost components for a period — the overview's "this month" panel. */
   @Get('summary')
   summary(@Query('from') from?: string, @Query('to') to?: string) {
