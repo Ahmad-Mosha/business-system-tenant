@@ -35,6 +35,32 @@ export function dateTime(v: string): string {
   });
 }
 
+/**
+ * `15:29`, or '' for something dated without a time. The API stores those —
+ * a voucher, an invoice, an opening balance — at midnight UTC, and printing
+ * that as "03:00" would invent a time nobody entered.
+ */
+export function timeOf(v: string): string {
+  const d = new Date(v);
+  if (d.getTime() % 86_400_000 === 0) return '';
+  return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+}
+
+/** A day heading for a dated list: "Today", "Yesterday", "Mon 14 Sept". */
+export function dayLabel(v: string, now = new Date()): string {
+  const d = new Date(v);
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (d.toDateString() === now.toDateString()) return 'Today';
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return d.toLocaleDateString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric',
+  });
+}
+
 export const isNegative = (v: string | number | null | undefined) =>
   v !== null && v !== undefined && v !== '' && Number(v) < 0;
 
