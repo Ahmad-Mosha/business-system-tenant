@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,8 @@ export default function ScreenError({
   error: Error & { digest?: string };
   retry: () => void;
 }) {
+  const t = useTranslations('states');
+  const tc = useTranslations('common');
   const unreachable = /fetch|ECONNREFUSED/.test(error.message);
   return (
     <div className="flex flex-1 items-center justify-center p-6">
@@ -32,23 +35,19 @@ export default function ScreenError({
           <EmptyMedia variant="icon" className="bg-destructive-subtle text-destructive">
             <AlertTriangle />
           </EmptyMedia>
-          <EmptyTitle>This screen couldn’t load</EmptyTitle>
-          <EmptyDescription>
-            {unreachable
-              ? 'The API isn’t reachable right now. Check that it’s running, then try again.'
-              : 'Something went wrong on our side. Trying again usually fixes it.'}
-          </EmptyDescription>
+          <EmptyTitle>{t('screenFailed')}</EmptyTitle>
+          <EmptyDescription>{unreachable ? t('apiDown') : t('failed')}</EmptyDescription>
           {error.digest ? (
-            <p className="num text-xs text-muted-foreground">Reference {error.digest}</p>
+            <p className="num text-xs text-muted-foreground">{t('reference', { code: error.digest })}</p>
           ) : null}
         </EmptyHeader>
         <EmptyContent className="flex-row justify-center">
           <Button onClick={() => retry()}>
             <RefreshCw />
-            Try again
+            {tc('tryAgain')}
           </Button>
           <Button variant="outline" asChild>
-            <Link href="/orders">Go to orders</Link>
+            <Link href="/orders">{t('goToOrders')}</Link>
           </Button>
         </EmptyContent>
       </Empty>
