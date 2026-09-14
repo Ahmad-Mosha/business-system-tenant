@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { authHeaders } from '@/lib/session';
 
 const API = process.env.API_URL ?? 'http://localhost:3001';
@@ -14,18 +15,28 @@ async function send(path: string, method: string, body: unknown) {
   });
   if (!res.ok) {
     const detail = await res.json().catch(() => null);
-    throw new Error(detail?.message ?? `Request failed (${res.status})`);
+    const t = await getTranslations('errors');
+    throw new Error(detail?.message ?? t('requestFailed', { status: res.status }));
   }
   return res.json();
 }
 
 export type ActionResult = { ok: true } | { ok: false; message: string };
 
+type Fallback = 'updateStatus' | 'updatePayment' | 'assign' | 'createOrder' | 'saveOrder' | 'updateTracking';
+
+/** The API's own message when it sent one, else ours, in the reader's language. */
+async function messageOf(e: unknown, fallback: Fallback) {
+  return e instanceof Error ? e.message : (await getTranslations('errors'))(fallback);
+}
+
+const noItems = async () => (await getTranslations('orders.form'))('needsItem');
+
 export async function setOrderStatus(orderId: string, status: string): Promise<ActionResult> {
   try {
     await send(`/orders/${orderId}/status`, 'PATCH', { status });
   } catch (e) {
-    return { ok: false, message: e instanceof Error ? e.message : 'Could not update status' };
+    return { ok: false, message: await messageOf(e, 'updateStatus') };
   }
   revalidatePath('/orders');
   revalidatePath(`/orders/${orderId}`);
@@ -39,7 +50,7 @@ export async function setPaymentStatus(
   try {
     await send(`/orders/${orderId}/payment`, 'PATCH', { paymentStatus });
   } catch (e) {
-    return { ok: false, message: e instanceof Error ? e.message : 'Could not update payment' };
+    return { ok: false, message: await messageOf(e, 'updatePayment') };
   }
   revalidatePath('/orders');
   revalidatePath(`/orders/${orderId}`);
@@ -53,7 +64,7 @@ export async function assignOrder(
   try {
     await send(`/orders/${orderId}/assignment`, 'PATCH', { assignedToId });
   } catch (e) {
-    return { ok: false, message: e instanceof Error ? e.message : 'Could not assign' };
+    return { ok: false, message: await messageOf(e, 'assign') };
   }
   revalidatePath('/orders');
   revalidatePath(`/orders/${orderId}`);
@@ -74,7 +85,7 @@ export async function createOrder(
     unitPrice: string;
   }>;
 
-  if (!items.length) return { status: 'error', message: 'Add at least one item.' };
+  if (!items.length) return { status: 'error', message: await noItems() };
 
   let created: { id: string };
   try {
@@ -89,7 +100,7 @@ export async function createOrder(
       items,
     });
   } catch (e) {
-    return { status: 'error', message: e instanceof Error ? e.message : 'Could not create order' };
+    return { status: 'error', message: await messageOf(e, 'createOrder') };
   }
 
   // Prepaid orders — wallet and InstaPay are usually settled before dispatch.
@@ -116,7 +127,7 @@ export async function updateOrder(
     unitPrice: string;
   }>;
 
-  if (!items.length) return { status: 'error', message: 'Add at least one item.' };
+  if (!items.length) return { status: 'error', message: await noItems() };
 
   try {
     await send(`/orders/${orderId}`, 'PATCH', {
@@ -130,7 +141,7 @@ export async function updateOrder(
       items,
     });
   } catch (e) {
-    return { status: 'error', message: e instanceof Error ? e.message : 'Could not save the order' };
+    return { status: 'error', message: await messageOf(e, 'saveOrder') };
   }
 
   revalidatePath('/orders');
@@ -163,7 +174,7 @@ export async function setOrderTracking(
   try {
     await send(`/bosta/orders/${orderId}/tracking`, 'PATCH', { trackingNumber });
   } catch (e) {
-    return { ok: false, message: e instanceof Error ? e.message : 'Could not update tracking number' };
+    return { ok: false, message: await messageOf(e, 'updateTracking') };
   }
   revalidatePath('/orders');
   revalidatePath(`/orders/${orderId}`);
@@ -172,22 +183,20 @@ export async function setOrderTracking(
 
 export async function trackBostaLive(trackingNumber: string) {
   const clean = trackingNumber.trim();
-  if (!clean) return { ok: false as const, message: 'Tracking number is required' };
+  const t = await getTranslations('errors');
+  if (!clean) return { ok: false as const, message: t('trackingRequired') };
   try {
     const res = await fetch(`${API}/bosta/track/${encodeURIComponent(clean)}`, {
       headers: await authHeaders(),
       cache: 'no-store',
     });
     if (!res.ok) {
-      const err = await res.json().catch(() => ({ message: 'Tracking failed' }));
-      return { ok: false as const, message: err?.message ?? 'Shipment not found on Bosta' };
+      const err = await res.json().catch(() => ({ message: t('trackingFailed') }));
+      return { ok: false as const, message: err?.message ?? t('shipmentNotFound') };
     }
     const data = await res.json();
     return { ok: true as const, data };
   } catch (e) {
-    return { ok: false as const, message: e instanceof Error ? e.message : 'Could not connect to tracking service' };
+    return { ok: false as const, message: e instanceof Error ? e.message : t('trackingUnreachable') };
   }
 }
-
-
-

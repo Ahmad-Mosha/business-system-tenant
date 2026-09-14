@@ -310,6 +310,7 @@ export function BarList({ items, empty }: { items: BarItem[]; empty: string }) {
 /** noon's net proceeds per settlement month; a bar opens its month. */
 export function MonthlyProceedsChart({ periods }: { periods: Period[] }) {
   const t = useTranslations('charts');
+  const tn = useTranslations('nouns');
   const f = useFormat();
   const router = useRouter();
   const axisWidth = useAxisWidth();
@@ -336,7 +337,7 @@ export function MonthlyProceedsChart({ periods }: { periods: Period[] }) {
             <ChartTooltipContent
               labelFormatter={(_, payload) => {
                 const p = payload?.[0]?.payload as Period | undefined;
-                return p ? `${f.month(p.month)} · ${t('units', { count: p.unitsSold })}` : '';
+                return p ? `${f.month(p.month)} · ${tn('units', { count: p.unitsSold })}` : '';
               }}
               valueFormatter={money}
             />

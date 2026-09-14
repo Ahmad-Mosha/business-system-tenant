@@ -126,7 +126,7 @@ export interface OrderRow {
   source: 'EASYORDERS' | 'SOCIAL';
   status: OrderStatus;
   paymentStatus: PaymentStatus;
-  paymentMethod: string;
+  paymentMethod: 'COD' | 'WALLET' | 'INSTAPAY';
   customerName: string;
   customerPhone: string;
   governorate: string | null;
