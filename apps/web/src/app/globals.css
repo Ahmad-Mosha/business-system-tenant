@@ -48,6 +48,7 @@
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
+  --color-highlight: var(--highlight);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
@@ -73,6 +74,10 @@
   --popover-foreground: oklch(0.145 0 0);
   --primary: oklch(0.511 0.096 186.391);
   --primary-foreground: oklch(0.984 0.014 180.72);
+  /* The current selection — pressed toggles, active filters, in-progress
+     chips. Equal to primary in light; its own token because dark mode's
+     primary is tuned for button fills and is too dim to read as text. */
+  --highlight: oklch(0.511 0.096 186.391);
   --secondary: oklch(0.967 0.001 286.375);
   --secondary-foreground: oklch(0.21 0.006 285.885);
   --muted: oklch(0.97 0 0);
@@ -114,6 +119,7 @@
   --popover-foreground: oklch(0.985 0 0);
   --primary: oklch(0.437 0.078 188.216);
   --primary-foreground: oklch(0.984 0.014 180.72);
+  --highlight: oklch(0.777 0.152 181.912);
   --secondary: oklch(0.274 0.006 286.033);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);

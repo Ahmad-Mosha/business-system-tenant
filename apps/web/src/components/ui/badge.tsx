@@ -20,7 +20,7 @@ const badgeVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
         // State tones — tinted fill plus a hairline of the same hue, quiet in
         // bulk and still legible at a glance.
-        primary: "border-primary/20 bg-primary/10 text-primary",
+        primary: "border-highlight/25 bg-highlight/10 text-highlight",
         success: "border-success/25 bg-success-subtle text-success",
         warning: "border-warning/25 bg-warning-subtle text-warning",
       },
