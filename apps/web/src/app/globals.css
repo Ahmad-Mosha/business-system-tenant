@@ -180,10 +180,20 @@
 
 /* Figures — money, counts, quantities. DM Sans ships without tabular digits,
    so columns of amounts would not align; Space Grotesk has them, and doubles
-   as the headline-figure face. */
+   as the headline-figure face. Arabic keeps Western digits (i18n/config.ts),
+   so figures stay in this face in both languages. */
 @utility num {
   font-family: var(--font-heading);
   font-variant-numeric: tabular-nums;
+}
+
+/* Arabic letters join; any letter-spacing, tight or wide, pulls the joins
+   apart. Headings and tracked labels read at natural spacing in Arabic —
+   figures keep theirs, being Latin digits. Unlayered on purpose, so it wins
+   over the tracking utilities. */
+:lang(ar) :is(h1, h2, h3),
+:lang(ar) [class*='tracking-']:not(.num) {
+  letter-spacing: normal;
 }
 
 /* iOS zooms into any focused field under 16px. */
