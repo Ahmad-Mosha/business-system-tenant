@@ -114,12 +114,14 @@ export default async function SupplierDetailPage({ params }: { params: Promise<{
               <TableBody>
                 {supplier.payments.map((p) => (
                   <TableRow key={p.id}>
+                    <TableCell className="h-auto max-w-0 py-2.5">
+                      <p className="truncate">
+                        <bdi>{p.memo ?? 'Payment'}</bdi>
+                      </p>
+                      <p className="text-xs text-muted-foreground">{dateTime(p.occurredAt)}</p>
+                    </TableCell>
                     <TableCell className="num w-[130px] text-right font-medium text-destructive">
                       −{money(p.amount)}
-                    </TableCell>
-                    <TableCell className="max-w-0 truncate text-muted-foreground">{p.memo ?? 'Payment'}</TableCell>
-                    <TableCell className="text-right text-xs text-muted-foreground">
-                      {dateTime(p.occurredAt)}
                     </TableCell>
                   </TableRow>
                 ))}
