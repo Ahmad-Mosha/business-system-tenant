@@ -1,78 +1,102 @@
+import { Users } from 'lucide-react';
 import Link from 'next/link';
+import { Amount } from '@/components/amount';
+import { MetricCard, MetricGrid } from '@/components/metric-card';
+import { Page, PageHeader } from '@/components/page';
 import { SupplierForm } from '@/components/supplier-form';
-import { ContextBar, Figure, Panel, Screen, Scroller } from '@/components/shell';
+import { TableCount, TableEmpty, TablePanel } from '@/components/table-panel';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { getSuppliers } from '@/lib/api';
 import { date, money } from '@/lib/format';
 import { requireAdmin } from '@/lib/session';
-import { cn } from '@/lib/utils';
 
 export default async function SuppliersPage() {
   await requireAdmin();
   const suppliers = await getSuppliers();
   const owed = suppliers.reduce((n, s) => n + Number(s.balance), 0);
+  const owing = suppliers.filter((s) => Number(s.balance) > 0).length;
 
   return (
-    <Screen>
-      <ContextBar
+    <Page fill>
+      <PageHeader
         title="Suppliers"
-        meta="everyone we buy stock from"
-        figures={<Figure label="Owed" value={money(owed)} tone={owed > 0 ? 'warning' : 'default'} />}
+        description="Everyone we buy stock from, and what we owe each of them."
         actions={<SupplierForm />}
       />
 
-      <div className="flex min-h-0 flex-1 flex-col p-4">
-        <Panel>
-          <Scroller>
-            {suppliers.length === 0 ? (
-              <p className="p-12 text-center text-sm text-muted-foreground">
-                No suppliers yet. Add one to record a purchase.
-              </p>
-            ) : (
-              <table className="w-full border-collapse text-[13px]">
-                <thead className="sticky top-0 z-10 bg-muted/40 backdrop-blur">
-                  <tr className="border-b border-border text-[11px] tracking-[0.06em] text-muted-foreground uppercase">
-                    <th className="px-4 py-2.5 text-left font-medium">Supplier</th>
-                    <th className="px-4 py-2.5 text-left font-medium">Phone</th>
-                    <th className="px-4 py-2.5 text-right font-medium">Balance owed</th>
-                    <th className="px-4 py-2.5 text-right font-medium">Added</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {suppliers.map((s) => (
-                    <tr
-                      key={s.id}
-                      className="group relative h-11 border-b border-border/60 last:border-b-0 hover:bg-accent/40"
+      <MetricGrid>
+        <MetricCard label="Suppliers" value={suppliers.length} hint="Active" />
+        <MetricCard
+          label="Owed in total"
+          value={<Amount value={owed} />}
+          tone={owed > 0 ? 'warning' : 'default'}
+          hint={owed > 0 ? `Across ${owing} ${owing === 1 ? 'supplier' : 'suppliers'}` : 'Nobody is owed anything'}
+        />
+      </MetricGrid>
+
+      <TablePanel
+        footer={
+          <TableCount>
+            <span className="num font-medium text-foreground">{suppliers.length}</span>{' '}
+            {suppliers.length === 1 ? 'supplier' : 'suppliers'}
+          </TableCount>
+        }
+      >
+        {suppliers.length === 0 ? (
+          <TableEmpty
+            icon={Users}
+            title="No suppliers yet"
+            description="Add one to record a purchase from them."
+            action={<SupplierForm />}
+          />
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Supplier</TableHead>
+                <TableHead className="w-[160px]">Phone</TableHead>
+                <TableHead className="w-[160px] text-right">Balance owed</TableHead>
+                <TableHead className="w-[130px] text-right">Added</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {suppliers.map((s) => (
+                <TableRow key={s.id} className="relative">
+                  <TableCell className="max-w-0">
+                    <Link
+                      href={`/money/suppliers/${s.id}`}
+                      className="block truncate font-medium after:absolute after:inset-0 hover:underline focus-visible:underline focus-visible:outline-none"
                     >
-                      <td className="px-4">
-                        <Link
-                          href={`/money/suppliers/${s.id}`}
-                          className="font-medium after:absolute after:inset-0 focus-visible:underline focus-visible:outline-none"
-                        >
-                          <bdi>{s.name}</bdi>
-                        </Link>
-                      </td>
-                      <td className="px-4 tabular-nums text-muted-foreground">
-                        {s.phone ?? <span className="opacity-40">—</span>}
-                      </td>
-                      <td
-                        className={cn(
-                          'px-4 text-right font-medium tabular-nums',
-                          Number(s.balance) > 0 ? 'text-warning' : 'text-muted-foreground',
-                        )}
-                      >
-                        {Number(s.balance) > 0 ? money(s.balance) : '—'}
-                      </td>
-                      <td className="px-4 text-right whitespace-nowrap text-muted-foreground">
-                        {date(s.createdAt)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </Scroller>
-        </Panel>
-      </div>
-    </Screen>
+                      <bdi>{s.name}</bdi>
+                    </Link>
+                    {s.note ? (
+                      <p className="truncate text-xs text-muted-foreground">
+                        <bdi>{s.note}</bdi>
+                      </p>
+                    ) : null}
+                  </TableCell>
+                  <TableCell className="num text-muted-foreground">{s.phone ?? '—'}</TableCell>
+                  <TableCell className="num text-right font-medium">
+                    {Number(s.balance) > 0 ? (
+                      <span className="text-warning">{money(s.balance)}</span>
+                    ) : (
+                      <span className="text-muted-foreground">Settled</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right text-muted-foreground">{date(s.createdAt)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </TablePanel>
+    </Page>
   );
 }

@@ -1,18 +1,24 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { Amount } from '@/components/amount';
+import { MetricCard, MetricGrid } from '@/components/metric-card';
+import { Page, PageHeader } from '@/components/page';
 import { PaidChip } from '@/components/paid-chip';
 import { PaySupplier } from '@/components/pay-supplier';
-import { ContextBar, Figure, Panel, Screen, Scroller } from '@/components/shell';
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { getSupplier } from '@/lib/api';
 import { date, dateTime, money } from '@/lib/format';
 import { requireAdmin } from '@/lib/session';
-import { cn } from '@/lib/utils';
 
-export default async function SupplierDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function SupplierDetailPage({ params }: { params: Promise<{ id: string }> }) {
   await requireAdmin();
   const { id } = await params;
   const supplier = await getSupplier(id).catch(() => null);
@@ -21,95 +27,107 @@ export default async function SupplierDetailPage({
   const posted = supplier.invoices.filter((i) => i.status === 'POSTED');
   const purchased = posted.reduce((n, i) => n + Number(i.landedTotal), 0);
   const paid = supplier.payments.reduce((n, p) => n + Number(p.amount), 0);
+  const owed = Number(supplier.balance);
 
   return (
-    <Screen>
-      <ContextBar
-        back="/money/suppliers"
+    <Page>
+      <PageHeader
+        back={{ href: '/money/suppliers', label: 'Back to suppliers' }}
         title={<bdi>{supplier.name}</bdi>}
-        meta={supplier.phone ?? undefined}
-        figures={
-          <>
-            <Figure
-              label="Owed"
-              value={money(supplier.balance)}
-              tone={Number(supplier.balance) > 0 ? 'warning' : 'default'}
-            />
-            <Figure label="Purchased" value={money(purchased)} />
-            <Figure label="Paid" value={money(paid)} />
-          </>
+        description={
+          [supplier.phone, supplier.note].filter(Boolean).join(' · ') || 'Supplier'
         }
         actions={<PaySupplier supplierId={supplier.id} owed={supplier.balance} />}
       />
 
-      <div className="flex min-h-0 flex-1 flex-col gap-4 p-4 lg:flex-row">
-        <Panel>
-          <div className="border-b border-border px-4 py-2.5 text-[13px] font-semibold">Invoices</div>
-          <Scroller>
-            {supplier.invoices.length === 0 ? (
-              <p className="p-8 text-center text-sm text-muted-foreground">No invoices yet.</p>
-            ) : (
-              <table className="w-full border-collapse text-[13px]">
-                <tbody>
-                  {supplier.invoices.map((i) => (
-                    <tr
-                      key={i.id}
-                      className="group relative border-b border-border/60 last:border-b-0 hover:bg-accent/40"
-                    >
-                      <td className="px-4 py-2.5">
-                        <Link
-                          href={`/money/purchases/${i.id}`}
-                          className="font-medium after:absolute after:inset-0"
-                        >
-                          {i.invoiceNo ?? 'No ref'}
-                        </Link>
-                        <span className="ms-2 text-muted-foreground">{date(i.invoiceDate)}</span>
-                        <span className="ms-2 text-[11px] text-muted-foreground">
-                          {i.payment === 'CASH' ? 'paid cash' : 'on credit'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <PaidChip status={i.paidStatus} />
-                      </td>
-                      <td className="px-4 py-2.5 text-right font-medium tabular-nums">
-                        {money(i.landedTotal)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </Scroller>
-        </Panel>
+      <MetricGrid>
+        <MetricCard
+          label="Owed"
+          value={<Amount value={supplier.balance} />}
+          tone={owed > 0 ? 'warning' : 'default'}
+          hint={owed > 0 ? 'On posted credit invoices' : 'Fully settled'}
+        />
+        <MetricCard
+          label="Bought"
+          value={<Amount value={purchased} />}
+          hint={`${posted.length} posted ${posted.length === 1 ? 'invoice' : 'invoices'}`}
+        />
+        <MetricCard
+          label="Paid"
+          value={<Amount value={paid} />}
+          hint={`${supplier.payments.length} ${supplier.payments.length === 1 ? 'payment' : 'payments'}`}
+        />
+      </MetricGrid>
 
-        <aside className="flex w-full shrink-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xs lg:w-[340px]">
-          <div className="border-b border-border px-4 py-2.5 text-[13px] font-semibold">Payments</div>
-          <Scroller>
-            {supplier.payments.length === 0 ? (
-              <p className="p-8 text-center text-sm text-muted-foreground">No payments yet.</p>
-            ) : (
-              <ul>
-                {supplier.payments.map((p, i) => (
-                  <li
-                    key={p.id}
-                    className={cn('flex items-center gap-3 px-4 py-2.5 text-[13px]', i > 0 && 'border-t border-border/60')}
-                  >
-                    <span className="w-24 shrink-0 text-right font-medium tabular-nums text-destructive">
-                      −{money(p.amount)}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-muted-foreground">
-                      {p.memo ?? 'Payment'}
-                    </span>
-                    <span className="shrink-0 text-[11px] text-muted-foreground">
-                      {dateTime(p.occurredAt)}
-                    </span>
-                  </li>
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_400px]">
+        <Card className="min-w-0 pb-0">
+          <CardHeader>
+            <CardTitle>Invoices</CardTitle>
+          </CardHeader>
+          {supplier.invoices.length === 0 ? (
+            <p className="border-t p-10 text-center text-[13px] text-muted-foreground">No invoices yet.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Invoice</TableHead>
+                  <TableHead className="w-[120px]">Date</TableHead>
+                  <TableHead className="w-[130px]">Status</TableHead>
+                  <TableHead className="w-[140px] text-right">Total</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {supplier.invoices.map((i) => (
+                  <TableRow key={i.id} className="relative">
+                    <TableCell>
+                      <Link
+                        href={`/money/purchases/${i.id}`}
+                        className="font-medium after:absolute after:inset-0 hover:underline focus-visible:underline focus-visible:outline-none"
+                      >
+                        {i.invoiceNo ?? 'No ref'}
+                      </Link>
+                      <span className="ms-2 text-xs text-muted-foreground">
+                        {i.payment === 'CASH' ? 'Cash' : 'Credit'}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{date(i.invoiceDate)}</TableCell>
+                    <TableCell>
+                      <PaidChip status={i.paidStatus} />
+                    </TableCell>
+                    <TableCell className="num text-right font-medium">{money(i.landedTotal)}</TableCell>
+                  </TableRow>
                 ))}
-              </ul>
-            )}
-          </Scroller>
-        </aside>
+              </TableBody>
+            </Table>
+          )}
+        </Card>
+
+        <Card className="pb-0">
+          <CardHeader>
+            <CardTitle>Payments</CardTitle>
+            <CardDescription>Cash paid to them, newest first.</CardDescription>
+          </CardHeader>
+          {supplier.payments.length === 0 ? (
+            <p className="border-t p-10 text-center text-[13px] text-muted-foreground">No payments yet.</p>
+          ) : (
+            <Table>
+              <TableBody>
+                {supplier.payments.map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell className="num w-[130px] text-right font-medium text-destructive">
+                      −{money(p.amount)}
+                    </TableCell>
+                    <TableCell className="max-w-0 truncate text-muted-foreground">{p.memo ?? 'Payment'}</TableCell>
+                    <TableCell className="text-right text-xs text-muted-foreground">
+                      {dateTime(p.occurredAt)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </Card>
       </div>
-    </Screen>
+    </Page>
   );
 }
