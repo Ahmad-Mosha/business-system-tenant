@@ -39,6 +39,12 @@ const REASONS = [
   { value: 'ADJUSTMENT', label: 'Correction' },
 ] as const;
 
+/** Every reason a movement can carry — SALE is recorded by orders, never by hand. */
+const REASON_LABEL: Record<string, string> = {
+  ...Object.fromEntries(REASONS.map((r) => [r.value, r.label])),
+  SALE: 'Sold',
+};
+
 interface Variant {
   id: string;
   name: string;
@@ -222,7 +228,7 @@ export function VariantPanel({ variant, movements }: { variant: Variant; movemen
                       {m.quantity}
                     </TableCell>
                     <TableCell className="max-w-0 truncate">
-                      {REASONS.find((r) => r.value === m.reason)?.label ?? m.reason}
+                      {REASON_LABEL[m.reason] ?? m.reason}
                       {m.note ? <span className="text-muted-foreground"> · {m.note}</span> : null}
                     </TableCell>
                     <TableCell className="num text-right">{m.runningTotal}</TableCell>

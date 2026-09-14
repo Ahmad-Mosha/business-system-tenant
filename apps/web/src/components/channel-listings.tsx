@@ -124,7 +124,7 @@ function ChannelRow({
           }}
         />
         <Button
-          variant={linked ? 'outline' : 'default'}
+          variant="outline"
           onClick={save}
           disabled={pending || !dirty || !trimmed}
           className="min-w-20"
