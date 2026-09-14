@@ -5,11 +5,19 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* DM Sans for text, Space Grotesk for headings and figures. Neither has
+     Arabic glyphs, so Arabic names must fall through to IBM Plex Sans Arabic —
+     every product and customer name in this system is Arabic.
+     The families are named first on purpose: each next/font variable carries a
+     size-adjusted Arial "Fallback" face covering every code point, and Arial
+     has Arabic glyphs, so `var(--font-dm-sans), var(--font-arabic)` renders
+     Arabic in Arial and never reaches Plex. The variables stay as the backstop
+     if a build ever serves the faces under hashed names. */
+  --font-sans: "DM Sans", "IBM Plex Sans Arabic", var(--font-dm-sans), var(--font-arabic), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: "Space Grotesk", "IBM Plex Sans Arabic", var(--font-space-grotesk), var(--font-arabic), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-latin), var(--font-arabic), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -53,98 +61,99 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* shadcn "Lyra" on neutral, teal theme (preset b6XGy1Otr6). Teal is the
+   primary action and the current selection; everything else is neutral, and
+   success / warning / destructive only ever mark state. */
 :root {
-  --background: oklch(0.972 0.003 265);
+  --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
+  --primary: oklch(0.511 0.096 186.391);
+  --primary-foreground: oklch(0.984 0.014 180.72);
+  --secondary: oklch(0.967 0.001 286.375);
+  --secondary-foreground: oklch(0.21 0.006 285.885);
   --muted: oklch(0.97 0 0);
   --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --accent: oklch(0.511 0.096 186.391);
+  --accent-foreground: oklch(0.984 0.014 180.72);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.905 0.003 265);
-  --input: oklch(0.905 0.003 265);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  /* Density. docs/ui-ux.md asks for 36px rows and 34px inputs; the shell is
-     built on these so a change here moves every screen at once. */
-  --row-h: 34px;
-  --control-h: 32px;
-  --bar-h: 48px;
-  --strip-h: 30px;
-  --rail-w: 216px;
-  --detail-w: 420px;
-  /* Semantic only — never decorative. The UI must stay legible with these
-     collapsed to the monochrome scale. */
-  --success: oklch(0.52 0.13 152);
-  --success-subtle: oklch(0.96 0.02 152);
-  --warning: oklch(0.62 0.14 72);
-  --warning-subtle: oklch(0.96 0.03 82);
-  --destructive-subtle: oklch(0.96 0.02 27);
-  --sidebar: oklch(1 0 0);
+  --chart-1: oklch(0.855 0.138 181.071);
+  --chart-2: oklch(0.704 0.14 182.503);
+  --chart-3: oklch(0.6 0.118 184.704);
+  --chart-4: oklch(0.511 0.096 186.391);
+  --chart-5: oklch(0.437 0.078 188.216);
+  --radius: 0;
+  --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.6 0.118 184.704);
+  --sidebar-primary-foreground: oklch(0.984 0.014 180.72);
   --sidebar-accent: oklch(0.97 0 0);
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  /* State colours, dark enough for 12px text on white (≥4.5:1). */
+  --success: oklch(0.527 0.137 150);
+  --success-subtle: oklch(0.967 0.028 152);
+  --warning: oklch(0.555 0.146 55);
+  --warning-subtle: oklch(0.975 0.035 85);
+  --destructive-subtle: oklch(0.971 0.013 17.38);
+  /* Legacy shell sizes — removed once every screen is on the new shell. */
+  --bar-h: 48px;
+  --strip-h: 30px;
+  --rail-w: 216px;
+  --detail-w: 420px;
 }
 
 .dark {
-  --background: oklch(0.155 0.004 265);
+  --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.202 0.004 265);
+  --card: oklch(0.205 0 0);
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
+  --primary: oklch(0.437 0.078 188.216);
+  --primary-foreground: oklch(0.984 0.014 180.72);
+  --secondary: oklch(0.274 0.006 286.033);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
   --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --accent: oklch(0.437 0.078 188.216);
+  --accent-foreground: oklch(0.984 0.014 180.72);
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.185 0.004 265);
+  --chart-1: oklch(0.855 0.138 181.071);
+  --chart-2: oklch(0.704 0.14 182.503);
+  --chart-3: oklch(0.6 0.118 184.704);
+  --chart-4: oklch(0.511 0.096 186.391);
+  --chart-5: oklch(0.437 0.078 188.216);
+  --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.922 0 0);
-  --sidebar-primary-foreground: oklch(0.205 0 0);
+  --sidebar-primary: oklch(0.704 0.14 182.503);
+  --sidebar-primary-foreground: oklch(0.277 0.046 192.524);
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
-  --success: oklch(0.72 0.15 152);
-  --success-subtle: oklch(0.27 0.04 152);
-  --warning: oklch(0.78 0.14 78);
-  --warning-subtle: oklch(0.28 0.04 78);
-  --destructive-subtle: oklch(0.28 0.05 27);
+  --success: oklch(0.765 0.15 152);
+  --success-subtle: oklch(0.27 0.045 152);
+  --warning: oklch(0.8 0.14 78);
+  --warning-subtle: oklch(0.28 0.045 78);
+  --destructive-subtle: oklch(0.28 0.06 27);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
   }
   body {
     @apply bg-background text-foreground;
@@ -152,26 +161,43 @@
   html {
     @apply font-sans;
   }
-}
-@layer base {
-  /* The palette is deliberately flat, so typography and spacing carry the
-     hierarchy. Tighter tracking on headings, lining figures in tables. */
-  h1, h2, h3 {
-    letter-spacing: -0.018em;
+  h1,
+  h2,
+  h3 {
+    @apply font-heading;
+    letter-spacing: -0.01em;
     text-wrap: balance;
   }
-  /* Financial columns must align digit-for-digit. */
+  /* Money columns must align digit-for-digit. */
   table {
     font-variant-numeric: tabular-nums;
   }
   ::selection {
-    background: var(--foreground);
-    color: var(--background);
+    background: color-mix(in oklch, var(--primary) 22%, transparent);
+  }
+}
+
+/* Figures — money, counts, quantities. DM Sans ships without tabular digits,
+   so columns of amounts would not align; Space Grotesk has them, and doubles
+   as the headline-figure face. */
+@utility num {
+  font-family: var(--font-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+/* iOS zooms into any focused field under 16px. */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: max(16px, 1em);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }

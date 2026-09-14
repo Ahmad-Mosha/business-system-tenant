@@ -1,19 +1,19 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono, IBM_Plex_Sans_Arabic } from 'next/font/google';
+import { DM_Sans, Geist_Mono, IBM_Plex_Sans_Arabic, Space_Grotesk } from 'next/font/google';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import './globals.css';
 
-const geistSans = Geist({ variable: '--font-latin', subsets: ['latin'] });
-const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
+const sans = DM_Sans({ variable: '--font-dm-sans', subsets: ['latin'] });
+const heading = Space_Grotesk({ variable: '--font-space-grotesk', subsets: ['latin'] });
+const mono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
 
 /**
- * Every product and customer name in this system is Arabic. Geist has no
- * Arabic coverage, so without a paired face the browser falls back to whatever
- * the OS supplies — which is how the previous build's Arabic looked wrong.
- * Plex Arabic is listed after Geist in --font-sans, so Latin glyphs come from
- * Geist and Arabic ones fall through to Plex.
+ * Every product and customer name in this system is Arabic, and neither DM
+ * Sans nor Space Grotesk has Arabic glyphs. Plex Arabic follows them in both
+ * font stacks (globals.css — which also explains why the stacks name the
+ * families directly), so Latin comes from the brand faces and Arabic from Plex.
  */
 const arabic = IBM_Plex_Sans_Arabic({
   variable: '--font-arabic',
@@ -31,9 +31,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} ${arabic.variable} h-full antialiased`}
+      className={`${sans.variable} ${heading.variable} ${mono.variable} ${arabic.variable} h-full antialiased`}
     >
-      {/* The document itself never scrolls. Panes inside the shell do. */}
       <body className="h-full overflow-hidden bg-background text-foreground">
         <ThemeProvider>
           <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
