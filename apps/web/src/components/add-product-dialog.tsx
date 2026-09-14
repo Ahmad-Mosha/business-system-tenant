@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { createProductForInvoice } from '@/app/(app)/money/actions';
@@ -17,13 +18,8 @@ import { Field, FieldDescription, FieldGroup, FieldLabel, FieldSeparator } from 
 import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { LISTING_CHANNELS } from '@/components/channel-listings';
 import { CATEGORIES } from '@/lib/categories';
-
-const CHANNELS = [
-  { key: 'noon', label: 'noon', placeholder: 'Partner SKU, e.g. CCC-0001' },
-  { key: 'amazon', label: 'Amazon', placeholder: 'Seller SKU' },
-  { key: 'easyorders', label: 'Website', placeholder: 'Easy Orders product ID' },
-] as const;
 
 /**
  * The Inventory screen's product form — name, category, our SKU, and the
@@ -42,12 +38,13 @@ export function AddProductDialog({
   initialName: string;
   onCreated: (variantId: string, label: string) => void;
 }) {
+  const t = useTranslations('product.dialog');
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-base">New product</DialogTitle>
-          <DialogDescription>Created in Inventory and added to this invoice.</DialogDescription>
+          <DialogTitle className="text-base">{t('title')}</DialogTitle>
+          <DialogDescription>{t('description')}</DialogDescription>
         </DialogHeader>
         {/* The dialog unmounts this on close, so every open starts fresh
             from `initialName` — no effect needed to reset it. */}
@@ -66,6 +63,8 @@ function Body({
   onCreated: (variantId: string, label: string) => void;
   onDone: () => void;
 }) {
+  const t = useTranslations('product');
+  const tr = useTranslations();
   const [name, setName] = useState(initialName);
   const [category, setCategory] = useState('');
   const [sku, setSku] = useState('');
@@ -80,13 +79,13 @@ function Body({
         name: trimmed,
         category: category || undefined,
         sku: sku.trim() || undefined,
-        listings: CHANNELS.map((c) => ({ channel: c.key, externalId: channelSkus[c.key] ?? '' })),
+        listings: LISTING_CHANNELS.map((c) => ({ channel: c, externalId: channelSkus[c] ?? '' })),
       });
       if (!res.ok) {
         toast.error(res.message);
         return;
       }
-      toast.success('Product created.');
+      toast.success(t('dialog.created'));
       onCreated(res.variantId, res.label);
       onDone();
     });
@@ -102,7 +101,7 @@ function Body({
     >
       <FieldGroup className="gap-4">
         <Field>
-          <FieldLabel htmlFor="np-name">Name</FieldLabel>
+          <FieldLabel htmlFor="np-name">{t('name')}</FieldLabel>
           <Input
             id="np-name"
             value={name}
@@ -113,7 +112,7 @@ function Body({
           />
         </Field>
         <Field>
-          <FieldLabel>Category</FieldLabel>
+          <FieldLabel>{t('category')}</FieldLabel>
           <ToggleGroup
             type="single"
             variant="outline"
@@ -121,42 +120,44 @@ function Body({
             value={category}
             onValueChange={setCategory}
             disabled={pending}
-            aria-label="Category"
+            aria-label={t('category')}
             className="flex-wrap"
           >
             {CATEGORIES.map((c) => (
-              <ToggleGroupItem key={c.value} value={c.value}>
-                {c.label}
+              <ToggleGroupItem key={c} value={c}>
+                {tr(`enums.category.${c}`)}
               </ToggleGroupItem>
             ))}
           </ToggleGroup>
         </Field>
         <Field>
           <FieldLabel htmlFor="np-sku">
-            Our SKU <span className="font-normal text-muted-foreground">(optional)</span>
+            {t('new.ourSku')} <span className="font-normal text-muted-foreground">{t('dialog.optional')}</span>
           </FieldLabel>
           <Input
             id="np-sku"
             value={sku}
             onChange={(e) => setSku(e.target.value)}
-            placeholder="Leave blank if none yet"
+            placeholder={t('dialog.skuPlaceholder')}
             disabled={pending}
             className="font-mono"
           />
         </Field>
         <FieldSeparator />
         <Field>
-          <FieldLabel>Also sold on</FieldLabel>
-          <FieldDescription>Optional — a sale there will move this product’s stock.</FieldDescription>
+          <FieldLabel>{t('new.alsoSoldOn')}</FieldLabel>
+          <FieldDescription>{t('dialog.alsoSoldOnHint')}</FieldDescription>
           <div className="grid gap-2">
-            {CHANNELS.map((c) => (
-              <div key={c.key} className="flex items-center gap-2.5">
-                <span className="w-16 shrink-0 text-xs text-muted-foreground">{c.label}</span>
+            {LISTING_CHANNELS.map((c) => (
+              <div key={c} className="flex items-center gap-2.5">
+                <span className="w-16 shrink-0 text-xs text-muted-foreground">
+                  {tr(`enums.channel.${c}`)}
+                </span>
                 <Input
-                  value={channelSkus[c.key] ?? ''}
-                  onChange={(e) => setChannelSkus((s) => ({ ...s, [c.key]: e.target.value }))}
-                  placeholder={c.placeholder}
-                  aria-label={`${c.label} SKU`}
+                  value={channelSkus[c] ?? ''}
+                  onChange={(e) => setChannelSkus((s) => ({ ...s, [c]: e.target.value }))}
+                  placeholder={t(`channelSku.${c}.placeholder`)}
+                  aria-label={t('listings.sku', { channel: tr(`enums.channel.${c}`) })}
                   disabled={pending}
                   className="font-mono"
                 />
@@ -168,12 +169,12 @@ function Body({
       <DialogFooter>
         <DialogClose asChild>
           <Button type="button" variant="ghost" disabled={pending}>
-            Cancel
+            {tr('common.cancel')}
           </Button>
         </DialogClose>
         <Button type="submit" disabled={pending || !name.trim()}>
           {pending ? <Spinner /> : null}
-          Create and add
+          {t('dialog.create')}
         </Button>
       </DialogFooter>
     </form>

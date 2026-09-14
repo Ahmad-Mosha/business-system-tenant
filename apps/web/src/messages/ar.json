@@ -95,7 +95,8 @@
     "entries": "{count, plural, =0 {لا توجد حركات} one {حركة واحدة} two {حركتان} few {# حركات} many {# حركة} other {# حركة}}",
     "items": "{count, plural, =0 {لا توجد أصناف} one {صنف واحد} two {صنفان} few {# أصناف} many {# صنفًا} other {# صنف}}",
     "units": "{count, plural, =0 {لا وحدات} one {وحدة واحدة} two {وحدتان} few {# وحدات} many {# وحدة} other {# وحدة}}",
-    "shipments": "{count, plural, =0 {لا توجد شحنات} one {شحنة واحدة} two {شحنتان} few {# شحنات} many {# شحنة} other {# شحنة}}"
+    "shipments": "{count, plural, =0 {لا توجد شحنات} one {شحنة واحدة} two {شحنتان} few {# شحنات} many {# شحنة} other {# شحنة}}",
+    "variants": "{count, plural, =0 {لا توجد أنواع} one {نوع واحد} two {نوعان} few {# أنواع} many {# نوعًا} other {# نوع}}"
   },
   "filters": {
     "reset": "مسح الفلاتر",
@@ -160,17 +161,9 @@
     "backHome": "العودة إلى Prime Market"
   },
   "errors": {
+    "unreachable": "تعذّر الاتصال بالخادم. تحقق من الاتصال ثم حاول مرة أخرى.",
     "requestFailed": "فشل الطلب ({status}).",
-    "updateStatus": "تعذّر تحديث الحالة.",
-    "updatePayment": "تعذّر تحديث حالة الدفع.",
-    "assign": "تعذّر إسناد الطلب.",
-    "createOrder": "تعذّر إنشاء الطلب.",
-    "saveOrder": "تعذّر حفظ الطلب.",
-    "updateTracking": "تعذّر تحديث رقم التتبع.",
-    "trackingRequired": "أدخل رقم التتبع.",
-    "trackingFailed": "فشل التتبع.",
-    "shipmentNotFound": "الشحنة غير موجودة على بوسطة.",
-    "trackingUnreachable": "تعذّر الاتصال بخدمة التتبع."
+    "trackingRequired": "أدخل رقم التتبع."
   },
   "orders": {
     "title": "الطلبات",
@@ -370,6 +363,146 @@
     "attempts": "محاولات التوصيل",
     "attemptsValue": "<num>{count}</num> من أصل <num>{max}</num> محاولات",
     "allowOpen": "السماح للعميل بفتح الشحنة؟"
+  },
+  "inventory": {
+    "title": "المخزون",
+    "description": "ما لديك، وكم يساوي، وما يحتاج إلى إعادة طلب.",
+    "add": "إضافة منتج",
+    "stockValue": "قيمة المخزون",
+    "missingCost": "{count, plural, one {منتج واحد بلا تكلفة بعد} two {منتجان بلا تكلفة بعد} few {# منتجات بلا تكلفة بعد} many {# منتجًا بلا تكلفة بعد} other {# منتج بلا تكلفة بعد}}",
+    "atCost": "بالجنيه، بسعر التكلفة",
+    "unitsOnHand": "الوحدات المتوفرة",
+    "inOpenOrders": "بالإضافة إلى {count} في طلبات مفتوحة",
+    "noneInOrders": "لا شيء محجوز في طلبات مفتوحة",
+    "lowHint": "متبقٍ {count} أو أقل",
+    "outHint": "لم يتبقَّ شيء للبيع",
+    "search": "ابحث عن منتج…",
+    "stockLevel": "مستوى المخزون",
+    "allCategories": "كل التصنيفات",
+    "anyChannel": "أي قناة",
+    "noMatch": "لا توجد منتجات مطابقة",
+    "noMatchHint": "جرّب فلترًا آخر، أو امسح البحث.",
+    "none": "لا توجد منتجات بعد",
+    "noneHint": "أضف أول منتج بتكلفته ورصيده الافتتاحي.",
+    "columns": {
+      "product": "المنتج",
+      "stock": "المخزون",
+      "onHand": "المتوفر",
+      "inOrders": "في الطلبات",
+      "unitCost": "تكلفة الوحدة",
+      "stockValue": "قيمة المخزون",
+      "channels": "القنوات"
+    },
+    "sync": "مزامنة الموقع",
+    "synced": "تمت مزامنة منتجات الموقع: تحديث {updated}، وتعذّرت مطابقة {unmatched}."
+  },
+  "product": {
+    "back": "العودة إلى المخزون",
+    "description": "المخزون والتكلفة وقنوات البيع.",
+    "edit": "تعديل",
+    "delete": "حذف",
+    "deleteTitle": "حذف «<bdi>{name}</bdi>»؟",
+    "deleteDescription": "سيُزال من المخزون، مع الاحتفاظ بسجل طلباته وحركات مخزونه كما هو — لن يتغير أي شيء مرتبط بهذا المنتج.",
+    "deleteConfirm": "حذف المنتج",
+    "updated": "تم تحديث المنتج.",
+    "details": "بيانات المنتج",
+    "name": "الاسم",
+    "nameRequired": "المنتج يحتاج إلى اسم.",
+    "category": "التصنيف",
+    "noCategory": "بدون",
+    "onHand": "المتوفر",
+    "lowHint": "منخفض — متبقٍ {count} أو أقل",
+    "inOpenOrders": "في طلبات مفتوحة",
+    "inOpenOrdersHint": "خُصمت من المتوفر ولم تُسلَّم بعد",
+    "nothingWaiting": "لا شيء في الانتظار",
+    "unitCost": "تكلفة الوحدة",
+    "varies": "متفاوتة",
+    "differs": "تختلف بين {variants}",
+    "costNotSet": "غير محددة — لا تدخل في قيمة المخزون",
+    "sellsFor": "يُباع بـ {price}",
+    "noPrice": "لا يوجد سعر بيع بعد",
+    "stockValueHint": "المتوفر بسعر التكلفة",
+    "channels": "قنوات البيع",
+    "channelsHint": "رمز SKU الذي تستخدمه كل قناة لهذا المنتج — أي بيع عليها يُحرّك هذا المخزون.",
+    "stock": {
+      "title": "المخزون والتسعير",
+      "description": "تكلفته وسعر بيعه، وكل وحدة دخلت أو خرجت.",
+      "inOpenOrders": "<num>{count}</num> في طلبات مفتوحة — خُصمت بالفعل من رصيد الرف",
+      "noneWaiting": "لا شيء محجوز في طلبات مفتوحة",
+      "onHand": "متوفر",
+      "pricing": "التسعير",
+      "sellingPrice": "سعر البيع",
+      "savePrices": "حفظ الأسعار",
+      "saved": "تم الحفظ.",
+      "record": "تسجيل حركة",
+      "direction": "الاتجاه",
+      "in": "إضافة للمخزون",
+      "out": "خصم من المخزون",
+      "quantity": "الكمية",
+      "reason": "السبب",
+      "add": "إضافة {units}",
+      "remove": "خصم {units}",
+      "increased": "زاد المخزون بمقدار {count}.",
+      "reduced": "نقص المخزون بمقدار {count}.",
+      "onlyOnHand": "المتوفر <num>{count}</num> فقط",
+      "nothingToRemove": "لا يوجد رصيد للخصم",
+      "movement": "الحركة",
+      "change": "التغيير",
+      "balance": "الرصيد",
+      "noMovements": "لا توجد حركات مخزون بعد."
+    },
+    "listings": {
+      "variantsNotBuilt": "لهذا المنتج أنواع متعددة، وربط القنوات لكل نوع على حدة غير متاح بعد — أخبرنا عندما تحتاج إليه.",
+      "socialNote": "طلبات السوشيال ميديا تُسجَّل يدويًا على هذا المنتج — لا يلزم إعداد شيء هنا.",
+      "linked": "مربوط",
+      "notLinked": "غير مربوط",
+      "sku": "SKU على {channel}",
+      "link": "ربط",
+      "unlink": "إلغاء الربط مع {channel}",
+      "skuUpdated": "تم تحديث SKU على {channel}.",
+      "linkedTo": "تم الربط مع {channel}.",
+      "unlinked": "تم إلغاء الربط مع {channel}."
+    },
+    "channelSku": {
+      "noon": {
+        "placeholder": "Partner SKU، مثال: CCC-0001",
+        "hint": "كما يظهر تمامًا في تقرير تسوية نون"
+      },
+      "amazon": {
+        "placeholder": "Seller SKU",
+        "hint": "رمز SKU الذي حددته في Seller Central"
+      },
+      "easyorders": {
+        "placeholder": "رقم المنتج في Easy Orders",
+        "hint": "من صفحة المنتج في Easy Orders"
+      }
+    },
+    "new": {
+      "description": "بياناته وتكلفته ورصيده الافتتاحي. السعر يُحدَّد في كل طلب.",
+      "details": "البيانات",
+      "namePlaceholder": "مثال: اكسجين بلوب 1 لتر مشكل",
+      "categoryHint": "اختياري — اضغط مرة أخرى للإلغاء.",
+      "costAndStock": "التكلفة والمخزون",
+      "ourSku": "SKU الخاص بنا",
+      "optional": "اختياري",
+      "costPlaceholder": "ما دفعناه",
+      "costInvalid": "مبلغ مثل 120 أو 120.50.",
+      "openingStock": "الرصيد الافتتاحي",
+      "stockInvalid": "رقم صحيح، 0 أو أكثر.",
+      "noPrice": "لا يوجد سعر بيع هنا — فهو يختلف حسب القناة، لذلك يأتي من كل طلب. المنتج يحمل التكلفة لا السعر.",
+      "alsoSoldOn": "يُباع أيضًا على",
+      "alsoSoldOnHint": "اختياري. رمز SKU الذي تستخدمه كل قناة — أي بيع عليها يُحرّك مخزون هذا المنتج. يمكنك إضافتها لاحقًا من صفحة المنتج.",
+      "adding": "جارٍ الإضافة"
+    },
+    "dialog": {
+      "title": "منتج جديد",
+      "description": "يُنشأ في المخزون ويُضاف إلى هذه الفاتورة.",
+      "optional": "(اختياري)",
+      "skuPlaceholder": "اتركه فارغًا إن لم يوجد بعد",
+      "alsoSoldOnHint": "اختياري — أي بيع عليها سيُحرّك مخزون هذا المنتج.",
+      "created": "تم إنشاء المنتج.",
+      "create": "إنشاء وإضافة"
+    }
   },
   "enums": {
     "orderStatus": {

@@ -3,23 +3,11 @@ import { House, Package, Plug, Sparkles, Tv, type LucideIcon } from 'lucide-reac
 /**
  * The business's fixed category vocabulary — mirrors PRODUCT_CATEGORIES on the
  * API. One definition, so the filter chips, the product form, and the table
- * all show the same four options in the same order.
+ * all show the same four options in the same order. Names: `enums.category`.
  */
-export const CATEGORIES = [
-  { value: 'COSMETICS', label: 'Cosmetics' },
-  { value: 'HOME', label: 'Home' },
-  { value: 'ELECTRONICS', label: 'Electronics' },
-  { value: 'TV_SHOP', label: 'TV Shop' },
-] as const;
+export const CATEGORIES = ['COSMETICS', 'HOME', 'ELECTRONICS', 'TV_SHOP'] as const;
 
-export type Category = (typeof CATEGORIES)[number]['value'];
-
-const LABELS: Record<string, string> = Object.fromEntries(
-  CATEGORIES.map((c) => [c.value, c.label]),
-);
-
-export const categoryLabel = (value: string | null): string =>
-  value ? (LABELS[value] ?? value) : 'Uncategorised';
+export type Category = (typeof CATEGORIES)[number];
 
 const ICONS: Record<string, LucideIcon> = {
   COSMETICS: Sparkles,
