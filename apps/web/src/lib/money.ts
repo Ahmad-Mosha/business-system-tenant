@@ -64,6 +64,28 @@ export function entryMemo(e: Pick<LedgerRow, 'memo' | 'kind' | 'reversesId'>): s
   return original === e.kind ? null : original;
 }
 
+/**
+ * Money moving into or out of the treasury, named by the account on the other
+ * side — "Supplier payments" rather than "Supplier payable". Anything not
+ * listed falls back to the account's own name.
+ */
+const FLOW_LABEL: Record<string, { in?: string; out?: string }> = {
+  SALES: { in: 'Sales', out: 'Sales reversed' },
+  OWNER_CAPITAL: { in: 'Owner deposits', out: 'Owner withdrawals' },
+  SUPPLIER_PAYABLE: { in: 'Supplier refunds', out: 'Supplier payments' },
+  INVENTORY: { in: 'Cash purchases reversed', out: 'Stock bought for cash' },
+  OTHER_EXPENSE: { out: 'Expenses' },
+  SHIPPING: { out: 'Shipping' },
+  CHANNEL_FEES: { out: 'Fees and ads' },
+  NOON_RECEIVABLE: { in: 'noon payouts' },
+  AMAZON_RECEIVABLE: { in: 'Amazon payouts' },
+  BOSTA_COD: { in: 'Bosta payouts' },
+  CHEQUES_PENDING: { in: 'Cheques cleared' },
+};
+
+export const flowLabel = (direction: 'in' | 'out', code: string, fallback: string) =>
+  FLOW_LABEL[code]?.[direction] ?? fallback;
+
 /** How an invoice's paid state reads, and what it means. */
 export const PAID_STATUS: Record<string, { label: string; tone: Tone }> = {
   DRAFT: { label: 'Draft', tone: 'neutral' },
