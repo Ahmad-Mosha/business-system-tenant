@@ -1,5 +1,8 @@
+import { Upload } from 'lucide-react';
 import { ImportForm } from '@/components/import-form';
-import { PageBody, PageHeader, SectionHeading } from '@/components/page-header';
+import { Page, PageHeader } from '@/components/page';
+import { TableCount, TableEmpty, TablePanel } from '@/components/table-panel';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -10,78 +13,78 @@ import {
 } from '@/components/ui/table';
 import { getImports } from '@/lib/api';
 import { date, dateTime } from '@/lib/format';
+import { requireAdmin } from '@/lib/session';
 
 export default async function ImportsPage() {
+  await requireAdmin();
   const imports = await getImports();
 
   return (
-    <>
-      <PageHeader title="Imports" />
+    <Page>
+      <PageHeader title="Imports" description="noon settlement exports — how noon’s figures get in." />
 
-      <PageBody>
-        <section className="max-w-3xl">
+      <Card className="max-w-3xl">
+        <CardHeader>
+          <CardTitle>Upload a report</CardTitle>
+          <CardDescription>Export the settlement report from the noon portal as CSV and drop it here.</CardDescription>
+        </CardHeader>
+        <CardContent>
           <ImportForm />
-          <p className="mt-4 text-xs text-muted-foreground">
-            Uploading the same report twice is safe. Files are recognised by
-            content, and rows already held from an overlapping export are skipped.
-          </p>
-        </section>
+        </CardContent>
+      </Card>
 
-        <section>
-          <SectionHeading
-            title="History"
-            hint={imports.length ? `${imports.length} imports` : undefined}
-          />
-          {imports.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-border px-5 py-10 text-center text-sm text-muted-foreground">
-              No reports imported yet.
-            </p>
-          ) : (
-            <div className="overflow-x-auto rounded-xl border border-border">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="min-w-[200px]">File</TableHead>
-                    <TableHead>Period</TableHead>
-                    <TableHead className="text-right">Rows</TableHead>
-                    <TableHead className="text-right">New</TableHead>
-                    <TableHead className="text-right">Skipped</TableHead>
-                    <TableHead className="text-right">Unmapped</TableHead>
-                    <TableHead className="text-right">Imported</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {imports.map((i) => (
-                    <TableRow key={i.id}>
-                      <TableCell className="max-w-0">
-                        <span className="block truncate font-medium" title={i.filename}>
-                          {i.filename}
-                        </span>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-muted-foreground">
-                        {date(i.periodStart)} – {date(i.periodEnd)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">{i.rowsInFile}</TableCell>
-                      <TableCell className="text-right font-medium tabular-nums">
-                        {i.rowsInserted}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-muted-foreground">
-                        {i.rowsSkipped || <span className="text-muted-foreground/40">—</span>}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-muted-foreground">
-                        {i.unmappedListings || <span className="text-muted-foreground/40">—</span>}
-                      </TableCell>
-                      <TableCell className="text-right whitespace-nowrap text-muted-foreground">
-                        {dateTime(i.createdAt)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </section>
-      </PageBody>
-    </>
+      <TablePanel
+        minWidth="56rem"
+        footer={
+          <TableCount>
+            <span className="num font-medium text-foreground">{imports.length}</span>{' '}
+            {imports.length === 1 ? 'import' : 'imports'}
+          </TableCount>
+        }
+      >
+        {imports.length === 0 ? (
+          <TableEmpty icon={Upload} title="No reports imported yet" description="Your first upload shows up here." />
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="min-w-[200px]">File</TableHead>
+                <TableHead>Period</TableHead>
+                <TableHead className="text-right">Rows</TableHead>
+                <TableHead className="text-right">New</TableHead>
+                <TableHead className="text-right">Skipped</TableHead>
+                <TableHead className="text-right">Unmapped</TableHead>
+                <TableHead className="text-right">Imported</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {imports.map((i) => (
+                <TableRow key={i.id}>
+                  <TableCell className="max-w-0">
+                    <span className="block truncate font-medium" title={i.filename}>
+                      {i.filename}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {date(i.periodStart)} – {date(i.periodEnd)}
+                  </TableCell>
+                  <TableCell className="num text-right">{i.rowsInFile}</TableCell>
+                  <TableCell className="num text-right font-medium">{i.rowsInserted}</TableCell>
+                  <TableCell className="num text-right text-muted-foreground">{i.rowsSkipped || '—'}</TableCell>
+                  <TableCell className="num text-right">
+                    {i.unmappedListings ? (
+                      <span className="text-warning">{i.unmappedListings}</span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right text-muted-foreground">{dateTime(i.createdAt)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </TablePanel>
+    </Page>
   );
 }

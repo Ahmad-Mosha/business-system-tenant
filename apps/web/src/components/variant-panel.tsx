@@ -1,9 +1,33 @@
 'use client';
 
-import { Loader2, Minus, Plus } from 'lucide-react';
+import { History, Minus, Plus } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { recordStock, updateVariant } from '@/app/(app)/inventory/actions';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from '@/components/ui/empty';
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from '@/components/ui/input-group';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Spinner } from '@/components/ui/spinner';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { dateTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -25,7 +49,7 @@ interface Variant {
   inOpenOrders: number;
 }
 
-interface Movement {
+export interface Movement {
   id: string;
   quantity: number;
   reason: string;
@@ -34,16 +58,20 @@ interface Movement {
   runningTotal: number;
 }
 
-const field =
-  'h-9 w-full rounded-md border border-border bg-card px-3 text-[13px] focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-60';
-
+/**
+ * One variant's stock: the figure, its cost and price, a way to record a
+ * movement, and every movement that produced the figure — no number without a
+ * way into the events behind it.
+ */
 export function VariantPanel({ variant, movements }: { variant: Variant; movements: Movement[] }) {
   const [pending, start] = useTransition();
   const [qty, setQty] = useState('1');
   const [reason, setReason] = useState<string>('PURCHASE');
-  const [direction, setDirection] = useState<1 | -1>(1);
+  const [direction, setDirection] = useState<'in' | 'out'>('in');
   const [cost, setCost] = useState(variant.unitCost ?? '');
   const [price, setPrice] = useState(variant.sellingPrice ?? '');
+
+  const pricesDirty = cost !== (variant.unitCost ?? '') || price !== (variant.sellingPrice ?? '');
 
   const save = () =>
     start(async () => {
@@ -54,157 +82,197 @@ export function VariantPanel({ variant, movements }: { variant: Variant; movemen
 
   const move = () =>
     start(async () => {
-      const n = Number(qty) * direction;
+      const n = Number(qty) * (direction === 'in' ? 1 : -1);
       const r = await recordStock(variant.id, n, reason);
       if (r.ok) {
-        toast.success(`Stock ${direction > 0 ? 'increased' : 'reduced'} by ${Math.abs(n)}.`);
+        toast.success(`Stock ${n > 0 ? 'increased' : 'reduced'} by ${Math.abs(n)}.`);
         setQty('1');
       } else toast.error(r.message);
     });
 
   return (
-    <div className="rounded-xl border border-border bg-card shadow-xs">
-      <div className="flex items-center justify-between gap-4 border-b border-border px-4 py-3">
-        <div className="min-w-0">
-          <p className="truncate text-[13px] font-medium">
-            {variant.name}
-            {variant.sku ? (
-              <code className="ms-2 rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
-                {variant.sku}
-              </code>
-            ) : null}
-          </p>
-          {variant.inOpenOrders > 0 && (
-            <p className="mt-0.5 text-[11px] text-muted-foreground">
-              {variant.inOpenOrders} in open orders
-            </p>
+    <Card className="pb-0">
+      <CardHeader>
+        <CardTitle className="flex flex-wrap items-center gap-2">
+          <bdi>{variant.name}</bdi>
+          {variant.sku ? (
+            <Badge variant="secondary" className="font-mono">
+              {variant.sku}
+            </Badge>
+          ) : null}
+        </CardTitle>
+        <CardDescription>
+          {variant.inOpenOrders > 0 ? (
+            <>
+              <span className="num">{variant.inOpenOrders}</span> in open orders — already off the
+              shelf count
+            </>
+          ) : (
+            'Nothing waiting in open orders'
           )}
-        </div>
-        <div className="shrink-0 text-right">
-          <p className="text-xl leading-none font-semibold tabular-nums">{variant.onHand}</p>
-          <p className="mt-0.5 text-[10px] text-muted-foreground">on hand</p>
-        </div>
-      </div>
-
-      <div className="grid gap-3 border-b border-border px-4 py-3 sm:grid-cols-[1fr_1fr_auto]">
-        <div>
-          <label className="mb-1 block text-[11px] text-muted-foreground">Unit cost</label>
-          <input
-            value={cost}
-            onChange={(e) => setCost(e.target.value)}
-            onFocus={(e) => e.currentTarget.select()}
-            inputMode="decimal"
-            placeholder="Not set"
-            disabled={pending}
-            className={cn(field, 'tabular-nums')}
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-[11px] text-muted-foreground">Selling price</label>
-          <input
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            onFocus={(e) => e.currentTarget.select()}
-            inputMode="decimal"
-            placeholder="Not set"
-            disabled={pending}
-            className={cn(field, 'tabular-nums')}
-          />
-        </div>
-        <div className="flex items-end">
-          <button
-            type="button"
-            onClick={save}
-            disabled={pending}
-            className="inline-flex h-9 min-w-[76px] items-center justify-center rounded-md border border-border bg-card px-3 text-[13px] font-medium transition-colors hover:bg-accent disabled:opacity-60"
-          >
-            {pending ? <Loader2 className="size-3.5 animate-spin" /> : 'Save'}
-          </button>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-end gap-2.5 border-b border-border px-4 py-3">
-        <div className="flex items-end gap-1">
-          <button
-            type="button"
-            onClick={() => setDirection(1)}
-            aria-pressed={direction === 1}
+        </CardDescription>
+        <CardAction className="text-right">
+          <p
             className={cn(
-              'inline-flex size-9 items-center justify-center rounded-md border transition-colors',
-              direction === 1 ? 'border-foreground bg-foreground text-background' : 'border-border hover:bg-accent',
+              'num text-[28px] leading-none font-semibold tracking-tight',
+              variant.onHand <= 0 && 'text-destructive',
             )}
           >
-            <Plus className="size-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setDirection(-1)}
-            aria-pressed={direction === -1}
-            className={cn(
-              'inline-flex size-9 items-center justify-center rounded-md border transition-colors',
-              direction === -1 ? 'border-foreground bg-foreground text-background' : 'border-border hover:bg-accent',
-            )}
-          >
-            <Minus className="size-4" />
-          </button>
-        </div>
-        <div className="w-20">
-          <label className="mb-1 block text-[11px] text-muted-foreground">Quantity</label>
-          <input
-            value={qty}
-            onChange={(e) => setQty(e.target.value)}
-            onFocus={(e) => e.currentTarget.select()}
-            inputMode="numeric"
-            disabled={pending}
-            className={cn(field, 'tabular-nums')}
-          />
-        </div>
-        <div className="min-w-[170px] flex-1">
-          <label className="mb-1 block text-[11px] text-muted-foreground">Reason</label>
-          <select value={reason} onChange={(e) => setReason(e.target.value)} disabled={pending} className={field}>
-            {REASONS.map((r) => (
-              <option key={r.value} value={r.value}>
-                {r.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <button
-          type="button"
-          onClick={move}
-          disabled={pending || !Number(qty)}
-          className="inline-flex h-9 min-w-[100px] items-center justify-center rounded-md bg-foreground px-3 text-[13px] font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-40"
-        >
-          {pending ? <Loader2 className="size-4 animate-spin" /> : 'Record'}
-        </button>
-      </div>
+            {variant.onHand}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">on hand</p>
+        </CardAction>
+      </CardHeader>
 
-      {movements.length > 0 && (
-        <ul className="max-h-56 overflow-y-auto">
-          {movements.map((m, i) => (
-            <li
-              key={m.id}
-              className={cn('flex items-center gap-4 px-4 py-2 text-[13px]', i > 0 && 'border-t border-border')}
+      <CardContent className="grid gap-5 md:grid-cols-2">
+        <FieldGroup className="gap-3">
+          <p className="text-xs font-medium">Pricing</p>
+          <div className="grid grid-cols-2 gap-3">
+            <Field>
+              <FieldLabel htmlFor={`cost-${variant.id}`}>Unit cost</FieldLabel>
+              <MoneyField id={`cost-${variant.id}`} value={cost} onChange={setCost} disabled={pending} />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={`price-${variant.id}`}>Selling price</FieldLabel>
+              <MoneyField id={`price-${variant.id}`} value={price} onChange={setPrice} disabled={pending} />
+            </Field>
+          </div>
+          <Button variant="outline" onClick={save} disabled={pending || !pricesDirty} className="w-fit">
+            {pending ? <Spinner /> : null}
+            Save prices
+          </Button>
+        </FieldGroup>
+
+        <FieldGroup className="gap-3">
+          <p className="text-xs font-medium">Record a movement</p>
+          <div className="grid grid-cols-[auto_80px_minmax(0,1fr)] items-end gap-2">
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              spacing={0}
+              value={direction}
+              onValueChange={(v) => v && setDirection(v as 'in' | 'out')}
+              aria-label="Direction"
             >
-              <span
-                className={cn(
-                  'w-11 shrink-0 text-right font-medium tabular-nums',
-                  m.quantity > 0 ? 'text-success' : 'text-muted-foreground',
-                )}
-              >
-                {m.quantity > 0 ? '+' : ''}
-                {m.quantity}
-              </span>
-              <span className="min-w-0 flex-1 truncate text-muted-foreground">
-                {REASONS.find((r) => r.value === m.reason)?.label ?? m.reason}
-                {m.note ? ` · ${m.note}` : ''}
-              </span>
-              <span className="shrink-0 tabular-nums text-muted-foreground">= {m.runningTotal}</span>
-              <span className="shrink-0 text-[11px] text-muted-foreground">{dateTime(m.occurredAt)}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+              <ToggleGroupItem value="in" aria-label="Stock in">
+                <Plus />
+              </ToggleGroupItem>
+              <ToggleGroupItem value="out" aria-label="Stock out">
+                <Minus />
+              </ToggleGroupItem>
+            </ToggleGroup>
+            <Field>
+              <FieldLabel htmlFor={`qty-${variant.id}`}>Quantity</FieldLabel>
+              <Input
+                id={`qty-${variant.id}`}
+                value={qty}
+                onChange={(e) => setQty(e.target.value)}
+                onFocus={(e) => e.currentTarget.select()}
+                inputMode="numeric"
+                disabled={pending}
+                className="num"
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={`reason-${variant.id}`}>Reason</FieldLabel>
+              <Select value={reason} onValueChange={setReason} disabled={pending}>
+                <SelectTrigger id={`reason-${variant.id}`} className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent position="popper">
+                  {REASONS.map((r) => (
+                    <SelectItem key={r.value} value={r.value}>
+                      {r.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+          <Button onClick={move} disabled={pending || !Number(qty)} className="w-fit">
+            {pending ? <Spinner /> : direction === 'in' ? <Plus /> : <Minus />}
+            {direction === 'in' ? 'Add' : 'Remove'} <span className="num">{Number(qty) || 0}</span>{' '}
+            {Number(qty) === 1 ? 'unit' : 'units'}
+          </Button>
+        </FieldGroup>
+      </CardContent>
+
+      <div className="mt-5 border-t">
+        {movements.length ? (
+          <div className="max-h-72 overflow-y-auto [&_thead]:sticky [&_thead]:top-0 [&_[data-slot=table-container]]:overflow-visible">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[90px] text-right">Change</TableHead>
+                  <TableHead>Reason</TableHead>
+                  <TableHead className="w-[90px] text-right">Balance</TableHead>
+                  <TableHead className="w-[140px] text-right">When</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {movements.map((m) => (
+                  <TableRow key={m.id}>
+                    <TableCell
+                      className={cn(
+                        'num text-right font-medium',
+                        m.quantity > 0 ? 'text-success' : 'text-destructive',
+                      )}
+                    >
+                      {m.quantity > 0 ? '+' : ''}
+                      {m.quantity}
+                    </TableCell>
+                    <TableCell className="max-w-0 truncate">
+                      {REASONS.find((r) => r.value === m.reason)?.label ?? m.reason}
+                      {m.note ? <span className="text-muted-foreground"> · {m.note}</span> : null}
+                    </TableCell>
+                    <TableCell className="num text-right">{m.runningTotal}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">{dateTime(m.occurredAt)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        ) : (
+          <Empty className="py-8">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <History />
+              </EmptyMedia>
+              <EmptyDescription>No stock movements yet.</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function MoneyField({
+  id,
+  value,
+  onChange,
+  disabled,
+}: {
+  id: string;
+  value: string;
+  onChange: (v: string) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <InputGroup>
+      <InputGroupInput
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={(e) => e.currentTarget.select()}
+        inputMode="decimal"
+        placeholder="Not set"
+        disabled={disabled}
+        className="num"
+      />
+      <InputGroupAddon align="inline-end">
+        <InputGroupText>EGP</InputGroupText>
+      </InputGroupAddon>
+    </InputGroup>
   );
 }

@@ -1,71 +1,68 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
-import { useActionState, useEffect } from 'react';
+import { useActionState } from 'react';
 import { toast } from 'sonner';
 import { settleCheque, type FormState } from '@/app/(app)/money/actions';
-import type { ChequeRow } from '@/lib/api';
 import { Button } from '@/components/ui/button';
+import { Card, CardAction, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Spinner } from '@/components/ui/spinner';
+import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
+import type { ChequeRow } from '@/lib/api';
 import { date, money } from '@/lib/format';
 
-const INITIAL: FormState = { status: 'idle' };
-
-/** The pending cheques strip on the Treasury screen — clear or bounce each one. */
+/** Cheques received but not cleared — clear or bounce each one. */
 export function PendingCheques({ cheques }: { cheques: ChequeRow[] }) {
   if (cheques.length === 0) return null;
+  const total = cheques.reduce((n, c) => n + Number(c.amount), 0);
   return (
-    <div className="rounded-xl border border-border bg-card shadow-xs">
-      <div className="border-b border-border px-4 py-2 text-[11px] font-medium tracking-[0.06em] text-muted-foreground uppercase">
-        Cheques pending · {cheques.length}
+    <Card className="shrink-0 pb-0">
+      <CardHeader>
+        <CardTitle>Cheques pending</CardTitle>
+        <CardDescription>Not counted as cash until they clear.</CardDescription>
+        <CardAction className="num text-sm font-semibold">{money(total)}</CardAction>
+      </CardHeader>
+      <div className="border-t">
+        <Table>
+          <TableBody>
+            {cheques.map((c) => (
+              <TableRow key={c.id}>
+                <TableCell className="num w-[140px] text-right font-medium">{money(c.amount)}</TableCell>
+                <TableCell className="max-w-0 truncate">
+                  <bdi>{c.fromParty}</bdi>
+                  {c.memo ? <span className="text-muted-foreground"> · {c.memo}</span> : null}
+                </TableCell>
+                <TableCell className="w-[160px] text-muted-foreground">
+                  {c.dueDate ? `Due ${date(c.dueDate)}` : `Received ${date(c.receivedDate)}`}
+                </TableCell>
+                <TableCell className="w-[190px] text-right">
+                  <ChequeActions id={c.id} />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </div>
-      <ul>
-        {cheques.map((c, i) => (
-          <li
-            key={c.id}
-            className={`flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 text-[13px] ${
-              i > 0 ? 'border-t border-border/60' : ''
-            }`}
-          >
-            <span className="w-24 shrink-0 text-right font-medium tabular-nums">{money(c.amount)}</span>
-            <span className="min-w-0 flex-1 truncate">
-              <bdi>{c.fromParty}</bdi>
-              {c.memo ? <span className="text-muted-foreground"> · {c.memo}</span> : null}
-            </span>
-            <span className="shrink-0 text-[11px] text-muted-foreground">
-              {c.dueDate ? `due ${date(c.dueDate)}` : `received ${date(c.receivedDate)}`}
-            </span>
-            <ChequeActions id={c.id} />
-          </li>
-        ))}
-      </ul>
-    </div>
+    </Card>
   );
 }
 
 function ChequeActions({ id }: { id: string }) {
-  const [state, submit, pending] = useActionState(settleCheque, INITIAL);
-
-  useEffect(() => {
-    if (state.status === 'error') toast.error(state.message);
-    if (state.status === 'saved') toast.success('Cheque updated.');
-  }, [state]);
+  const [, submit, pending] = useActionState<FormState, FormData>(async (prev, form) => {
+    const next = await settleCheque(prev, form);
+    if (next.status === 'error') toast.error(next.message);
+    if (next.status === 'saved') toast.success('Cheque updated.');
+    return next;
+  }, { status: 'idle' });
 
   return (
-    <form action={submit} className="flex shrink-0 items-center gap-1.5">
+    <form action={submit} className="inline-flex items-center gap-1.5">
       <input type="hidden" name="id" value={id} />
-      <Button type="submit" name="status" value="CLEARED" size="sm" variant="outline" disabled={pending}>
-        {pending ? <Loader2 className="size-3.5 animate-spin" /> : 'Cleared'}
-      </Button>
-      <Button
-        type="submit"
-        name="status"
-        value="BOUNCED"
-        size="sm"
-        variant="ghost"
-        disabled={pending}
-        className="text-muted-foreground"
-      >
+      <Button type="submit" name="status" value="BOUNCED" size="sm" variant="ghost" disabled={pending} className="text-muted-foreground">
         Bounced
+      </Button>
+      <Button type="submit" name="status" value="CLEARED" size="sm" variant="outline" disabled={pending}>
+        {pending ? <Spinner /> : null}
+        Cleared
       </Button>
     </form>
   );

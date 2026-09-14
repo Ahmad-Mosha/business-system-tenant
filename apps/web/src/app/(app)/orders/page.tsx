@@ -1,30 +1,29 @@
-import Link from "next/link";
-import { Plus } from "lucide-react";
-import { AssignMenu } from "@/components/assign-menu";
-import { OrderFilters } from "@/components/order-filters";
-import { OrderStatusMenu } from "@/components/order-status-menu";
-import { PaymentStatusMenu } from "@/components/payment-status-menu";
+import { AlertTriangle, Plus, ShoppingBag } from 'lucide-react';
+import Link from 'next/link';
+import { AssignMenu } from '@/components/assign-menu';
+import { FilterBar } from '@/components/filter-bar';
+import { MetricCard, MetricGrid } from '@/components/metric-card';
+import { ALL_ORDER_STATUSES, sourceLabel, STATUS_LABELS } from '@/components/order-status';
+import { OrderStatusMenu } from '@/components/order-status-menu';
+import { Page, PageHeader } from '@/components/page';
+import { PaymentStatusMenu } from '@/components/payment-status-menu';
+import { TableEmpty, TablePagination, TablePanel } from '@/components/table-panel';
+import { Button } from '@/components/ui/button';
 import {
-  MetricCard,
-  MetricRow,
-  PageCard,
-  Pagination,
-  Panel,
-  Screen,
-  Scroller,
-} from "@/components/shell";
-import { getAssignees, getOrderSummary, getOrders } from "@/lib/api";
-import { date, money } from "@/lib/format";
-import { requireSession } from "@/lib/session";
-import { cn } from "@/lib/utils";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { getAssignees, getOrderSummary, getOrders } from '@/lib/api';
+import { date, money } from '@/lib/format';
+import { requireSession } from '@/lib/session';
 
-/**
- * 8 was tuned to a ~900px window and left a dead gap under the table on
- * anything taller — the panel has no more rows to show, so the empty space
- * just sits there instead of being filled. 20 fills or slightly overflows
- * (scrolling inside the panel, never the page) on realistic screen heights.
- */
 const PAGE_SIZE = 20;
+const FILTERS = ['status', 'source', 'search'] as const;
 
 export default async function OrdersPage({
   searchParams,
@@ -33,21 +32,16 @@ export default async function OrdersPage({
 }) {
   const user = await requireSession();
   const params = await searchParams;
+  const isAdmin = user.role === 'ADMIN';
 
   const filters = new URLSearchParams();
-  for (const key of ["status", "source", "search"] as const) {
-    if (params[key]) filters.set(key, params[key]);
-  }
-  if (params.unassigned === "true") filters.set("unassigned", "true");
+  for (const key of FILTERS) if (params[key]) filters.set(key, params[key]);
+  if (params.unassigned === 'true') filters.set('unassigned', 'true');
 
   const page = Math.max(Number(params.page) || 1, 1);
-  const offset = (page - 1) * PAGE_SIZE;
-
   const listQuery = new URLSearchParams(filters);
-  listQuery.set("limit", String(PAGE_SIZE));
-  listQuery.set("offset", String(offset));
-
-  const isAdmin = user.role === "ADMIN";
+  listQuery.set('limit', String(PAGE_SIZE));
+  listQuery.set('offset', String((page - 1) * PAGE_SIZE));
 
   const [{ orders, total }, summary, assignees] = await Promise.all([
     getOrders(listQuery.toString()),
@@ -58,189 +52,196 @@ export default async function OrdersPage({
   /** Paging keeps the current filters, so it never resets the view. */
   const pageHref = (p: number) => {
     const next = new URLSearchParams(filters);
-    if (p > 1) next.set("page", String(p));
+    if (p > 1) next.set('page', String(p));
     const qs = next.toString();
-    return qs ? `/orders?${qs}` : "/orders";
+    return qs ? `/orders?${qs}` : '/orders';
   };
-
-  const lastPage = Math.max(Math.ceil(total / PAGE_SIZE), 1);
+  const share = (n: number) =>
+    summary.total > 0 ? ` · ${Math.round((n / summary.total) * 100)}% of orders` : '';
 
   return (
-    <Screen>
-      <div className="flex min-h-0 flex-1 flex-col gap-4 p-4">
-        <PageCard
-          title="Orders"
-          description={
-            isAdmin
-              ? "Every order from social and the website, in one list."
-              : "The orders assigned to you."
-          }
-          actions={
-            <Link
-              href="/orders/new"
-              className="inline-flex h-9 items-center gap-1.5 rounded-md bg-foreground px-3.5 text-[13px] font-medium text-background transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-            >
-              <Plus className="size-4" />
+    <Page fill>
+      <PageHeader
+        title="Orders"
+        description={
+          isAdmin
+            ? 'Every order from social and the website, in one list.'
+            : 'The orders assigned to you.'
+        }
+        actions={
+          <Button asChild>
+            <Link href="/orders/new">
+              <Plus />
               New order
             </Link>
-          }
+          </Button>
+        }
+      />
+
+      <MetricGrid>
+        <MetricCard
+          label="All orders"
+          value={summary.total}
+          hint={isAdmin ? 'Social and website' : 'Assigned to you'}
         />
-
-        <MetricRow>
+        <MetricCard
+          label="Needs work"
+          value={summary.needsWork}
+          tone={summary.needsWork > 0 ? 'warning' : 'default'}
+          hint={`New or assigned${share(summary.needsWork)}`}
+        />
+        {isAdmin ? (
           <MetricCard
-            label="All orders"
-            value={summary.total}
-            hint={isAdmin ? "social and website" : "assigned to you"}
+            label="Unassigned"
+            value={summary.unassigned}
+            tone={summary.unassigned > 0 ? 'warning' : 'default'}
+            hint={summary.unassigned > 0 ? 'Nobody owns these yet' : 'Every order has an owner'}
           />
-          <MetricCard
-            label="Needs work"
-            value={summary.needsWork}
-            hint="new or assigned"
-            tone={summary.needsWork > 0 ? "warning" : "default"}
-          />
-          {isAdmin && (
-            <MetricCard
-              label="Unassigned"
-              value={summary.unassigned}
-              hint="nobody owns these"
-              tone={summary.unassigned > 0 ? "warning" : "default"}
-            />
-          )}
-          <MetricCard
-            label="Delivered unpaid"
-            value={summary.deliveredUnpaid}
-            hint="cash not yet collected"
-            tone={summary.deliveredUnpaid > 0 ? "warning" : "default"}
-          />
-        </MetricRow>
+        ) : null}
+        <MetricCard
+          label="Delivered, unpaid"
+          value={summary.deliveredUnpaid}
+          tone={summary.deliveredUnpaid > 0 ? 'warning' : 'default'}
+          hint={summary.deliveredUnpaid > 0 ? 'Cash not yet collected' : 'All delivered orders paid'}
+        />
+      </MetricGrid>
 
-        <OrderFilters />
+      <FilterBar
+        search={{ param: 'search', placeholder: 'Search orders, customers, phones…' }}
+        filters={[
+          {
+            kind: 'select',
+            param: 'source',
+            all: 'All channels',
+            options: [
+              { value: 'SOCIAL', label: 'Social' },
+              { value: 'EASYORDERS', label: 'Website' },
+            ],
+          },
+          {
+            kind: 'select',
+            param: 'status',
+            all: 'Any status',
+            options: ALL_ORDER_STATUSES.map((s) => ({ value: s, label: STATUS_LABELS[s] })),
+          },
+          ...(isAdmin
+            ? [{ kind: 'toggle' as const, param: 'unassigned', value: 'true', label: 'Unassigned' }]
+            : []),
+        ]}
+      />
 
-        <Panel>
-          <Scroller>
-            {orders.length === 0 ? (
-              <p className="p-12 text-center text-sm text-muted-foreground">
-                No orders match this view.
-              </p>
-            ) : (
-              <table className="w-full border-collapse text-[13px]">
-                <thead className="sticky top-0 z-10 bg-muted/40 backdrop-blur">
-                  <tr className="border-b border-border text-[11px] tracking-[0.06em] text-muted-foreground uppercase">
-                    <Th className="w-[110px]">Order</Th>
-                    <Th>Customer</Th>
-                    <Th className="w-[130px]">Phone</Th>
-                    <Th className="w-[100px]">Channel</Th>
-                    <Th className="w-[120px]">Status</Th>
-                    <Th className="w-[100px]">Payment</Th>
-                    {isAdmin && <Th className="w-[120px]">Assigned</Th>}
-                    <Th className="w-[110px] text-right">Total</Th>
-                    <Th className="w-[110px] text-right">Date</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders.map((o) => (
-                    <tr
-                      key={o.id}
-                      className="group relative h-11 border-b border-border/60 last:border-b-0 hover:bg-accent/50"
-                    >
-                      <Td className="font-medium tabular-nums">
-                        <Link
-                          href={`/orders/${o.id}`}
-                          className="after:absolute after:inset-0 focus-visible:underline focus-visible:outline-none"
-                        >
-                          {o.orderNumber}
-                        </Link>
-                      </Td>
-                      <Td className="max-w-0">
-                        <span className="block truncate font-medium">
-                          {o.customerName}
-                        </span>
-                      </Td>
-                      <Td className="tabular-nums text-muted-foreground">
-                        {o.customerPhone}
-                      </Td>
-                      <Td className="text-muted-foreground">
-                        {o.source === "EASYORDERS" ? "Website" : "Social"}
-                      </Td>
-                      <Td>
-                        <OrderStatusMenu
-                          orderId={o.id}
-                          status={o.status}
-                          canRevert={isAdmin}
-                        />
-                        {o.unmappedCount > 0 && (
-                          <span className="ms-1 text-[11px] text-warning">
-                            {o.unmappedCount}
-                          </span>
-                        )}
-                      </Td>
-                      <Td>
-                        <PaymentStatusMenu orderId={o.id} status={o.paymentStatus} />
-                      </Td>
-                      {isAdmin && (
-                        <Td className="max-w-0 text-muted-foreground">
-                          <AssignMenu
-                            orderId={o.id}
-                            assignedToId={o.assignedToId}
-                            assignedToName={o.assignedToName}
-                            assignees={assignees}
-                          />
-                        </Td>
-                      )}
-                      <Td className="text-right font-medium tabular-nums">
-                        {money(o.total)}
-                      </Td>
-                      <Td className="text-right whitespace-nowrap text-muted-foreground">
-                        {date(o.placedAt)}
-                      </Td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </Scroller>
-
-          <Pagination
-            from={total === 0 ? 0 : offset + 1}
-            to={offset + orders.length}
+      <TablePanel
+        minWidth="68rem"
+        footer={
+          <TablePagination
+            page={page}
+            pageSize={PAGE_SIZE}
             total={total}
+            count={orders.length}
             noun="orders"
-            prevHref={page > 1 ? pageHref(page - 1) : null}
-            nextHref={page < lastPage ? pageHref(page + 1) : null}
+            href={pageHref}
           />
-        </Panel>
-      </div>
-    </Screen>
-  );
-}
-
-function Th({
-  className,
-  children,
-}: {
-  className?: string;
-  children?: React.ReactNode;
-}) {
-  return (
-    <th
-      className={cn(
-        "px-4 py-2.5 text-left font-medium whitespace-nowrap",
-        className,
-      )}
-    >
-      {children}
-    </th>
-  );
-}
-
-function Td({
-  className,
-  children,
-}: {
-  className?: string;
-  children?: React.ReactNode;
-}) {
-  return (
-    <td className={cn("px-4 whitespace-nowrap", className)}>{children}</td>
+        }
+      >
+        {orders.length === 0 ? (
+          filters.size > 0 ? (
+            <TableEmpty
+              icon={ShoppingBag}
+              title="No orders match this view"
+              description="Try another status or channel, or clear the search."
+              action={
+                <Button variant="outline" asChild>
+                  <Link href="/orders">Reset filters</Link>
+                </Button>
+              }
+            />
+          ) : (
+            <TableEmpty
+              icon={ShoppingBag}
+              title="No orders yet"
+              description="Website orders arrive here on their own. Social orders are entered by hand."
+              action={
+                <Button asChild>
+                  <Link href="/orders/new">
+                    <Plus />
+                    New order
+                  </Link>
+                </Button>
+              }
+            />
+          )
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[120px]">Order</TableHead>
+                <TableHead>Customer</TableHead>
+                <TableHead className="w-[96px]">Channel</TableHead>
+                <TableHead className="w-[140px]">Status</TableHead>
+                <TableHead className="w-[120px]">Payment</TableHead>
+                {isAdmin ? <TableHead className="w-[150px]">Assigned</TableHead> : null}
+                <TableHead className="w-[120px] text-right">Total</TableHead>
+                <TableHead className="w-[110px] text-right">Placed</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {orders.map((o) => (
+                <TableRow key={o.id} className="relative">
+                  <TableCell>
+                    <div className="flex items-center gap-1.5">
+                      <Link
+                        href={`/orders/${o.id}`}
+                        className="num font-medium after:absolute after:inset-0 hover:underline focus-visible:underline focus-visible:outline-none"
+                      >
+                        {o.orderNumber}
+                      </Link>
+                      {o.unmappedCount > 0 ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <AlertTriangle
+                              aria-label={`${o.unmappedCount} not in inventory`}
+                              className="relative z-10 size-3.5 text-warning"
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {o.unmappedCount} {o.unmappedCount === 1 ? 'item isn’t' : 'items aren’t'}{' '}
+                            linked to inventory, so stock won’t move
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : null}
+                    </div>
+                  </TableCell>
+                  <TableCell className="max-w-0">
+                    <p className="truncate font-medium">
+                      <bdi>{o.customerName}</bdi>
+                    </p>
+                    <p className="num truncate text-xs text-muted-foreground">{o.customerPhone}</p>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{sourceLabel(o.source)}</TableCell>
+                  <TableCell>
+                    <OrderStatusMenu orderId={o.id} status={o.status} canRevert={isAdmin} />
+                  </TableCell>
+                  <TableCell>
+                    <PaymentStatusMenu orderId={o.id} status={o.paymentStatus} />
+                  </TableCell>
+                  {isAdmin ? (
+                    <TableCell className="max-w-0">
+                      <AssignMenu
+                        orderId={o.id}
+                        assignedToId={o.assignedToId}
+                        assignedToName={o.assignedToName}
+                        assignees={assignees}
+                      />
+                    </TableCell>
+                  ) : null}
+                  <TableCell className="num text-right font-medium">{money(o.total)}</TableCell>
+                  <TableCell className="text-right text-muted-foreground">{date(o.placedAt)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </TablePanel>
+    </Page>
   );
 }

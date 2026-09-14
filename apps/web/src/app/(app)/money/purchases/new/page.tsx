@@ -1,6 +1,16 @@
+import { Users } from 'lucide-react';
 import Link from 'next/link';
 import { InvoiceBuilder } from '@/components/invoice-builder';
-import { ContextBar, Screen } from '@/components/shell';
+import { Page, PageHeader } from '@/components/page';
+import { Button } from '@/components/ui/button';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty';
 import { getMoneyAccounts, getSuppliers } from '@/lib/api';
 import { accountByCode } from '@/lib/money';
 import { requireAdmin } from '@/lib/session';
@@ -11,26 +21,30 @@ export default async function NewPurchasePage() {
 
   if (suppliers.length === 0) {
     return (
-      <Screen>
-        <ContextBar back="/money/purchases" title="New purchase invoice" />
-        <div className="mx-auto flex max-w-md flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
-          <h1 className="text-lg font-semibold">Add a supplier first</h1>
-          <p className="text-sm text-muted-foreground">A purchase invoice needs a supplier to buy from.</p>
-          <Link
-            href="/money/suppliers"
-            className="inline-flex h-9 items-center rounded-md bg-foreground px-4 text-[13px] font-medium text-background"
-          >
-            Go to Suppliers
-          </Link>
-        </div>
-      </Screen>
+      <Page width="narrow">
+        <PageHeader
+          back={{ href: '/money/purchases', label: 'Back to purchases' }}
+          title="New purchase invoice"
+        />
+        <Empty className="border bg-card">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Users />
+            </EmptyMedia>
+            <EmptyTitle>Add a supplier first</EmptyTitle>
+            <EmptyDescription>A purchase invoice needs a supplier to buy from.</EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button asChild>
+              <Link href="/money/suppliers">Go to Suppliers</Link>
+            </Button>
+          </EmptyContent>
+        </Empty>
+      </Page>
     );
   }
 
   return (
-    <InvoiceBuilder
-      suppliers={suppliers}
-      cashBalance={accountByCode(accounts, 'CASH')?.balance ?? '0'}
-    />
+    <InvoiceBuilder suppliers={suppliers} cashBalance={accountByCode(accounts, 'CASH')?.balance ?? '0'} />
   );
 }

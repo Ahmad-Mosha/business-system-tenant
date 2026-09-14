@@ -1,39 +1,35 @@
 'use client';
 
 import { useState } from 'react';
+import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from '@/components/ui/input-group';
 import { groupDigits } from '@/lib/format';
-import { cn } from '@/lib/utils';
 
 /**
- * An amount field that shows thousands separators as you type — so entering
- * `1250000` reads back as `1,250,000` and you can see the decimal point coming
- * instead of counting zeros. The form still receives the plain number.
+ * An amount field that groups thousands as you type — `1250000` reads back as
+ * `1,250,000`, so the decimal point is visible coming instead of counted in
+ * zeros. The form still receives the plain number, under `name`.
  */
 export function MoneyInput({
   name,
+  id,
   defaultValue = '',
   placeholder = '0.00',
-  required,
   autoFocus,
   disabled,
-  className,
 }: {
   name: string;
+  id?: string;
   defaultValue?: string;
   placeholder?: string;
-  required?: boolean;
   autoFocus?: boolean;
   disabled?: boolean;
-  className?: string;
 }) {
-  const [display, setDisplay] = useState(() =>
-    defaultValue ? groupDigits(defaultValue) : '',
-  );
-  const raw = display.replace(/,/g, '');
+  const [display, setDisplay] = useState(() => (defaultValue ? groupDigits(defaultValue) : ''));
 
   return (
-    <span className="relative block">
-      <input
+    <InputGroup>
+      <InputGroupInput
+        id={id}
         type="text"
         inputMode="decimal"
         value={display}
@@ -41,14 +37,13 @@ export function MoneyInput({
         placeholder={placeholder}
         autoFocus={autoFocus}
         disabled={disabled}
-        aria-label="Amount in EGP"
-        className={cn(
-          'h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-right text-sm tabular-nums outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50',
-          className,
-        )}
+        className="num text-right"
       />
+      <InputGroupAddon align="inline-end">
+        <InputGroupText>EGP</InputGroupText>
+      </InputGroupAddon>
       {/* The unformatted value the server action reads. */}
-      <input type="hidden" name={name} value={raw} required={required} />
-    </span>
+      <input type="hidden" name={name} value={display.replace(/,/g, '')} />
+    </InputGroup>
   );
 }
