@@ -60,7 +60,9 @@ export function InlineMenu({
           {pending ? (
             <Spinner className="size-3 text-muted-foreground" />
           ) : (
-            <ChevronDown className="size-3 shrink-0 text-muted-foreground/70 transition-colors group-hover/inline:text-foreground group-data-[state=open]/inline:text-foreground" />
+            // In a table the chevrons show only on the hovered (or focused)
+            // row — a column of them is noise. Elsewhere they always show.
+            <ChevronDown className="size-3 shrink-0 text-muted-foreground/70 transition-[color,opacity] group-hover/inline:text-foreground group-data-[state=open]/inline:text-foreground group-data-[state=open]/inline:opacity-100 [tr_&]:opacity-0 [tr:focus-within_&]:opacity-100 [tr:hover_&]:opacity-100" />
           )}
         </button>
       </DropdownMenuTrigger>
