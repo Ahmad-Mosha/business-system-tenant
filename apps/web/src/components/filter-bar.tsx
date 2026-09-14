@@ -98,7 +98,6 @@ export function FilterBar({
               variant="outline"
               pressed={on}
               onPressedChange={(p) => update({ [f.param]: p ? f.value : null })}
-              className="data-[state=on]:border-foreground/25 data-[state=on]:text-foreground"
             >
               {f.label}
             </Toggle>
@@ -125,7 +124,7 @@ export function FilterBar({
             <SelectTrigger
               className={cn(
                 'min-w-36',
-                chosen ? 'border-foreground/25 font-medium' : 'text-muted-foreground',
+                chosen ? 'border-primary/30 bg-primary/5 font-medium text-primary' : 'text-muted-foreground',
               )}
             >
               <SelectValue>{chosen ? chosen.label : f.all}</SelectValue>

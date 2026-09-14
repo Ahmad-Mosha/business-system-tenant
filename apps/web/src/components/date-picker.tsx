@@ -125,7 +125,10 @@ export function DateRangePicker({
         <Button
           type="button"
           variant="outline"
-          className={cn('font-normal', current ? 'border-foreground/25 text-foreground' : 'text-muted-foreground')}
+          className={cn(
+            'font-normal',
+            current ? 'border-primary/30 bg-primary/5 text-primary hover:bg-primary/10' : 'text-muted-foreground',
+          )}
         >
           <CalendarIcon className="text-muted-foreground" />
           <span className="num">{label}</span>

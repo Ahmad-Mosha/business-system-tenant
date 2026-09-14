@@ -154,10 +154,10 @@ export function VariantPanel({ variant, movements }: { variant: Variant; movemen
               onValueChange={(v) => v && setDirection(v as 'in' | 'out')}
               aria-label="Direction"
             >
-              <ToggleGroupItem value="in" aria-label="Stock in" className="data-[state=on]:bg-foreground data-[state=on]:text-background">
+              <ToggleGroupItem value="in" aria-label="Stock in">
                 <Plus />
               </ToggleGroupItem>
-              <ToggleGroupItem value="out" aria-label="Stock out" className="data-[state=on]:bg-foreground data-[state=on]:text-background">
+              <ToggleGroupItem value="out" aria-label="Stock out">
                 <Minus />
               </ToggleGroupItem>
             </ToggleGroup>
