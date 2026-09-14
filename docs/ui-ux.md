@@ -65,48 +65,53 @@ These are required workflows with no screen in the folder:
 
 ---
 
-## Colour
+## Design system (since the 2026-09 redesign)
 
-Monochrome ground, one accent, semantic colour for state only.
+Built on **shadcn/ui, style `radix-lyra`** — preset `b6XGy1Otr6`: neutral base,
+teal theme, radius 0, Lucide icons, bold menu accent. Components live in
+`apps/web/src/components/ui` and are owned code; add more with
+`npx shadcn add <name>` from `apps/web` (then point any `from "cn"` import at
+`@/lib/utils` — the registry leaves it untransformed).
+
+### Colour
+
+Tokens only, in `apps/web/src/app/globals.css` — light is the product, dark
+exists behind the theme toggle.
 
 | Role | Use |
 |---|---|
-| Ground | Cool-tinted off-white surfaces, near-white cards — the reference's palette, kept |
-| Primary action | Near-black. Buttons, active nav |
-| Accent | The reference's teal — **reserved** for focus rings, the active nav rail, and the current selection. Never decorative |
-| Semantic | Success, warning, destructive. Applied to state, never to identity or category |
+| Ground | White background and cards, `sidebar` a step off-white |
+| Primary (teal) | Primary actions, the current selection (active nav mark, pressed toggles, active filters, checked choice cards), charts |
+| Semantic | `success`, `warning`, `destructive` (+ `-subtle` fills) — state only, never identity. Dark enough for 12px text on white |
 
-No brand hues, no category colours, no gradients. Colour that appears in the
-interface means something happened.
+Status chips go through `ToneBadge` (`neutral`, `muted`, `progress`, `success`,
+`warning`, `danger`) — one mapping per domain status, never ad-hoc colours.
 
----
+### Type
 
-## Type
+- **DM Sans** for text, **Space Grotesk** for headings (`h1–h3` by default).
+- **Figures use the `num` utility** — Space Grotesk with tabular digits. DM
+  Sans ships without `tnum`, so money columns in it would not align.
+- **IBM Plex Sans Arabic** for every Arabic name. The font stacks name the
+  families directly (`"DM Sans", "IBM Plex Sans Arabic", …`) because each
+  next/font variable carries an Arial fallback that covers Arabic and would
+  otherwise win. Arabic inside English gets `<bdi>`; Arabic inputs `dir="auto"`.
+- Scale: 24px page titles, 14px card titles, 13px table body and copy, 12px
+  labels and controls.
 
-The reference specifies Geist and Geist Mono. Both are kept — and one thing it
-missed has to be fixed:
+### Page anatomy
 
-**Every product name in this system is Arabic.** Geist has no Arabic coverage,
-so Arabic text would silently fall back to whatever the operating system
-supplies, which is exactly how the previous build's Arabic looked wrong. An
-Arabic face is paired explicitly and the two are metric-matched at the sizes
-used in tables.
+`Page` → `PageHeader` (title, description, actions, optional back) →
+`MetricGrid` of `MetricCard`s → `FilterBar` (URL-synced) → `TablePanel` with
+`TablePagination`. List screens use `<Page fill>`: on desktop the table scrolls
+inside its panel and the filters and pagination never leave the screen; under
+`lg` the page scrolls. Forms are cards with a sticky summary column; small
+records use `FormDialog`.
 
-Numbers use tabular figures everywhere. Table body sits at 13px, not 16 —
-density is the point.
-
----
-
-## Density
-
-The previous build was rejected on spacing and size. Concretely:
-
-- Table rows 36px, not 56.
-- Inputs 34px, not 48.
-- Forms in two columns inside a side sheet, with a sticky summary — not a
-  full-page stack.
-- Generous space **between** functional blocks, tight space **within** a row.
-- A screen's primary work should be visible without scrolling on a laptop.
+- Metric cards are read-only — a corner link drills into the records behind a
+  figure, and trends appear only where real history exists.
+- Tables: 44px rows, muted header, row-link overlay on the first cell.
+- Every list has an empty state that says why it's empty and what to do.
 
 ---
 
