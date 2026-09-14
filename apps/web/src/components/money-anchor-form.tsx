@@ -1,14 +1,15 @@
 'use client';
 
-import { Check, Loader2 } from 'lucide-react';
-import { useActionState, useEffect } from 'react';
+import { AlertTriangle } from 'lucide-react';
+import { useActionState } from 'react';
 import { toast } from 'sonner';
 import { setAnchor, type FormState } from '@/app/(app)/money/actions';
+import { DatePicker } from '@/components/date-picker';
 import { MoneyInput } from '@/components/money-input';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-
-const INITIAL: FormState = { status: 'idle' };
+import { Field, FieldLabel } from '@/components/ui/field';
+import { Spinner } from '@/components/ui/spinner';
 
 /** Sets the cash figure the ledger is measured from. Re-runnable — see the API. */
 export function MoneyAnchorForm({
@@ -18,34 +19,43 @@ export function MoneyAnchorForm({
   openingBalance: string;
   openingAsOf: string | null;
 }) {
-  const [state, submit, pending] = useActionState(setAnchor, INITIAL);
-
-  useEffect(() => {
-    if (state.status === 'error') toast.error(state.message);
-    if (state.status === 'saved') toast.success('Opening balance saved.');
-  }, [state]);
+  const [state, submit, pending] = useActionState<FormState, FormData>(async (prev, form) => {
+    const next = await setAnchor(prev, form);
+    if (next.status === 'saved') toast.success('Opening balance saved.');
+    return next;
+  }, { status: 'idle' });
 
   return (
-    <form action={submit} className="flex flex-wrap items-end gap-3">
-      <label className="min-w-[150px] flex-1 space-y-1.5">
-        <span className="text-xs font-medium text-muted-foreground">Cash on hand (EGP)</span>
-        <MoneyInput name="openingBalance" defaultValue={openingBalance === '0' ? '' : openingBalance} />
-      </label>
-      <label className="min-w-[150px] flex-1 space-y-1.5">
-        <span className="text-xs font-medium text-muted-foreground">As of</span>
-        <Input name="openingAsOf" type="date" defaultValue={openingAsOf ?? ''} disabled={pending} />
-      </label>
-      <Button type="submit" variant="outline" size="lg" disabled={pending} className="min-w-[96px]">
-        {pending ? (
-          <Loader2 className="size-4 animate-spin" />
-        ) : state.status === 'saved' ? (
-          <>
-            <Check className="size-4 text-success" />
-            Saved
-          </>
-        ) : (
-          'Save'
-        )}
+    <form action={submit} className="grid w-full gap-4 text-left">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field>
+          <FieldLabel htmlFor="openingBalance">Cash on hand</FieldLabel>
+          <MoneyInput
+            id="openingBalance"
+            name="openingBalance"
+            defaultValue={openingBalance === '0' ? '' : openingBalance}
+            disabled={pending}
+          />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="openingAsOf">As of</FieldLabel>
+          <DatePicker
+            id="openingAsOf"
+            name="openingAsOf"
+            defaultValue={openingAsOf ?? new Date().toISOString().slice(0, 10)}
+            disabled={pending}
+          />
+        </Field>
+      </div>
+      {state.status === 'error' ? (
+        <Alert variant="destructive">
+          <AlertTriangle />
+          <AlertDescription>{state.message}</AlertDescription>
+        </Alert>
+      ) : null}
+      <Button type="submit" disabled={pending} className="justify-self-start">
+        {pending ? <Spinner /> : null}
+        Start the ledger
       </Button>
     </form>
   );
