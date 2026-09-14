@@ -1,222 +1,179 @@
 'use client';
 
-import { ArrowDownLeft, ArrowUpRight, Banknote, FileText, Loader2 } from 'lucide-react';
-import { useActionState, useEffect, useState } from 'react';
-import { toast } from 'sonner';
-import { recordCheque, recordVoucher, type FormState } from '@/app/(app)/money/actions';
+import { ArrowDownLeft, ArrowUpRight, Banknote, FileText } from 'lucide-react';
+import { recordCheque, recordVoucher } from '@/app/(app)/money/actions';
+import { DatePicker } from '@/components/date-picker';
+import { FormDialog } from '@/components/form-dialog';
 import { MoneyInput } from '@/components/money-input';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { VOUCHER_COUNTERS } from '@/lib/money';
 
-const INITIAL: FormState = { status: 'idle' };
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
+const VOUCHERS = {
+  deposit: {
+    title: 'Cash deposit — إيداع نقدي',
+    description: 'Money an owner puts into the business, as cash.',
+    direction: 'IN',
+    fixedCounter: 'OWNER_CAPITAL',
+  },
+  in: {
+    title: 'Cash in — سند قبض',
+    description: 'Money received for any reason that isn’t a sale or a payout.',
+    direction: 'IN',
+    fixedCounter: null,
+  },
+  out: {
+    title: 'Cash out — سند صرف',
+    description: 'An expense paid from cash, or an owner withdrawal.',
+    direction: 'OUT',
+    fixedCounter: null,
+  },
+} as const;
+
+/** Every hand-entered cash movement, as the Treasury screen's actions. */
 export function TreasuryActions() {
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <VoucherDialog
-        kind="deposit"
+    <>
+      <ChequeDialog
         trigger={
-          <Button variant="default" size="lg">
-            <Banknote className="size-4" /> Cash deposit
-          </Button>
-        }
-      />
-      <VoucherDialog
-        kind="in"
-        trigger={
-          <Button variant="outline" size="lg">
-            <ArrowDownLeft className="size-4" /> Cash in
+          <Button variant="outline">
+            <FileText />
+            Cheque
           </Button>
         }
       />
       <VoucherDialog
         kind="out"
         trigger={
-          <Button variant="outline" size="lg">
-            <ArrowUpRight className="size-4" /> Cash out
+          <Button variant="outline">
+            <ArrowUpRight />
+            Cash out
           </Button>
         }
       />
-      <ChequeDialog
+      <VoucherDialog
+        kind="in"
         trigger={
-          <Button variant="outline" size="lg">
-            <FileText className="size-4" /> Cheque
+          <Button variant="outline">
+            <ArrowDownLeft />
+            Cash in
           </Button>
         }
       />
-    </div>
+      <VoucherDialog
+        kind="deposit"
+        trigger={
+          <Button>
+            <Banknote />
+            Cash deposit
+          </Button>
+        }
+      />
+    </>
   );
 }
 
-const VOUCHER_COPY = {
-  deposit: {
-    title: 'Cash deposit — إيداع نقدي',
-    description: 'Money an owner puts into the business, as cash.',
-    direction: 'IN' as const,
-    fixedCounter: 'OWNER_CAPITAL',
-  },
-  in: {
-    title: 'Cash in — سند قبض',
-    description: 'Money received for any reason that isn’t a sale or a payout.',
-    direction: 'IN' as const,
-    fixedCounter: null,
-  },
-  out: {
-    title: 'Cash out — سند صرف',
-    description: 'An expense paid from cash, or an owner withdrawal.',
-    direction: 'OUT' as const,
-    fixedCounter: null,
-  },
-};
-
-function VoucherDialog({
-  kind,
-  trigger,
-}: {
-  kind: 'deposit' | 'in' | 'out';
-  trigger: React.ReactNode;
-}) {
-  const copy = VOUCHER_COPY[kind];
-  const [open, setOpen] = useState(false);
-  const [state, submit, pending] = useActionState(recordVoucher, INITIAL);
-
-  useEffect(() => {
-    if (state.status === 'error') toast.error(state.message);
-    if (state.status === 'saved') {
-      toast.success('Recorded.');
-      setOpen(false);
-    }
-  }, [state]);
-
+function VoucherDialog({ kind, trigger }: { kind: keyof typeof VOUCHERS; trigger: React.ReactNode }) {
+  const v = VOUCHERS[kind];
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{copy.title}</DialogTitle>
-          <DialogDescription>{copy.description}</DialogDescription>
-        </DialogHeader>
-        <form action={submit} className="grid gap-3">
-          <input type="hidden" name="direction" value={copy.direction} />
-          {copy.fixedCounter && <input type="hidden" name="counter" value={copy.fixedCounter} />}
+    <FormDialog
+      trigger={trigger}
+      title={v.title}
+      description={v.description}
+      action={recordVoucher}
+      submitLabel="Record"
+      success="Recorded."
+    >
+      <input type="hidden" name="direction" value={v.direction} />
+      {v.fixedCounter ? <input type="hidden" name="counter" value={v.fixedCounter} /> : null}
 
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Amount (EGP)">
-              <MoneyInput name="amount" autoFocus required />
-            </Field>
-            <Field label="Date">
-              <Input name="occurredAt" type="date" defaultValue={todayISO()} />
-            </Field>
-          </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Field>
+          <FieldLabel htmlFor={`${kind}-amount`}>Amount</FieldLabel>
+          <MoneyInput id={`${kind}-amount`} name="amount" autoFocus />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor={`${kind}-date`}>Date</FieldLabel>
+          <DatePicker id={`${kind}-date`} name="occurredAt" defaultValue={todayISO()} />
+        </Field>
+      </div>
 
-          {!copy.fixedCounter && (
-            <Field label={copy.direction === 'OUT' ? 'What it’s for' : 'Source'}>
-              <select
-                name="counter"
-                required
-                className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-              >
-                <option value="">Choose…</option>
-                {VOUCHER_COUNTERS.map((c) => (
-                  <option key={c.code} value={c.code}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          )}
+      {!v.fixedCounter ? (
+        <Field>
+          <FieldLabel htmlFor={`${kind}-counter`}>
+            {v.direction === 'OUT' ? 'What it’s for' : 'Source'}
+          </FieldLabel>
+          <Select name="counter">
+            <SelectTrigger id={`${kind}-counter`} className="w-full">
+              <SelectValue placeholder="Choose…" />
+            </SelectTrigger>
+            <SelectContent position="popper">
+              {VOUCHER_COUNTERS.map((c) => (
+                <SelectItem key={c.code} value={c.code}>
+                  {c.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+      ) : null}
 
-          <Field label="Note (optional)">
-            <Input name="memo" placeholder="e.g. Bosta August pickup fees" />
-          </Field>
-
-          <FormFooter pending={pending} label="Record" />
-        </form>
-      </DialogContent>
-    </Dialog>
+      <Field>
+        <FieldLabel htmlFor={`${kind}-memo`}>
+          Note <span className="font-normal text-muted-foreground">(optional)</span>
+        </FieldLabel>
+        <Input id={`${kind}-memo`} name="memo" dir="auto" placeholder="e.g. Bosta August pickup fees" />
+      </Field>
+    </FormDialog>
   );
 }
 
 function ChequeDialog({ trigger }: { trigger: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
-  const [state, submit, pending] = useActionState(recordCheque, INITIAL);
-
-  useEffect(() => {
-    if (state.status === 'error') toast.error(state.message);
-    if (state.status === 'saved') {
-      toast.success('Cheque recorded — held pending until it clears.');
-      setOpen(false);
-    }
-  }, [state]);
-
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Cheque deposit — إيداع سندي</DialogTitle>
-          <DialogDescription>
-            A cheque received. It sits in “Cheques pending” — not counted as cash until it clears.
-          </DialogDescription>
-        </DialogHeader>
-        <form action={submit} className="grid gap-3">
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Amount (EGP)">
-              <MoneyInput name="amount" autoFocus required />
-            </Field>
-            <Field label="From">
-              <Input name="fromParty" placeholder="e.g. الشريك أحمد" required />
-            </Field>
-            <Field label="Received">
-              <Input name="receivedDate" type="date" defaultValue={todayISO()} required />
-            </Field>
-            <Field label="Due (optional)">
-              <Input name="dueDate" type="date" />
-            </Field>
-          </div>
-          <Field label="Note (optional)">
-            <Input name="memo" placeholder="cheque number, bank…" />
-          </Field>
-          <FormFooter pending={pending} label="Record cheque" />
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="grid gap-1.5">
-      <span className="text-[11px] font-medium tracking-[0.03em] text-muted-foreground uppercase">
-        {label}
-      </span>
-      {children}
-    </label>
-  );
-}
-
-function FormFooter({ pending, label }: { pending: boolean; label: string }) {
-  return (
-    <div className="mt-1 flex items-center justify-end gap-2">
-      <DialogClose asChild>
-        <Button type="button" variant="ghost" size="lg" disabled={pending}>
-          Cancel
-        </Button>
-      </DialogClose>
-      <Button type="submit" size="lg" disabled={pending} className="min-w-[110px]">
-        {pending ? <Loader2 className="size-4 animate-spin" /> : label}
-      </Button>
-    </div>
+    <FormDialog
+      trigger={trigger}
+      title="Cheque deposit — إيداع سندي"
+      description="A cheque received. It sits in “Cheques pending” — not counted as cash until it clears."
+      action={recordCheque}
+      submitLabel="Record cheque"
+      success="Cheque recorded — held pending until it clears."
+    >
+      <div className="grid grid-cols-2 gap-3">
+        <Field>
+          <FieldLabel htmlFor="cheque-amount">Amount</FieldLabel>
+          <MoneyInput id="cheque-amount" name="amount" autoFocus />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="cheque-from">From</FieldLabel>
+          <Input id="cheque-from" name="fromParty" dir="auto" placeholder="e.g. الشريك أحمد" />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="cheque-received">Received</FieldLabel>
+          <DatePicker id="cheque-received" name="receivedDate" defaultValue={todayISO()} />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="cheque-due">
+            Due <span className="font-normal text-muted-foreground">(optional)</span>
+          </FieldLabel>
+          <DatePicker id="cheque-due" name="dueDate" placeholder="No due date" />
+        </Field>
+      </div>
+      <Field>
+        <FieldLabel htmlFor="cheque-memo">
+          Note <span className="font-normal text-muted-foreground">(optional)</span>
+        </FieldLabel>
+        <Input id="cheque-memo" name="memo" placeholder="Cheque number, bank…" />
+      </Field>
+    </FormDialog>
   );
 }
