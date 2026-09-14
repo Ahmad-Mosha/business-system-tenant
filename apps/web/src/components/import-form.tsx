@@ -1,25 +1,24 @@
 'use client';
 
-import { CheckCircle2, FileText, Info, Loader2, Upload, X } from 'lucide-react';
-import { useActionState, useEffect, useRef, useState } from 'react';
+import { CheckCircle2, FileText, Info, Upload, X } from 'lucide-react';
+import { useActionState, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
 import { uploadReport, type UploadState } from '@/app/(app)/imports/actions';
+import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 
-const INITIAL: UploadState = { status: 'idle' };
-
 export function ImportForm() {
-  const [state, submit, pending] = useActionState(uploadReport, INITIAL);
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
-  useEffect(() => {
-    if (state.status === 'error') toast.error(state.message);
-    if (state.status === 'done') {
-      const { rowsInserted, alreadyImported } = state.result;
+  const [state, submit, pending] = useActionState<UploadState, FormData>(async (prev, form) => {
+    const next = await uploadReport(prev, form);
+    if (next.status === 'error') toast.error(next.message);
+    if (next.status === 'done') {
+      const { rowsInserted, alreadyImported } = next.result;
       if (alreadyImported) toast.info('This exact file was already imported.');
       else if (rowsInserted === 0) toast.info('Every row was already on record.');
       else toast.success(`Imported ${rowsInserted} new rows.`);
@@ -27,7 +26,8 @@ export function ImportForm() {
       setFile(null);
       formRef.current?.reset();
     }
-  }, [state]);
+    return next;
+  }, { status: 'idle' });
 
   const choose = (files: FileList | null) => {
     const next = files?.[0];
@@ -40,7 +40,7 @@ export function ImportForm() {
   };
 
   return (
-    <form ref={formRef} action={submit} className="space-y-4">
+    <form ref={formRef} action={submit} className="grid gap-4">
       <div
         onDragOver={(e) => {
           e.preventDefault();
@@ -55,8 +55,8 @@ export function ImportForm() {
           if (inputRef.current) inputRef.current.files = e.dataTransfer.files;
         }}
         className={cn(
-          'relative rounded-xl border border-dashed px-6 py-10 text-center transition-colors duration-150',
-          dragging ? 'border-foreground bg-accent/60' : 'border-border',
+          'relative border border-dashed px-6 py-10 text-center transition-colors duration-150 focus-within:border-ring',
+          dragging ? 'border-primary bg-primary/5' : 'border-input hover:bg-muted/50',
           pending && 'opacity-60',
         )}
       >
@@ -70,59 +70,51 @@ export function ImportForm() {
           className="absolute inset-0 cursor-pointer opacity-0 disabled:cursor-not-allowed"
           aria-label="Choose a noon settlement export"
         />
-
         {file ? (
           <div className="pointer-events-none flex items-center justify-center gap-2.5">
-            <FileText className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.8} />
-            <span className="truncate text-sm font-medium">{file.name}</span>
-            <span className="shrink-0 text-xs text-muted-foreground">
-              {(file.size / 1024).toFixed(0)} KB
-            </span>
-            {!pending && (
-              <button
+            <FileText className="size-4 shrink-0 text-muted-foreground" />
+            <span className="truncate text-[13px] font-medium">{file.name}</span>
+            <span className="num shrink-0 text-xs text-muted-foreground">{(file.size / 1024).toFixed(0)} KB</span>
+            {!pending ? (
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon-xs"
                 aria-label="Remove file"
                 onClick={() => {
                   setFile(null);
                   formRef.current?.reset();
                 }}
-                className="pointer-events-auto rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
+                className="pointer-events-auto relative z-10"
               >
-                <X className="size-3.5" />
-              </button>
-            )}
+                <X />
+              </Button>
+            ) : null}
           </div>
         ) : (
-          <div className="pointer-events-none space-y-1">
-            <Upload
-              className="mx-auto mb-3 size-5 text-muted-foreground"
-              strokeWidth={1.8}
-            />
-            <p className="text-sm font-medium">Drop a settlement export here</p>
-            <p className="text-xs text-muted-foreground">or click to browse · CSV</p>
+          <div className="pointer-events-none grid justify-items-center gap-1">
+            <span className="mb-2 flex size-9 items-center justify-center bg-muted">
+              <Upload className="size-4 text-muted-foreground" />
+            </span>
+            <p className="text-[13px] font-medium">Drop a settlement export here</p>
+            <p className="text-xs text-muted-foreground">or click to browse · CSV from the noon portal</p>
           </div>
         )}
       </div>
 
-      <div className="flex items-center gap-3">
-        <Button type="submit" disabled={!file || pending} className="min-w-[132px]">
-          {pending ? (
-            <>
-              <Loader2 className="size-4 animate-spin" />
-              Reading…
-            </>
-          ) : (
-            'Import report'
-          )}
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="submit" disabled={!file || pending}>
+          {pending ? <Spinner /> : <Upload />}
+          {pending ? 'Reading…' : 'Import report'}
         </Button>
-        {pending && (
-          <p className="text-xs text-muted-foreground">
-            Parsing, matching products and storing rows.
-          </p>
-        )}
+        <p className="text-xs text-muted-foreground">
+          {pending
+            ? 'Parsing, matching products and storing rows.'
+            : 'The same report twice is safe — files are recognised by content, and rows already held are skipped.'}
+        </p>
       </div>
 
-      {state.status === 'done' && <Outcome state={state} />}
+      {state.status === 'done' ? <Outcome state={state} /> : null}
     </form>
   );
 }
@@ -132,39 +124,35 @@ function Outcome({ state }: { state: Extract<UploadState, { status: 'done' }> })
   const nothingNew = r.alreadyImported || r.rowsInserted === 0;
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-1 rounded-xl border border-border duration-200">
-      <div className="flex items-center gap-2.5 border-b border-border px-5 py-3.5">
+    <div className="animate-in fade-in slide-in-from-bottom-1 border duration-200">
+      <div className="flex items-center gap-2.5 border-b px-4 py-3">
         {nothingNew ? (
-          <Info className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.9} />
+          <Info className="size-4 shrink-0 text-muted-foreground" />
         ) : (
-          <CheckCircle2 className="size-4 shrink-0 text-success" strokeWidth={1.9} />
+          <CheckCircle2 className="size-4 shrink-0 text-success" />
         )}
-        <p className="min-w-0 flex-1 truncate text-sm font-medium">{state.filename}</p>
+        <p className="min-w-0 flex-1 truncate text-[13px] font-medium">{state.filename}</p>
       </div>
-
-      <dl className="grid grid-cols-2 gap-px bg-border sm:grid-cols-4">
+      <dl className="grid grid-cols-2 sm:grid-cols-4">
         {[
           { label: 'Rows read', value: r.rowsInFile },
           { label: 'New', value: r.rowsInserted },
           { label: 'Already held', value: r.rowsSkipped },
           { label: 'Unmapped SKUs', value: r.unmappedListings },
-        ].map((cell) => (
-          <div key={cell.label} className="bg-background px-5 py-3.5">
-            <dt className="text-[11px] tracking-[0.06em] text-muted-foreground uppercase">
-              {cell.label}
-            </dt>
-            <dd className="mt-1 text-lg font-semibold tabular-nums">{cell.value}</dd>
+        ].map((cell, i) => (
+          <div key={cell.label} className={cn('px-4 py-3', i > 0 && 'border-l')}>
+            <dt className="text-xs text-muted-foreground">{cell.label}</dt>
+            <dd className="num mt-1 text-lg font-semibold">{cell.value}</dd>
           </div>
         ))}
       </dl>
-
-      {nothingNew && (
-        <p className="border-t border-border px-5 py-3 text-xs text-muted-foreground">
+      {nothingNew ? (
+        <p className="border-t px-4 py-3 text-xs text-muted-foreground">
           {r.alreadyImported
             ? 'This exact file had already been imported, so nothing changed.'
             : 'Every row was already on record from an earlier export.'}
         </p>
-      )}
+      ) : null}
     </div>
   );
 }

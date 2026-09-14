@@ -1,17 +1,57 @@
 'use client';
 
-import { Loader2, Plus, Search, Trash2 } from 'lucide-react';
+import { PackageOpen, Send, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
-import { searchVariants } from '@/app/(app)/orders/actions';
 import { saveInvoice, type InvoicePayload } from '@/app/(app)/money/actions';
 import { AddProductDialog } from '@/components/add-product-dialog';
-import { ContextBar, Screen } from '@/components/shell';
+import { Amount } from '@/components/amount';
+import { DatePicker } from '@/components/date-picker';
+import { Page, PageHeader } from '@/components/page';
+import { VariantSearch } from '@/components/variant-search';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from '@/components/ui/empty';
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+  FieldTitle,
+} from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Spinner } from '@/components/ui/spinner';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import type { SupplierRow } from '@/lib/api';
 import { money } from '@/lib/format';
-import { cn } from '@/lib/utils';
 
 interface Line {
   key: string;
@@ -22,10 +62,9 @@ interface Line {
   onHand: number | null;
 }
 
-type Hit = Awaited<ReturnType<typeof searchVariants>>[number];
 const todayISO = () => new Date().toISOString().slice(0, 10);
-const field =
-  'h-8 w-full rounded-md border border-border bg-card px-2.5 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-60';
+const cellInput =
+  'h-8 border-transparent bg-transparent px-2 text-right shadow-none hover:border-input focus-visible:border-ring';
 
 export function InvoiceBuilder({
   suppliers,
@@ -36,26 +75,33 @@ export function InvoiceBuilder({
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const [confirming, setConfirming] = useState(false);
 
   const [supplierId, setSupplierId] = useState('');
   const [invoiceNo, setInvoiceNo] = useState('');
   const [invoiceDate, setInvoiceDate] = useState(todayISO());
   const [payment, setPayment] = useState<'CASH' | 'CREDIT'>('CREDIT');
   const [lines, setLines] = useState<Line[]>([]);
+  const [creating, setCreating] = useState<string | null>(null);
 
   const supplier = suppliers.find((s) => s.id === supplierId);
   const total = lines.reduce((s, l) => s + l.quantity * (Number(l.unitCost) || 0), 0);
+  const missing = !supplierId
+    ? 'Choose a supplier.'
+    : !lines.length
+      ? 'Add at least one product.'
+      : lines.some((l) => !(Number(l.unitCost) > 0))
+        ? 'Every line needs a unit cost.'
+        : null;
 
-  const removeLine = (key: string) => setLines((ls) => ls.filter((l) => l.key !== key));
   const patchLine = (key: string, patch: Partial<Line>) =>
     setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
-  const addLine = (variantId: string, label: string, onHand: number | null, unitCost = '') => {
-    if (lines.some((l) => l.variantId === variantId)) return;
-    setLines((ls) => [
-      ...ls,
-      { key: crypto.randomUUID(), variantId, label, quantity: 1, unitCost, onHand },
-    ]);
-  };
+  const addLine = (variantId: string, label: string, onHand: number | null, unitCost = '') =>
+    setLines((ls) =>
+      ls.some((l) => l.variantId === variantId)
+        ? ls
+        : [...ls, { key: crypto.randomUUID(), variantId, label, quantity: 1, unitCost, onHand }],
+    );
 
   const submit = (asDraft: boolean) => {
     const payload: InvoicePayload = {
@@ -74,6 +120,7 @@ export function InvoiceBuilder({
       const res = await saveInvoice(payload, asDraft);
       if (!res.ok) {
         toast.error(res.message);
+        setConfirming(false);
         return;
       }
       toast.success(asDraft ? 'Draft saved.' : 'Invoice posted.');
@@ -81,271 +128,267 @@ export function InvoiceBuilder({
     });
   };
 
+  const consequence =
+    payment === 'CASH' ? (
+      <>
+        <span className="num font-medium text-foreground">{money(total)}</span> leaves the till — الخزينة
+        goes <span className="num">{money(cashBalance)}</span> →{' '}
+        <span className="num">{money(Number(cashBalance) - total)}</span>.
+      </>
+    ) : (
+      <>
+        <span className="num font-medium text-foreground">{money(total)}</span> is added to what you owe{' '}
+        {supplier ? <bdi className="text-foreground">{supplier.name}</bdi> : 'the supplier'}. Record the
+        payment from their page when you pay them.
+      </>
+    );
+
   return (
-    <Screen>
-      <ContextBar back="/money/purchases" title="New purchase invoice" />
+    <Page>
+      <PageHeader
+        back={{ href: '/money/purchases', label: 'Back to purchases' }}
+        title="New purchase invoice"
+        description="Stock in at cost — from one supplier, on one date."
+      />
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-2xl space-y-5 p-4">
-          {/* Supplier + terms */}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="grid gap-1.5">
-              <Lbl>Supplier</Lbl>
-              <select className={field} value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
-                <option value="">Choose…</option>
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="grid gap-1.5">
-              <Lbl>Payment</Lbl>
-              <select
-                className={field}
-                value={payment}
-                onChange={(e) => setPayment(e.target.value as 'CASH' | 'CREDIT')}
-              >
-                <option value="CREDIT">On credit — pay the supplier later</option>
-                <option value="CASH">Paid in cash now</option>
-              </select>
-            </label>
-            <label className="grid gap-1.5">
-              <Lbl>Invoice ref (optional)</Lbl>
-              <input className={field} value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} placeholder="the supplier's number" />
-            </label>
-            <label className="grid gap-1.5">
-              <Lbl>Invoice date</Lbl>
-              <input type="date" className={field} value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} />
-            </label>
-          </div>
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="grid min-w-0 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Supplier and terms</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <FieldGroup className="grid gap-4 sm:grid-cols-3">
+                <Field>
+                  <FieldLabel htmlFor="inv-supplier">Supplier</FieldLabel>
+                  <Select value={supplierId} onValueChange={setSupplierId} disabled={pending}>
+                    <SelectTrigger id="inv-supplier" className="w-full">
+                      <SelectValue placeholder="Choose…" />
+                    </SelectTrigger>
+                    <SelectContent position="popper">
+                      {suppliers.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          <bdi>{s.name}</bdi>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="inv-ref">
+                    Invoice ref <span className="font-normal text-muted-foreground">(optional)</span>
+                  </FieldLabel>
+                  <Input
+                    id="inv-ref"
+                    value={invoiceNo}
+                    onChange={(e) => setInvoiceNo(e.target.value)}
+                    placeholder="The supplier’s number"
+                    disabled={pending}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="inv-date">Invoice date</FieldLabel>
+                  <DatePicker id="inv-date" value={invoiceDate} onChange={setInvoiceDate} disabled={pending} />
+                </Field>
+                <RadioGroup
+                  value={payment}
+                  onValueChange={(v) => setPayment(v as 'CASH' | 'CREDIT')}
+                  disabled={pending}
+                  aria-label="Payment"
+                  className="grid gap-2 sm:col-span-3 sm:grid-cols-2"
+                >
+                  <FieldLabel htmlFor="pay-credit">
+                    <Field orientation="horizontal">
+                      <RadioGroupItem value="CREDIT" id="pay-credit" />
+                      <FieldContent>
+                        <FieldTitle className="font-medium">On credit</FieldTitle>
+                        <FieldDescription>Pay the supplier later</FieldDescription>
+                      </FieldContent>
+                    </Field>
+                  </FieldLabel>
+                  <FieldLabel htmlFor="pay-cash">
+                    <Field orientation="horizontal">
+                      <RadioGroupItem value="CASH" id="pay-cash" />
+                      <FieldContent>
+                        <FieldTitle className="font-medium">Paid in cash now</FieldTitle>
+                        <FieldDescription>Comes out of the till on posting</FieldDescription>
+                      </FieldContent>
+                    </Field>
+                  </FieldLabel>
+                </RadioGroup>
+              </FieldGroup>
+            </CardContent>
+          </Card>
 
-          {/* Products */}
-          <div>
-            <div className="mb-2 flex items-baseline justify-between">
-              <Lbl>Products received</Lbl>
-              <span className="text-[11px] text-muted-foreground">
-                pick from inventory, or add a new product
-              </span>
-            </div>
-            <ProductPicker chosen={lines.map((l) => l.variantId)} onExisting={addLine} onNew={addLine} />
-
-            {lines.length > 0 && (
-              <div className="mt-2 overflow-hidden rounded-lg border border-border">
-                <table className="w-full border-collapse text-[13px]">
-                  <thead>
-                    <tr className="border-b border-border bg-muted/40 text-[10.5px] tracking-[0.06em] text-muted-foreground uppercase">
-                      <th className="px-3 py-1.5 text-left font-medium">Product</th>
-                      <th className="px-2 py-1.5 text-right font-medium">Qty</th>
-                      <th className="px-2 py-1.5 text-right font-medium">Unit cost</th>
-                      <th className="px-2 py-1.5 text-right font-medium">Line</th>
-                      <th className="w-7" />
-                    </tr>
-                  </thead>
-                  <tbody>
+          <Card className="pb-0">
+            <CardHeader>
+              <CardTitle>Products received</CardTitle>
+              <CardDescription>Pick from inventory, or add a new product on the spot.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <VariantSearch
+                disabled={pending}
+                placeholder="Add a product — search by Arabic name or SKU"
+                disabledReason={(h) => (lines.some((l) => l.variantId === h.id) ? 'Added' : null)}
+                meta={(h) => `${h.onHand} on hand`}
+                onPick={(h) => addLine(h.id, h.label, h.onHand, h.unitCost ?? '')}
+                onCreate={setCreating}
+              />
+            </CardContent>
+            <div className="mt-4 border-t">
+              {lines.length ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Product</TableHead>
+                      <TableHead className="w-[100px] text-right">Qty</TableHead>
+                      <TableHead className="w-[130px] text-right">Unit cost</TableHead>
+                      <TableHead className="w-[130px] text-right">Line total</TableHead>
+                      <TableHead className="w-12" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {lines.map((l) => (
-                      <tr key={l.key} className="border-b border-border/60 last:border-b-0">
-                        <td className="px-3 py-1.5">
-                          <bdi>{l.label}</bdi>
-                          {l.onHand !== null && (
-                            <span className="ms-2 text-[11px] text-muted-foreground">
-                              {l.onHand} on hand
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-2 py-1.5 text-right">
-                          <input
+                      <TableRow key={l.key}>
+                        <TableCell className="max-w-0">
+                          <p className="truncate font-medium">
+                            <bdi>{l.label}</bdi>
+                          </p>
+                          {l.onHand !== null ? (
+                            <p className="num text-xs text-muted-foreground">{l.onHand} on hand now</p>
+                          ) : null}
+                        </TableCell>
+                        <TableCell className="py-1.5">
+                          <Input
                             type="number"
                             min={1}
                             value={l.quantity}
+                            onFocus={(e) => e.currentTarget.select()}
                             onChange={(e) =>
                               patchLine(l.key, { quantity: Math.max(1, Number(e.target.value) || 1) })
                             }
-                            className="h-7 w-14 rounded border border-border bg-card px-1.5 text-right tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            aria-label="Quantity"
+                            disabled={pending}
+                            className={`num ${cellInput}`}
                           />
-                        </td>
-                        <td className="px-2 py-1.5 text-right">
-                          <input
+                        </TableCell>
+                        <TableCell className="py-1.5">
+                          <Input
                             inputMode="decimal"
                             value={l.unitCost}
+                            onFocus={(e) => e.currentTarget.select()}
                             onChange={(e) => patchLine(l.key, { unitCost: e.target.value })}
                             placeholder="0.00"
-                            className="h-7 w-20 rounded border border-border bg-card px-1.5 text-right tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            aria-label="Unit cost"
+                            aria-invalid={!(Number(l.unitCost) > 0)}
+                            disabled={pending}
+                            className={`num ${cellInput}`}
                           />
-                        </td>
-                        <td className="px-2 py-1.5 text-right tabular-nums">
+                        </TableCell>
+                        <TableCell className="num text-right font-medium">
                           {money(l.quantity * (Number(l.unitCost) || 0))}
-                        </td>
-                        <td className="px-1.5 py-1.5 text-center">
-                          <button
-                            type="button"
-                            onClick={() => removeLine(l.key)}
-                            className="text-muted-foreground hover:text-destructive"
-                            aria-label="Remove line"
+                        </TableCell>
+                        <TableCell className="pe-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))}
+                            aria-label={`Remove ${l.label}`}
+                            disabled={pending}
+                            className="text-muted-foreground hover:bg-destructive-subtle hover:text-destructive"
                           >
-                            <Trash2 className="size-3.5" />
-                          </button>
-                        </td>
-                      </tr>
+                            <Trash2 />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          {/* Money summary — the point of the whole screen */}
-          <div className="rounded-lg border border-border bg-card px-4 py-3 text-[13px]">
-            <div className="flex items-baseline justify-between font-semibold">
-              <span>Total for this invoice</span>
-              <span className="tabular-nums">{money(total)}</span>
+                  </TableBody>
+                </Table>
+              ) : (
+                <Empty className="py-10">
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <PackageOpen />
+                    </EmptyMedia>
+                    <EmptyDescription>No products yet — search above to add the first line.</EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              )}
             </div>
-            {lines.length > 0 && (
-              <p className="mt-2 border-t border-border pt-2 text-[12px] text-muted-foreground">
-                {payment === 'CASH' ? (
-                  <>
-                    On posting, <b className="text-foreground">{money(total)} leaves cash</b> —
-                    الخزينة goes {money(cashBalance)} → {money(Number(cashBalance) - total)}.
-                  </>
-                ) : (
-                  <>
-                    On posting, <b className="text-foreground">{money(total)} is added to what you owe{' '}
-                    {supplier ? <bdi>{supplier.name}</bdi> : 'the supplier'}</b>. Record the
-                    payment from their page when you pay them.
-                  </>
-                )}{' '}
-                Either way, {money(total)} of stock value is added.
-              </p>
-            )}
-          </div>
+          </Card>
         </div>
-      </div>
 
-      <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-4 py-2.5">
-        <Button variant="outline" size="lg" disabled={pending || !lines.length} onClick={() => submit(true)}>
-          Save draft
-        </Button>
-        <Button
-          size="lg"
-          disabled={pending || !lines.length || !supplierId}
-          onClick={() => submit(false)}
-        >
-          {pending ? <Loader2 className="size-4 animate-spin" /> : `Post — ${money(total)}`}
-        </Button>
-      </div>
-    </Screen>
-  );
-}
+        <aside className="lg:sticky lg:top-0">
+          <Card>
+            <CardHeader>
+              <CardTitle>Summary</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-4 text-[13px]">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-muted-foreground">
+                  <span className="num">{lines.length}</span> {lines.length === 1 ? 'product' : 'products'}
+                </span>
+                <Amount value={total} className="text-[28px] font-semibold tracking-tight" />
+              </div>
+              {lines.length ? (
+                <p className="border-t pt-3 text-xs/relaxed text-muted-foreground">
+                  On posting, {consequence} Either way,{' '}
+                  <span className="num text-foreground">{money(total)}</span> of stock value is added.
+                </p>
+              ) : null}
 
-function Lbl({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="text-[11px] font-medium tracking-[0.03em] text-muted-foreground uppercase">
-      {children}
-    </span>
-  );
-}
-
-function ProductPicker({
-  chosen,
-  onExisting,
-  onNew,
-}: {
-  chosen: string[];
-  onExisting: (variantId: string, label: string, onHand: number | null, unitCost?: string) => void;
-  onNew: (variantId: string, label: string, onHand: number | null) => void;
-}) {
-  const [term, setTerm] = useState('');
-  const [hits, setHits] = useState<Hit[]>([]);
-  const [open, setOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const box = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!term.trim()) {
-      setHits([]);
-      return;
-    }
-    const t = setTimeout(async () => setHits(await searchVariants(term)), 250);
-    return () => clearTimeout(t);
-  }, [term]);
-
-  useEffect(() => {
-    const close = (e: MouseEvent) => {
-      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, []);
-
-  return (
-    <div ref={box} className="relative">
-      <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-      <input
-        value={term}
-        onChange={(e) => {
-          setTerm(e.target.value);
-          setOpen(true);
-        }}
-        onFocus={() => setOpen(true)}
-        placeholder="Search products by Arabic name or SKU…"
-        className="h-9 w-full rounded-md border border-border bg-card pr-3 pl-9 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      />
-      {open && term.trim() && (
-        <div className="absolute inset-x-0 z-20 mt-1 overflow-hidden rounded-md border border-border bg-popover shadow-lg">
-          {hits.length > 0 && (
-            <ul className="max-h-56 overflow-y-auto">
-              {hits.map((h) => {
-                const taken = chosen.includes(h.id);
-                return (
-                  <li key={h.id}>
-                    <button
-                      type="button"
-                      disabled={taken}
-                      onClick={() => {
-                        onExisting(h.id, h.label, h.onHand, h.unitCost ?? '');
-                        setTerm('');
-                        setOpen(false);
+              <AlertDialog open={confirming} onOpenChange={setConfirming}>
+                <AlertDialogTrigger asChild>
+                  <Button size="lg" disabled={pending || !!missing} className="w-full">
+                    <Send />
+                    Post — <span className="num">{money(total)}</span>
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Post this invoice?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {consequence} Stock comes in at these costs. Posting can’t be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={pending}>Not yet</AlertDialogCancel>
+                    <AlertDialogAction
+                      disabled={pending}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        submit(false);
                       }}
-                      className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-[13px] hover:bg-accent disabled:opacity-40"
                     >
-                      <bdi className="truncate">{h.label}</bdi>
-                      <span className="shrink-0 text-[11px] text-muted-foreground">
-                        {taken ? 'added' : `${h.onHand} on hand`}
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-
-          <button
-            type="button"
-            onClick={() => {
-              setCreating(true);
-              setOpen(false);
-            }}
-            className={cn(
-              'flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] hover:bg-accent',
-              hits.length > 0 && 'border-t border-border',
-            )}
-          >
-            <Plus className="size-3.5" />
-            Add “<bdi>{term.trim()}</bdi>” as a new product
-          </button>
-        </div>
-      )}
+                      {pending ? <Spinner /> : null}
+                      Post invoice
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+              <Button
+                variant="outline"
+                disabled={pending || !lines.length || !supplierId}
+                onClick={() => submit(true)}
+                className="w-full"
+              >
+                {pending && !confirming ? <Spinner /> : null}
+                Save as draft
+              </Button>
+              {missing && !pending ? (
+                <p className="text-center text-xs text-muted-foreground">{missing}</p>
+              ) : null}
+            </CardContent>
+          </Card>
+        </aside>
+      </div>
 
       <AddProductDialog
-        open={creating}
-        onOpenChange={setCreating}
-        initialName={term.trim()}
-        onCreated={(variantId, label) => {
-          onNew(variantId, label, 0);
-          setTerm('');
-        }}
+        open={creating !== null}
+        onOpenChange={(o) => !o && setCreating(null)}
+        initialName={creating ?? ''}
+        onCreated={(variantId, label) => addLine(variantId, label, 0)}
       />
-    </div>
+    </Page>
   );
 }

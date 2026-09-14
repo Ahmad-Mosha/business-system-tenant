@@ -1,30 +1,48 @@
 'use client';
 
-import {
-  AlignLeft,
-  ArrowLeft,
-  CheckCircle2,
-  CreditCard,
-  Loader2,
-  Plus,
-  Search,
-  ShoppingBag,
-  Trash2,
-  Truck,
-  User,
-} from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Plus, Trash2 } from 'lucide-react';
 import Link from 'next/link';
-import { useActionState, useEffect, useRef, useState } from 'react';
+import { useActionState, useRef, useState } from 'react';
+import { createOrder, updateOrder, type CreateOrderState } from '@/app/(app)/orders/actions';
+import { Amount } from '@/components/amount';
+import { Page, PageHeader } from '@/components/page';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
-  createOrder,
-  searchVariants,
-  updateOrder,
-  type CreateOrderState,
-} from '@/app/(app)/orders/actions';
-import { Screen } from '@/components/shell';
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldTitle,
+} from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from '@/components/ui/input-group';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Spinner } from '@/components/ui/spinner';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
+import { VariantSearch, type VariantHit } from '@/components/variant-search';
 import type { OrderDetail } from '@/lib/api';
-import { GOVERNORATES } from '@/lib/governorates';
 import { money } from '@/lib/format';
+import { GOVERNORATES } from '@/lib/governorates';
 import { cn } from '@/lib/utils';
 
 const INITIAL: CreateOrderState = { status: 'idle' };
@@ -45,24 +63,20 @@ interface Line {
   unitCost?: string | null;
 }
 
-type Hit = Awaited<ReturnType<typeof searchVariants>>[number];
-
 const PAYMENT_METHODS = [
-  { value: 'COD', label: 'Cash on Delivery' },
-  { value: 'WALLET', label: 'Mobile Wallet' },
-  { value: 'INSTAPAY', label: 'InstaPay' },
+  { value: 'COD', label: 'Cash on delivery', hint: 'Bosta collects it' },
+  { value: 'WALLET', label: 'Mobile wallet', hint: 'Usually paid first' },
+  { value: 'INSTAPAY', label: 'InstaPay', hint: 'Usually paid first' },
 ] as const;
 
-const field =
-  'h-9 w-full rounded-md border border-border bg-card px-3 text-[13px] focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-60';
+/** An inline table input that reads as text until it's pointed at. */
+const cellInput =
+  'h-8 border-transparent bg-transparent px-2 shadow-none hover:border-input focus-visible:border-ring';
 
 /**
  * Manual order entry, and the edit screen for an existing one — the same form
- * either way, because they collect exactly the same thing.
- *
- * Laid out as a grid of cards rather than a stack of sections: the two short
- * forms sit side by side, the item table is capped, and the whole screen fits a
- * laptop without scrolling.
+ * either way, because they collect exactly the same thing. The summary rides
+ * alongside the work (sticky), with the submit and anything blocking it.
  */
 export function OrderForm({
   assignsToSelf,
@@ -88,28 +102,11 @@ export function OrderForm({
   );
   const [shipping, setShipping] = useState(order?.shippingCost ?? '0');
   const [phone, setPhone] = useState(order?.customerPhone ?? '');
+  const [governorate, setGovernorate] = useState(order?.governorate ?? '');
   const [method, setMethod] = useState<string>(order?.paymentMethod ?? 'COD');
-  const [term, setTerm] = useState('');
-  const [hits, setHits] = useState<Hit[]>([]);
-  const [searching, setSearching] = useState(false);
   const seq = useRef(0);
 
-  // Debounced lookup, so typing does not fire a request per keystroke.
-  useEffect(() => {
-    const t = setTimeout(async () => {
-      if (!term.trim()) {
-        setHits([]);
-        return;
-      }
-      setSearching(true);
-      setHits(await searchVariants(term));
-      setSearching(false);
-    }, 250);
-    return () => clearTimeout(t);
-  }, [term]);
-
-  const addLine = (hit?: Hit) => {
-    if (hit && hit.onHand <= 0) return; // out of stock — nothing to sell
+  const addLine = (hit?: VariantHit) => {
     seq.current += 1;
     setLines((l) => [
       ...l,
@@ -123,8 +120,6 @@ export function OrderForm({
         unitCost: hit?.unitCost,
       },
     ]);
-    setTerm('');
-    setHits([]);
   };
 
   const patch = (key: string, next: Partial<Line>) =>
@@ -136,12 +131,32 @@ export function OrderForm({
   const units = lines.reduce((n, l) => n + l.quantity, 0);
 
   const phoneOk = isEgyptianPhone(phone);
+  const phoneBad = phone.length > 0 && !phoneOk;
   const overStock = lines.filter((l) => l.onHand !== undefined && l.quantity > l.onHand);
   const belowCost = lines.filter(
     (l) => l.unitCost && Number(l.unitPrice) > 0 && Number(l.unitPrice) < Number(l.unitCost),
   );
   const unpriced = lines.filter((l) => !l.title.trim() || !(Number(l.unitPrice) > 0));
-  const ready = lines.length > 0 && !unpriced.length && phoneOk && !overStock.length;
+  // The first thing still missing, said under the disabled button — a button
+  // that won't press without saying why is the worst kind of form.
+  const missing = !lines.length
+    ? 'Add at least one item.'
+    : unpriced.length
+      ? 'Every item needs a name and a price.'
+      : !phoneOk
+        ? 'Add a valid phone number.'
+        : !governorate
+          ? 'Pick a governorate.'
+          : null;
+  const ready = !missing && !overStock.length;
+  const back = editing ? `/orders/${order.id}` : '/orders';
+  // An order can carry a governorate outside the 27 (a website order's own
+  // spelling). Offer it too — otherwise the form's native select falls back
+  // to its first option and saving silently rewrites it to القاهرة.
+  const governorates: readonly string[] =
+    order?.governorate && !(GOVERNORATES as readonly string[]).includes(order.governorate)
+      ? [order.governorate, ...GOVERNORATES]
+      : GOVERNORATES;
 
   return (
     <form action={submit} className="contents">
@@ -158,457 +173,360 @@ export function OrderForm({
         )}
       />
 
-      <Screen>
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-card px-5">
-          <Link
-            href={editing ? `/orders/${order.id}` : '/orders'}
-            aria-label={editing ? 'Back to the order' : 'Back to orders'}
-            className="-ms-2 inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-          >
-            <ArrowLeft className="size-4.5" />
-          </Link>
-          <h1 className="text-lg font-semibold tracking-[-0.02em]">
-            {editing ? `Edit ${order.orderNumber}` : 'Manual Order Entry'}
-          </h1>
-          <span className="text-xs text-muted-foreground">
-            {editing
-              ? 'changing the items adjusts stock'
+      <Page>
+        <PageHeader
+          back={{ href: back, label: editing ? 'Back to the order' : 'Back to orders' }}
+          title={editing ? `Edit ${order.orderNumber}` : 'New order'}
+          description={
+            editing
+              ? 'Changing the items adjusts stock.'
               : assignsToSelf
-                ? 'assigned to you'
-                : 'unassigned until an admin assigns it'}
-          </span>
-          <Link
-            href={editing ? `/orders/${order.id}` : '/orders'}
-            className="ms-auto inline-flex h-9 items-center rounded-md border border-border bg-card px-4 text-[13px] font-medium transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-          >
-            Cancel
-          </Link>
-        </header>
+                ? 'For an order taken on social — it’s assigned to you.'
+                : 'For an order taken on social — unassigned until an admin assigns it.'
+          }
+          actions={
+            <Button variant="outline" asChild>
+              <Link href={back}>Cancel</Link>
+            </Button>
+          }
+        />
 
-        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_340px] items-start gap-4 overflow-y-auto p-4">
-          {/* The work column: two short forms side by side, then the item table
-              taking whatever height is left. */}
-          <div className="grid content-start gap-4">
-            <div className="grid gap-4 lg:grid-cols-2">
-              <Card icon={User} step="1" title="Customer Information">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Labelled label="Full Name" htmlFor="customerName">
-                    <input
-                      id="customerName"
-                      name="customerName"
-                      required
-                      defaultValue={order?.customerName ?? ''}
-                      placeholder="e.g. أحمد جمال"
-                      disabled={pending}
-                      className={field}
-                    />
-                  </Labelled>
-                  <Labelled label="Phone Number" htmlFor="customerPhone">
-                    <input
-                      id="customerPhone"
-                      name="customerPhone"
-                      required
-                      inputMode="tel"
-                      placeholder="01xxxxxxxxx"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      aria-invalid={phone.length > 0 && !phoneOk}
-                      disabled={pending}
-                      className={cn(field, phone.length > 0 && !phoneOk && 'border-destructive')}
-                    />
-                  </Labelled>
-                </div>
-                {phone.length > 0 && !phoneOk && (
-                  <p className="mt-1.5 text-[11px] text-destructive">
-                    Not a valid Egyptian mobile number
-                  </p>
-                )}
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="grid min-w-0 gap-6">
+            <div className="grid gap-6 xl:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Customer</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <FieldGroup className="grid gap-4 sm:grid-cols-2">
+                    <Field>
+                      <FieldLabel htmlFor="customerName">Full name</FieldLabel>
+                      <Input
+                        id="customerName"
+                        name="customerName"
+                        dir="auto"
+                        required
+                        defaultValue={order?.customerName ?? ''}
+                        placeholder="e.g. أحمد جمال"
+                        disabled={pending}
+                      />
+                    </Field>
+                    <Field data-invalid={phoneBad}>
+                      <FieldLabel htmlFor="customerPhone">Phone number</FieldLabel>
+                      <Input
+                        id="customerPhone"
+                        name="customerPhone"
+                        required
+                        inputMode="tel"
+                        placeholder="01xxxxxxxxx"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        aria-invalid={phoneBad}
+                        disabled={pending}
+                        className="num"
+                      />
+                      {phoneBad ? <FieldError>Not a valid Egyptian mobile number</FieldError> : null}
+                    </Field>
+                  </FieldGroup>
+                </CardContent>
               </Card>
 
-              <Card icon={Truck} step="2" title="Shipping Details">
-                <div className="grid gap-3 sm:grid-cols-[150px_minmax(0,1fr)]">
-                  <Labelled label="Governorate" htmlFor="governorate">
-                    <select
-                      id="governorate"
-                      name="governorate"
-                      required
-                      defaultValue={order?.governorate ?? ''}
-                      disabled={pending}
-                      className={field}
-                    >
-                      <option value="" disabled>
-                        Select…
-                      </option>
-                      {GOVERNORATES.map((g) => (
-                        <option key={g} value={g}>
-                          {g}
-                        </option>
-                      ))}
-                    </select>
-                  </Labelled>
-                  <Labelled label="Street Address" htmlFor="address">
-                    <input
-                      id="address"
-                      name="address"
-                      defaultValue={order?.address ?? ''}
-                      placeholder="Street, building, apartment, landmark"
-                      disabled={pending}
-                      className={field}
-                    />
-                  </Labelled>
-                </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Delivery</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <FieldGroup className="grid gap-4 sm:grid-cols-[160px_minmax(0,1fr)]">
+                    <Field>
+                      <FieldLabel htmlFor="governorate">Governorate</FieldLabel>
+                      <Select
+                        name="governorate"
+                        value={governorate}
+                        onValueChange={setGovernorate}
+                        disabled={pending}
+                      >
+                        <SelectTrigger id="governorate" className="w-full">
+                          <SelectValue placeholder="Select…" />
+                        </SelectTrigger>
+                        <SelectContent position="popper" className="max-h-72">
+                          {governorates.map((g) => (
+                            <SelectItem key={g} value={g}>
+                              {g}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="address">Street address</FieldLabel>
+                      <Input
+                        id="address"
+                        name="address"
+                        dir="auto"
+                        defaultValue={order?.address ?? ''}
+                        placeholder="Street, building, apartment, landmark"
+                        disabled={pending}
+                      />
+                    </Field>
+                  </FieldGroup>
+                </CardContent>
               </Card>
             </div>
 
-            <Card icon={ShoppingBag} step="3" title="Order Items">
-              <div className="relative mb-3 shrink-0">
-                <Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  value={term}
-                  onChange={(e) => setTerm(e.target.value)}
-                  placeholder="Search products by name or SKU"
-                  disabled={pending}
-                  className={cn(field, 'pl-8.5')}
-                />
-                {(hits.length > 0 || searching) && (
-                  <ul className="absolute inset-x-0 z-30 mt-1 max-h-64 overflow-y-auto rounded-md border border-border bg-popover shadow-lg">
-                    {searching && !hits.length ? (
-                      <li className="px-3 py-2 text-[13px] text-muted-foreground">Searching…</li>
+            <Card className="pb-0">
+              <CardHeader>
+                <CardTitle>Items</CardTitle>
+                <CardDescription>
+                  Pick from inventory so stock moves, or add a custom line.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-wrap gap-2">
+                <div className="min-w-0 flex-1">
+                  <VariantSearch
+                    onPick={addLine}
+                    disabled={pending}
+                    disabledReason={(h) => (h.onHand <= 0 ? 'Out of stock' : null)}
+                    meta={(h) =>
+                      `${h.onHand} in stock${h.sellingPrice ? ` · ${money(h.sellingPrice)}` : ''}`
+                    }
+                  />
+                </div>
+                <Button type="button" variant="outline" onClick={() => addLine()} disabled={pending}>
+                  <Plus />
+                  Custom item
+                </Button>
+              </CardContent>
+              <div className="mt-4 border-t">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Item</TableHead>
+                      <TableHead className="w-[90px] text-right">Qty</TableHead>
+                      <TableHead className="w-[120px] text-right">Unit price</TableHead>
+                      <TableHead className="w-[110px] text-right">Total</TableHead>
+                      <TableHead className="w-12" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {lines.length === 0 ? (
+                      <TableRow className="hover:bg-transparent">
+                        <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                          No items yet — search above, or add a custom item.
+                        </TableCell>
+                      </TableRow>
                     ) : (
-                      hits.map((h) => {
-                        const out = h.onHand <= 0;
+                      lines.map((l) => {
+                        const over = l.onHand !== undefined && l.quantity > l.onHand;
+                        const under =
+                          !!l.unitCost &&
+                          Number(l.unitPrice) > 0 &&
+                          Number(l.unitPrice) < Number(l.unitCost);
                         return (
-                          <li key={h.id}>
-                            <button
-                              type="button"
-                              onClick={() => addLine(h)}
-                              disabled={out}
-                              className="flex w-full items-center gap-3 px-3 py-2 text-left text-[13px] transition-colors enabled:hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              <span className="min-w-0 flex-1 truncate">{h.label}</span>
-                              <span
-                                className={cn(
-                                  'shrink-0 text-[11px]',
-                                  out ? 'text-destructive' : 'text-muted-foreground',
+                          <TableRow key={l.key} className="align-top">
+                            <TableCell className="h-auto py-1.5 ps-2">
+                              <Input
+                                value={l.title}
+                                onChange={(e) => patch(l.key, { title: e.target.value })}
+                                placeholder="Item name"
+                                aria-label="Item name"
+                                dir="auto"
+                                disabled={pending}
+                                className={cn(cellInput, 'font-medium')}
+                              />
+                              <p className="px-2 text-xs text-muted-foreground">
+                                {!l.variantId ? (
+                                  <span className="text-warning">Not linked to inventory</span>
+                                ) : l.onHand === undefined ? (
+                                  // Loaded from a saved order — linked, but
+                                  // today's stock isn't known here.
+                                  'Linked to inventory'
+                                ) : (
+                                  <span className="num">
+                                    {l.onHand} in stock
+                                    {l.unitCost ? ` · cost ${money(l.unitCost)}` : ''}
+                                  </span>
                                 )}
+                              </p>
+                            </TableCell>
+                            <TableCell className="h-auto py-1.5">
+                              <Input
+                                type="number"
+                                min={1}
+                                value={l.quantity}
+                                onFocus={(e) => e.currentTarget.select()}
+                                onChange={(e) =>
+                                  patch(l.key, { quantity: Math.max(1, Number(e.target.value)) })
+                                }
+                                aria-label="Quantity"
+                                aria-invalid={over}
+                                disabled={pending}
+                                className={cn(cellInput, 'num text-right', over && 'border-destructive')}
+                              />
+                            </TableCell>
+                            <TableCell className="h-auto py-1.5">
+                              <Input
+                                inputMode="decimal"
+                                value={l.unitPrice}
+                                onFocus={(e) => e.currentTarget.select()}
+                                onChange={(e) => patch(l.key, { unitPrice: e.target.value })}
+                                aria-label="Unit price"
+                                placeholder="0.00"
+                                disabled={pending}
+                                className={cn(cellInput, 'num text-right', under && 'border-warning')}
+                              />
+                            </TableCell>
+                            <TableCell className="num h-auto py-1.5 text-right leading-8 font-medium">
+                              {money(lineTotal(l))}
+                            </TableCell>
+                            <TableCell className="h-auto py-1.5 pe-2">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setLines((x) => x.filter((y) => y.key !== l.key))}
+                                aria-label={`Remove ${l.title || 'item'}`}
+                                disabled={pending}
+                                className="text-muted-foreground hover:bg-destructive-subtle hover:text-destructive"
                               >
-                                {out ? 'Out of stock' : `${h.onHand} in stock`}
-                              </span>
-                              {h.sellingPrice && (
-                                <span className="w-16 shrink-0 text-right tabular-nums">
-                                  {money(h.sellingPrice)}
-                                </span>
-                              )}
-                            </button>
-                          </li>
+                                <Trash2 />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
                         );
                       })
                     )}
-                  </ul>
-                )}
-              </div>
-
-              <div className="flex flex-col overflow-hidden rounded-lg border border-border">
-                <div className="max-h-[264px] overflow-y-auto">
-                  <table className="w-full border-collapse text-[13px]">
-                    <thead className="sticky top-0 z-10 bg-muted/60 backdrop-blur">
-                      <tr className="border-b border-border text-[11px] tracking-[0.06em] text-muted-foreground uppercase">
-                        <th className="px-3 py-2 text-left font-medium">Item</th>
-                        <th className="w-[80px] px-3 py-2 text-right font-medium">Qty</th>
-                        <th className="w-[110px] px-3 py-2 text-right font-medium">Unit Price</th>
-                        <th className="w-[100px] px-3 py-2 text-right font-medium">Total</th>
-                        <th className="w-10 px-2" />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {lines.length === 0 ? (
-                        <tr>
-                          <td
-                            colSpan={5}
-                            className="px-3 py-6 text-center text-[13px] text-muted-foreground"
-                          >
-                            No items yet — search above, or add a custom item.
-                          </td>
-                        </tr>
-                      ) : (
-                        lines.map((l) => {
-                          const over = l.onHand !== undefined && l.quantity > l.onHand;
-                          const under =
-                            l.unitCost &&
-                            Number(l.unitPrice) > 0 &&
-                            Number(l.unitPrice) < Number(l.unitCost);
-                          return (
-                            <tr key={l.key} className="border-b border-border/60">
-                              <td className="px-3 py-1.5">
-                                <input
-                                  value={l.title}
-                                  onChange={(e) => patch(l.key, { title: e.target.value })}
-                                  placeholder="Item name"
-                                  disabled={pending}
-                                  className={cn(
-                                    field,
-                                    'h-8 border-transparent bg-transparent px-2 hover:border-border',
-                                  )}
-                                />
-                                <p className="px-2 text-[11px] text-muted-foreground">
-                                  {!l.variantId ? (
-                                    <span className="text-warning">not linked to inventory</span>
-                                  ) : l.onHand === undefined ? (
-                                    // Loaded from a saved order — we know it is
-                                    // linked, but not what stock stands at now.
-                                    'linked to inventory'
-                                  ) : (
-                                    <>
-                                      {l.onHand} in stock
-                                      {l.unitCost ? ` · cost ${money(l.unitCost)}` : ''}
-                                    </>
-                                  )}
-                                </p>
-                              </td>
-                              <td className="px-3 py-1.5 align-top">
-                                <input
-                                  type="number"
-                                  min={1}
-                                  value={l.quantity}
-                                  onFocus={(e) => e.currentTarget.select()}
-                                  onChange={(e) =>
-                                    patch(l.key, { quantity: Math.max(1, Number(e.target.value)) })
-                                  }
-                                  aria-invalid={over}
-                                  disabled={pending}
-                                  className={cn(
-                                    field,
-                                    'h-8 px-2 text-right tabular-nums',
-                                    over && 'border-destructive',
-                                  )}
-                                />
-                              </td>
-                              <td className="px-3 py-1.5 align-top">
-                                <input
-                                  inputMode="decimal"
-                                  value={l.unitPrice}
-                                  onFocus={(e) => e.currentTarget.select()}
-                                  onChange={(e) => patch(l.key, { unitPrice: e.target.value })}
-                                  disabled={pending}
-                                  className={cn(
-                                    field,
-                                    'h-8 px-2 text-right tabular-nums',
-                                    under && 'border-warning',
-                                  )}
-                                />
-                              </td>
-                              <td className="px-3 py-1.5 text-right align-top font-medium tabular-nums leading-8">
-                                {money(lineTotal(l))}
-                              </td>
-                              <td className="px-2 py-1.5 align-top">
-                                <button
-                                  type="button"
-                                  onClick={() => setLines((x) => x.filter((y) => y.key !== l.key))}
-                                  aria-label={`Remove ${l.title || 'item'}`}
-                                  disabled={pending}
-                                  className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive-subtle hover:text-destructive"
-                                >
-                                  <Trash2 className="size-3.5" />
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => addLine()}
-                  disabled={pending}
-                  className="flex shrink-0 items-center justify-center gap-1.5 border-t border-border py-2 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                >
-                  <Plus className="size-3.5" />
-                  Custom Item
-                </button>
+                  </TableBody>
+                </Table>
               </div>
             </Card>
 
-            <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
-              <Card icon={CreditCard} title="Payment Method">
-                <input type="hidden" name="paymentMethod" value={method} />
-                <div
-                  role="radiogroup"
-                  aria-label="Payment method"
-                  className="flex rounded-md border border-border p-0.5"
-                >
-                  {PAYMENT_METHODS.map((m) => (
-                    <button
-                      key={m.value}
-                      type="button"
-                      role="radio"
-                      aria-checked={method === m.value}
-                      onClick={() => setMethod(m.value)}
+            <Card>
+              <CardHeader>
+                <CardTitle>Payment and notes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <FieldGroup>
+                  <RadioGroup
+                    name="paymentMethod"
+                    value={method}
+                    onValueChange={setMethod}
+                    disabled={pending}
+                    aria-label="Payment method"
+                    className="grid gap-2 sm:grid-cols-3"
+                  >
+                    {PAYMENT_METHODS.map((m) => (
+                      <FieldLabel key={m.value} htmlFor={`pm-${m.value}`}>
+                        <Field orientation="horizontal">
+                          <RadioGroupItem value={m.value} id={`pm-${m.value}`} />
+                          <FieldContent>
+                            <FieldTitle className="font-medium">{m.label}</FieldTitle>
+                            <FieldDescription>{m.hint}</FieldDescription>
+                          </FieldContent>
+                        </Field>
+                      </FieldLabel>
+                    ))}
+                  </RadioGroup>
+                  <Field>
+                    <FieldLabel htmlFor="notes">Notes</FieldLabel>
+                    <Textarea
+                      id="notes"
+                      name="notes"
+                      dir="auto"
+                      rows={2}
+                      defaultValue={order?.notes ?? ''}
+                      placeholder="Any special instructions…"
                       disabled={pending}
-                      className={cn(
-                        'h-8 flex-1 rounded-[5px] text-[12.5px] transition-colors',
-                        'focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-                        method === m.value
-                          ? 'bg-foreground font-medium text-background'
-                          : 'text-muted-foreground hover:text-foreground',
-                      )}
-                    >
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
-              </Card>
-
-              <Card icon={AlignLeft} title="Notes">
-                <textarea
-                  id="notes"
-                  name="notes"
-                  rows={2}
-                  defaultValue={order?.notes ?? ''}
-                  placeholder="Any special instructions…"
-                  disabled={pending}
-                  className="w-full resize-none rounded-md border border-border bg-card px-3 py-2 text-[13px] focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-60"
-                />
-              </Card>
-            </div>
+                      className="min-h-16 resize-none"
+                    />
+                  </Field>
+                </FieldGroup>
+              </CardContent>
+            </Card>
           </div>
 
-          {/* Order Summary — a card, sized to its contents, with the button in it. */}
-          <aside className="min-h-0">
-            <div className="rounded-xl border border-border bg-card p-5 shadow-xs">
-              <h2 className="text-[15px] font-semibold">Order Summary</h2>
-
-              <div className="mt-4 space-y-2.5 border-t border-border pt-4 text-[13px]">
+          <aside className="lg:sticky lg:top-0">
+            <Card>
+              <CardHeader>
+                <CardTitle>Summary</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-3 text-[13px]">
                 <div className="flex items-baseline justify-between gap-3">
                   <span className="text-muted-foreground">
-                    Subtotal ({units} {units === 1 ? 'item' : 'items'})
+                    Subtotal · <span className="num">{units}</span> {units === 1 ? 'item' : 'items'}
                   </span>
-                  <span className="tabular-nums">{money(subtotal)}</span>
+                  <span className="num">{money(subtotal)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <label htmlFor="shippingCost" className="text-muted-foreground">
                     Shipping
                   </label>
-                  <input
-                    id="shippingCost"
-                    name="shippingCost"
-                    inputMode="decimal"
-                    value={shipping}
-                    onFocus={(e) => e.currentTarget.select()}
-                    onChange={(e) => setShipping(e.target.value)}
-                    disabled={pending}
-                    className={cn(field, 'h-8 w-24 px-2 text-right tabular-nums')}
-                  />
+                  <InputGroup className="w-32">
+                    <InputGroupInput
+                      id="shippingCost"
+                      name="shippingCost"
+                      inputMode="decimal"
+                      value={shipping}
+                      onFocus={(e) => e.currentTarget.select()}
+                      onChange={(e) => setShipping(e.target.value)}
+                      disabled={pending}
+                      className="num text-right"
+                    />
+                    <InputGroupAddon align="inline-end">
+                      <InputGroupText>EGP</InputGroupText>
+                    </InputGroupAddon>
+                  </InputGroup>
                 </div>
-              </div>
+                <div className="flex items-baseline justify-between gap-3 border-t pt-3">
+                  <span className="font-medium">Total</span>
+                  <Amount value={total} className="text-[28px] font-semibold tracking-tight" />
+                </div>
 
-              <div className="mt-4 flex items-baseline justify-between gap-3 border-t border-border pt-4">
-                <span className="text-[15px] font-semibold">Total</span>
-                <span className="text-2xl font-semibold tracking-[-0.02em] tabular-nums">
-                  {money(total)}
-                </span>
-              </div>
+                {!editing ? (
+                  <Field orientation="horizontal" className="mt-1">
+                    <Checkbox id="paymentCollected" name="paymentCollected" disabled={pending} />
+                    <FieldLabel htmlFor="paymentCollected" className="font-normal">
+                      Payment already collected
+                    </FieldLabel>
+                  </Field>
+                ) : null}
 
-              {!editing && (
-                <label className="mt-4 flex cursor-pointer items-start gap-2.5 text-[13px]">
-                  <input
-                    type="checkbox"
-                    name="paymentCollected"
-                    disabled={pending}
-                    className="mt-0.5 size-3.5 accent-[var(--foreground)]"
-                  />
-                  <span>Payment already collected manually</span>
-                </label>
-              )}
+                <Button type="submit" size="lg" disabled={!ready || pending} className="mt-1 w-full">
+                  {pending ? <Spinner /> : <CheckCircle2 />}
+                  {pending ? 'Saving' : editing ? 'Save changes' : 'Create order'}
+                </Button>
 
-              <button
-                type="submit"
-                disabled={!ready || pending}
-                className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-foreground text-sm font-medium text-background transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-40"
-              >
-                {pending ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="size-4" />
-                )}
-                {pending ? 'Saving' : editing ? 'Save Changes' : 'Create Order'}
-              </button>
+                {missing && !pending ? (
+                  <p className="text-center text-xs text-muted-foreground">{missing}</p>
+                ) : null}
 
-              {(overStock.length > 0 || belowCost.length > 0 || state.status === 'error') && (
-                <ul className="mt-4 space-y-1.5 text-[11px]">
-                  {overStock.map((l) => (
-                    <li
-                      key={l.key}
-                      className="rounded-md border border-destructive/30 bg-destructive-subtle px-2 py-1.5 text-destructive"
-                    >
-                      Only {l.onHand} of <bdi>{l.title}</bdi> in stock.
-                    </li>
-                  ))}
-                  {belowCost.map((l) => (
-                    <li
-                      key={l.key}
-                      className="rounded-md border border-warning/30 bg-warning-subtle px-2 py-1.5 text-warning"
-                    >
+                {overStock.map((l) => (
+                  <Alert key={`o${l.key}`} variant="destructive">
+                    <AlertTriangle />
+                    <AlertDescription>
+                      Only <span className="num">{l.onHand}</span> of <bdi>{l.title}</bdi> in stock.
+                    </AlertDescription>
+                  </Alert>
+                ))}
+                {belowCost.map((l) => (
+                  <Alert key={`b${l.key}`} variant="warning">
+                    <AlertTriangle />
+                    <AlertDescription>
                       <bdi>{l.title}</bdi> is priced below its {money(l.unitCost)} cost.
-                    </li>
-                  ))}
-                  {state.status === 'error' && (
-                    <li
-                      role="alert"
-                      className="rounded-md border border-destructive/30 bg-destructive-subtle px-2 py-1.5 text-destructive"
-                    >
-                      {state.message}
-                    </li>
-                  )}
-                </ul>
-              )}
-            </div>
+                    </AlertDescription>
+                  </Alert>
+                ))}
+                {state.status === 'error' ? (
+                  <Alert variant="destructive">
+                    <AlertTriangle />
+                    <AlertDescription>{state.message}</AlertDescription>
+                  </Alert>
+                ) : null}
+              </CardContent>
+            </Card>
           </aside>
         </div>
-      </Screen>
+      </Page>
     </form>
-  );
-}
-
-function Card({
-  icon: Icon,
-  step,
-  title,
-  children,
-}: {
-  icon: typeof User;
-  step?: string;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-xl border border-border bg-card p-4 shadow-xs">
-      <h2 className="mb-3 flex shrink-0 items-center gap-2 text-[14px] font-semibold tracking-[-0.01em]">
-        <Icon className="size-4 text-muted-foreground" strokeWidth={1.9} />
-        {step ? `${step}. ` : ''}
-        {title}
-      </h2>
-      {children}
-    </section>
-  );
-}
-
-function Labelled({
-  label,
-  htmlFor,
-  children,
-}: {
-  label: string;
-  htmlFor: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <label htmlFor={htmlFor} className="mb-1.5 block text-[11px] text-muted-foreground">
-        {label}
-      </label>
-      {children}
-    </div>
   );
 }

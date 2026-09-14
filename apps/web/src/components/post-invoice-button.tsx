@@ -1,28 +1,74 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
-import { useActionState, useEffect } from 'react';
+import { Send } from 'lucide-react';
+import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
-import { postInvoice, type FormState } from '@/app/(app)/money/actions';
+import { postInvoice } from '@/app/(app)/money/actions';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
+import { money } from '@/lib/format';
 
-const INITIAL: FormState = { status: 'idle' };
+/**
+ * Posts a draft invoice — the one irreversible step in purchasing (stock moves
+ * in, the ledger books it), so it asks first and says exactly what happens.
+ */
+export function PostInvoiceButton({ id, total }: { id: string; total: string }) {
+  const [open, setOpen] = useState(false);
+  const [pending, start] = useTransition();
 
-/** Posts a draft invoice — the one irreversible step, so it lives on its own. */
-export function PostInvoiceButton({ id }: { id: string }) {
-  const [state, submit, pending] = useActionState(postInvoice, INITIAL);
-
-  useEffect(() => {
-    if (state.status === 'error') toast.error(state.message);
-    if (state.status === 'saved') toast.success('Invoice posted — stock and the ledger updated.');
-  }, [state]);
+  const post = () =>
+    start(async () => {
+      const form = new FormData();
+      form.set('id', id);
+      const result = await postInvoice({ status: 'idle' }, form);
+      if (result.status === 'error') toast.error(result.message);
+      if (result.status === 'saved') {
+        toast.success('Invoice posted — stock and the ledger updated.');
+        setOpen(false);
+      }
+    });
 
   return (
-    <form action={submit}>
-      <input type="hidden" name="id" value={id} />
-      <Button type="submit" size="lg" disabled={pending} className="min-w-[110px]">
-        {pending ? <Loader2 className="size-4 animate-spin" /> : 'Post invoice'}
-      </Button>
-    </form>
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger asChild>
+        <Button>
+          <Send />
+          Post invoice
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Post this invoice?</AlertDialogTitle>
+          <AlertDialogDescription>
+            <span className="num text-foreground">{money(total)}</span> of stock comes in at cost and
+            the money is booked. Posting can’t be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={pending}>Not yet</AlertDialogCancel>
+          <AlertDialogAction
+            disabled={pending}
+            onClick={(e) => {
+              e.preventDefault();
+              post();
+            }}
+          >
+            {pending ? <Spinner /> : null}
+            Post invoice
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

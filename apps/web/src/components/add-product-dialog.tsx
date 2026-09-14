@@ -1,7 +1,6 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
-import { useEffect, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { createProductForInvoice } from '@/app/(app)/money/actions';
 import { Button } from '@/components/ui/button';
@@ -9,14 +8,17 @@ import {
   Dialog,
   DialogClose,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Field, FieldDescription, FieldGroup, FieldLabel, FieldSeparator } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { Spinner } from '@/components/ui/spinner';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { CATEGORIES } from '@/lib/categories';
-import { cn } from '@/lib/utils';
 
-const label = 'text-[11px] font-medium tracking-[0.03em] text-muted-foreground uppercase';
 const CHANNELS = [
   { key: 'noon', label: 'noon', placeholder: 'Partner SKU, e.g. CCC-0001' },
   { key: 'amazon', label: 'Amazon', placeholder: 'Seller SKU' },
@@ -24,13 +26,10 @@ const CHANNELS = [
 ] as const;
 
 /**
- * The same product-creation form as the Inventory screen — name, category,
- * our SKU, and the channels it also sells on — as a popup, so building a
- * purchase invoice for a brand-new product never has to leave the screen.
- *
- * Controlled from outside (`open`/`onOpenChange`): it's triggered from within
- * the invoice's product picker, not by its own button. Cost and quantity stay
- * on the invoice line, not here — this only creates the product identity.
+ * The Inventory screen's product form — name, category, our SKU, and the
+ * channels it also sells on — as a popup, so a purchase invoice for a
+ * brand-new product never has to leave the screen. Cost and quantity stay on
+ * the invoice line; this only creates the product's identity.
  */
 export function AddProductDialog({
   open,
@@ -43,20 +42,35 @@ export function AddProductDialog({
   initialName: string;
   onCreated: (variantId: string, label: string) => void;
 }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-base">New product</DialogTitle>
+          <DialogDescription>Created in Inventory and added to this invoice.</DialogDescription>
+        </DialogHeader>
+        {/* The dialog unmounts this on close, so every open starts fresh
+            from `initialName` — no effect needed to reset it. */}
+        <Body initialName={initialName} onCreated={onCreated} onDone={() => onOpenChange(false)} />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function Body({
+  initialName,
+  onCreated,
+  onDone,
+}: {
+  initialName: string;
+  onCreated: (variantId: string, label: string) => void;
+  onDone: () => void;
+}) {
   const [name, setName] = useState(initialName);
   const [category, setCategory] = useState('');
   const [sku, setSku] = useState('');
   const [channelSkus, setChannelSkus] = useState<Record<string, string>>({});
   const [pending, start] = useTransition();
-
-  // Re-seed the name (and clear everything else) every time it's opened fresh.
-  useEffect(() => {
-    if (!open) return;
-    setName(initialName);
-    setCategory('');
-    setSku('');
-    setChannelSkus({});
-  }, [open, initialName]);
 
   const submit = () => {
     const trimmed = name.trim();
@@ -74,99 +88,94 @@ export function AddProductDialog({
       }
       toast.success('Product created.');
       onCreated(res.variantId, res.label);
-      onOpenChange(false);
+      onDone();
     });
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>New product</DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-3">
-          <label className="grid gap-1.5">
-            <span className={label}>Name</span>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              dir="rtl"
-              autoFocus
-              disabled={pending}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  submit();
-                }
-              }}
-            />
-          </label>
-
-          <div>
-            <p className={cn(label, 'mb-1.5')}>Category</p>
-            <div className="flex flex-wrap gap-1.5">
-              {CATEGORIES.map((c) => (
-                <button
-                  key={c.value}
-                  type="button"
-                  onClick={() => setCategory(category === c.value ? '' : c.value)}
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
+      }}
+      className="grid gap-4"
+    >
+      <FieldGroup className="gap-4">
+        <Field>
+          <FieldLabel htmlFor="np-name">Name</FieldLabel>
+          <Input
+            id="np-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            dir="auto"
+            autoFocus
+            disabled={pending}
+          />
+        </Field>
+        <Field>
+          <FieldLabel>Category</FieldLabel>
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            spacing={0}
+            value={category}
+            onValueChange={setCategory}
+            disabled={pending}
+            aria-label="Category"
+            className="flex-wrap"
+          >
+            {CATEGORIES.map((c) => (
+              <ToggleGroupItem key={c.value} value={c.value}>
+                {c.label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="np-sku">
+            Our SKU <span className="font-normal text-muted-foreground">(optional)</span>
+          </FieldLabel>
+          <Input
+            id="np-sku"
+            value={sku}
+            onChange={(e) => setSku(e.target.value)}
+            placeholder="Leave blank if none yet"
+            disabled={pending}
+            className="font-mono"
+          />
+        </Field>
+        <FieldSeparator />
+        <Field>
+          <FieldLabel>Also sold on</FieldLabel>
+          <FieldDescription>Optional — a sale there will move this product’s stock.</FieldDescription>
+          <div className="grid gap-2">
+            {CHANNELS.map((c) => (
+              <div key={c.key} className="flex items-center gap-2.5">
+                <span className="w-16 shrink-0 text-xs text-muted-foreground">{c.label}</span>
+                <Input
+                  value={channelSkus[c.key] ?? ''}
+                  onChange={(e) => setChannelSkus((s) => ({ ...s, [c.key]: e.target.value }))}
+                  placeholder={c.placeholder}
+                  aria-label={`${c.label} SKU`}
                   disabled={pending}
-                  className={cn(
-                    'h-7 rounded-md border px-2.5 text-[12px] transition-colors',
-                    category === c.value
-                      ? 'border-foreground bg-foreground font-medium text-background'
-                      : 'border-border text-muted-foreground hover:bg-accent',
-                  )}
-                >
-                  {c.label}
-                </button>
-              ))}
-            </div>
+                  className="font-mono"
+                />
+              </div>
+            ))}
           </div>
-
-          <label className="grid gap-1.5">
-            <span className={label}>Our SKU (optional)</span>
-            <Input
-              value={sku}
-              onChange={(e) => setSku(e.target.value)}
-              placeholder="leave blank if none yet"
-              disabled={pending}
-              className="font-mono"
-            />
-          </label>
-
-          <div className="border-t border-border pt-3">
-            <p className="mb-2 text-[11px] text-muted-foreground">
-              Also sold on (optional) — a sale there will move this product’s stock.
-            </p>
-            <div className="space-y-2">
-              {CHANNELS.map((c) => (
-                <div key={c.key} className="flex items-center gap-2.5">
-                  <span className="w-16 shrink-0 text-[11px] text-muted-foreground">{c.label}</span>
-                  <Input
-                    value={channelSkus[c.key] ?? ''}
-                    onChange={(e) => setChannelSkus((s) => ({ ...s, [c.key]: e.target.value }))}
-                    placeholder={c.placeholder}
-                    disabled={pending}
-                    className="font-mono"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-1 flex justify-end gap-2">
-            <DialogClose asChild>
-              <Button type="button" variant="ghost" size="lg" disabled={pending}>
-                Cancel
-              </Button>
-            </DialogClose>
-            <Button type="button" size="lg" onClick={submit} disabled={pending || !name.trim()}>
-              {pending ? <Loader2 className="size-4 animate-spin" /> : 'Create & add'}
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </Field>
+      </FieldGroup>
+      <DialogFooter>
+        <DialogClose asChild>
+          <Button type="button" variant="ghost" disabled={pending}>
+            Cancel
+          </Button>
+        </DialogClose>
+        <Button type="submit" disabled={pending || !name.trim()}>
+          {pending ? <Spinner /> : null}
+          Create and add
+        </Button>
+      </DialogFooter>
+    </form>
   );
 }

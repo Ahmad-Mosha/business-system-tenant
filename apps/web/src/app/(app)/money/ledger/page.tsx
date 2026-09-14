@@ -1,5 +1,18 @@
-import { LedgerFilters } from '@/components/ledger-filters';
-import { ContextBar, Pagination, Panel, Screen, Scroller } from '@/components/shell';
+import { ArrowRight, BookText } from 'lucide-react';
+import Link from 'next/link';
+import { FilterBar } from '@/components/filter-bar';
+import { Page, PageHeader } from '@/components/page';
+import { TableEmpty, TablePagination, TablePanel } from '@/components/table-panel';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { getLedger, getMoneyAccounts } from '@/lib/api';
 import { dateTime, money } from '@/lib/format';
 import { kindLabel } from '@/lib/money';
@@ -19,25 +32,22 @@ export default async function LedgerPage({
   const from = params.from && ISO.test(params.from) ? params.from : undefined;
   const to = params.to && ISO.test(params.to) ? params.to : undefined;
   const page = Math.max(Number(params.page) || 1, 1);
-  const offset = (page - 1) * PAGE_SIZE;
 
-  const query = new URLSearchParams();
-  if (code) query.set('code', code);
-  if (from) query.set('from', from);
-  if (to) query.set('to', to);
+  const keep = new URLSearchParams();
+  if (code) keep.set('code', code);
+  if (from) keep.set('from', from);
+  if (to) keep.set('to', to);
+
+  const query = new URLSearchParams(keep);
   query.set('limit', String(PAGE_SIZE));
-  query.set('offset', String(offset));
+  query.set('offset', String((page - 1) * PAGE_SIZE));
 
   const [accounts, { entries, total }] = await Promise.all([
     getMoneyAccounts(),
     getLedger(query.toString()),
   ]);
+  const account = accounts.find((a) => a.code === code);
 
-  const lastPage = Math.max(Math.ceil(total / PAGE_SIZE), 1);
-  const keep = new URLSearchParams();
-  if (code) keep.set('code', code);
-  if (from) keep.set('from', from);
-  if (to) keep.set('to', to);
   const pageHref = (p: number) => {
     const next = new URLSearchParams(keep);
     if (p > 1) next.set('page', String(p));
@@ -46,67 +56,94 @@ export default async function LedgerPage({
   };
 
   return (
-    <Screen>
-      <ContextBar title="Ledger" meta="every recorded movement of value" />
-      <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
-        <LedgerFilters accounts={accounts} />
+    <Page fill>
+      <PageHeader
+        title="Ledger"
+        description={
+          account ? (
+            <>
+              Every movement through <span className="text-foreground">{account.nameEn}</span>{' '}
+              <bdi>({account.nameAr})</bdi>.
+            </>
+          ) : (
+            'Every recorded movement of value, oldest to newest at the bottom.'
+          )
+        }
+      />
 
-        <Panel>
-          <Scroller>
-            {entries.length === 0 ? (
-              <p className="p-12 text-center text-sm text-muted-foreground">
-                Nothing recorded for this view.
-              </p>
-            ) : (
-              <table className="w-full border-collapse text-[13px]">
-                <thead className="sticky top-0 z-10 bg-muted/40 backdrop-blur">
-                  <tr className="border-b border-border text-[11px] tracking-[0.06em] text-muted-foreground uppercase">
-                    <th className="px-4 py-2.5 text-left font-medium">When</th>
-                    <th className="px-4 py-2.5 text-left font-medium">Entry</th>
-                    <th className="px-4 py-2.5 text-left font-medium">From → to</th>
-                    <th className="px-4 py-2.5 text-right font-medium">Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {entries.map((e) => (
-                    <tr
-                      key={e.id}
-                      className="h-11 border-b border-border/60 last:border-b-0 hover:bg-accent/40"
-                    >
-                      <td className="px-4 whitespace-nowrap text-muted-foreground">
-                        {dateTime(e.occurredAt)}
-                      </td>
-                      <td className="px-4">
-                        <span className="font-medium">{kindLabel(e.kind)}</span>
-                        {e.reversesId && (
-                          <span className="ms-1.5 rounded border border-border px-1 text-[10px] tracking-wide text-muted-foreground uppercase">
-                            reversal
-                          </span>
-                        )}
-                        {e.memo ? <span className="text-muted-foreground"> · {e.memo}</span> : null}
-                      </td>
-                      <td className="px-4 whitespace-nowrap text-muted-foreground">
-                        <bdi>{e.creditAr}</bdi>
-                        <span className="mx-1.5 opacity-50">→</span>
-                        <bdi>{e.debitAr}</bdi>
-                      </td>
-                      <td className="px-4 text-right font-medium tabular-nums">{money(e.amount)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </Scroller>
-          <Pagination
-            from={total === 0 ? 0 : offset + 1}
-            to={offset + entries.length}
+      <FilterBar
+        filters={[
+          {
+            kind: 'select',
+            param: 'code',
+            all: 'All accounts',
+            options: accounts.map((a) => ({ value: a.code, label: a.nameEn, hint: a.nameAr })),
+          },
+          { kind: 'dates', from: 'from', to: 'to' },
+        ]}
+      />
+
+      <TablePanel
+        minWidth="48rem"
+        footer={
+          <TablePagination
+            page={page}
+            pageSize={PAGE_SIZE}
             total={total}
+            count={entries.length}
             noun="entries"
-            prevHref={page > 1 ? pageHref(page - 1) : null}
-            nextHref={page < lastPage ? pageHref(page + 1) : null}
+            href={pageHref}
           />
-        </Panel>
-      </div>
-    </Screen>
+        }
+      >
+        {entries.length === 0 ? (
+          <TableEmpty
+            icon={BookText}
+            title="Nothing recorded for this view"
+            description={keep.size ? 'Try another account or date range.' : 'Entries appear as money moves.'}
+            action={
+              keep.size ? (
+                <Button variant="outline" asChild>
+                  <Link href="/money/ledger">Reset filters</Link>
+                </Button>
+              ) : undefined
+            }
+          />
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[150px]">When</TableHead>
+                <TableHead>Entry</TableHead>
+                <TableHead>From → to</TableHead>
+                <TableHead className="w-[140px] text-right">Amount</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {entries.map((e) => (
+                <TableRow key={e.id}>
+                  <TableCell className="text-muted-foreground">{dateTime(e.occurredAt)}</TableCell>
+                  <TableCell className="max-w-0">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="shrink-0 font-medium">{kindLabel(e.kind)}</span>
+                      {e.reversesId ? <Badge variant="outline">Reversal</Badge> : null}
+                      {e.memo ? <span className="truncate text-muted-foreground">{e.memo}</span> : null}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    <span className="inline-flex items-center gap-1.5">
+                      <bdi>{e.creditAr}</bdi>
+                      <ArrowRight className="size-3.5 shrink-0 opacity-60" />
+                      <bdi>{e.debitAr}</bdi>
+                    </span>
+                  </TableCell>
+                  <TableCell className="num text-right font-medium">{money(e.amount)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </TablePanel>
+    </Page>
   );
 }

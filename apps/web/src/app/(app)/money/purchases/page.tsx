@@ -1,7 +1,19 @@
+import { ClipboardList, Plus } from 'lucide-react';
 import Link from 'next/link';
-import { Plus } from 'lucide-react';
+import { Amount } from '@/components/amount';
+import { MetricCard, MetricGrid } from '@/components/metric-card';
+import { Page, PageHeader } from '@/components/page';
 import { PaidChip } from '@/components/paid-chip';
-import { ContextBar, Figure, Panel, Screen, Scroller } from '@/components/shell';
+import { TableCount, TableEmpty, TablePanel } from '@/components/table-panel';
+import { Button } from '@/components/ui/button';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { getPurchases } from '@/lib/api';
 import { date, money } from '@/lib/format';
 import { requireAdmin } from '@/lib/session';
@@ -16,91 +28,114 @@ export default async function PurchasesPage() {
   const invoices = await getPurchases();
 
   const since = monthStart();
-  const postedThisMonth = invoices.filter(
-    (i) => i.status === 'POSTED' && String(i.invoiceDate).slice(0, 10) >= since,
-  );
-  const monthTotal = postedThisMonth.reduce((n, i) => n + Number(i.landedTotal), 0);
+  const posted = invoices.filter((i) => i.status === 'POSTED');
+  const monthTotal = posted
+    .filter((i) => String(i.invoiceDate).slice(0, 10) >= since)
+    .reduce((n, i) => n + Number(i.landedTotal), 0);
   const drafts = invoices.filter((i) => i.status === 'DRAFT').length;
+  // What's still owed on credit invoices — the same derivation supplier
+  // balances use, so the two can't disagree.
+  const owed = posted
+    .filter((i) => i.payment === 'CREDIT')
+    .reduce((n, i) => n + Number(i.landedTotal) - Number(i.settledAmount), 0);
+
+  const newInvoice = (
+    <Button asChild>
+      <Link href="/money/purchases/new">
+        <Plus />
+        New invoice
+      </Link>
+    </Button>
+  );
 
   return (
-    <Screen>
-      <ContextBar
-        title="Purchases"
-        meta="فاتورة شراء"
-        figures={
+    <Page fill>
+      <PageHeader
+        title={
           <>
-            <Figure label="This month" value={money(monthTotal)} />
-            <Figure label="Drafts" value={drafts} tone={drafts > 0 ? 'warning' : 'default'} />
+            Purchases <bdi className="font-sans text-lg font-normal text-muted-foreground">فاتورة شراء</bdi>
           </>
         }
-        actions={
-          <Link
-            href="/money/purchases/new"
-            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-foreground px-3 text-[13px] font-medium text-background transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-          >
-            <Plus className="size-4" /> New invoice
-          </Link>
-        }
+        description="Supplier invoices — how stock comes in, at cost."
+        actions={newInvoice}
       />
 
-      <div className="flex min-h-0 flex-1 flex-col p-4">
-        <Panel>
-          <Scroller>
-            {invoices.length === 0 ? (
-              <p className="p-12 text-center text-sm text-muted-foreground">
-                No purchase invoices yet. Create one to bring stock in at cost.
-              </p>
-            ) : (
-              <table className="w-full border-collapse text-[13px]">
-                <thead className="sticky top-0 z-10 bg-muted/40 backdrop-blur">
-                  <tr className="border-b border-border text-[11px] tracking-[0.06em] text-muted-foreground uppercase">
-                    <th className="px-4 py-2.5 text-left font-medium">Invoice</th>
-                    <th className="px-4 py-2.5 text-left font-medium">Supplier</th>
-                    <th className="px-4 py-2.5 text-left font-medium">Date</th>
-                    <th className="px-4 py-2.5 text-left font-medium">Payment</th>
-                    <th className="px-4 py-2.5 text-left font-medium">Status</th>
-                    <th className="px-4 py-2.5 text-right font-medium">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {invoices.map((i) => (
-                    <tr
-                      key={i.id}
-                      className="group relative h-11 border-b border-border/60 last:border-b-0 hover:bg-accent/40"
+      <MetricGrid>
+        <MetricCard label="Bought this month" value={<Amount value={monthTotal} />} hint="Posted invoices, at cost" />
+        <MetricCard
+          label="Owed on invoices"
+          value={<Amount value={owed} />}
+          tone={owed > 0.005 ? 'warning' : 'default'}
+          hint={owed > 0.005 ? 'Credit invoices not fully paid' : 'Every credit invoice is paid'}
+          link={{ href: '/money/suppliers', label: 'Open Suppliers' }}
+        />
+        <MetricCard
+          label="Drafts"
+          value={drafts}
+          tone={drafts > 0 ? 'warning' : 'default'}
+          hint={drafts > 0 ? 'Not posted — stock hasn’t moved' : 'Nothing waiting to post'}
+        />
+      </MetricGrid>
+
+      <TablePanel
+        minWidth="52rem"
+        footer={
+          <TableCount>
+            <span className="num font-medium text-foreground">{invoices.length}</span>{' '}
+            {invoices.length === 1 ? 'invoice' : 'invoices'}
+          </TableCount>
+        }
+      >
+        {invoices.length === 0 ? (
+          <TableEmpty
+            icon={ClipboardList}
+            title="No purchase invoices yet"
+            description="Create one to bring stock in at cost."
+            action={newInvoice}
+          />
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Invoice</TableHead>
+                <TableHead>Supplier</TableHead>
+                <TableHead className="w-[120px]">Date</TableHead>
+                <TableHead className="w-[110px]">Payment</TableHead>
+                <TableHead className="w-[130px]">Status</TableHead>
+                <TableHead className="w-[140px] text-right">Total</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {invoices.map((i) => (
+                <TableRow key={i.id} className="relative">
+                  <TableCell>
+                    <Link
+                      href={`/money/purchases/${i.id}`}
+                      className="font-medium after:absolute after:inset-0 hover:underline focus-visible:underline focus-visible:outline-none"
                     >
-                      <td className="px-4">
-                        <Link
-                          href={`/money/purchases/${i.id}`}
-                          className="font-medium after:absolute after:inset-0 focus-visible:underline focus-visible:outline-none"
-                        >
-                          {i.invoiceNo ?? <span className="text-muted-foreground">No ref</span>}
-                        </Link>
-                        <span className="ms-2 text-[11px] text-muted-foreground">{i.lineCount} lines</span>
-                      </td>
-                      <td className="px-4">
-                        <bdi>{i.supplierName}</bdi>
-                      </td>
-                      <td className="px-4 whitespace-nowrap text-muted-foreground">
-                        {date(i.invoiceDate)}
-                      </td>
-                      <td className="px-4 text-muted-foreground">
-                        {i.payment === 'CASH' ? 'Paid cash' : 'On credit'}
-                      </td>
-                      <td className="px-4">
-                        <PaidChip status={i.paidStatus} />
-                      </td>
-                      <td className="px-4 text-right font-medium tabular-nums">{money(i.landedTotal)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </Scroller>
-          <div className="shrink-0 border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
-            {invoices.length} invoice{invoices.length === 1 ? '' : 's'}
-          </div>
-        </Panel>
-      </div>
-    </Screen>
+                      {i.invoiceNo ?? <span className="text-muted-foreground">No ref</span>}
+                    </Link>
+                    <span className="num ms-2 text-xs text-muted-foreground">
+                      {i.lineCount} {i.lineCount === 1 ? 'line' : 'lines'}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <bdi>{i.supplierName}</bdi>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{date(i.invoiceDate)}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {i.payment === 'CASH' ? 'Cash' : 'Credit'}
+                  </TableCell>
+                  <TableCell>
+                    <PaidChip status={i.paidStatus} />
+                  </TableCell>
+                  <TableCell className="num text-right font-medium">{money(i.landedTotal)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </TablePanel>
+    </Page>
   );
 }

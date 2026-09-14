@@ -9,24 +9,24 @@ export default async function LoginPage() {
   if (await getSession()) redirect('/');
 
   return (
-    <div className="flex min-h-svh items-center justify-center px-6 py-12">
-      <div className="w-full max-w-[360px]">
-        <div className="mb-9 flex flex-col items-center text-center">
-          <span className="mb-5 flex size-10 items-center justify-center rounded-[10px] bg-foreground text-base font-semibold text-background">
+    <div className="flex h-svh items-center justify-center overflow-y-auto p-6">
+      <div className="w-full max-w-sm">
+        <div className="mb-8 flex flex-col items-center text-center">
+          <span className="mb-5 flex size-10 items-center justify-center bg-primary font-heading text-base font-bold text-primary-foreground">
             P
           </span>
-          <h1 className="text-xl font-semibold tracking-[-0.02em]">Prime Market</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Sign in to continue</p>
+          <h1 className="text-2xl font-semibold tracking-tight">Prime Market</h1>
+          <p className="mt-1 text-[13px] text-muted-foreground">Sign in to continue</p>
         </div>
 
         <LoginForm />
 
-        {process.env.NODE_ENV !== 'production' && (
+        {process.env.NODE_ENV !== 'production' ? (
           <p className="mt-8 text-center text-xs text-muted-foreground">
-            Development accounts: admin@admin.com / admin123 ·
-            moderator@moderator.com / moderator123
+            Development accounts: <span className="text-foreground">admin@admin.com</span> / admin123 ·{' '}
+            <span className="text-foreground">moderator@moderator.com</span> / moderator123
           </p>
-        )}
+        ) : null}
       </div>
     </div>
   );

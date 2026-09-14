@@ -1,16 +1,36 @@
+import { ArrowUpRight, Wallet } from 'lucide-react';
 import Link from 'next/link';
-import { ArrowUpRight } from 'lucide-react';
+import { Amount } from '@/components/amount';
 import { BreakdownBar, CashAreaChart, Sparkline } from '@/components/charts';
+import { Delta, MetricCard, MetricGrid } from '@/components/metric-card';
 import { MoneyAnchorForm } from '@/components/money-anchor-form';
-import { ContextBar, Screen } from '@/components/shell';
+import { Page, PageHeader } from '@/components/page';
+import { Button } from '@/components/ui/button';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  getAccountLedger,
   getCashSeries,
   getFinanceOverview,
-  getAccountLedger,
   getMoneyAccounts,
   getPeriodSummary,
 } from '@/lib/api';
-import { date, money, moneyParts, signedTone } from '@/lib/format';
+import { date, money, signedTone } from '@/lib/format';
 import { accountByCode, groupAccounts, kindLabel } from '@/lib/money';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
@@ -18,23 +38,27 @@ import { cn } from '@/lib/utils';
 export default async function MoneyOverviewPage() {
   await requireAdmin();
   const overview = await getFinanceOverview();
-  const anchored = overview.openingAsOf !== null;
 
-  if (!anchored) {
+  if (overview.openingAsOf === null) {
     return (
-      <Screen>
-        <ContextBar title="Money" />
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
-          <section className="max-w-xl rounded-xl border border-dashed border-border bg-card px-5 py-6">
-            <h2 className="text-sm font-medium">Start the ledger</h2>
-            <p className="mt-1 mb-4 text-[13px] text-muted-foreground">
-              Enter the cash the business holds right now. Everything after is recorded automatically
-              or entered in Treasury — this figure is the starting point.
-            </p>
+      <Page width="narrow">
+        <PageHeader title="Money" description="Every figure here is built from recorded events." />
+        <Empty className="border bg-card">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Wallet />
+            </EmptyMedia>
+            <EmptyTitle>Start the ledger</EmptyTitle>
+            <EmptyDescription>
+              Enter the cash the business holds right now. Everything after is recorded
+              automatically or entered in Treasury — this figure is the starting point.
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent className="max-w-md">
             <MoneyAnchorForm openingBalance={overview.openingBalance} openingAsOf={overview.openingAsOf} />
-          </section>
-        </div>
-      </Screen>
+          </EmptyContent>
+        </Empty>
+      </Page>
     );
   }
 
@@ -47,10 +71,16 @@ export default async function MoneyOverviewPage() {
 
   const bal = (code: string) => accountByCode(accounts, code)?.balance ?? '0';
   const groups = groupAccounts(accounts);
-  const spark = series.map((p) => Number(p.balance));
+  const values = series.map((p) => Number(p.balance));
+
+  // A real 30-day change, from the recorded series — shown only when there is
+  // a non-zero starting point to compare against.
+  const then = values.length > 30 ? values[values.length - 31] : null;
+  const now = values.length ? values[values.length - 1] : null;
+  const change = then && now !== null ? ((now - then) / Math.abs(then)) * 100 : null;
 
   const rev = Number(summary.revenue);
-  const seg = [
+  const segments = [
     { label: 'Cost of goods', value: Number(summary.cogs), tone: 'cost' as const },
     { label: 'Channel fees', value: Number(summary.channelFees), tone: 'cost' as const },
     { label: 'Shipping', value: Number(summary.shipping), tone: 'cost' as const },
@@ -58,177 +88,169 @@ export default async function MoneyOverviewPage() {
     { label: 'Net profit', value: Number(summary.netProfit), tone: 'profit' as const },
   ].filter((s) => Math.abs(s.value) > 0.005);
   const margin = rev > 0 ? (Number(summary.grossProfit) / rev) * 100 : null;
+  const chequesPending = Number(bal('CHEQUES_PENDING'));
 
   return (
-    <Screen>
-      <ContextBar
+    <Page>
+      <PageHeader
         title="Money"
-        meta="every figure built from recorded events"
+        description="Every figure here is built from recorded events — open any of them to see which."
+        actions={
+          <Button variant="outline" asChild>
+            <Link href="/money/ledger">
+              Full ledger
+              <ArrowUpRight />
+            </Link>
+          </Button>
+        }
       />
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <Verdict href="/money/ledger?code=CASH" label="Cash on hand" value={bal('CASH')} sub="الخزينة">
-            <Sparkline points={spark} />
-          </Verdict>
-          <Verdict href="/money/ledger?code=NOON_RECEIVABLE" label="noon owes us" value={bal('NOON_RECEIVABLE')} sub="not yet paid out" />
-          <Verdict href="/money/ledger?code=BOSTA_COD" label="Bosta holding" value={bal('BOSTA_COD')} sub="COD not transferred" />
-          <Verdict
-            href="/money/treasury"
-            label="Cheques pending"
-            value={bal('CHEQUES_PENDING')}
-            sub="not yet cleared"
-            warn={Number(bal('CHEQUES_PENDING')) > 0}
-          />
-          <Verdict href="/inventory" label="Stock value" value={overview.stockValue} sub="at cost" />
-        </section>
 
-        <section className="grid gap-4 lg:grid-cols-3">
-          <div className="rounded-xl border border-border bg-card lg:col-span-2">
-            <div className="flex items-baseline justify-between border-b border-border px-4 py-2.5">
-              <h2 className="text-[13px] font-semibold">Cash — last 90 days</h2>
-              <span className="text-[12px] text-muted-foreground">now {money(bal('CASH'))}</span>
-            </div>
-            <div className="h-[200px] px-2 py-2">
-              <CashAreaChart series={series} />
-            </div>
-          </div>
+      <MetricGrid>
+        <MetricCard
+          label="Cash on hand"
+          value={<Amount value={bal('CASH')} />}
+          badge={change !== null ? <Delta value={change} /> : undefined}
+          link={{ href: '/money/ledger?code=CASH', label: 'Open in the ledger' }}
+          hint={change !== null ? 'vs 30 days ago' : 'الخزينة'}
+        >
+          <Sparkline points={values} />
+        </MetricCard>
+        <MetricCard
+          label="noon owes us"
+          value={<Amount value={bal('NOON_RECEIVABLE')} />}
+          link={{ href: '/money/ledger?code=NOON_RECEIVABLE', label: 'Open in the ledger' }}
+          hint="Sold, not yet paid out"
+        />
+        <MetricCard
+          label="Bosta is holding"
+          value={<Amount value={bal('BOSTA_COD')} />}
+          link={{ href: '/money/ledger?code=BOSTA_COD', label: 'Open in the ledger' }}
+          hint="Cash collected, not transferred"
+        />
+        <MetricCard
+          label="Cheques pending"
+          value={<Amount value={chequesPending} />}
+          tone={chequesPending > 0 ? 'warning' : 'default'}
+          link={{ href: '/money/treasury', label: 'Open Treasury' }}
+          hint={chequesPending > 0 ? 'Not cleared yet' : 'Nothing waiting to clear'}
+        />
+        <MetricCard
+          label="Stock value"
+          value={<Amount value={overview.stockValue} />}
+          link={{ href: '/inventory', label: 'Open Inventory' }}
+          hint="Everything on hand, at cost"
+        />
+      </MetricGrid>
 
-          <div className="rounded-xl border border-border bg-card">
-            <div className="border-b border-border px-4 py-2.5">
-              <h2 className="text-[13px] font-semibold">This month</h2>
-            </div>
-            <div className="space-y-4 px-4 py-4">
-              {rev === 0 && seg.length === 0 ? (
-                <p className="py-6 text-center text-[13px] text-muted-foreground">
-                  No sales or costs recorded this month yet.
-                </p>
-              ) : (
-                <>
-                  <div className="space-y-1">
-                    <Row label="Revenue" value={money(summary.revenue)} strong />
-                    <Row
-                      label={`Gross profit${margin !== null ? ` · ${margin.toFixed(1)}%` : ''}`}
-                      value={money(summary.grossProfit)}
-                      negative={Number(summary.grossProfit) < 0}
+      <div className="grid gap-6 xl:grid-cols-3">
+        <Card className="xl:col-span-2">
+          <CardHeader>
+            <CardTitle>Cash — last 90 days</CardTitle>
+            <CardDescription>The till balance at the end of each day.</CardDescription>
+          </CardHeader>
+          <CardContent className="h-64">
+            <CashAreaChart series={series} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>This month</CardTitle>
+            <CardDescription>Where the revenue went.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-5">
+            {rev === 0 && segments.length === 0 ? (
+              <p className="py-10 text-center text-[13px] text-muted-foreground">
+                No sales or costs recorded this month yet.
+              </p>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Revenue</p>
+                    <Amount value={summary.revenue} className="text-xl font-semibold tracking-tight" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      Gross profit{margin !== null ? ` · ${margin.toFixed(1)}%` : ''}
+                    </p>
+                    <Amount
+                      value={summary.grossProfit}
+                      className={cn(
+                        'text-xl font-semibold tracking-tight',
+                        Number(summary.grossProfit) < 0 && 'text-destructive',
+                      )}
                     />
                   </div>
-                  <BreakdownBar revenue={rev} segments={seg} />
-                </>
-              )}
-            </div>
-          </div>
-        </section>
+                </div>
+                <BreakdownBar revenue={rev} segments={segments} />
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
-        <section className="grid gap-4 lg:grid-cols-[1fr_320px]">
-          <div className="overflow-hidden rounded-xl border border-border bg-card">
-            <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
-              <h2 className="text-[13px] font-semibold">Recent activity</h2>
-              <Link
-                href="/money/ledger"
-                className="inline-flex items-center gap-0.5 text-[12px] text-muted-foreground hover:text-foreground"
-              >
-                Full ledger <ArrowUpRight className="size-3.5" />
-              </Link>
-            </div>
-            {recent.length === 0 ? (
-              <p className="p-10 text-center text-sm text-muted-foreground">No cash movements yet.</p>
-            ) : (
-              <ul>
-                {recent.map((e, i) => (
-                  <li
-                    key={e.id}
-                    className={cn('flex items-center gap-4 px-4 py-2.5 text-[13px]', i > 0 && 'border-t border-border/60')}
-                  >
-                    <span
-                      className={cn(
-                        'w-28 shrink-0 text-right font-medium tabular-nums',
-                        signedTone(e.effect),
-                      )}
-                    >
+      <div className="grid gap-6 xl:grid-cols-3">
+        <Card className="pb-0 xl:col-span-2">
+          <CardHeader>
+            <CardTitle>Recent cash movements</CardTitle>
+            <CardAction>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/money/treasury">
+                  Treasury
+                  <ArrowUpRight />
+                </Link>
+              </Button>
+            </CardAction>
+          </CardHeader>
+          {recent.length === 0 ? (
+            <p className="border-t p-10 text-center text-[13px] text-muted-foreground">No cash movements yet.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Movement</TableHead>
+                  <TableHead className="w-[140px] text-right">Amount</TableHead>
+                  <TableHead className="hidden w-[140px] text-right sm:table-cell">Balance</TableHead>
+                  <TableHead className="w-[110px] text-right">Date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {recent.map((e) => (
+                  <TableRow key={e.id}>
+                    <TableCell className="max-w-0 truncate">
+                      <span className="font-medium">{kindLabel(e.kind)}</span>
+                      {e.memo ? <span className="text-muted-foreground"> · {e.memo}</span> : null}
+                    </TableCell>
+                    <TableCell className={cn('num text-right font-medium', signedTone(e.effect))}>
                       {Number(e.effect) > 0 ? '+' : ''}
                       {money(e.effect)}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate">
-                      {kindLabel(e.kind)}
-                      {e.memo ? <span className="text-muted-foreground"> · {e.memo}</span> : null}
-                    </span>
-                    <span className="hidden shrink-0 tabular-nums text-muted-foreground sm:block">
+                    </TableCell>
+                    <TableCell className="num hidden text-right text-muted-foreground sm:table-cell">
                       {money(e.runningBalance)}
-                    </span>
-                    <span className="w-20 shrink-0 text-right text-[11px] text-muted-foreground">
-                      {date(e.occurredAt)}
-                    </span>
-                  </li>
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground">{date(e.occurredAt)}</TableCell>
+                  </TableRow>
                 ))}
-              </ul>
-            )}
-          </div>
+              </TableBody>
+            </Table>
+          )}
+        </Card>
 
-          <div className="overflow-hidden rounded-xl border border-border bg-card">
-            <div className="border-b border-border px-4 py-2.5">
-              <h2 className="text-[13px] font-semibold">The books</h2>
-            </div>
-            <div className="px-4 py-3">
-              <AccountList title="What we hold" rows={groups.held} />
-              <AccountList title="What we owe" rows={groups.owe} />
-              <AccountList title="Capital" rows={groups.capital} />
-              <AccountList title="Revenue & costs" rows={groups.performance} muted />
-            </div>
-          </div>
-        </section>
+        <Card>
+          <CardHeader>
+            <CardTitle>The books</CardTitle>
+            <CardDescription>Every account’s balance, right now.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-5">
+            <AccountList title="What we hold" rows={groups.held} />
+            <AccountList title="What we owe" rows={groups.owe} />
+            <AccountList title="Capital" rows={groups.capital} />
+            <AccountList title="Revenue and costs" rows={groups.performance} muted />
+          </CardContent>
+        </Card>
       </div>
-    </Screen>
-  );
-}
-
-function Verdict({
-  href,
-  label,
-  value,
-  sub,
-  warn,
-  children,
-}: {
-  href: string;
-  label: string;
-  value: string;
-  sub: string;
-  warn?: boolean;
-  children?: React.ReactNode;
-}) {
-  const p = moneyParts(value);
-  return (
-    <Link
-      href={href}
-      className="group rounded-xl border border-border bg-card px-4 py-3 shadow-xs transition-colors hover:border-foreground/25 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-    >
-      <p className="text-[11px] font-medium tracking-[0.07em] text-muted-foreground uppercase">{label}</p>
-      <p className={cn('mt-1.5 text-[22px] leading-none font-semibold tabular-nums', warn && 'text-warning')}>
-        {p.sign}
-        {p.whole}
-        <span className="text-[0.62em] font-medium text-muted-foreground">{p.frac}</span>
-      </p>
-      {children ? <div className="mt-2">{children}</div> : <p className="mt-1.5 text-[11px] text-muted-foreground">{sub}</p>}
-    </Link>
-  );
-}
-
-function Row({
-  label,
-  value,
-  strong,
-  negative,
-}: {
-  label: string;
-  value: string;
-  strong?: boolean;
-  negative?: boolean;
-}) {
-  return (
-    <div className="flex items-baseline justify-between">
-      <span className={cn('text-[12px]', strong ? 'text-foreground' : 'text-muted-foreground')}>{label}</span>
-      <span className={cn('tabular-nums font-medium', negative && 'text-destructive')}>{value}</span>
-    </div>
+    </Page>
   );
 }
 
@@ -243,20 +265,23 @@ function AccountList({
 }) {
   if (rows.length === 0) return null;
   return (
-    <div className="mb-4 last:mb-0">
-      <p className="mb-1.5 text-[10.5px] font-medium tracking-[0.07em] text-muted-foreground uppercase">
-        {title}
-      </p>
-      <ul className="space-y-0.5">
+    <section>
+      <h3 className="mb-2 font-sans text-xs font-medium text-muted-foreground">{title}</h3>
+      <ul className="grid gap-1">
         {rows.map((a) => (
-          <li key={a.code} className="flex items-baseline justify-between gap-3 text-[13px]">
-            <span className={cn('truncate', muted && 'text-muted-foreground')}>{a.nameEn}</span>
-            <span className={cn('shrink-0 tabular-nums', muted ? 'text-muted-foreground' : 'font-medium')}>
-              {money(a.balance)}
-            </span>
+          <li key={a.code}>
+            <Link
+              href={`/money/ledger?code=${a.code}`}
+              className="-mx-2 flex items-baseline justify-between gap-3 px-2 py-1 text-[13px] hover:bg-muted"
+            >
+              <span className={cn('truncate', muted && 'text-muted-foreground')}>{a.nameEn}</span>
+              <span className={cn('num shrink-0', muted ? 'text-muted-foreground' : 'font-medium')}>
+                {money(a.balance)}
+              </span>
+            </Link>
           </li>
         ))}
       </ul>
-    </div>
+    </section>
   );
 }
