@@ -113,7 +113,8 @@ export function MetricGrid({ children }: { children: ReactNode }) {
         ? '@4xl:grid-cols-4'
         : count === 3
           ? '@2xl:grid-cols-3'
-          : '';
+          : // Two figures at half the row each would be mostly empty card.
+            '@4xl:grid-cols-4';
   // Two up even on a phone — stacked one per row, a moderator scrolls past
   // several screens of figures before reaching their orders.
   return (
