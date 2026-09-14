@@ -22,7 +22,7 @@ export default async function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center text-center">
           <span className="mb-5 flex size-10 items-center justify-center bg-primary font-heading text-base font-bold text-primary-foreground">
-            P
+            {t('app.name').charAt(0)}
           </span>
           <h1 className="text-2xl font-semibold tracking-tight">{t('app.name')}</h1>
           <p className="mt-1 text-[13px] text-muted-foreground">{t('auth.title')}</p>
@@ -31,10 +31,12 @@ export default async function LoginPage() {
         <LoginForm />
 
         {process.env.NODE_ENV !== 'production' ? (
+          /* eslint-disable react/jsx-no-literals -- dev-only seed accounts: data, not copy */
           <p className="mt-8 text-center text-xs text-muted-foreground">
             {t('auth.devAccounts')} <bdi className="text-foreground">admin@admin.com</bdi> / admin123 ·{' '}
             <bdi className="text-foreground">moderator@moderator.com</bdi> / moderator123
           </p>
+          /* eslint-enable react/jsx-no-literals */
         ) : null}
       </div>
     </div>
