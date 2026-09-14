@@ -14,10 +14,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { getSuppliers } from '@/lib/api';
-import { date, money } from '@/lib/format';
+import { money } from '@/lib/format';
 import { requireAdmin } from '@/lib/session';
+import { getFormat } from '@/i18n/get-format';
 
 export default async function SuppliersPage() {
+  const f = await getFormat();
   await requireAdmin();
   const suppliers = await getSuppliers();
   const owed = suppliers.reduce((n, s) => n + Number(s.balance), 0);
@@ -62,8 +64,8 @@ export default async function SuppliersPage() {
               <TableRow>
                 <TableHead>Supplier</TableHead>
                 <TableHead className="w-[160px]">Phone</TableHead>
-                <TableHead className="w-[160px] text-right">Balance owed</TableHead>
-                <TableHead className="w-[130px] text-right">Added</TableHead>
+                <TableHead className="w-[160px] text-end">Balance owed</TableHead>
+                <TableHead className="w-[130px] text-end">Added</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -83,14 +85,14 @@ export default async function SuppliersPage() {
                     ) : null}
                   </TableCell>
                   <TableCell className="num text-muted-foreground">{s.phone ?? '—'}</TableCell>
-                  <TableCell className="num text-right font-medium">
+                  <TableCell className="num text-end font-medium">
                     {Number(s.balance) > 0 ? (
                       <span className="text-warning">{money(s.balance)}</span>
                     ) : (
                       <span className="text-muted-foreground">Settled</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-right text-muted-foreground">{date(s.createdAt)}</TableCell>
+                  <TableCell className="text-end text-muted-foreground">{f.date(s.createdAt)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

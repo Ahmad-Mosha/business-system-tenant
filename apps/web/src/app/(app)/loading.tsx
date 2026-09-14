@@ -1,10 +1,12 @@
+import { useTranslations } from 'next-intl';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
 /** The shape of a screen while it loads — title, figures, filters, table — so nothing jumps. */
 export default function Loading() {
+  const t = useTranslations('common');
   return (
-    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 p-4 md:p-6" aria-busy aria-label="Loading">
+    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 p-4 md:p-6" aria-busy aria-label={t('loading')}>
       <div className="grid gap-2">
         <Skeleton className="h-8 w-44" />
         <Skeleton className="h-4 w-80 max-w-full" />

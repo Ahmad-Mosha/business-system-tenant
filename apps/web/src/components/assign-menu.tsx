@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useTransition } from 'react';
 import { toast } from 'sonner';
 import { assignOrder } from '@/app/(app)/orders/actions';
@@ -29,23 +30,24 @@ export function AssignMenu({
   assignedToName: string | null;
   assignees: Assignee[];
 }) {
+  const t = useTranslations('status');
   const [pending, start] = useTransition();
 
   return (
     <InlineMenu
-      label={`Change assignee, currently ${assignedToName ?? 'unassigned'}`}
+      label={t('changeAssignee', { name: assignedToName ?? t('unassigned') })}
       pending={pending}
       className="px-1.5 py-1 hover:bg-muted"
       trigger={
         <span className={cn('truncate', !assignedToName && 'text-muted-foreground')}>
-          {assignedToName ?? 'Unassigned'}
+          {assignedToName ?? t('unassigned')}
         </span>
       }
       sections={[
         {
-          heading: 'Assign to',
+          heading: t('assignTo'),
           items: [
-            { value: NOBODY, label: 'Unassigned', current: !assignedToId },
+            { value: NOBODY, label: t('unassigned'), current: !assignedToId },
             ...assignees.map((a) => ({ value: a.id, label: a.name, current: a.id === assignedToId })),
           ],
         },
@@ -56,7 +58,10 @@ export function AssignMenu({
         start(async () => {
           const result = await assignOrder(orderId, to);
           if (!result.ok) toast.error(result.message);
-          else toast.success(to ? `Assigned to ${assignees.find((a) => a.id === to)?.name}.` : 'Unassigned.');
+          else
+            toast.success(
+              to ? t('assignedTo', { name: assignees.find((a) => a.id === to)?.name ?? '' }) : t('unassignedDone'),
+            );
         });
       }}
     />

@@ -28,8 +28,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { dateTime } from '@/lib/format';
+
 import { cn } from '@/lib/utils';
+import { useFormat } from '@/i18n/use-format';
 
 const REASONS = [
   { value: 'PURCHASE', label: 'Purchased' },
@@ -79,6 +80,7 @@ export function VariantPanel({
   movements: Movement[];
   single?: boolean;
 }) {
+  const f = useFormat();
   const [pending, start] = useTransition();
   const [qty, setQty] = useState('1');
   const [reason, setReason] = useState<string>('PURCHASE');
@@ -136,7 +138,7 @@ export function VariantPanel({
               'Nothing waiting in open orders'
             )}
           </CardDescription>
-          <CardAction className="text-right">
+          <CardAction className="text-end">
             <p
               className={cn(
                 'num text-xl leading-none font-semibold tracking-tight',
@@ -244,8 +246,8 @@ export function VariantPanel({
               <TableHeader>
                 <TableRow>
                   <TableHead>Movement</TableHead>
-                  <TableHead className="w-[90px] text-right">Change</TableHead>
-                  <TableHead className="w-[90px] text-right">Balance</TableHead>
+                  <TableHead className="w-[90px] text-end">Change</TableHead>
+                  <TableHead className="w-[90px] text-end">Balance</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -263,12 +265,12 @@ export function VariantPanel({
                               inbound ? 'bg-success-subtle text-success' : 'bg-destructive-subtle text-destructive',
                             )}
                           >
-                            <Icon className="size-3.5" />
+                            <Icon className="size-3.5 rtl:-scale-x-100" />
                           </span>
                           <div className="min-w-0">
                             <p className="truncate font-medium">{REASON_LABEL[m.reason] ?? m.reason}</p>
                             <p className="truncate text-xs text-muted-foreground">
-                              {dateTime(m.occurredAt)}
+                              {f.dateTime(m.occurredAt)}
                               {m.note ? (
                                 <>
                                   {' · '}
@@ -280,12 +282,12 @@ export function VariantPanel({
                         </div>
                       </TableCell>
                       <TableCell
-                        className={cn('num text-right font-semibold', inbound ? 'text-success' : 'text-destructive')}
+                        className={cn('num text-end font-semibold', inbound ? 'text-success' : 'text-destructive')}
                       >
                         {inbound ? '+' : '−'}
                         {Math.abs(m.quantity)}
                       </TableCell>
-                      <TableCell className="num text-right text-muted-foreground">{m.runningTotal}</TableCell>
+                      <TableCell className="num text-end text-muted-foreground">{m.runningTotal}</TableCell>
                     </TableRow>
                   );
                 })}

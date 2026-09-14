@@ -20,8 +20,10 @@ export function Amount({
   }
   const p = moneyParts(value);
   const sign = p.sign || (signed && Number(value) > 0 ? '+' : '');
+  // Isolated left-to-right: in Arabic text an unisolated `−10,000.00` can
+  // lose its minus to the far side of the number.
   return (
-    <span className={cn('num whitespace-nowrap', className)}>
+    <span dir="ltr" className={cn('num whitespace-nowrap', className)}>
       {sign}
       {p.whole}
       <span className="text-[0.62em] font-medium text-muted-foreground">{p.frac}</span>

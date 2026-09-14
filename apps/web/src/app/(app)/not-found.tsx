@@ -1,5 +1,6 @@
 import { SearchX } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import {
   Empty,
@@ -12,6 +13,7 @@ import {
 
 /** A record that isn't there (deleted, or a stale link) — inside the shell. */
 export default function RecordNotFound() {
+  const t = useTranslations('states');
   return (
     <div className="flex flex-1 items-center justify-center p-6">
       <Empty className="max-w-lg border bg-card">
@@ -19,14 +21,12 @@ export default function RecordNotFound() {
           <EmptyMedia variant="icon">
             <SearchX />
           </EmptyMedia>
-          <EmptyTitle>Not found</EmptyTitle>
-          <EmptyDescription>
-            This record doesn’t exist, or it was removed. The link may be out of date.
-          </EmptyDescription>
+          <EmptyTitle>{t('notFound')}</EmptyTitle>
+          <EmptyDescription>{t('recordMissing')}</EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
           <Button variant="outline" asChild>
-            <Link href="/orders">Go to orders</Link>
+            <Link href="/orders">{t('goToOrders')}</Link>
           </Button>
         </EmptyContent>
       </Empty>

@@ -153,8 +153,8 @@ export async function StatementView({ from, to }: { from: string; to: string }) 
               <TableRow>
                 <TableHead className="w-12">#</TableHead>
                 <TableHead>Product</TableHead>
-                <TableHead className="w-[100px] text-right">Units</TableHead>
-                <TableHead className="w-[140px] text-right">Net</TableHead>
+                <TableHead className="w-[100px] text-end">Units</TableHead>
+                <TableHead className="w-[140px] text-end">Net</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -164,8 +164,8 @@ export async function StatementView({ from, to }: { from: string; to: string }) 
                   <TableCell className="max-w-0 truncate font-medium">
                     <bdi>{p.name}</bdi>
                   </TableCell>
-                  <TableCell className="num text-right text-muted-foreground">{p.unitsSold}</TableCell>
-                  <TableCell className="num text-right font-medium">{moneyWhole(p.net)}</TableCell>
+                  <TableCell className="num text-end text-muted-foreground">{p.unitsSold}</TableCell>
+                  <TableCell className="num text-end font-medium">{moneyWhole(p.net)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

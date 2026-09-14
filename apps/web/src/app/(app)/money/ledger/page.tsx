@@ -1,5 +1,6 @@
 import { ArrowRight, BookText } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { Fragment } from 'react';
 import { Amount } from '@/components/amount';
 import { FilterBar } from '@/components/filter-bar';
@@ -25,10 +26,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { getLedger, getMoneyAccounts, type AccountBalance } from '@/lib/api';
-import { byDay, timeOf } from '@/lib/format';
+
 import { effectOn } from '@/lib/money';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
+import { getFormat } from '@/i18n/get-format';
 
 const PAGE_SIZE = 30;
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
@@ -41,6 +43,7 @@ export default async function LedgerPage({
 }: {
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
+  const f = await getFormat();
   await requireAdmin();
   const params = await searchParams;
   const code = params.code;
@@ -140,11 +143,11 @@ export default async function LedgerPage({
               <TableRow>
                 <TableHead>Entry</TableHead>
                 <TableHead className="hidden w-[340px] md:table-cell">From → to</TableHead>
-                <TableHead className="w-[160px] text-right">Amount</TableHead>
+                <TableHead className="w-[160px] text-end">Amount</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {byDay(entries).map((day) => (
+              {f.byDay(entries).map((day) => (
                 <Fragment key={day.key}>
                   <DayRow label={day.label} span={3} />
                   {day.rows.map((e) => {
@@ -153,7 +156,7 @@ export default async function LedgerPage({
                     return (
                       <TableRow key={e.id}>
                         <TableCell className="h-14 max-w-0">
-                          <EntryCell entry={e} mark={mark} when={timeOf(e.occurredAt)} />
+                          <EntryCell entry={e} mark={mark} when={f.time(e.occurredAt)} />
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
                           <div className="flex min-w-0 items-center gap-1.5">
@@ -163,7 +166,7 @@ export default async function LedgerPage({
                               href={accountHref(e.creditCode)}
                               lens={e.creditCode === lens?.code}
                             />
-                            <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
+                            <ArrowRight className="size-3.5 shrink-0 text-muted-foreground rtl:rotate-180" />
                             <AccountChip
                               name={e.debitAr}
                               title={english.get(e.debitCode)}
@@ -172,7 +175,7 @@ export default async function LedgerPage({
                             />
                           </div>
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-end">
                           <Amount
                             value={effect ?? e.amount}
                             signed={effect !== null}
@@ -205,6 +208,7 @@ function Lens({
   marks: Record<Direction, Mark>;
   all: boolean;
 }) {
+  const t = useTranslations('ledger');
   // Filtered to one account, every entry touches it.
   const shown: Direction[] = all ? ['up', 'down', 'none'] : ['up', 'down'];
   return (
@@ -218,8 +222,8 @@ function Lens({
           const mark = marks[d];
           return (
             <span key={d} className="inline-flex items-center gap-1">
-              <mark.icon className={cn('size-3.5', mark.tone)} />
-              {mark.label}
+              <mark.icon className={cn('size-3.5 rtl:-scale-x-100', mark.tone)} />
+              {t(mark.label)}
             </span>
           );
         })}

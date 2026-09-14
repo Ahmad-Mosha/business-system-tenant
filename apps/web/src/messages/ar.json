@@ -1,0 +1,256 @@
+{
+  "app": {
+    "name": "Prime Market",
+    "tagline": "إدارة العمليات",
+    "description": "منصة إدارة العمليات والتجارة"
+  },
+  "common": {
+    "cancel": "إلغاء",
+    "save": "حفظ",
+    "close": "إغلاق",
+    "apply": "تطبيق",
+    "clear": "مسح",
+    "search": "بحث",
+    "back": "رجوع",
+    "more": "المزيد",
+    "previous": "السابق",
+    "next": "التالي",
+    "tryAgain": "حاول مرة أخرى",
+    "loading": "جارٍ التحميل",
+    "today": "اليوم",
+    "yesterday": "أمس",
+    "all": "الكل",
+    "egp": "ج.م"
+  },
+  "language": {
+    "label": "اللغة",
+    "ar": "العربية",
+    "en": "English"
+  },
+  "auth": {
+    "pageTitle": "تسجيل الدخول · Prime Market",
+    "title": "سجّل الدخول للمتابعة",
+    "email": "البريد الإلكتروني",
+    "password": "كلمة المرور",
+    "submit": "تسجيل الدخول",
+    "submitting": "جارٍ تسجيل الدخول",
+    "missing": "أدخل بريدك الإلكتروني وكلمة المرور.",
+    "wrong": "البريد الإلكتروني أو كلمة المرور غير صحيحة.",
+    "unreachable": "تعذّر الاتصال بالخادم.",
+    "noSession": "لم يُرجع الخادم جلسة دخول.",
+    "devAccounts": "حسابات التطوير:"
+  },
+  "nav": {
+    "modules": "الأقسام",
+    "toggleSidebar": "إظهار أو إخفاء القائمة",
+    "groups": {
+      "operations": "العمليات",
+      "money": "المالية",
+      "noon": "نون",
+      "admin": "الإدارة"
+    },
+    "items": {
+      "orders": "الطلبات",
+      "shipments": "الشحنات",
+      "inventory": "المخزون",
+      "moneyOverview": "نظرة عامة",
+      "treasury": "الخزينة",
+      "purchases": "المشتريات",
+      "suppliers": "الموردون",
+      "ledger": "سجل الحركات",
+      "noonOverview": "نظرة عامة",
+      "months": "الشهور",
+      "products": "المنتجات",
+      "imports": "رفع التقارير",
+      "team": "الفريق"
+    },
+    "crumbs": {
+      "new": "جديد",
+      "edit": "تعديل",
+      "details": "التفاصيل"
+    }
+  },
+  "user": {
+    "lightTheme": "الوضع الفاتح",
+    "darkTheme": "الوضع الداكن",
+    "signOut": "تسجيل الخروج"
+  },
+  "table": {
+    "showing": "عرض <b>{from} إلى {to}</b> من {items}",
+    "pages": "الصفحات",
+    "previousPage": "الصفحة السابقة",
+    "nextPage": "الصفحة التالية",
+    "morePages": "صفحات أخرى"
+  },
+  "nouns": {
+    "orders": "{count, plural, =0 {لا توجد طلبات} one {طلب واحد} two {طلبان} few {# طلبات} many {# طلبًا} other {# طلب}}",
+    "products": "{count, plural, =0 {لا توجد منتجات} one {منتج واحد} two {منتجان} few {# منتجات} many {# منتجًا} other {# منتج}}",
+    "entries": "{count, plural, =0 {لا توجد حركات} one {حركة واحدة} two {حركتان} few {# حركات} many {# حركة} other {# حركة}}"
+  },
+  "filters": {
+    "reset": "مسح الفلاتر",
+    "clearSearch": "مسح البحث",
+    "anyDate": "أي تاريخ",
+    "pickDate": "اختر تاريخًا"
+  },
+  "period": {
+    "label": "الفترة"
+  },
+  "status": {
+    "moveTo": "نقل إلى",
+    "otherStatuses": "حالات أخرى",
+    "markAs": "تغيير إلى",
+    "assignTo": "إسناد إلى",
+    "unassigned": "غير مُسند",
+    "changeStatus": "تغيير الحالة، الحالية: {status}",
+    "changePayment": "تغيير حالة الدفع، الحالية: {status}",
+    "changeAssignee": "تغيير المسؤول، الحالي: {name}",
+    "movedTo": "تم النقل إلى «{status}».",
+    "markedAs": "تم تغيير حالة الدفع إلى «{status}».",
+    "assignedTo": "تم الإسناد إلى {name}.",
+    "unassignedDone": "تم إلغاء الإسناد."
+  },
+  "ledger": {
+    "in": "وارد",
+    "out": "صادر",
+    "untouched": "بين حسابات أخرى",
+    "grew": "زاد",
+    "shrank": "نقص",
+    "reversal": "قيد عكسي",
+    "openAccount": "{account} — عرض كشف الحساب"
+  },
+  "charts": {
+    "cashOnHand": "النقدية بالخزينة",
+    "moneyIn": "الوارد",
+    "moneyOut": "الصادر",
+    "netProceeds": "صافي المتحصلات",
+    "amount": "المبلغ",
+    "weekOf": "أسبوع {date}",
+    "units": "{count, plural, =0 {لا وحدات} one {وحدة واحدة} two {وحدتان} few {# وحدات} many {# وحدة} other {# وحدة}}",
+    "notEnoughHistory": "لا توجد بيانات كافية بعد — يكتمل الرسم مع مرور الأيام.",
+    "noMovement": "لم تتحرك أي أموال في هذه الفترة."
+  },
+  "noData": {
+    "title": "لم يُرفع أي تقرير بعد",
+    "description": "ارفع ملف تسوية من نون، وستُقرأ منه المنتجات والإيرادات والرسوم تلقائيًا.",
+    "action": "رفع تقرير"
+  },
+  "states": {
+    "apiDown": "تعذّر الوصول إلى الخادم الآن. تأكد أنه يعمل، ثم حاول مرة أخرى.",
+    "failed": "حدث خطأ من جانبنا. غالبًا ما تحل المحاولة مرة أخرى المشكلة.",
+    "failedShort": "غالبًا ما تحل المحاولة مرة أخرى المشكلة.",
+    "screenFailed": "تعذّر تحميل هذه الشاشة",
+    "somethingWrong": "حدث خطأ ما",
+    "reference": "المرجع {code}",
+    "goToOrders": "الذهاب إلى الطلبات",
+    "notFound": "غير موجود",
+    "recordMissing": "هذا السجل غير موجود أو تم حذفه. ربما يكون الرابط قديمًا.",
+    "pageNotFound": "الصفحة غير موجودة",
+    "noScreen": "لا توجد شاشة على هذا العنوان.",
+    "backHome": "العودة إلى Prime Market"
+  },
+  "enums": {
+    "orderStatus": {
+      "NEW": "جديد",
+      "ASSIGNED": "مُسند",
+      "CONFIRMED": "مؤكد",
+      "SHIPPED": "تم الشحن",
+      "DELIVERED": "تم التسليم",
+      "CANCELLED": "ملغي",
+      "RETURNED": "مرتجع"
+    },
+    "paymentStatus": {
+      "UNPAID": "غير مدفوع",
+      "PAID": "مدفوع",
+      "REFUNDED": "مسترد"
+    },
+    "orderSource": {
+      "EASYORDERS": "الموقع",
+      "SOCIAL": "السوشيال ميديا"
+    },
+    "channel": {
+      "noon": "نون",
+      "amazon": "أمازون",
+      "easyorders": "الموقع",
+      "website": "الموقع",
+      "social": "السوشيال ميديا",
+      "unlisted": "غير معروض على أي قناة"
+    },
+    "category": {
+      "COSMETICS": "مستحضرات تجميل",
+      "HOME": "أدوات منزلية",
+      "ELECTRONICS": "إلكترونيات",
+      "TV_SHOP": "تي في شوب",
+      "NONE": "بدون تصنيف"
+    },
+    "stockState": {
+      "in": "متوفر",
+      "low": "مخزون منخفض",
+      "out": "نفد من المخزون"
+    },
+    "stockReason": {
+      "PURCHASE": "شراء",
+      "SALE": "بيع",
+      "RETURN": "مرتجع من عميل",
+      "DAMAGE": "تالف أو مفقود",
+      "COUNT": "جرد فعلي",
+      "ADJUSTMENT": "تصحيح"
+    },
+    "entryKind": {
+      "OPENING_BALANCE": "رصيد افتتاحي",
+      "CASH_DEPOSIT": "إيداع نقدي",
+      "CHEQUE_DEPOSIT": "إيداع سندي",
+      "CHEQUE_CLEAR": "تحصيل شيك",
+      "CHEQUE_BOUNCE": "شيك مرتد",
+      "PAYMENT_IN": "سند قبض",
+      "PAYMENT_OUT": "سند صرف",
+      "CAPITAL_WITHDRAWAL": "مسحوبات المالك",
+      "PURCHASE": "شراء بضاعة",
+      "SUPPLIER_PAYMENT": "دفعة لمورد",
+      "NOON_ACCRUAL": "مبيعات نون",
+      "NOON_FEE": "رسوم نون",
+      "NOON_PAYOUT": "تحويل من نون",
+      "ORDER_SALE": "تحصيل طلب",
+      "COGS": "تكلفة البضاعة المباعة",
+      "BOSTA_PAYOUT": "تحويل من بوسطة",
+      "RETURN": "مرتجع",
+      "STOCK_LOSS": "فاقد مخزون",
+      "ADJUSTMENT": "تسوية"
+    },
+    "paidStatus": {
+      "DRAFT": "مسودة",
+      "UNPAID": "غير مدفوعة",
+      "PARTIAL": "مدفوعة جزئيًا",
+      "PAID": "مدفوعة"
+    },
+    "cashIn": {
+      "SALES": "المبيعات",
+      "OWNER_CAPITAL": "إيداعات المالك",
+      "SUPPLIER_PAYABLE": "مستردات من الموردين",
+      "INVENTORY": "إلغاء مشتريات نقدية",
+      "NOON_RECEIVABLE": "تحويلات نون",
+      "AMAZON_RECEIVABLE": "تحويلات أمازون",
+      "BOSTA_COD": "تحويلات بوسطة",
+      "CHEQUES_PENDING": "شيكات محصّلة"
+    },
+    "cashOut": {
+      "SALES": "مبيعات مُلغاة",
+      "OWNER_CAPITAL": "مسحوبات المالك",
+      "SUPPLIER_PAYABLE": "مدفوعات الموردين",
+      "INVENTORY": "مشتريات بضاعة نقدًا",
+      "OTHER_EXPENSE": "مصروفات",
+      "SHIPPING": "الشحن",
+      "CHANNEL_FEES": "رسوم وإعلانات"
+    },
+    "voucherCounter": {
+      "OTHER_EXPENSE": "مصروف عام",
+      "SHIPPING": "شحن",
+      "CHANNEL_FEES": "رسوم قنوات البيع / إعلانات",
+      "OWNER_CAPITAL": "رأس مال المالك"
+    },
+    "role": {
+      "ADMIN": "مدير",
+      "MODERATOR": "مشرف"
+    }
+  }
+}

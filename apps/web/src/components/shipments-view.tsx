@@ -41,8 +41,9 @@ import {
 } from '@/components/ui/table';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import type { ShipmentTracking } from '@/lib/api';
-import { dateTime, money } from '@/lib/format';
+import { money } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { useFormat } from '@/i18n/use-format';
 
 type Filter = 'ALL' | 'DELIVERED' | 'IN_TRANSIT' | 'DELAYED';
 
@@ -60,7 +61,7 @@ const COLLECTION_TONE: Record<string, Tone> = { PAID: 'success', UNPAID: 'danger
 
 /** A date inside Arabic text, isolated — otherwise the bidi algorithm drags its
  *  digits across the words ("17 بحد أقصى Sept"). */
-const when = (v: string) => <bdi>{dateTime(v)}</bdi>;
+const isolate = (text: string) => <bdi>{text}</bdi>;
 
 const MATCHES: Record<Filter, (s: ShipmentTracking) => boolean> = {
   ALL: () => true,
@@ -75,6 +76,8 @@ const MATCHES: Record<Filter, (s: ShipmentTracking) => boolean> = {
  * searching and filtering it in the browser is instant.
  */
 export function ShipmentsView({ initialShipments }: { initialShipments: ShipmentTracking[] }) {
+  const f = useFormat();
+  const when = (v: string) => isolate(f.dateTime(v));
   const [shipments, setShipments] = useState(initialShipments);
   const [selected, setSelected] = useState<ShipmentTracking | null>(null);
   const [search, setSearch] = useState('');
@@ -203,12 +206,12 @@ export function ShipmentsView({ initialShipments }: { initialShipments: Shipment
                 <TableHead>رقم التتبع / Type</TableHead>
                 <TableHead>العميل / Customer</TableHead>
                 <TableHead>المنطقة / Destination</TableHead>
-                <TableHead className="text-right">مبلغ التحصيل (COD)</TableHead>
-                <TableHead className="text-right">رسوم فليكس شيب</TableHead>
+                <TableHead className="text-end">مبلغ التحصيل (COD)</TableHead>
+                <TableHead className="text-end">رسوم فليكس شيب</TableHead>
                 <TableHead>الحالة / Status</TableHead>
                 <TableHead className="text-center">المحاولات</TableHead>
                 <TableHead>حالة المبلغ المحصل</TableHead>
-                <TableHead className="text-right">وقت التوصيل</TableHead>
+                <TableHead className="text-end">وقت التوصيل</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -253,13 +256,13 @@ export function ShipmentsView({ initialShipments }: { initialShipments: Shipment
                         </p>
                       ) : null}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-end">
                       <p className="num font-medium">{money(s.cod?.amount ?? 0)}</p>
                       <p className="text-xs text-muted-foreground">
                         {s.cod?.paymentMethodLabel || 'الدفع عند الاستلام'}
                       </p>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-end">
                       <p className="num">{s.flexShipFee ? money(s.flexShipFee) : '—'}</p>
                       <p className="text-xs text-muted-foreground">
                         {s.flexShipStatusLabel || 'غير مستحق بعد'}
@@ -276,7 +279,7 @@ export function ShipmentsView({ initialShipments }: { initialShipments: Shipment
                         {s.cod?.collectionStatusLabel ?? 'قيد التنفيذ'}
                       </ToneBadge>
                     </TableCell>
-                    <TableCell className="text-right text-xs text-muted-foreground">
+                    <TableCell className="text-end text-xs text-muted-foreground">
                       {s.deliveredAt ? (
                         <>
                           <p className="text-[13px] text-foreground">{when(s.deliveredAt)}</p>
@@ -325,6 +328,8 @@ function ShipmentDetail({
   refreshing: boolean;
   onRefresh: () => void;
 }) {
+  const f = useFormat();
+  const when = (v: string) => isolate(f.dateTime(v));
   const status = statusOf(s);
   const collection = s.cod?.collectionStatus ?? 'PENDING';
 

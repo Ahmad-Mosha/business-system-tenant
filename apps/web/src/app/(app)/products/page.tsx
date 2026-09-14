@@ -16,9 +16,10 @@ import {
 } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { getDataRange, getPeriods, getProducts, type ProductPerformance } from '@/lib/api';
-import { money, moneyWhole, monthLabel } from '@/lib/format';
+import { money, moneyWhole } from '@/lib/format';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
+import { getFormat } from '@/i18n/get-format';
 
 const fees = (p: ProductPerformance) =>
   Number(p.referralFee) + Number(p.fulfilmentFee) + Number(p.otherFees);
@@ -38,6 +39,7 @@ export default async function ProductsPage({
 }: {
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
+  const f = await getFormat();
   await requireAdmin();
   const params = await searchParams;
   const { period, q, returns, cost } = params;
@@ -92,7 +94,7 @@ export default async function ProductsPage({
   const sortHead = (k: string, label: string) => {
     const Icon = sort !== k ? ArrowUpDown : asc ? ArrowUp : ArrowDown;
     return (
-      <TableHead key={k} className="text-right">
+      <TableHead key={k} className="text-end">
         <Link
           href={sortHref(k)}
           scroll={false}
@@ -114,7 +116,7 @@ export default async function ProductsPage({
         title="Products"
         description={
           selected
-            ? `How each product did on noon in ${monthLabel(selected.month)}.`
+            ? `How each product did on noon in ${f.month(selected.month)}.`
             : 'How each product did on noon — units, proceeds, fees, and profit where cost is known.'
         }
       />
@@ -126,7 +128,7 @@ export default async function ProductsPage({
             kind: 'select',
             param: 'period',
             all: 'All time',
-            options: periods.map((p) => ({ value: p.month, label: monthLabel(p.month) })),
+            options: periods.map((p) => ({ value: p.month, label: f.month(p.month) })),
           },
           { kind: 'toggle', param: 'returns', value: '1', label: 'Has returns' },
           { kind: 'toggle', param: 'cost', value: 'missing', label: 'Missing cost' },
@@ -194,18 +196,18 @@ export default async function ProductsPage({
                       ) : null}
                     </div>
                   </TableCell>
-                  <TableCell className="num text-right">{p.unitsSold}</TableCell>
-                  <TableCell className="num text-right">
+                  <TableCell className="num text-end">{p.unitsSold}</TableCell>
+                  <TableCell className="num text-end">
                     {p.unitsReturned > 0 ? (
                       <span className="text-warning">{p.unitsReturned}</span>
                     ) : (
                       <span className="text-muted-foreground/50">—</span>
                     )}
                   </TableCell>
-                  <TableCell className="num text-right">{moneyWhole(p.netProceeds)}</TableCell>
-                  <TableCell className="num text-right text-muted-foreground">{moneyWhole(fees(p))}</TableCell>
-                  <TableCell className="num text-right font-medium">{moneyWhole(p.net)}</TableCell>
-                  <TableCell className="num text-right">
+                  <TableCell className="num text-end">{moneyWhole(p.netProceeds)}</TableCell>
+                  <TableCell className="num text-end text-muted-foreground">{moneyWhole(fees(p))}</TableCell>
+                  <TableCell className="num text-end font-medium">{moneyWhole(p.net)}</TableCell>
+                  <TableCell className="num text-end">
                     {p.grossProfit === null ? (
                       <Tooltip>
                         <TooltipTrigger asChild>

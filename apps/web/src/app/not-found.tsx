@@ -1,5 +1,6 @@
 import { SearchX } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import {
   Empty,
@@ -12,6 +13,7 @@ import {
 
 /** A URL that matches no screen. */
 export default function NotFound() {
+  const t = useTranslations('states');
   return (
     <div className="flex min-h-svh items-center justify-center p-6">
       <Empty className="max-w-lg">
@@ -19,12 +21,12 @@ export default function NotFound() {
           <EmptyMedia variant="icon">
             <SearchX />
           </EmptyMedia>
-          <EmptyTitle>Page not found</EmptyTitle>
-          <EmptyDescription>There’s no screen at this address.</EmptyDescription>
+          <EmptyTitle>{t('pageNotFound')}</EmptyTitle>
+          <EmptyDescription>{t('noScreen')}</EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
           <Button variant="outline" asChild>
-            <Link href="/">Back to Prime Market</Link>
+            <Link href="/">{t('backHome')}</Link>
           </Button>
         </EmptyContent>
       </Empty>

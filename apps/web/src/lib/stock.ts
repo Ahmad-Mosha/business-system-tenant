@@ -9,4 +9,3 @@ export function stockState(onHand: number): { tone: Tone; label: string } {
   return { tone: 'success', label: 'In stock' };
 }
 
-export const units = (n: number) => n.toLocaleString('en-GB');

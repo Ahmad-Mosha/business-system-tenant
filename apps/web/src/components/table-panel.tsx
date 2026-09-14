@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,6 +21,7 @@ import {
   PaginationPrevious,
 } from '@/components/ui/pagination';
 import { cn } from '@/lib/utils';
+import type messages from '@/messages/en.json';
 
 /**
  * A table on a card. On a `fill` page it shrinks to the space left and scrolls
@@ -101,9 +103,12 @@ export function TablePagination({
   total: number;
   /** Rows on this page. */
   count: number;
-  noun: string;
+  /** What the rows are — a `nouns.*` message, so each language counts them its own way. */
+  noun: keyof (typeof messages)['nouns'];
   href: (page: number) => string;
 }) {
+  const t = useTranslations();
+  const items = t(`nouns.${noun}`, { count: total });
   const last = Math.max(Math.ceil(total / pageSize), 1);
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const to = (page - 1) * pageSize + count;
@@ -111,17 +116,14 @@ export function TablePagination({
   return (
     <>
       <TableCount>
-        {total === 0 ? (
-          `No ${noun}`
-        ) : (
-          <>
-            Showing{' '}
-            <span className="num font-medium text-foreground">
-              {from}–{to}
-            </span>{' '}
-            of <span className="num font-medium text-foreground">{total}</span> {noun}
-          </>
-        )}
+        {total === 0
+          ? items
+          : t.rich('table.showing', {
+              from,
+              to,
+              items,
+              b: (chunks) => <span className="num font-medium text-foreground">{chunks}</span>,
+            })}
       </TableCount>
       {last > 1 ? (
         <Pagination className="mx-0 w-auto">
@@ -130,9 +132,9 @@ export function TablePagination({
               {page > 1 ? (
                 <PaginationPrevious href={href(page - 1)} />
               ) : (
-                <Button variant="ghost" disabled className="pl-1.5!">
-                  <ChevronLeftIcon data-icon="inline-start" />
-                  <span className="hidden sm:block">Previous</span>
+                <Button variant="ghost" disabled className="ps-1.5!">
+                  <ChevronLeftIcon data-icon="inline-start" className="rtl:rotate-180" />
+                  <span className="hidden sm:block">{t('common.previous')}</span>
                 </Button>
               )}
             </PaginationItem>
@@ -153,9 +155,9 @@ export function TablePagination({
               {page < last ? (
                 <PaginationNext href={href(page + 1)} />
               ) : (
-                <Button variant="ghost" disabled className="pr-1.5!">
-                  <span className="hidden sm:block">Next</span>
-                  <ChevronRightIcon data-icon="inline-end" />
+                <Button variant="ghost" disabled className="pe-1.5!">
+                  <span className="hidden sm:block">{t('common.next')}</span>
+                  <ChevronRightIcon data-icon="inline-end" className="rtl:rotate-180" />
                 </Button>
               )}
             </PaginationItem>

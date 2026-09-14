@@ -12,10 +12,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { getImports } from '@/lib/api';
-import { date, dateTime } from '@/lib/format';
+
 import { requireAdmin } from '@/lib/session';
+import { getFormat } from '@/i18n/get-format';
 
 export default async function ImportsPage() {
+  const f = await getFormat();
   await requireAdmin();
   const imports = await getImports();
 
@@ -50,11 +52,11 @@ export default async function ImportsPage() {
               <TableRow>
                 <TableHead className="min-w-[200px]">File</TableHead>
                 <TableHead>Period</TableHead>
-                <TableHead className="text-right">Rows</TableHead>
-                <TableHead className="text-right">New</TableHead>
-                <TableHead className="text-right">Skipped</TableHead>
-                <TableHead className="text-right">Unmapped</TableHead>
-                <TableHead className="text-right">Imported</TableHead>
+                <TableHead className="text-end">Rows</TableHead>
+                <TableHead className="text-end">New</TableHead>
+                <TableHead className="text-end">Skipped</TableHead>
+                <TableHead className="text-end">Unmapped</TableHead>
+                <TableHead className="text-end">Imported</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -66,19 +68,19 @@ export default async function ImportsPage() {
                     </span>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {date(i.periodStart)} – {date(i.periodEnd)}
+                    {f.date(i.periodStart)} – {f.date(i.periodEnd)}
                   </TableCell>
-                  <TableCell className="num text-right">{i.rowsInFile}</TableCell>
-                  <TableCell className="num text-right font-medium">{i.rowsInserted}</TableCell>
-                  <TableCell className="num text-right text-muted-foreground">{i.rowsSkipped || '—'}</TableCell>
-                  <TableCell className="num text-right">
+                  <TableCell className="num text-end">{i.rowsInFile}</TableCell>
+                  <TableCell className="num text-end font-medium">{i.rowsInserted}</TableCell>
+                  <TableCell className="num text-end text-muted-foreground">{i.rowsSkipped || '—'}</TableCell>
+                  <TableCell className="num text-end">
                     {i.unmappedListings ? (
                       <span className="text-warning">{i.unmappedListings}</span>
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-right text-muted-foreground">{dateTime(i.createdAt)}</TableCell>
+                  <TableCell className="text-end text-muted-foreground">{f.dateTime(i.createdAt)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

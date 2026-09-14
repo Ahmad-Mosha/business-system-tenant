@@ -240,9 +240,9 @@ export function InvoiceBuilder({
                   <TableHeader>
                     <TableRow>
                       <TableHead>Product</TableHead>
-                      <TableHead className="w-[100px] text-right">Qty</TableHead>
-                      <TableHead className="w-[130px] text-right">Unit cost</TableHead>
-                      <TableHead className="w-[130px] text-right">Line total</TableHead>
+                      <TableHead className="w-[100px] text-end">Qty</TableHead>
+                      <TableHead className="w-[130px] text-end">Unit cost</TableHead>
+                      <TableHead className="w-[130px] text-end">Line total</TableHead>
                       <TableHead className="w-12" />
                     </TableRow>
                   </TableHeader>
@@ -284,7 +284,7 @@ export function InvoiceBuilder({
                             className={`num ${cellInput}`}
                           />
                         </TableCell>
-                        <TableCell className="num text-right font-medium">
+                        <TableCell className="num text-end font-medium">
                           {money(l.quantity * (Number(l.unitCost) || 0))}
                         </TableCell>
                         <TableCell className="pe-2">

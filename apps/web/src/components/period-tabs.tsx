@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 
 /**
@@ -14,8 +15,9 @@ export function PeriodTabs({
   options: ReadonlyArray<{ value: string; label: string }>;
   href: (value: string) => string;
 }) {
+  const t = useTranslations('period');
   return (
-    <nav aria-label="Period" className="inline-flex max-w-full overflow-x-auto border border-input">
+    <nav aria-label={t('label')} className="inline-flex max-w-full overflow-x-auto border border-input">
       {options.map((o) => {
         const active = o.value === value;
         return (
@@ -25,7 +27,7 @@ export function PeriodTabs({
             scroll={false}
             aria-current={active ? 'true' : undefined}
             className={cn(
-              'inline-flex h-8 shrink-0 items-center border-l border-input px-3 text-xs font-medium whitespace-nowrap transition-colors first:border-l-0',
+              'inline-flex h-8 shrink-0 items-center border-s border-input px-3 text-xs font-medium whitespace-nowrap transition-colors first:border-s-0',
               active ? 'bg-highlight/10 text-highlight' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
             )}
           >
