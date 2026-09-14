@@ -63,7 +63,7 @@ export function AppSidebar({ user }: { user: SessionUser }) {
             <SidebarMenuButton size="lg" asChild tooltip={t('app.name')}>
               <Link href={user.role === 'ADMIN' ? '/' : '/orders'}>
                 <span className="flex aspect-square size-8 items-center justify-center bg-primary font-heading text-sm font-bold text-primary-foreground">
-                  P
+                  {t('app.name').charAt(0)}
                 </span>
                 <span className="grid flex-1 leading-tight">
                   <span className="truncate font-heading text-sm font-semibold">{t('app.name')}</span>
