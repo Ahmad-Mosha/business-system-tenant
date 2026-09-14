@@ -3,7 +3,6 @@ import Link from 'next/link';
 import { Children, type ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
@@ -47,7 +46,9 @@ export function MetricCard({
   className?: string;
 }) {
   return (
-    <Card size="sm" className={cn('@container/metric gap-0 px-3.5', className)}>
+    // A cell of MetricGrid's strip: it draws its top and left hairlines, and
+    // the strip clips the outer ones, so the dividers stay 1px at any count.
+    <div className={cn('@container/metric flex min-w-0 flex-col border-t border-l px-4 py-3', className)}>
       <div className="flex min-h-5 items-start justify-between gap-2">
         <p className="text-xs font-medium text-muted-foreground">{label}</p>
         {link ? (
@@ -78,7 +79,7 @@ export function MetricCard({
           <span className="line-clamp-2">{hint}</span>
         </div>
       ) : null}
-    </Card>
+    </div>
   );
 }
 
@@ -100,9 +101,11 @@ export function Delta({ value, suffix = '%' }: { value: number; suffix?: string 
 }
 
 /**
- * The metric row. Columns follow how many cards are passed and how wide the
- * content area actually is (a container query, not the viewport — the sidebar
- * can be open or collapsed), so five figures never wrap one onto its own line.
+ * The figures of a screen as one strip: a single frame with hairline dividers,
+ * not a row of separate boxes competing with each other. Columns follow how
+ * many figures there are and how wide the content area actually is (a
+ * container query — the sidebar can be open or collapsed). Two up even on a
+ * phone, so a moderator isn't scrolling past figures to reach their orders.
  */
 export function MetricGrid({ children }: { children: ReactNode }) {
   const count = Children.toArray(children).filter(Boolean).length;
@@ -110,16 +113,21 @@ export function MetricGrid({ children }: { children: ReactNode }) {
     count >= 5
       ? '@2xl:grid-cols-3 @5xl:grid-cols-5'
       : count === 4
-        ? '@4xl:grid-cols-4'
+        ? '@3xl:grid-cols-4'
         : count === 3
           ? '@2xl:grid-cols-3'
-          : // Two figures at half the row each would be mostly empty card.
-            '@4xl:grid-cols-4';
-  // Two up even on a phone — stacked one per row, a moderator scrolls past
-  // several screens of figures before reaching their orders.
+          : '';
   return (
     <div className="@container">
-      <div className={cn('grid grid-cols-2 gap-3 @md:gap-4', cols)}>{children}</div>
+      <div
+        className={cn(
+          'overflow-hidden bg-card ring-1 ring-foreground/10',
+          // Two figures across the whole row would be mostly empty frame.
+          count <= 2 && '@3xl:w-1/2',
+        )}
+      >
+        <div className={cn('-mt-px -ml-px grid grid-cols-2', cols)}>{children}</div>
+      </div>
     </div>
   );
 }
