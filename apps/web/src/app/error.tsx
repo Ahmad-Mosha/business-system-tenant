@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,6 +20,8 @@ export default function RootError({
   error: Error & { digest?: string };
   retry: () => void;
 }) {
+  const t = useTranslations('states');
+  const tc = useTranslations('common');
   const unreachable = /fetch|ECONNREFUSED/.test(error.message);
   return (
     <div className="flex min-h-svh items-center justify-center p-6">
@@ -27,17 +30,13 @@ export default function RootError({
           <EmptyMedia variant="icon" className="bg-destructive-subtle text-destructive">
             <AlertTriangle />
           </EmptyMedia>
-          <EmptyTitle>Something went wrong</EmptyTitle>
-          <EmptyDescription>
-            {unreachable
-              ? 'The API isn’t reachable right now. Check that it’s running, then try again.'
-              : 'Trying again usually fixes it.'}
-          </EmptyDescription>
+          <EmptyTitle>{t('somethingWrong')}</EmptyTitle>
+          <EmptyDescription>{unreachable ? t('apiDown') : t('failedShort')}</EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
           <Button onClick={() => retry()}>
             <RefreshCw />
-            Try again
+            {tc('tryAgain')}
           </Button>
         </EmptyContent>
       </Empty>

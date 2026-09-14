@@ -1,5 +1,6 @@
 import type { Tone } from '@/components/tone-badge';
 import type { AccountBalance, LedgerRow } from '@/lib/api';
+import type messages from '@/messages/en.json';
 
 /** Plain-language label for every ledger entry kind, for the activity feed. */
 export const KIND_LABEL: Record<string, string> = {
@@ -25,6 +26,10 @@ export const KIND_LABEL: Record<string, string> = {
 };
 
 export const kindLabel = (kind: string) => KIND_LABEL[kind] ?? kind;
+
+/** A kind the messages name (`enums.entryKind.*`) — anything newer shows as its code. */
+export const isEntryKind = (kind: string): kind is keyof (typeof messages)['enums']['entryKind'] =>
+  kind in KIND_LABEL;
 
 /**
  * What one entry did to one account: positive when its balance grew, negative

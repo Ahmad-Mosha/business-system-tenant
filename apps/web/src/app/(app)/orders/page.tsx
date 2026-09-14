@@ -19,8 +19,9 @@ import {
 } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { getAssignees, getOrderSummary, getOrders } from '@/lib/api';
-import { date, money } from '@/lib/format';
+import { money } from '@/lib/format';
 import { requireSession } from '@/lib/session';
+import { getFormat } from '@/i18n/get-format';
 
 const PAGE_SIZE = 20;
 const FILTERS = ['status', 'source', 'search'] as const;
@@ -30,6 +31,7 @@ export default async function OrdersPage({
 }: {
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
+  const f = await getFormat();
   const user = await requireSession();
   const params = await searchParams;
   const isAdmin = user.role === 'ADMIN';
@@ -180,8 +182,8 @@ export default async function OrdersPage({
                 <TableHead className="w-[140px]">Status</TableHead>
                 <TableHead className="w-[120px]">Payment</TableHead>
                 {isAdmin ? <TableHead className="w-[150px]">Assigned</TableHead> : null}
-                <TableHead className="w-[120px] text-right">Total</TableHead>
-                <TableHead className="w-[110px] text-right">Placed</TableHead>
+                <TableHead className="w-[120px] text-end">Total</TableHead>
+                <TableHead className="w-[110px] text-end">Placed</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -234,8 +236,8 @@ export default async function OrdersPage({
                       />
                     </TableCell>
                   ) : null}
-                  <TableCell className="num text-right font-medium">{money(o.total)}</TableCell>
-                  <TableCell className="text-right text-muted-foreground">{date(o.placedAt)}</TableCell>
+                  <TableCell className="num text-end font-medium">{money(o.total)}</TableCell>
+                  <TableCell className="text-end text-muted-foreground">{f.date(o.placedAt)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

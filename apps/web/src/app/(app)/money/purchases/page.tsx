@@ -15,8 +15,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { getPurchases } from '@/lib/api';
-import { date, money } from '@/lib/format';
+import { money } from '@/lib/format';
 import { requireAdmin } from '@/lib/session';
+import { getFormat } from '@/i18n/get-format';
 
 function monthStart() {
   const d = new Date();
@@ -24,6 +25,7 @@ function monthStart() {
 }
 
 export default async function PurchasesPage() {
+  const f = await getFormat();
   await requireAdmin();
   const invoices = await getPurchases();
 
@@ -102,7 +104,7 @@ export default async function PurchasesPage() {
                 <TableHead className="w-[120px]">Date</TableHead>
                 <TableHead className="w-[110px]">Payment</TableHead>
                 <TableHead className="w-[130px]">Status</TableHead>
-                <TableHead className="w-[140px] text-right">Total</TableHead>
+                <TableHead className="w-[140px] text-end">Total</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -122,14 +124,14 @@ export default async function PurchasesPage() {
                   <TableCell>
                     <bdi>{i.supplierName}</bdi>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{date(i.invoiceDate)}</TableCell>
+                  <TableCell className="text-muted-foreground">{f.date(i.invoiceDate)}</TableCell>
                   <TableCell className="text-muted-foreground">
                     {i.payment === 'CASH' ? 'Cash' : 'Credit'}
                   </TableCell>
                   <TableCell>
                     <PaidChip status={i.paidStatus} />
                   </TableCell>
-                  <TableCell className="num text-right font-medium">{money(i.landedTotal)}</TableCell>
+                  <TableCell className="num text-end font-medium">{money(i.landedTotal)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

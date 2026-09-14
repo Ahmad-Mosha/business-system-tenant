@@ -1,3 +1,4 @@
+import { useTranslations } from 'next-intl';
 import { ToneBadge, type Tone } from '@/components/tone-badge';
 import { Badge } from '@/components/ui/badge';
 import type { OrderStatus, PaymentStatus } from '@/lib/api';
@@ -13,6 +14,7 @@ const STATUS_TONE: Record<OrderStatus, Tone> = {
   RETURNED: 'warning',
 };
 
+/** English names for screens not yet on translations — new code reads `enums.orderStatus`. */
 export const STATUS_LABELS: Record<OrderStatus, string> = {
   NEW: 'New',
   ASSIGNED: 'Assigned',
@@ -66,17 +68,19 @@ export const PAYMENT_LABELS: Record<PaymentStatus, string> = {
 export const ALL_PAYMENT_STATUSES: PaymentStatus[] = ['UNPAID', 'PAID', 'REFUNDED'];
 
 export function StatusBadge({ status, className }: { status: OrderStatus; className?: string }) {
+  const t = useTranslations('enums.orderStatus');
   return (
     <ToneBadge tone={STATUS_TONE[status]} className={className}>
-      {STATUS_LABELS[status]}
+      {t(status)}
     </ToneBadge>
   );
 }
 
 export function PaymentBadge({ status, className }: { status: PaymentStatus; className?: string }) {
+  const t = useTranslations('enums.paymentStatus');
   return (
     <ToneBadge tone={PAYMENT_TONE[status]} className={className}>
-      {PAYMENT_LABELS[status]}
+      {t(status)}
     </ToneBadge>
   );
 }
@@ -101,11 +105,16 @@ export const CHANNEL_LABELS: Record<string, string> = {
  * it would compete with the badges that do mean something (noon's yellow
  * collided with `warning` when it was tried). Its name is unambiguous.
  */
+const KNOWN_CHANNELS = ['noon', 'amazon', 'easyorders', 'website', 'social'] as const;
+const isKnownChannel = (key: string): key is (typeof KNOWN_CHANNELS)[number] =>
+  (KNOWN_CHANNELS as readonly string[]).includes(key);
+
 export function ChannelBadge({ channel, className }: { channel: string; className?: string }) {
+  const t = useTranslations('enums.channel');
   const key = (channel ?? '').toLowerCase();
   return (
     <Badge variant="outline" className={className}>
-      {CHANNEL_LABELS[key] ?? channel}
+      {isKnownChannel(key) ? t(key) : channel}
     </Badge>
   );
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useTransition } from 'react';
 import { toast } from 'sonner';
 import { setOrderStatus } from '@/app/(app)/orders/actions';
@@ -8,7 +9,6 @@ import {
   ALL_ORDER_STATUSES,
   isReverse,
   NEXT_STATUSES,
-  STATUS_LABELS,
   StatusBadge,
 } from '@/components/order-status';
 import type { OrderStatus } from '@/lib/api';
@@ -30,6 +30,7 @@ export function OrderStatusMenu({
   status: OrderStatus;
   canRevert?: boolean;
 }) {
+  const t = useTranslations();
   const [pending, start] = useTransition();
   const next = NEXT_STATUSES[status];
   const other = canRevert
@@ -39,21 +40,22 @@ export function OrderStatusMenu({
   // A final state with no revert power has nowhere to go.
   if (!next.length && !other.length) return <StatusBadge status={status} />;
 
-  const item = (s: OrderStatus) => ({ value: s, label: STATUS_LABELS[s], destructive: isReverse(s) });
+  const name = (s: OrderStatus) => t(`enums.orderStatus.${s}`);
+  const item = (s: OrderStatus) => ({ value: s, label: name(s), destructive: isReverse(s) });
 
   return (
     <InlineMenu
-      label={`Change status, currently ${STATUS_LABELS[status]}`}
+      label={t('status.changeStatus', { status: name(status) })}
       trigger={<StatusBadge status={status} />}
       pending={pending}
       sections={[
-        { heading: 'Move to', items: next.map(item) },
-        { heading: 'Other statuses', items: other.map(item) },
+        { heading: t('status.moveTo'), items: next.map(item) },
+        { heading: t('status.otherStatuses'), items: other.map(item) },
       ]}
       onSelect={(to) =>
         start(async () => {
           const result = await setOrderStatus(orderId, to);
-          if (result.ok) toast.success(`Moved to ${STATUS_LABELS[to as OrderStatus].toLowerCase()}.`);
+          if (result.ok) toast.success(t('status.movedTo', { status: name(to as OrderStatus) }));
           else toast.error(result.message);
         })
       }
