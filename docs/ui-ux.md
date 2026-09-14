@@ -73,6 +73,10 @@ teal theme, radius 0, Lucide icons, bold menu accent. Components live in
 `npx shadcn add <name>` from `apps/web` (then point any `from "cn"` import at
 `@/lib/utils` — the registry leaves it untransformed).
 
+Arabic and English, RTL and LTR: see [i18n.md](./i18n.md) — every screen
+takes its words from `src/messages`, its dates from the formatter, and its
+direction from logical classes.
+
 ### Colour
 
 Tokens only, in `apps/web/src/app/globals.css` — light is the product, dark
