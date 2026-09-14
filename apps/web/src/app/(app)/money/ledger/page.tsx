@@ -66,7 +66,7 @@ export default async function LedgerPage({
               <bdi>({account.nameAr})</bdi>.
             </>
           ) : (
-            'Every recorded movement of value, oldest to newest at the bottom.'
+            'Every recorded movement of value, newest first.'
           )
         }
       />
@@ -115,7 +115,7 @@ export default async function LedgerPage({
               <TableRow>
                 <TableHead className="w-[150px]">When</TableHead>
                 <TableHead>Entry</TableHead>
-                <TableHead>From → to</TableHead>
+                <TableHead className="w-[300px]">From → to</TableHead>
                 <TableHead className="w-[140px] text-right">Amount</TableHead>
               </TableRow>
             </TableHeader>
