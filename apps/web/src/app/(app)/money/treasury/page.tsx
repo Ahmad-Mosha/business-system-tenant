@@ -1,5 +1,7 @@
 import { Receipt } from 'lucide-react';
+import { Fragment } from 'react';
 import { Amount } from '@/components/amount';
+import { AccountChip, DayRow, directionOf, EntryCell, MONEY } from '@/components/ledger-entry';
 import { MetricCard, MetricGrid } from '@/components/metric-card';
 import { Page, PageHeader } from '@/components/page';
 import { PendingCheques } from '@/components/pending-cheques';
@@ -14,8 +16,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { getAccountLedger, getCheques, getMoneyAccounts } from '@/lib/api';
-import { date, money } from '@/lib/format';
-import { accountByCode, kindLabel } from '@/lib/money';
+import { byDay, date, timeOf } from '@/lib/format';
+import { accountByCode } from '@/lib/money';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
 
@@ -106,44 +108,50 @@ export default async function TreasuryPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[120px]">Date</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead className="w-[130px] text-right">In</TableHead>
-                <TableHead className="w-[130px] text-right">Out</TableHead>
-                <TableHead className="w-[140px] text-right">Balance</TableHead>
+                <TableHead>Movement</TableHead>
+                <TableHead className="w-[260px]">From or to</TableHead>
+                <TableHead className="w-[150px] text-right">Amount</TableHead>
+                <TableHead className="w-[150px] text-right">Balance</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {movements.map((m) => {
-                const inflow = Number(m.effect) > 0;
-                return (
-                  <TableRow key={m.id}>
-                    <TableCell className="text-muted-foreground">{date(m.occurredAt)}</TableCell>
-                    <TableCell className="max-w-0 truncate">
-                      <span className="font-medium">{kindLabel(m.kind)}</span>
-                      <span className="text-muted-foreground">
-                        {' · '}
-                        <bdi>{inflow ? m.creditAr : m.debitAr}</bdi>
-                        {m.memo ? ` · ${m.memo}` : ''}
-                      </span>
-                    </TableCell>
-                    <TableCell className="num text-right font-medium text-success">
-                      {inflow ? money(m.amount) : ''}
-                    </TableCell>
-                    <TableCell className="num text-right font-medium text-destructive">
-                      {!inflow ? money(m.amount) : ''}
-                    </TableCell>
-                    <TableCell
-                      className={cn(
-                        'num text-right font-medium',
-                        Number(m.runningBalance) < 0 && 'text-destructive',
-                      )}
-                    >
-                      {money(m.runningBalance)}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
+              {byDay(movements).map((day) => (
+                <Fragment key={day.key}>
+                  <DayRow label={day.label} span={4} />
+                  {day.rows.map((m) => {
+                    const effect = Number(m.effect);
+                    const mark = MONEY[directionOf(effect)];
+                    // The treasury is one end of every row here; the other end is the story.
+                    const other = effect > 0 ? m.creditCode : m.debitCode;
+                    return (
+                      <TableRow key={m.id}>
+                        <TableCell className="h-14 max-w-0">
+                          <EntryCell entry={m} mark={mark} when={timeOf(m.occurredAt)} />
+                        </TableCell>
+                        <TableCell>
+                          <span className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                            {effect > 0 ? 'from' : 'to'}
+                            <AccountChip
+                              name={effect > 0 ? m.creditAr : m.debitAr}
+                              title={accountByCode(accounts, other)?.nameEn}
+                              href={`/money/ledger?code=${other}`}
+                            />
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Amount value={effect} signed className={cn('text-sm font-semibold', mark.tone)} />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Amount
+                            value={m.runningBalance}
+                            className={cn('font-medium', Number(m.runningBalance) < 0 && 'text-destructive')}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </Fragment>
+              ))}
             </TableBody>
           </Table>
         )}
