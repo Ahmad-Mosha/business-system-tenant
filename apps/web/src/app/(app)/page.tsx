@@ -1,83 +1,84 @@
+import { ArrowUpRight } from 'lucide-react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { NoDataYet } from '@/components/empty-state';
-import { PageBody, PageHeader } from '@/components/page-header';
+import { Page, PageHeader } from '@/components/page';
 import { StatementView } from '@/components/statement-view';
+import { Button } from '@/components/ui/button';
+import { Card, CardAction, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getDataRange, getPeriods } from '@/lib/api';
-import { money, monthLabel } from '@/lib/format';
+import { date, money, monthLabel } from '@/lib/format';
 import { requireSession } from '@/lib/session';
 
 export default async function OverviewPage() {
   const user = await requireSession();
-  if (user.role === 'MODERATOR') {
-    redirect('/orders');
-  }
+  if (user.role === 'MODERATOR') redirect('/orders');
 
   const range = await getDataRange();
   if (!range) {
     return (
-      <>
-        <PageHeader title="Overview" />
-        <PageBody>
-          <NoDataYet />
-        </PageBody>
-      </>
+      <Page>
+        <PageHeader title="noon" description="What noon owes us, and why." />
+        <NoDataYet />
+      </Page>
     );
   }
 
   const periods = await getPeriods();
+  const peak = Math.max(...periods.map((p) => Math.abs(Number(p.netProceeds))), 1);
 
   return (
-    <>
+    <Page>
       <PageHeader
-        title="Overview"
+        title="noon"
+        description={`Everything imported, ${date(range.from)} – ${date(range.to)}. Every figure matches noon’s own statement.`}
         actions={
-          <Link
-            href="/months"
-            className="inline-flex h-9 items-center rounded-md border border-border px-3 text-sm transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-          >
-            View by month
-          </Link>
+          <Button variant="outline" asChild>
+            <Link href="/months">
+              View by month
+              <ArrowUpRight />
+            </Link>
+          </Button>
         }
       />
 
-      <PageBody>
-        <StatementView from={range.from} to={range.to} />
+      <StatementView from={range.from} to={range.to} />
 
-        {periods.length > 1 && (
-          <section>
-            <div className="mb-4 flex items-baseline justify-between gap-4">
-              <h2 className="text-sm font-medium tracking-[-0.01em]">By month</h2>
-              <Link
-                href="/months"
-                className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-              >
-                See all
-              </Link>
-            </div>
-            <ul className="grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-3">
-              {periods.map((p) => (
-                <li key={p.month} className="bg-background">
-                  <Link
-                    href={`/months/${p.month}`}
-                    className="block p-5 transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:-outline-offset-2"
-                  >
-                    <p className="text-[11px] font-medium tracking-[0.08em] text-muted-foreground uppercase">
-                      {monthLabel(p.month)}
-                    </p>
-                    <p className="mt-3 text-xl font-semibold tracking-[-0.02em] tabular-nums">
-                      {money(p.netProceeds)}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {p.unitsSold} units · {money(p.movement)} movement
-                    </p>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-      </PageBody>
-    </>
+      {periods.length > 1 ? (
+        <Card className="pb-2">
+          <CardHeader>
+            <CardTitle>By month</CardTitle>
+            <CardDescription>Net proceeds per settlement month.</CardDescription>
+            <CardAction>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/months">
+                  All months
+                  <ArrowUpRight />
+                </Link>
+              </Button>
+            </CardAction>
+          </CardHeader>
+          <ul className="grid px-2">
+            {periods.map((p) => (
+              <li key={p.month}>
+                <Link
+                  href={`/months/${p.month}`}
+                  className="grid grid-cols-[110px_minmax(0,1fr)_auto] items-center gap-4 px-2 py-2 text-[13px] hover:bg-muted"
+                >
+                  <span className="font-medium">{monthLabel(p.month)}</span>
+                  <span className="h-2 bg-muted">
+                    <span
+                      className="block h-full bg-chart-3"
+                      style={{ width: `${(Math.abs(Number(p.netProceeds)) / peak) * 100}%` }}
+                    />
+                  </span>
+                  <span className="num w-28 text-right font-medium">{money(p.netProceeds)}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
+    </Page>
   );
 }
