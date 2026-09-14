@@ -26,24 +26,27 @@ export function date(v: string | null | undefined): string {
   });
 }
 
+/**
+ * Recorded from a date alone — a voucher, an invoice, an opening balance. The
+ * API stores those at midnight UTC, and printing that as "03:00" would invent
+ * a time nobody entered.
+ */
+const isDateOnly = (d: Date) => d.getTime() % 86_400_000 === 0;
+
+/** `14 Sept, 15:29` — or `4 Sept` for something that has no time. */
 export function dateTime(v: string): string {
-  return new Date(v).toLocaleString('en-GB', {
+  const d = new Date(v);
+  return d.toLocaleString('en-GB', {
     day: 'numeric',
     month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
+    ...(isDateOnly(d) ? {} : { hour: '2-digit', minute: '2-digit' }),
   });
 }
 
-/**
- * `15:29`, or '' for something dated without a time. The API stores those —
- * a voucher, an invoice, an opening balance — at midnight UTC, and printing
- * that as "03:00" would invent a time nobody entered.
- */
+/** `15:29`, or '' for something that has no time. */
 export function timeOf(v: string): string {
   const d = new Date(v);
-  if (d.getTime() % 86_400_000 === 0) return '';
-  return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  return isDateOnly(d) ? '' : d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }
 
 /** A day heading for a dated list: "Today", "Yesterday", "Mon 14 Sept". */
