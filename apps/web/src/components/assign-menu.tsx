@@ -1,6 +1,5 @@
 'use client';
 
-import { UserRound } from 'lucide-react';
 import { useTransition } from 'react';
 import { toast } from 'sonner';
 import { assignOrder } from '@/app/(app)/orders/actions';
@@ -38,12 +37,9 @@ export function AssignMenu({
       pending={pending}
       className="px-1.5 py-1 hover:bg-muted"
       trigger={
-        <>
-          <UserRound className="size-3.5 shrink-0 text-muted-foreground" />
-          <span className={cn('truncate', !assignedToName && 'text-muted-foreground')}>
-            {assignedToName ?? 'Unassigned'}
-          </span>
-        </>
+        <span className={cn('truncate', !assignedToName && 'text-muted-foreground')}>
+          {assignedToName ?? 'Unassigned'}
+        </span>
       }
       sections={[
         {
