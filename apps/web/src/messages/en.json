@@ -19,12 +19,26 @@
     "loading": "Loading",
     "today": "Today",
     "yesterday": "Yesterday",
-    "all": "All"
+    "all": "All",
+    "egp": "EGP"
   },
   "language": {
     "label": "Language",
     "ar": "العربية",
     "en": "English"
+  },
+  "auth": {
+    "pageTitle": "Sign in · Prime Market",
+    "title": "Sign in to continue",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Sign in",
+    "submitting": "Signing in",
+    "missing": "Enter your email and password.",
+    "wrong": "Incorrect email or password.",
+    "unreachable": "Could not reach the server.",
+    "noSession": "The server did not return a session.",
+    "devAccounts": "Development accounts:"
   },
   "nav": {
     "modules": "Modules",
@@ -62,7 +76,7 @@
     "signOut": "Sign out"
   },
   "table": {
-    "showing": "Showing {from}–{to} of {items}",
+    "showing": "Showing <b>{from}–{to}</b> of {items}",
     "pages": "Pages",
     "previousPage": "Go to the previous page",
     "nextPage": "Go to the next page",
@@ -124,7 +138,16 @@
   "states": {
     "apiDown": "The API isn’t reachable right now. Check that it’s running, then try again.",
     "failed": "Something went wrong on our side. Trying again usually fixes it.",
-    "failedShort": "Trying again usually fixes it."
+    "failedShort": "Trying again usually fixes it.",
+    "screenFailed": "This screen couldn’t load",
+    "somethingWrong": "Something went wrong",
+    "reference": "Reference {code}",
+    "goToOrders": "Go to orders",
+    "notFound": "Not found",
+    "recordMissing": "This record doesn’t exist, or it was removed. The link may be out of date.",
+    "pageNotFound": "Page not found",
+    "noScreen": "There’s no screen at this address.",
+    "backHome": "Back to Prime Market"
   },
   "enums": {
     "orderStatus": {

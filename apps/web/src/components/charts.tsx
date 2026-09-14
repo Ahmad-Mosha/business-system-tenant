@@ -251,7 +251,14 @@ export function BarList({ items, empty }: { items: BarItem[]; empty: string }) {
   const config = { size: { label: t('amount') } } satisfies ChartConfig;
   const data = items.map((i) => ({ ...i, size: Math.abs(i.value) }));
   return (
-    <ChartContainer config={config} className="aspect-auto w-full" style={{ height: items.length * 36 }}>
+    // Keyed by direction: Recharts keeps a reversed axis's geometry across a
+    // language switch, so a new direction gets a fresh chart.
+    <ChartContainer
+      key={rtl ? 'rtl' : 'ltr'}
+      config={config}
+      className="aspect-auto w-full"
+      style={{ height: items.length * 36 }}
+    >
       <BarChart
         accessibilityLayer
         data={data}
@@ -284,9 +291,11 @@ export function BarList({ items, empty }: { items: BarItem[]; empty: string }) {
           {data.map((i) => (
             <Cell key={i.key} fill={i.fill} fillOpacity={0.6} />
           ))}
+          {/* "right" is past the bar's end in both directions: on the reversed
+              axis bars have negative width, and Recharts flips the side. */}
           <LabelList
             dataKey="value"
-            position={rtl ? 'left' : 'right'}
+            position="right"
             offset={8}
             className="num fill-foreground"
             fontSize={12}

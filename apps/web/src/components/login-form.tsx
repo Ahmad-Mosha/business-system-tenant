@@ -1,6 +1,7 @@
 'use client';
 
 import { AlertTriangle } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { useActionState } from 'react';
 import { signIn, type LoginState } from '@/app/login/actions';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -12,6 +13,7 @@ import { Spinner } from '@/components/ui/spinner';
 const INITIAL: LoginState = { status: 'idle' };
 
 export function LoginForm() {
+  const t = useTranslations('auth');
   const [state, submit, pending] = useActionState(signIn, INITIAL);
   const failed = state.status === 'error';
 
@@ -19,7 +21,7 @@ export function LoginForm() {
     <form action={submit}>
       <FieldGroup className="gap-4">
         <Field data-invalid={failed}>
-          <FieldLabel htmlFor="email">Email</FieldLabel>
+          <FieldLabel htmlFor="email">{t('email')}</FieldLabel>
           <Input
             id="email"
             name="email"
@@ -33,7 +35,7 @@ export function LoginForm() {
           />
         </Field>
         <Field data-invalid={failed}>
-          <FieldLabel htmlFor="password">Password</FieldLabel>
+          <FieldLabel htmlFor="password">{t('password')}</FieldLabel>
           <Input
             id="password"
             name="password"
@@ -53,7 +55,7 @@ export function LoginForm() {
         ) : null}
         <Button type="submit" size="lg" disabled={pending} className="w-full">
           {pending ? <Spinner /> : null}
-          {pending ? 'Signing in' : 'Sign in'}
+          {pending ? t('submitting') : t('submit')}
         </Button>
       </FieldGroup>
     </form>

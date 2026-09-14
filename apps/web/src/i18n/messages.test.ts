@@ -25,6 +25,7 @@ function argumentsOf(elements: MessageFormatElement[], found = new Set<string>()
     if (el.type === TYPE.plural || el.type === TYPE.select) {
       for (const option of Object.values(el.options)) argumentsOf(option.value, found);
     }
+    if (el.type === TYPE.tag) argumentsOf(el.children, found);
   }
   return found;
 }

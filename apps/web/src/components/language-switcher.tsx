@@ -42,7 +42,7 @@ export function LanguageMenuGroup() {
       <DropdownMenuLabel className="text-muted-foreground">{t('label')}</DropdownMenuLabel>
       <DropdownMenuRadioGroup value={current} onValueChange={(v) => isLanguage(v) && change(v)}>
         {LANGUAGES.map((l) => (
-          <DropdownMenuRadioItem key={l} value={l} lang={l} disabled={pending} onSelect={(e) => e.preventDefault()}>
+          <DropdownMenuRadioItem key={l} value={l} lang={l} disabled={pending}>
             {t(l)}
           </DropdownMenuRadioItem>
         ))}
