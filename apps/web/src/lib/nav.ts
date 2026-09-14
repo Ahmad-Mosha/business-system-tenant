@@ -7,6 +7,7 @@ import {
   Package,
   Receipt,
   ShoppingBag,
+  Store,
   Truck,
   Upload,
   UserCog,
@@ -27,6 +28,10 @@ export interface NavItem {
 
 export interface NavGroup {
   label: string;
+  /** The module's icon in the sidebar. */
+  icon: LucideIcon;
+  /** Listed as plain links rather than a collapsible module. */
+  flat?: boolean;
   items: NavItem[];
 }
 
@@ -38,6 +43,7 @@ export interface NavGroup {
 export const NAVIGATION: NavGroup[] = [
   {
     label: 'Operations',
+    icon: ShoppingBag,
     items: [
       { href: '/orders', label: 'Orders', icon: ShoppingBag },
       { href: '/shipments', label: 'Shipments', icon: Truck },
@@ -46,6 +52,7 @@ export const NAVIGATION: NavGroup[] = [
   },
   {
     label: 'Money',
+    icon: Wallet,
     items: [
       { href: '/money', label: 'Overview', icon: Wallet, roles: ['ADMIN'], exact: true },
       { href: '/money/treasury', label: 'Treasury', icon: Receipt, roles: ['ADMIN'] },
@@ -57,6 +64,7 @@ export const NAVIGATION: NavGroup[] = [
   {
     // These four screens all answer one question — what noon owes and why.
     label: 'noon',
+    icon: Store,
     items: [
       { href: '/', label: 'Overview', icon: LayoutGrid, roles: ['ADMIN'], exact: true },
       { href: '/months', label: 'Months', icon: CalendarRange, roles: ['ADMIN'] },
@@ -66,6 +74,8 @@ export const NAVIGATION: NavGroup[] = [
   },
   {
     label: 'Admin',
+    icon: UserCog,
+    flat: true,
     items: [{ href: '/team', label: 'Team', icon: UserCog, roles: ['ADMIN'] }],
   },
 ];
