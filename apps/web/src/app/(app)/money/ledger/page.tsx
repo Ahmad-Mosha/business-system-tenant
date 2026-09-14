@@ -1,20 +1,20 @@
-import {
-  ArrowDown,
-  ArrowDownLeft,
-  ArrowLeftRight,
-  ArrowRight,
-  ArrowUp,
-  ArrowUpRight,
-  BookText,
-  type LucideIcon,
-} from 'lucide-react';
+import { ArrowRight, BookText } from 'lucide-react';
 import Link from 'next/link';
 import { Fragment } from 'react';
 import { Amount } from '@/components/amount';
 import { FilterBar } from '@/components/filter-bar';
+import {
+  AccountChip,
+  BALANCE,
+  DayRow,
+  directionOf,
+  EntryCell,
+  MONEY,
+  type Direction,
+  type Mark,
+} from '@/components/ledger-entry';
 import { Page, PageHeader } from '@/components/page';
 import { TableEmpty, TablePagination, TablePanel } from '@/components/table-panel';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -24,9 +24,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { getLedger, getMoneyAccounts, type AccountBalance, type LedgerRow } from '@/lib/api';
-import { dayLabel, timeOf } from '@/lib/format';
-import { effectOn, entryMemo, kindLabel, sourceHref } from '@/lib/money';
+import { getLedger, getMoneyAccounts, type AccountBalance } from '@/lib/api';
+import { byDay, timeOf } from '@/lib/format';
+import { effectOn } from '@/lib/money';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
 
@@ -35,38 +35,6 @@ const ISO = /^\d{4}-\d{2}-\d{2}$/;
 
 /** With no account chosen, the ledger is read from the treasury — the money itself. */
 const TREASURY = 'CASH';
-
-/** Whether an entry raised the account's balance, lowered it, or never touched it. */
-type Direction = 'up' | 'down' | 'none';
-
-/** How a direction reads: its icon and label, the amount's colour, the icon tile's. */
-type Mark = { icon: LucideIcon; label: string; tone: string; tile: string };
-
-const QUIET = 'bg-muted text-muted-foreground';
-const UNTOUCHED: Mark = { icon: ArrowLeftRight, label: 'Between other accounts', tone: '', tile: QUIET };
-
-/** An account that holds money or stock: its entries are money in and money out. */
-const MONEY: Record<Direction, Mark> = {
-  up: { icon: ArrowDownLeft, label: 'In', tone: 'text-success', tile: 'bg-success-subtle text-success' },
-  down: {
-    icon: ArrowUpRight,
-    label: 'Out',
-    tone: 'text-destructive',
-    tile: 'bg-destructive-subtle text-destructive',
-  },
-  none: UNTOUCHED,
-};
-
-/**
- * What's owed, earned, spent or put in: an entry grows or shrinks the balance.
- * "In" would contradict the arrow — paying a supplier moves value *to* what we
- * owe, and what we owe goes down. No colour either: owing more isn't green news.
- */
-const BALANCE: Record<Direction, Mark> = {
-  up: { icon: ArrowUp, label: 'Grew', tone: '', tile: QUIET },
-  down: { icon: ArrowDown, label: 'Shrank', tone: '', tile: QUIET },
-  none: UNTOUCHED,
-};
 
 export default async function LedgerPage({
   searchParams,
@@ -110,15 +78,6 @@ export default async function LedgerPage({
     next.set('code', c);
     return `/money/ledger?${next}`;
   };
-
-  // Newest first, so one day's entries always sit together.
-  const days: Array<{ key: string; label: string; entries: LedgerRow[] }> = [];
-  for (const e of entries) {
-    const key = new Date(e.occurredAt).toDateString();
-    const day = days.at(-1);
-    if (day?.key === key) day.entries.push(e);
-    else days.push({ key, label: dayLabel(e.occurredAt), entries: [e] });
-  }
 
   return (
     <Page fill>
@@ -185,55 +144,16 @@ export default async function LedgerPage({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {days.map((day) => (
+              {byDay(entries).map((day) => (
                 <Fragment key={day.key}>
-                  <TableRow className="hover:bg-transparent">
-                    <TableCell
-                      colSpan={3}
-                      className="h-8 bg-muted/40 text-xs font-medium text-muted-foreground"
-                    >
-                      {day.label}
-                    </TableCell>
-                  </TableRow>
-                  {day.entries.map((e) => {
+                  <DayRow label={day.label} span={3} />
+                  {day.rows.map((e) => {
                     const effect = lens ? effectOn(e, lens) : null;
-                    const mark = marks[effect === null ? 'none' : effect > 0 ? 'up' : 'down'];
-                    const href = sourceHref(e);
-                    const time = timeOf(e.occurredAt);
-                    const memo = entryMemo(e);
+                    const mark = marks[directionOf(effect)];
                     return (
                       <TableRow key={e.id}>
                         <TableCell className="h-14 max-w-0">
-                          <div className="flex min-w-0 items-center gap-3">
-                            <span
-                              title={mark.label}
-                              className={cn('flex size-8 shrink-0 items-center justify-center', mark.tile)}
-                            >
-                              <mark.icon className="size-4" />
-                            </span>
-                            <div className="min-w-0">
-                              <div className="flex min-w-0 items-center gap-2">
-                                {href ? (
-                                  <Link
-                                    href={href}
-                                    className="truncate font-medium underline-offset-2 hover:underline"
-                                  >
-                                    {kindLabel(e.kind)}
-                                  </Link>
-                                ) : (
-                                  <span className="truncate font-medium">{kindLabel(e.kind)}</span>
-                                )}
-                                {e.reversesId ? <Badge variant="outline">Reversal</Badge> : null}
-                              </div>
-                              {time || memo ? (
-                                <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                                  {time ? <span className="num">{time}</span> : null}
-                                  {time && memo ? ' · ' : null}
-                                  {memo ? <bdi>{memo}</bdi> : null}
-                                </p>
-                              ) : null}
-                            </div>
-                          </div>
+                          <EntryCell entry={e} mark={mark} when={timeOf(e.occurredAt)} />
                         </TableCell>
                         <TableCell>
                           <div className="flex min-w-0 items-center gap-1.5">
@@ -272,41 +192,6 @@ export default async function LedgerPage({
         )}
       </TablePanel>
     </Page>
-  );
-}
-
-/**
- * An account as the ledger names it — a chip, so the two ends of a movement
- * read as places rather than words, and a link to that account's own ledger.
- * The account the amounts are signed against wears the selection colour.
- */
-function AccountChip({
-  name,
-  title,
-  href,
-  lens,
-}: {
-  name: string;
-  title?: string;
-  href?: string;
-  lens?: boolean;
-}) {
-  const className = cn(
-    'inline-flex h-6 min-w-0 items-center border px-2 font-medium transition-colors',
-    lens
-      ? 'border-highlight/30 bg-highlight/10 text-highlight'
-      : 'border-border bg-muted/50 text-foreground',
-    href && (lens ? 'hover:bg-highlight/15' : 'hover:border-foreground/20 hover:bg-muted'),
-  );
-  const label = <bdi className="truncate">{name}</bdi>;
-  return href ? (
-    <Link href={href} title={title ? `${title} — open its ledger` : undefined} className={className}>
-      {label}
-    </Link>
-  ) : (
-    <span title={title} className={className}>
-      {label}
-    </span>
   );
 }
 

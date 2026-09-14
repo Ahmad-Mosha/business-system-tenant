@@ -64,19 +64,20 @@ export function dayLabel(v: string, now = new Date()): string {
   });
 }
 
+/** Rows already newest first, bunched by calendar day, each day with its heading. */
+export function byDay<T extends { occurredAt: string }>(rows: T[]) {
+  const days: Array<{ key: string; label: string; rows: T[] }> = [];
+  for (const row of rows) {
+    const key = new Date(row.occurredAt).toDateString();
+    const day = days.at(-1);
+    if (day?.key === key) day.rows.push(row);
+    else days.push({ key, label: dayLabel(row.occurredAt), rows: [row] });
+  }
+  return days;
+}
+
 export const isNegative = (v: string | number | null | undefined) =>
   v !== null && v !== undefined && v !== '' && Number(v) < 0;
-
-/**
- * The colour a signed figure gets everywhere: money out / negative is
- * destructive-red, money in / positive is success-green, zero is neutral.
- */
-export function signedTone(v: string | number | null | undefined): string {
-  const n = Number(v ?? 0);
-  if (n < 0) return 'text-destructive';
-  if (n > 0) return 'text-success';
-  return '';
-}
 
 /**
  * Money split into a bold whole part and a de-emphasised `.dd` — so a big
