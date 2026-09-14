@@ -103,11 +103,6 @@
   --warning: oklch(0.555 0.146 55);
   --warning-subtle: oklch(0.975 0.035 85);
   --destructive-subtle: oklch(0.971 0.013 17.38);
-  /* Legacy shell sizes — removed once every screen is on the new shell. */
-  --bar-h: 48px;
-  --strip-h: 30px;
-  --rail-w: 216px;
-  --detail-w: 420px;
 }
 
 .dark {
