@@ -36,7 +36,7 @@ export function AssignMenu({
     <InlineMenu
       label={`Change assignee, currently ${assignedToName ?? 'unassigned'}`}
       pending={pending}
-      className="-ms-1.5 px-1.5 py-1 hover:bg-muted"
+      className="px-1.5 py-1 hover:bg-muted"
       trigger={
         <>
           <UserRound className="size-3.5 shrink-0 text-muted-foreground" />

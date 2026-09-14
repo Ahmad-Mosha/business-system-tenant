@@ -4,7 +4,13 @@ import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { Amount } from '@/components/amount';
 import { OrderActions } from '@/components/order-actions';
-import { PaymentBadge, sourceLabel, StatusBadge } from '@/components/order-status';
+import {
+  PAYMENT_LABELS,
+  PaymentBadge,
+  sourceLabel,
+  STATUS_LABELS,
+  StatusBadge,
+} from '@/components/order-status';
 import { Page, PageHeader } from '@/components/page';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -241,6 +247,8 @@ function Detail({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function describe(e: { type: string; fromValue: string | null; toValue: string | null }): string {
+  // Enum values read as words: "Status Confirmed → Shipped", not CONFIRMED.
+  const label = (map: Record<string, string>, v: string | null) => (v ? (map[v] ?? v) : '—');
   switch (e.type) {
     case 'CREATED':
       return `Created from ${e.toValue === 'EASYORDERS' ? 'the website' : 'social'}`;
@@ -249,9 +257,9 @@ function describe(e: { type: string; fromValue: string | null; toValue: string |
     case 'ASSIGNED':
       return e.toValue === 'unassigned' ? 'Unassigned' : 'Assigned to a moderator';
     case 'STATUS_CHANGED':
-      return `Status ${e.fromValue} → ${e.toValue}`;
+      return `Status ${label(STATUS_LABELS, e.fromValue)} → ${label(STATUS_LABELS, e.toValue)}`;
     case 'PAYMENT_CHANGED':
-      return `Payment ${e.fromValue} → ${e.toValue}`;
+      return `Payment ${label(PAYMENT_LABELS, e.fromValue)} → ${label(PAYMENT_LABELS, e.toValue)}`;
     default:
       return e.toValue ? `Updated to ${e.toValue}` : 'Updated';
   }
