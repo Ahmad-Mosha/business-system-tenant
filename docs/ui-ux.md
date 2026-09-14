@@ -116,6 +116,29 @@ records use `FormDialog`.
 - Tables: 44px rows, muted header, row-link overlay on the first cell; the
   dropdown chevrons of in-row menus show only on the hovered row.
 - Every list has an empty state that says why it's empty and what to do.
+- The one filter a list is mostly used by can be `segments` in the `FilterBar`
+  (all options on show, with counts) — Inventory's stock level.
+
+### Money and stock rows
+
+Ledger, Treasury, the Money overview and a product's stock history share one
+row (`components/ledger-entry.tsx`): a direction tile, the entry and what's
+behind it (linked to its order or invoice), then its time and note under it;
+days get a heading row.
+
+- Ledger entries are never signed — each moves a positive amount between two
+  accounts. A sign exists only from one account's side (`effectOn`, the API's
+  `naturalBalance` rule). With no account chosen, the ledger is read from the
+  treasury (الخزينة); a movement that never touched it shows plain.
+- Green in / red out only for accounts that hold money or stock (`ASSET`). For
+  what's owed, earned, spent or put in, entries *grew* or *shrank* the balance,
+  without colour — owing more is not green news.
+- Account names are chips that open that account's ledger; the account the
+  amounts are read from wears the selection colour.
+- Stock states: out (≤ 0), low (≤ 5, the API's `low_stock` line), in stock —
+  `lib/stock.ts`. A product has no photo, so lists show its category's icon.
+- Things recorded from a date alone (vouchers, invoices) are stored at midnight
+  UTC; `dateTime` and `timeOf` print them without a time.
 
 ---
 

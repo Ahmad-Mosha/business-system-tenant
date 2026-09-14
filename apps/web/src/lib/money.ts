@@ -1,5 +1,5 @@
 import type { Tone } from '@/components/tone-badge';
-import type { AccountBalance } from '@/lib/api';
+import type { AccountBalance, LedgerRow } from '@/lib/api';
 
 /** Plain-language label for every ledger entry kind, for the activity feed. */
 export const KIND_LABEL: Record<string, string> = {
@@ -25,6 +25,44 @@ export const KIND_LABEL: Record<string, string> = {
 };
 
 export const kindLabel = (kind: string) => KIND_LABEL[kind] ?? kind;
+
+/**
+ * What one entry did to one account: positive when its balance grew, negative
+ * when it shrank, null when the entry never touched it. Entries themselves are
+ * never signed — they move a positive amount from one account to another — so
+ * a sign only exists from an account's point of view. Same rule as the API's
+ * `naturalBalance` (finance/ledger.service.ts).
+ */
+export function effectOn(
+  e: Pick<LedgerRow, 'amount' | 'debitCode' | 'creditCode'>,
+  account: Pick<AccountBalance, 'code' | 'kind'>,
+): number | null {
+  const side = e.debitCode === account.code ? 1 : e.creditCode === account.code ? -1 : 0;
+  if (!side) return null;
+  const debitGrows = account.kind === 'ASSET' || account.kind === 'EXPENSE';
+  return Number(e.amount) * side * (debitGrows ? 1 : -1);
+}
+
+/** Where an entry came from, when that record has a screen of its own. */
+const SOURCE_PATH: Record<string, string> = {
+  order: '/orders/',
+  purchase_invoice: '/money/purchases/',
+  supplier: '/money/suppliers/',
+};
+
+export const sourceHref = (e: Pick<LedgerRow, 'sourceType' | 'sourceId'>) =>
+  e.sourceType && e.sourceId && SOURCE_PATH[e.sourceType] ? SOURCE_PATH[e.sourceType] + e.sourceId : null;
+
+/**
+ * An entry's memo minus what its row already says. A reversal is written as
+ * "Reversal — <original memo or kind>"; the row shows a Reversal badge and the
+ * kind, so only an original memo is worth repeating.
+ */
+export function entryMemo(e: Pick<LedgerRow, 'memo' | 'kind' | 'reversesId'>): string | null {
+  if (!e.memo || !e.reversesId) return e.memo;
+  const original = e.memo.replace(/^Reversal — /, '');
+  return original === e.kind ? null : original;
+}
 
 /** How an invoice's paid state reads, and what it means. */
 export const PAID_STATUS: Record<string, { label: string; tone: Tone }> = {

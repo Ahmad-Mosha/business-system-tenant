@@ -26,28 +26,58 @@ export function date(v: string | null | undefined): string {
   });
 }
 
+/**
+ * Recorded from a date alone — a voucher, an invoice, an opening balance. The
+ * API stores those at midnight UTC, and printing that as "03:00" would invent
+ * a time nobody entered.
+ */
+const isDateOnly = (d: Date) => d.getTime() % 86_400_000 === 0;
+
+/** `14 Sept, 15:29` — or `4 Sept` for something that has no time. */
 export function dateTime(v: string): string {
-  return new Date(v).toLocaleString('en-GB', {
+  const d = new Date(v);
+  return d.toLocaleString('en-GB', {
     day: 'numeric',
     month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
+    ...(isDateOnly(d) ? {} : { hour: '2-digit', minute: '2-digit' }),
   });
+}
+
+/** `15:29`, or '' for something that has no time. */
+export function timeOf(v: string): string {
+  const d = new Date(v);
+  return isDateOnly(d) ? '' : d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+}
+
+/** A day heading for a dated list: "Today", "Yesterday", "Mon 14 Sept". */
+export function dayLabel(v: string, now = new Date()): string {
+  const d = new Date(v);
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (d.toDateString() === now.toDateString()) return 'Today';
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return d.toLocaleDateString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric',
+  });
+}
+
+/** Rows already newest first, bunched by calendar day, each day with its heading. */
+export function byDay<T extends { occurredAt: string }>(rows: T[]) {
+  const days: Array<{ key: string; label: string; rows: T[] }> = [];
+  for (const row of rows) {
+    const key = new Date(row.occurredAt).toDateString();
+    const day = days.at(-1);
+    if (day?.key === key) day.rows.push(row);
+    else days.push({ key, label: dayLabel(row.occurredAt), rows: [row] });
+  }
+  return days;
 }
 
 export const isNegative = (v: string | number | null | undefined) =>
   v !== null && v !== undefined && v !== '' && Number(v) < 0;
-
-/**
- * The colour a signed figure gets everywhere: money out / negative is
- * destructive-red, money in / positive is success-green, zero is neutral.
- */
-export function signedTone(v: string | number | null | undefined): string {
-  const n = Number(v ?? 0);
-  if (n < 0) return 'text-destructive';
-  if (n > 0) return 'text-success';
-  return '';
-}
 
 /**
  * Money split into a bold whole part and a de-emphasised `.dd` — so a big
