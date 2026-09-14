@@ -81,11 +81,12 @@ exists behind the theme toggle.
 | Role | Use |
 |---|---|
 | Ground | White background and cards, `sidebar` a step off-white |
-| Primary (teal) | Primary actions, the current selection (active nav mark, pressed toggles, active filters, checked choice cards), charts |
+| Primary (teal) | Primary actions and charts. The current selection (pressed toggles, active filters, checked choice cards) uses `highlight` — the same teal in light, a brighter one in dark where primary is too dim as text |
 | Semantic | `success`, `warning`, `destructive` (+ `-subtle` fills) — state only, never identity. Dark enough for 12px text on white |
 
-Status chips go through `ToneBadge` (`neutral`, `muted`, `progress`, `success`,
-`warning`, `danger`) — one mapping per domain status, never ad-hoc colours.
+Statuses go through `ToneBadge` (`neutral`, `muted`, `progress`, `success`,
+`warning`, `danger`) — a coloured mark and a plain word, no box, one mapping
+per domain status, never ad-hoc colours.
 
 ### Type
 
@@ -101,16 +102,19 @@ Status chips go through `ToneBadge` (`neutral`, `muted`, `progress`, `success`,
 
 ### Page anatomy
 
-`Page` → `PageHeader` (title, description, actions, optional back) →
-`MetricGrid` of `MetricCard`s → `FilterBar` (URL-synced) → `TablePanel` with
-`TablePagination`. List screens use `<Page fill>`: on desktop the table scrolls
+The content sits on an inset sheet beside a collapsible, 13rem sidebar (modules
+fold open). `Page` → `PageHeader` (title, description, actions, optional back)
+→ `MetricGrid` (one strip of figures with hairline dividers) → `FilterBar`
+(URL-synced) → `TablePanel` with `TablePagination`. List screens use `<Page fill>`: on desktop the table scrolls
 inside its panel and the filters and pagination never leave the screen; under
 `lg` the page scrolls. Forms are cards with a sticky summary column; small
 records use `FormDialog`.
 
-- Metric cards are read-only — a corner link drills into the records behind a
-  figure, and trends appear only where real history exists.
-- Tables: 44px rows, muted header, row-link overlay on the first cell.
+- Figures are read-only and compact (20px max) — a corner link drills into the
+  records behind one, a small coloured mark flags state, and trends appear
+  only where real history exists.
+- Tables: 44px rows, muted header, row-link overlay on the first cell; the
+  dropdown chevrons of in-row menus show only on the hovered row.
 - Every list has an empty state that says why it's empty and what to do.
 
 ---
