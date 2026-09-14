@@ -7,7 +7,7 @@ import { ChannelBadge } from '@/components/order-status';
 import { Page, PageHeader } from '@/components/page';
 import { SyncWebsiteButton } from '@/components/sync-website-button';
 import { TableEmpty, TablePagination, TablePanel } from '@/components/table-panel';
-import { ToneBadge, type Tone } from '@/components/tone-badge';
+import { ToneBadge } from '@/components/tone-badge';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -20,25 +20,16 @@ import {
 import { getProductsCatalog, getProductsSummary } from '@/lib/api';
 import { CATEGORIES, categoryIcon, categoryLabel } from '@/lib/categories';
 import { requireAdmin } from '@/lib/session';
+import { LOW_STOCK, stockState, units } from '@/lib/stock';
 import { cn } from '@/lib/utils';
 
 const PAGE_SIZE = 20;
-/** Mirrors the API's `low_stock` filter. */
-const LOW_STOCK = 5;
 
 const STOCK_LEVELS = [
   { value: 'in_stock', label: 'In stock' },
   { value: 'low_stock', label: 'Low stock' },
   { value: 'out_of_stock', label: 'Out of stock' },
 ] as const;
-
-function stockState(onHand: number): { tone: Tone; label: string } {
-  if (onHand <= 0) return { tone: 'danger', label: 'Out of stock' };
-  if (onHand <= LOW_STOCK) return { tone: 'warning', label: 'Low stock' };
-  return { tone: 'success', label: 'In stock' };
-}
-
-const units = (n: number) => n.toLocaleString('en-GB');
 
 export default async function InventoryPage({
   searchParams,
