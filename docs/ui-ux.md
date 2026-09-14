@@ -140,6 +140,24 @@ days get a heading row.
 - Things recorded from a date alone (vouchers, invoices) are stored at midnight
   UTC; `dateTime` and `timeOf` print them without a time.
 
+### Charts
+
+shadcn's chart (`components/ui/chart.tsx`, Recharts v3); every chart lives in
+`components/charts.tsx`. The rules the analytics should keep:
+
+- **Fed by an API aggregate, never by a page of rows.** Totals come from SQL
+  (`GET /finance/cash-flow` buckets money in/out per day, week or month and
+  groups it by the other account); a list screen's rows stop at its page size.
+- **The window is in the URL** — `PeriodTabs` (7 / 30 / 90 days, 12 months), so
+  a view can be shared and the page stays a server component.
+- **Only honest comparisons.** A trend or "vs before" appears only when the
+  earlier window is entirely inside the books; the cash chart starts at the
+  opening balance, which is where the books began, not a gain.
+- Colour: the treasury's balance is teal; money in/out uses `success` /
+  `destructive`, the same as the ledger rows. A bar that stands for records
+  opens them (a breakdown bar → that account's ledger for the window).
+- Cost of goods sold isn't posted yet, so no screen shows a profit figure.
+
 ---
 
 ## Where screens get built
