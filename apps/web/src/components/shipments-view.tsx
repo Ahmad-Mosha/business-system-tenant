@@ -159,7 +159,7 @@ export function ShipmentsView({ initialShipments }: { initialShipments: Shipment
             <ToggleGroupItem
               key={value}
               value={value}
-              className="gap-1.5 data-[state=on]:bg-foreground data-[state=on]:text-background"
+              className="gap-1.5"
             >
               {label}
               <span className="num opacity-60">{count(value)}</span>
