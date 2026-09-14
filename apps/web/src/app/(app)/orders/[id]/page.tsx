@@ -175,8 +175,9 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                   <li key={e.id} className="relative flex items-baseline gap-3 ps-5">
                     <span
                       aria-hidden
+                      // Events arrive newest first — the top one is where the order is now.
                       className={
-                        i === order.events.length - 1
+                        i === 0
                           ? 'absolute top-1.5 left-0 size-[7px] bg-primary'
                           : 'absolute top-1.5 left-0 size-[7px] border border-muted-foreground/50 bg-card'
                       }

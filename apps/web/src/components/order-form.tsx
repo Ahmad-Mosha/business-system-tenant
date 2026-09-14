@@ -150,6 +150,13 @@ export function OrderForm({
           : null;
   const ready = !missing && !overStock.length;
   const back = editing ? `/orders/${order.id}` : '/orders';
+  // An order can carry a governorate outside the 27 (a website order's own
+  // spelling). Offer it too — otherwise the form's native select falls back
+  // to its first option and saving silently rewrites it to القاهرة.
+  const governorates: readonly string[] =
+    order?.governorate && !(GOVERNORATES as readonly string[]).includes(order.governorate)
+      ? [order.governorate, ...GOVERNORATES]
+      : GOVERNORATES;
 
   return (
     <form action={submit} className="contents">
@@ -243,7 +250,7 @@ export function OrderForm({
                           <SelectValue placeholder="Select…" />
                         </SelectTrigger>
                         <SelectContent position="popper" className="max-h-72">
-                          {GOVERNORATES.map((g) => (
+                          {governorates.map((g) => (
                             <SelectItem key={g} value={g}>
                               {g}
                             </SelectItem>
