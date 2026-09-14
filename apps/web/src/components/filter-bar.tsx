@@ -124,7 +124,7 @@ export function FilterBar({
             <SelectTrigger
               className={cn(
                 'min-w-36',
-                chosen ? 'border-primary/30 bg-primary/5 font-medium text-primary' : 'text-muted-foreground',
+                chosen ? 'border-highlight/30 bg-highlight/5 font-medium text-highlight' : 'text-muted-foreground',
               )}
             >
               <SelectValue>{chosen ? chosen.label : f.all}</SelectValue>

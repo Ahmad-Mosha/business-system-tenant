@@ -127,7 +127,7 @@ export function DateRangePicker({
           variant="outline"
           className={cn(
             'font-normal',
-            current ? 'border-primary/30 bg-primary/5 text-primary hover:bg-primary/10' : 'text-muted-foreground',
+            current ? 'border-highlight/30 bg-highlight/5 text-highlight hover:bg-highlight/10' : 'text-muted-foreground',
           )}
         >
           <CalendarIcon className="text-muted-foreground" />
