@@ -131,6 +131,7 @@ export default async function OrdersPage({
       />
 
       <TablePanel
+        minWidth="68rem"
         footer={
           <TablePagination
             page={page}

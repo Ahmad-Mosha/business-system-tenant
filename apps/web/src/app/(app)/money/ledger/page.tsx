@@ -84,6 +84,7 @@ export default async function LedgerPage({
       />
 
       <TablePanel
+        minWidth="48rem"
         footer={
           <TablePagination
             page={page}

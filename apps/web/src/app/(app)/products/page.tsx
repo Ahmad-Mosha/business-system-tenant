@@ -134,6 +134,7 @@ export default async function ProductsPage({
       />
 
       <TablePanel
+        minWidth="56rem"
         footer={
           <TableCount>
             <span className="num font-medium text-foreground">{products.length}</span>{' '}

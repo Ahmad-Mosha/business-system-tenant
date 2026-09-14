@@ -34,6 +34,7 @@ export default async function ImportsPage() {
       </Card>
 
       <TablePanel
+        minWidth="56rem"
         footer={
           <TableCount>
             <span className="num font-medium text-foreground">{imports.length}</span>{' '}
