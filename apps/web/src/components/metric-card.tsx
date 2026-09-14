@@ -47,13 +47,13 @@ export function MetricCard({
   className?: string;
 }) {
   return (
-    <Card className={cn('@container/metric gap-0 px-4', className)}>
-      <div className="flex min-h-6 items-start justify-between gap-2">
-        <p className="pt-0.5 text-xs font-medium text-muted-foreground">{label}</p>
+    <Card size="sm" className={cn('@container/metric gap-0 px-3.5', className)}>
+      <div className="flex min-h-5 items-start justify-between gap-2">
+        <p className="text-xs font-medium text-muted-foreground">{label}</p>
         {link ? (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon-xs" asChild className="-mt-0.5 -mr-1.5 shrink-0">
+              <Button variant="ghost" size="icon-xs" asChild className="-mt-1 -mr-1.5 shrink-0">
                 <Link href={link.href} aria-label={link.label}>
                   <ArrowUpRight />
                 </Link>
@@ -65,12 +65,12 @@ export function MetricCard({
       </div>
       {/* Never truncated — a clipped amount is a wrong amount. The size steps
           down with the card instead. */}
-      <div className="num mt-2 text-lg leading-none font-semibold tracking-tight whitespace-nowrap @[11rem]/metric:text-[22px] @[14rem]/metric:text-2xl @[17rem]/metric:text-[28px]">
+      <div className="num mt-1.5 text-lg leading-none font-semibold tracking-tight whitespace-nowrap @[11rem]/metric:text-xl @[15rem]/metric:text-2xl">
         {value}
       </div>
-      {children ? <div className="mt-3">{children}</div> : null}
+      {children ? <div className="mt-2">{children}</div> : null}
       {hint || badge ? (
-        <div className={cn('mt-2.5 flex items-center gap-1.5 text-xs', TONE_TEXT[tone])}>
+        <div className={cn('mt-2 flex items-center gap-1.5 text-xs', TONE_TEXT[tone])}>
           {badge}
           {tone !== 'default' && !badge ? (
             <span aria-hidden className="size-1.5 shrink-0 bg-current" />
