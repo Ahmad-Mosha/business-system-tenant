@@ -18,11 +18,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { getPurchase, getSupplier } from '@/lib/api';
-import { date, money } from '@/lib/format';
+import { money } from '@/lib/format';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
+import { getFormat } from '@/i18n/get-format';
 
 export default async function PurchaseDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const f = await getFormat();
   await requireAdmin();
   const { id } = await params;
   const invoice = await getPurchase(id).catch(() => null);
@@ -46,7 +48,7 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
         meta={<PaidChip status={invoice.paidStatus} />}
         description={
           <>
-            <bdi className="text-foreground">{invoice.supplier.name}</bdi> · {date(invoice.invoiceDate)} ·{' '}
+            <bdi className="text-foreground">{invoice.supplier.name}</bdi> · {f.date(invoice.invoiceDate)} ·{' '}
             {invoice.payment === 'CASH' ? 'paid in cash' : 'on credit'}
           </>
         }
@@ -139,14 +141,14 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
                 <>Not posted yet. Posting adds {money(invoice.landedTotal)} of stock and books the money.</>
               ) : invoice.payment === 'CASH' ? (
                 <>
-                  Posted {date(invoice.postedAt)}. {money(invoice.landedTotal)} came out of cash — this
+                  Posted {f.date(invoice.postedAt)}. {money(invoice.landedTotal)} came out of cash — this
                   invoice is settled.
                 </>
               ) : invoice.paidStatus === 'PAID' ? (
-                <>Posted {date(invoice.postedAt)} on credit, and fully paid.</>
+                <>Posted {f.date(invoice.postedAt)} on credit, and fully paid.</>
               ) : (
                 <>
-                  Posted {date(invoice.postedAt)} on credit. {money(remaining)} is still owed to{' '}
+                  Posted {f.date(invoice.postedAt)} on credit. {money(remaining)} is still owed to{' '}
                   <bdi>{invoice.supplier.name}</bdi> — use Record payment when you pay them.
                 </>
               )}

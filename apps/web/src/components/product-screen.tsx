@@ -31,7 +31,8 @@ import { VariantPanel, type Movement } from '@/components/variant-panel';
 import type { ProductDetail } from '@/lib/api';
 import { CATEGORIES, categoryLabel } from '@/lib/categories';
 import { money } from '@/lib/format';
-import { LOW_STOCK, stockState, units } from '@/lib/stock';
+import { LOW_STOCK, stockState } from '@/lib/stock';
+import { useFormat } from '@/i18n/use-format';
 
 /** "No category" in a toggle group that can't hold an empty value. */
 const NONE = 'none';
@@ -51,6 +52,7 @@ export function ProductScreen({
   product: ProductDetail;
   history: Array<{ variantId: string; movements: Movement[] }>;
 }) {
+  const f = useFormat();
   const [editing, setEditing] = useState(false);
   const [pending, start] = useTransition();
   const [archiving, startArchive] = useTransition();
@@ -209,7 +211,7 @@ export function ProductScreen({
       <MetricGrid>
         <MetricCard
           label="On hand"
-          value={units(onHand)}
+          value={f.count(onHand)}
           tone={STATE_MARK[state.tone]}
           hint={
             state.tone === 'success'
@@ -221,7 +223,7 @@ export function ProductScreen({
         />
         <MetricCard
           label="In open orders"
-          value={units(inOrders)}
+          value={f.count(inOrders)}
           hint={inOrders > 0 ? 'Already off on-hand, not delivered yet' : 'Nothing waiting'}
         />
         <MetricCard

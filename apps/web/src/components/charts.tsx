@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useId, type ReactNode } from 'react';
 import {
   Area,
@@ -20,48 +21,48 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart';
+import { useDirection } from '@/components/ui/direction';
+import type { Format } from '@/i18n/format';
+import { useFormat } from '@/i18n/use-format';
 import type { Period } from '@/lib/api';
-import { money, monthLabel } from '@/lib/format';
+import { money } from '@/lib/format';
 
 /**
  * Every chart in the app, on shadcn's chart (Recharts underneath). Each one is
  * fed straight from an API aggregate — none of them sums a page of rows — and
  * colours come from the theme: teal for the brand's own figures, success and
  * destructive only where a value means money in or out.
+ *
+ * Right-to-left, by kind rather than blanket mirroring: time series keep time
+ * running left to right, the most common pattern in Arabic charts and the way
+ * the digits themselves read; breakdowns — labels and bars — mirror, so a
+ * label sits where an Arabic reader starts. Axis ticks, tooltips and legends
+ * are in the reader's language either way.
  */
 
 export type Bucket = 'day' | 'week' | 'month';
 
-/** `1,250,000` → `1.3M` — axis ticks only, where the exact figure is noise. */
-const compact = (v: number) =>
-  new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(v);
-
-/** A bucket's start date as an axis tick, or in full for a tooltip. */
-function periodLabel(iso: string, bucket: Bucket, long = false) {
-  const d = new Date(`${iso}T00:00:00Z`);
-  if (bucket === 'month') {
-    return d.toLocaleDateString('en-GB', {
-      month: long ? 'long' : 'short',
-      year: long ? 'numeric' : '2-digit',
-      timeZone: 'UTC',
-    });
-  }
-  const day = d.toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: long ? 'numeric' : undefined,
-    timeZone: 'UTC',
-  });
-  return bucket === 'week' && long ? `Week of ${day}` : day;
+/** A bucket's start as an axis tick, or in full for a tooltip. */
+function bucketLabel(f: Format, weekOf: (date: string) => string, iso: string, bucket: Bucket, long = false) {
+  if (bucket === 'month') return long ? f.month(iso.slice(0, 7)) : f.monthShort(iso.slice(0, 7));
+  if (!long) return f.dayShort(iso);
+  const full = f.date(`${iso}T12:00:00Z`);
+  return bucket === 'week' ? weekOf(full) : full;
 }
 
 /** Signed money for a tooltip: `+490.00`, `−10,000.00`. */
 const signedMoney = (v: number) => (v > 0 ? '+' : v < 0 ? '−' : '') + money(Math.abs(v));
 
+/** Amounts in a breakdown read unsigned unless they're below zero. */
+const signedOrPlain = (v: number) => (v < 0 ? '−' : '') + money(Math.abs(v));
+
 /** A gradient id that's safe inside `url(#…)`. */
 function useGradientId() {
   return `g${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
 }
+
+/** Room for the value axis — Arabic compact figures ("1.1 مليون") run longer. */
+const useAxisWidth = () => (useDirection() === 'rtl' ? 64 : 52);
 
 function ChartEmpty({ children, className = 'h-64' }: { children: ReactNode; className?: string }) {
   return (
@@ -71,7 +72,7 @@ function ChartEmpty({ children, className = 'h-64' }: { children: ReactNode; cla
   );
 }
 
-const sparkConfig = { balance: { label: 'Cash', color: 'var(--chart-4)' } } satisfies ChartConfig;
+const sparkConfig = { balance: { color: 'var(--chart-4)' } } satisfies ChartConfig;
 
 /** A small trend line under a figure. Flat grey when the period ended lower. */
 export function Sparkline({ points }: { points: number[] }) {
@@ -104,8 +105,6 @@ export function Sparkline({ points }: { points: number[] }) {
   );
 }
 
-const balanceConfig = { balance: { label: 'Cash on hand', color: 'var(--chart-4)' } } satisfies ChartConfig;
-
 /** The treasury's closing balance, day by day. */
 export function CashBalanceChart({
   series,
@@ -114,13 +113,17 @@ export function CashBalanceChart({
   series: Array<{ date: string; balance: string }>;
   className?: string;
 }) {
+  const t = useTranslations('charts');
+  const f = useFormat();
   const id = useGradientId();
+  const axisWidth = useAxisWidth();
   if (series.length < 2) {
-    return <ChartEmpty className={className}>Not enough history yet — the chart fills in as days pass.</ChartEmpty>;
+    return <ChartEmpty className={className}>{t('notEnoughHistory')}</ChartEmpty>;
   }
+  const config = { balance: { label: t('cashOnHand'), color: 'var(--chart-4)' } } satisfies ChartConfig;
   const data = series.map((p) => ({ date: p.date, balance: Number(p.balance) }));
   return (
-    <ChartContainer config={balanceConfig} className={`aspect-auto w-full ${className}`}>
+    <ChartContainer config={config} className={`aspect-auto w-full ${className}`}>
       <AreaChart accessibilityLayer data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
         <defs>
           <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
@@ -135,20 +138,20 @@ export function CashBalanceChart({
           axisLine={false}
           tickMargin={8}
           minTickGap={40}
-          tickFormatter={(v: string) => periodLabel(v, 'day')}
+          tickFormatter={(v: string) => f.dayShort(v)}
         />
         <YAxis
           tickLine={false}
           axisLine={false}
-          width={52}
+          width={axisWidth}
           domain={['auto', 'auto']}
-          tickFormatter={compact}
+          tickFormatter={(v: number) => f.compact(v)}
         />
         <ChartTooltip
           content={
             <ChartTooltipContent
               indicator="line"
-              labelFormatter={(v) => periodLabel(String(v), 'day', true)}
+              labelFormatter={(v) => f.date(`${String(v)}T12:00:00Z`)}
               valueFormatter={money}
             />
           }
@@ -165,11 +168,6 @@ export function CashBalanceChart({
   );
 }
 
-const flowConfig = {
-  in: { label: 'Money in', color: 'var(--success)' },
-  out: { label: 'Money out', color: 'var(--destructive)' },
-} satisfies ChartConfig;
-
 /**
  * Money in above the line, money out below it — one bar pair per day, week or
  * month, so which way cash moved reads before any number does.
@@ -181,12 +179,20 @@ export function CashFlowChart({
   series: Array<{ period: string; in: string; out: string }>;
   bucket: Bucket;
 }) {
+  const t = useTranslations('charts');
+  const f = useFormat();
+  const axisWidth = useAxisWidth();
   const data = series.map((p) => ({ period: p.period, in: Number(p.in), out: -Number(p.out) }));
   if (data.every((d) => d.in === 0 && d.out === 0)) {
-    return <ChartEmpty>No money moved in this period.</ChartEmpty>;
+    return <ChartEmpty>{t('noMovement')}</ChartEmpty>;
   }
+  const config = {
+    in: { label: t('moneyIn'), color: 'var(--success)' },
+    out: { label: t('moneyOut'), color: 'var(--destructive)' },
+  } satisfies ChartConfig;
+  const weekOf = (date: string) => t('weekOf', { date });
   return (
-    <ChartContainer config={flowConfig} className="aspect-auto h-64 w-full">
+    <ChartContainer config={config} className="aspect-auto h-64 w-full">
       <BarChart accessibilityLayer data={data} stackOffset="sign" margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
         <CartesianGrid vertical={false} />
         <XAxis
@@ -195,20 +201,20 @@ export function CashFlowChart({
           axisLine={false}
           tickMargin={8}
           minTickGap={24}
-          tickFormatter={(v: string) => periodLabel(v, bucket)}
+          tickFormatter={(v: string) => bucketLabel(f, weekOf, v, bucket)}
         />
         <YAxis
           tickLine={false}
           axisLine={false}
-          width={52}
-          tickFormatter={(v: number) => compact(Math.abs(v))}
+          width={axisWidth}
+          tickFormatter={(v: number) => f.compact(Math.abs(v))}
         />
         <ReferenceLine y={0} stroke="var(--border)" />
         <ChartTooltip
           cursor={{ fill: 'var(--muted)', fillOpacity: 0.6 }}
           content={
             <ChartTooltipContent
-              labelFormatter={(v) => periodLabel(String(v), bucket, true)}
+              labelFormatter={(v) => bucketLabel(f, weekOf, String(v), bucket, true)}
               valueFormatter={signedMoney}
             />
           }
@@ -230,36 +236,39 @@ export interface BarItem {
   href?: string;
 }
 
-const listConfig = { size: { label: 'Amount' } } satisfies ChartConfig;
-
 /**
- * Horizontal bars, label on the left and amount at the end — for "what made
- * this up" breakdowns. Labels sit in their own column, not inside the bar, so
- * a small amount's label never has to squeeze into a small bar. A bar with an
- * `href` opens the records behind it.
+ * Horizontal bars, label then bar then amount — for "what made this up"
+ * breakdowns. Labels sit in their own column, not inside the bar, so a small
+ * amount's label never squeezes into a small bar. In Arabic the whole row
+ * mirrors: label on the right, bar growing leftward, amount at its end. A bar
+ * with an `href` opens the records behind it.
  */
 export function BarList({ items, empty }: { items: BarItem[]; empty: string }) {
+  const t = useTranslations('charts');
   const router = useRouter();
+  const rtl = useDirection() === 'rtl';
   if (items.length === 0) return <ChartEmpty className="h-24">{empty}</ChartEmpty>;
+  const config = { size: { label: t('amount') } } satisfies ChartConfig;
   const data = items.map((i) => ({ ...i, size: Math.abs(i.value) }));
   return (
-    <ChartContainer config={listConfig} className="aspect-auto w-full" style={{ height: items.length * 36 }}>
+    <ChartContainer config={config} className="aspect-auto w-full" style={{ height: items.length * 36 }}>
       <BarChart
         accessibilityLayer
         data={data}
         layout="vertical"
-        margin={{ top: 0, right: 84, bottom: 0, left: 0 }}
+        margin={rtl ? { top: 0, right: 0, bottom: 0, left: 84 } : { top: 0, right: 84, bottom: 0, left: 0 }}
         barCategoryGap={6}
       >
         <YAxis
           dataKey="label"
           type="category"
+          orientation={rtl ? 'right' : 'left'}
           width={176}
           tickLine={false}
           axisLine={false}
           tick={{ fontSize: 12, fill: 'var(--foreground)' }}
         />
-        <XAxis dataKey="size" type="number" hide domain={[0, 'dataMax']} />
+        <XAxis dataKey="size" type="number" hide reversed={rtl} domain={[0, 'dataMax']} />
         <ChartTooltip
           cursor={false}
           content={<ChartTooltipContent hideIndicator nameKey="label" valueFormatter={money} />}
@@ -277,7 +286,7 @@ export function BarList({ items, empty }: { items: BarItem[]; empty: string }) {
           ))}
           <LabelList
             dataKey="value"
-            position="right"
+            position={rtl ? 'left' : 'right'}
             offset={8}
             className="num fill-foreground"
             fontSize={12}
@@ -289,19 +298,18 @@ export function BarList({ items, empty }: { items: BarItem[]; empty: string }) {
   );
 }
 
-/** Amounts in a breakdown read unsigned unless they're below zero. */
-const signedOrPlain = (v: number) => (v < 0 ? '−' : '') + money(Math.abs(v));
-
-const monthsConfig = { netProceeds: { label: 'Net proceeds', color: 'var(--chart-3)' } } satisfies ChartConfig;
-
 /** noon's net proceeds per settlement month; a bar opens its month. */
 export function MonthlyProceedsChart({ periods }: { periods: Period[] }) {
+  const t = useTranslations('charts');
+  const f = useFormat();
   const router = useRouter();
+  const axisWidth = useAxisWidth();
+  const config = { netProceeds: { label: t('netProceeds'), color: 'var(--chart-3)' } } satisfies ChartConfig;
   const data = [...periods]
     .sort((a, b) => a.month.localeCompare(b.month))
     .map((p) => ({ ...p, netProceeds: Number(p.netProceeds) }));
   return (
-    <ChartContainer config={monthsConfig} className="aspect-auto h-60 w-full">
+    <ChartContainer config={config} className="aspect-auto h-60 w-full">
       <BarChart accessibilityLayer data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
         <CartesianGrid vertical={false} />
         <XAxis
@@ -309,9 +317,9 @@ export function MonthlyProceedsChart({ periods }: { periods: Period[] }) {
           tickLine={false}
           axisLine={false}
           tickMargin={8}
-          tickFormatter={(m: string) => periodLabel(`${m}-01`, 'month')}
+          tickFormatter={(m: string) => f.monthShort(m)}
         />
-        <YAxis tickLine={false} axisLine={false} width={52} tickFormatter={compact} />
+        <YAxis tickLine={false} axisLine={false} width={axisWidth} tickFormatter={(v: number) => f.compact(v)} />
         <ReferenceLine y={0} stroke="var(--border)" />
         <ChartTooltip
           cursor={{ fill: 'var(--muted)', fillOpacity: 0.6 }}
@@ -319,7 +327,7 @@ export function MonthlyProceedsChart({ periods }: { periods: Period[] }) {
             <ChartTooltipContent
               labelFormatter={(_, payload) => {
                 const p = payload?.[0]?.payload as Period | undefined;
-                return p ? `${monthLabel(p.month)} · ${p.unitsSold.toLocaleString('en-GB')} units` : '';
+                return p ? `${f.month(p.month)} · ${t('units', { count: p.unitsSold })}` : '';
               }}
               valueFormatter={money}
             />

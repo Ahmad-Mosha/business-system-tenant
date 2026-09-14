@@ -15,10 +15,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { getSupplier } from '@/lib/api';
-import { date, dateTime, money } from '@/lib/format';
+import { money } from '@/lib/format';
 import { requireAdmin } from '@/lib/session';
+import { getFormat } from '@/i18n/get-format';
 
 export default async function SupplierDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const f = await getFormat();
   await requireAdmin();
   const { id } = await params;
   const supplier = await getSupplier(id).catch(() => null);
@@ -90,7 +92,7 @@ export default async function SupplierDetailPage({ params }: { params: Promise<{
                         {i.payment === 'CASH' ? 'Cash' : 'Credit'}
                       </span>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{date(i.invoiceDate)}</TableCell>
+                    <TableCell className="text-muted-foreground">{f.date(i.invoiceDate)}</TableCell>
                     <TableCell>
                       <PaidChip status={i.paidStatus} />
                     </TableCell>
@@ -118,7 +120,7 @@ export default async function SupplierDetailPage({ params }: { params: Promise<{
                       <p className="truncate">
                         <bdi>{p.memo ?? 'Payment'}</bdi>
                       </p>
-                      <p className="text-xs text-muted-foreground">{dateTime(p.occurredAt)}</p>
+                      <p className="text-xs text-muted-foreground">{f.dateTime(p.occurredAt)}</p>
                     </TableCell>
                     <TableCell className="num w-[130px] text-end font-medium text-destructive">
                       −{money(p.amount)}

@@ -14,10 +14,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { getAccount, getPeriods } from '@/lib/api';
-import { money, monthLabel } from '@/lib/format';
+import { money } from '@/lib/format';
 import { requireAdmin } from '@/lib/session';
+import { getFormat } from '@/i18n/get-format';
 
 export default async function MonthsPage() {
+  const f = await getFormat();
   await requireAdmin();
   const [periods, account] = await Promise.all([getPeriods(), getAccount()]);
 
@@ -58,7 +60,7 @@ export default async function MonthsPage() {
                     href={`/months/${p.month}`}
                     className="after:absolute after:inset-0 hover:underline focus-visible:underline focus-visible:outline-none"
                   >
-                    {monthLabel(p.month)}
+                    {f.month(p.month)}
                   </Link>
                 </TableCell>
                 <TableCell className="num text-end">{p.unitsSold}</TableCell>

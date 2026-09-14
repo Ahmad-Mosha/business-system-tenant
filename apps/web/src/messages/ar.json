@@ -62,7 +62,7 @@
     "signOut": "تسجيل الخروج"
   },
   "table": {
-    "showing": "عرض {from}–{to} من {items}",
+    "showing": "عرض {from} إلى {to} من {items}",
     "pages": "الصفحات",
     "previousPage": "الصفحة السابقة",
     "nextPage": "الصفحة التالية",

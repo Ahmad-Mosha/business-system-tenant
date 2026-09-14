@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useDirection } from "@/components/ui/direction"
 import { cn } from "@/lib/utils"
 import * as RechartsPrimitive from "recharts"
 import type { TooltipValueType } from "recharts"
@@ -60,9 +61,14 @@ function ChartContainer({
 
   return (
     <ChartContext.Provider value={{ config }}>
+      {/* Chart geometry is always laid out left to right — Recharts places
+          axes and labels assuming it — and each chart mirrors itself where the
+          reading direction calls for it. Tooltips and legends read in the
+          page's own direction. */}
       <div
         data-slot="chart"
         data-chart={chartId}
+        dir="ltr"
         className={cn(
           "flex aspect-video justify-center text-xs [&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-hidden [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border [&_.recharts-sector]:outline-hidden [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-surface]:outline-hidden",
           className
@@ -147,6 +153,7 @@ function ChartTooltipContent({
     "accessibilityLayer"
   >) {
   const { config } = useChart()
+  const dir = useDirection()
 
   const tooltipLabel = React.useMemo(() => {
     if (hideLabel || !payload?.length) {
@@ -192,6 +199,7 @@ function ChartTooltipContent({
 
   return (
     <div
+      dir={dir}
       className={cn(
         "grid min-w-32 items-start gap-1.5 rounded-none border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl",
         className
@@ -287,6 +295,7 @@ function ChartLegendContent({
   nameKey?: string
 } & RechartsPrimitive.DefaultLegendContentProps) {
   const { config } = useChart()
+  const dir = useDirection()
 
   if (!payload?.length) {
     return null
@@ -294,6 +303,7 @@ function ChartLegendContent({
 
   return (
     <div
+      dir={dir}
       className={cn(
         "flex items-center justify-center gap-4",
         verticalAlign === "top" ? "pb-3" : "pt-3",

@@ -31,10 +31,11 @@ import {
   getPeriodSummary,
   type CashFlow,
 } from '@/lib/api';
-import { date, daysAgo, isoDate, money } from '@/lib/format';
+import { daysAgo, isoDate, money } from '@/lib/format';
 import { accountByCode, flowLabel, groupAccounts } from '@/lib/money';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
+import { getFormat } from '@/i18n/get-format';
 
 /** The windows the overview can cover, and how finely each one is bucketed. */
 const RANGES = [
@@ -59,6 +60,7 @@ export default async function MoneyOverviewPage({
 }: {
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
+  const f = await getFormat();
   await requireAdmin();
   const overview = await getFinanceOverview();
 
@@ -108,7 +110,7 @@ export default async function MoneyOverviewPage({
   const cash = accountByCode(accounts, 'CASH')?.balance ?? '0';
   const balances = series.map((p) => Number(p.balance));
   const moved = balances.length > 1 ? balances[balances.length - 1] - balances[0] : null;
-  const balanceSpan = sinceOpening ? `since the books began on ${date(opened)}` : span(range.label);
+  const balanceSpan = sinceOpening ? `since the books began on ${f.date(opened)}` : span(range.label);
   const moneyIn = sum(flow.series, 'in');
   const moneyOut = sum(flow.series, 'out');
   const net = moneyIn - moneyOut;
@@ -170,7 +172,7 @@ export default async function MoneyOverviewPage({
                   signed
                   className={cn(moved > 0 && 'text-success', moved < 0 && 'text-destructive')}
                 />{' '}
-                {sinceOpening ? `since ${date(opened)}` : `over ${range.label}`}
+                {sinceOpening ? `since ${f.date(opened)}` : `over ${range.label}`}
               </>
             )
           }

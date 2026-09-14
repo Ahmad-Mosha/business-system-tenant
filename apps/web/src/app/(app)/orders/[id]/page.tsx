@@ -25,13 +25,15 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { getAssignees, getOrder } from '@/lib/api';
-import { dateTime, money } from '@/lib/format';
+import { money } from '@/lib/format';
 import { requireSession } from '@/lib/session';
+import { getFormat } from '@/i18n/get-format';
 
 /** Mirrors OrdersService.EDITABLE — once it ships, the goods have left. */
 const EDITABLE = ['NEW', 'ASSIGNED', 'CONFIRMED'];
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
+  const f = await getFormat();
   const user = await requireSession();
   const { id } = await params;
 
@@ -55,7 +57,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             <PaymentBadge status={order.paymentStatus} />
           </>
         }
-        description={`${sourceLabel(order.source)} order · placed ${dateTime(order.placedAt)}`}
+        description={`${sourceLabel(order.source)} order · placed ${f.dateTime(order.placedAt)}`}
         actions={
           editable ? (
             <Button variant="outline" asChild>
@@ -190,7 +192,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                     />
                     <span className="min-w-0 flex-1 text-[13px]">{describe(e)}</span>
                     <span className="shrink-0 text-xs text-muted-foreground">
-                      {e.actorName ?? 'Integration'} · {dateTime(e.createdAt)}
+                      {e.actorName ?? 'Integration'} · {f.dateTime(e.createdAt)}
                     </span>
                   </li>
                 ))}
