@@ -17,7 +17,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const open = (await cookies()).get('sidebar_state')?.value !== 'false';
 
   return (
-    <SidebarProvider defaultOpen={open} className="h-svh min-h-0 overflow-hidden">
+    <SidebarProvider
+      defaultOpen={open}
+      // 13rem, not shadcn's 16 — the labels fit, and the screen is for the work.
+      style={{ '--sidebar-width': '13rem' } as React.CSSProperties}
+      className="h-svh min-h-0 overflow-hidden"
+    >
       <AppSidebar user={user} />
       <SidebarInset className="min-h-0 min-w-0 overflow-hidden">
         <SiteHeader user={user} />

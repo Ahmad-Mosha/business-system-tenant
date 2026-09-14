@@ -174,7 +174,7 @@ export function ShipmentsView({ initialShipments }: { initialShipments: Shipment
       </div>
 
       <TablePanel
-        minWidth="76rem"
+        minWidth="60rem"
         footer={
           <TableCount>
             <span className="num font-medium text-foreground">{rows.length}</span> of{' '}
