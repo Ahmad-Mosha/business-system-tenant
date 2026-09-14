@@ -48,15 +48,15 @@ export function MetricCard({
   return (
     // A cell of MetricGrid's strip: it draws its top and left hairlines, and
     // the strip clips the outer ones, so the dividers stay 1px at any count.
-    <div className={cn('@container/metric flex min-w-0 flex-col border-t border-l px-4 py-3', className)}>
+    <div className={cn('@container/metric flex min-w-0 flex-col border-t border-s px-4 py-3', className)}>
       <div className="flex min-h-5 items-start justify-between gap-2">
         <p className="text-xs font-medium text-muted-foreground">{label}</p>
         {link ? (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon-xs" asChild className="-mt-1 -mr-1.5 shrink-0">
+              <Button variant="ghost" size="icon-xs" asChild className="-mt-1 -me-1.5 shrink-0">
                 <Link href={link.href} aria-label={link.label}>
-                  <ArrowUpRight />
+                  <ArrowUpRight className="rtl:-scale-x-100" />
                 </Link>
               </Button>
             </TooltipTrigger>
@@ -136,7 +136,7 @@ export function MetricGrid({ children }: { children: ReactNode }) {
           count <= 2 && '@3xl:w-1/2',
         )}
       >
-        <div className={cn('-mt-px -ml-px grid grid-cols-2', cols)}>{children}</div>
+        <div className={cn('-mt-px -ms-px grid grid-cols-2', cols)}>{children}</div>
       </div>
     </div>
   );

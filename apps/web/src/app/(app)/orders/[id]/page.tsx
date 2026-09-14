@@ -135,9 +135,9 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               <TableHeader>
                 <TableRow>
                   <TableHead>Item</TableHead>
-                  <TableHead className="w-[70px] text-right">Qty</TableHead>
-                  <TableHead className="w-[120px] text-right">Unit price</TableHead>
-                  <TableHead className="w-[120px] text-right">Total</TableHead>
+                  <TableHead className="w-[70px] text-end">Qty</TableHead>
+                  <TableHead className="w-[120px] text-end">Unit price</TableHead>
+                  <TableHead className="w-[120px] text-end">Total</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -149,11 +149,11 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                         <span className="ms-2 text-xs text-warning">not in inventory</span>
                       ) : null}
                     </TableCell>
-                    <TableCell className="num text-right">{i.quantity}</TableCell>
-                    <TableCell className="num text-right text-muted-foreground">
+                    <TableCell className="num text-end">{i.quantity}</TableCell>
+                    <TableCell className="num text-end text-muted-foreground">
                       {money(i.unitPrice)}
                     </TableCell>
-                    <TableCell className="num text-right font-medium">{money(i.lineTotal)}</TableCell>
+                    <TableCell className="num text-end font-medium">{money(i.lineTotal)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -176,7 +176,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               <CardTitle>History</CardTitle>
             </CardHeader>
             <CardContent>
-              <ol className="relative grid gap-4 before:absolute before:inset-y-1.5 before:left-[3px] before:w-px before:bg-border">
+              <ol className="relative grid gap-4 before:absolute before:inset-y-1.5 before:start-[3px] before:w-px before:bg-border">
                 {order.events.map((e, i) => (
                   <li key={e.id} className="relative flex items-baseline gap-3 ps-5">
                     <span
@@ -184,8 +184,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                       // Events arrive newest first — the top one is where the order is now.
                       className={
                         i === 0
-                          ? 'absolute top-1.5 left-0 size-[7px] bg-primary'
-                          : 'absolute top-1.5 left-0 size-[7px] border border-muted-foreground/50 bg-card'
+                          ? 'absolute top-1.5 start-0 size-[7px] bg-primary'
+                          : 'absolute top-1.5 start-0 size-[7px] border border-muted-foreground/50 bg-card'
                       }
                     />
                     <span className="min-w-0 flex-1 text-[13px]">{describe(e)}</span>

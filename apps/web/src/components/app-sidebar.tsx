@@ -43,7 +43,7 @@ import { cn } from '@/lib/utils';
  * plus the filled row.
  */
 const SUB_ITEM =
-  'relative text-[13px] text-sidebar-foreground/75 before:absolute before:inset-y-1 before:-left-[11px] before:w-0.5 before:bg-sidebar-primary before:opacity-0 before:transition-opacity data-active:font-medium data-active:text-sidebar-foreground data-active:before:opacity-100';
+  'relative text-[13px] text-sidebar-foreground/75 before:absolute before:inset-y-1 before:-start-[11px] before:w-0.5 before:bg-sidebar-primary before:opacity-0 before:transition-opacity data-active:font-medium data-active:text-sidebar-foreground data-active:before:opacity-100';
 
 export function AppSidebar({ user }: { user: SessionUser }) {
   const pathname = usePathname();
@@ -167,7 +167,7 @@ function NavModule({ module: m, pathname }: { module: NavGroup; pathname: string
           >
             <m.icon />
             <span>{m.label}</span>
-            <ChevronRight className="ml-auto text-muted-foreground transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+            <ChevronRight className="ms-auto text-muted-foreground rtl:rotate-180 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
           </SidebarMenuButton>
         </CollapsibleTrigger>
         <CollapsibleContent>
@@ -214,7 +214,7 @@ function NavUser({ user }: { user: SessionUser }) {
                   {user.role.toLowerCase()}
                 </span>
               </span>
-              <ChevronsUpDown className="ml-auto size-4 text-muted-foreground" />
+              <ChevronsUpDown className="ms-auto size-4 text-muted-foreground" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent

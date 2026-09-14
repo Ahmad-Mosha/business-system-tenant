@@ -37,7 +37,7 @@ export function MoneyInput({
         placeholder={placeholder}
         autoFocus={autoFocus}
         disabled={disabled}
-        className="num text-right"
+        className="num text-end"
       />
       <InputGroupAddon align="inline-end">
         <InputGroupText>EGP</InputGroupText>

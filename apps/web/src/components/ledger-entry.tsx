@@ -62,7 +62,7 @@ export function EntryCell({ entry, mark, when }: { entry: LedgerRow; mark: Mark;
         title={mark.label}
         className={cn('flex size-8 shrink-0 items-center justify-center', mark.tile)}
       >
-        <mark.icon className="size-4" />
+        <mark.icon className="size-4 rtl:-scale-x-100" />
       </span>
       <div className="min-w-0">
         <div className="flex min-w-0 items-center gap-2">

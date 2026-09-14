@@ -194,11 +194,11 @@ export default async function InventoryPage({
               <TableRow>
                 <TableHead>Product</TableHead>
                 <TableHead className="w-[120px]">Stock</TableHead>
-                <TableHead className="w-[84px] text-right">On hand</TableHead>
-                <TableHead className="w-[84px] text-right">In orders</TableHead>
-                <TableHead className="w-[110px] text-right">Unit cost</TableHead>
-                <TableHead className="w-[130px] text-right">Stock value</TableHead>
-                <TableHead className="w-[210px] pl-6">Channels</TableHead>
+                <TableHead className="w-[84px] text-end">On hand</TableHead>
+                <TableHead className="w-[84px] text-end">In orders</TableHead>
+                <TableHead className="w-[110px] text-end">Unit cost</TableHead>
+                <TableHead className="w-[130px] text-end">Stock value</TableHead>
+                <TableHead className="w-[210px] ps-6">Channels</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -239,28 +239,28 @@ export default async function InventoryPage({
                       <ToneBadge tone={state.tone}>{state.label}</ToneBadge>
                     </TableCell>
                     <TableCell
-                      className={cn('num text-right font-medium', p.onHand < 0 && 'text-destructive')}
+                      className={cn('num text-end font-medium', p.onHand < 0 && 'text-destructive')}
                     >
                       {units(p.onHand)}
                     </TableCell>
-                    <TableCell className="num text-right text-muted-foreground">
+                    <TableCell className="num text-end text-muted-foreground">
                       {p.inOrders > 0 ? units(p.inOrders) : '—'}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-end">
                       {p.unitCost ? (
                         <Amount value={p.unitCost} />
                       ) : (
                         <span className="text-xs text-warning">Not set</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-end">
                       {p.unitCost && p.onHand > 0 ? (
                         <Amount value={p.onHand * Number(p.unitCost)} className="font-medium" />
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
                     </TableCell>
-                    <TableCell className="pl-6">
+                    <TableCell className="ps-6">
                       {p.channels.length ? (
                         <div className="flex flex-wrap gap-1">
                           {p.channels.map((c) => (

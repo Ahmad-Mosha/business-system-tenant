@@ -106,8 +106,8 @@ export default async function TreasuryPage() {
               <TableRow>
                 <TableHead>Movement</TableHead>
                 <TableHead className="hidden w-[240px] md:table-cell">From or to</TableHead>
-                <TableHead className="w-[150px] text-right">Amount</TableHead>
-                <TableHead className="hidden w-[150px] text-right sm:table-cell">Balance</TableHead>
+                <TableHead className="w-[150px] text-end">Amount</TableHead>
+                <TableHead className="hidden w-[150px] text-end sm:table-cell">Balance</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -134,10 +134,10 @@ export default async function TreasuryPage() {
                             />
                           </span>
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-end">
                           <Amount value={effect} signed className={cn('text-sm font-semibold', mark.tone)} />
                         </TableCell>
-                        <TableCell className="hidden text-right sm:table-cell">
+                        <TableCell className="hidden text-end sm:table-cell">
                           <Amount
                             value={m.runningBalance}
                             className={cn('font-medium', Number(m.runningBalance) < 0 && 'text-destructive')}

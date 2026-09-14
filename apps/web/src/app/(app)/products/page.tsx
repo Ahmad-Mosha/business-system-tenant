@@ -92,7 +92,7 @@ export default async function ProductsPage({
   const sortHead = (k: string, label: string) => {
     const Icon = sort !== k ? ArrowUpDown : asc ? ArrowUp : ArrowDown;
     return (
-      <TableHead key={k} className="text-right">
+      <TableHead key={k} className="text-end">
         <Link
           href={sortHref(k)}
           scroll={false}
@@ -194,18 +194,18 @@ export default async function ProductsPage({
                       ) : null}
                     </div>
                   </TableCell>
-                  <TableCell className="num text-right">{p.unitsSold}</TableCell>
-                  <TableCell className="num text-right">
+                  <TableCell className="num text-end">{p.unitsSold}</TableCell>
+                  <TableCell className="num text-end">
                     {p.unitsReturned > 0 ? (
                       <span className="text-warning">{p.unitsReturned}</span>
                     ) : (
                       <span className="text-muted-foreground/50">—</span>
                     )}
                   </TableCell>
-                  <TableCell className="num text-right">{moneyWhole(p.netProceeds)}</TableCell>
-                  <TableCell className="num text-right text-muted-foreground">{moneyWhole(fees(p))}</TableCell>
-                  <TableCell className="num text-right font-medium">{moneyWhole(p.net)}</TableCell>
-                  <TableCell className="num text-right">
+                  <TableCell className="num text-end">{moneyWhole(p.netProceeds)}</TableCell>
+                  <TableCell className="num text-end text-muted-foreground">{moneyWhole(fees(p))}</TableCell>
+                  <TableCell className="num text-end font-medium">{moneyWhole(p.net)}</TableCell>
+                  <TableCell className="num text-end">
                     {p.grossProfit === null ? (
                       <Tooltip>
                         <TooltipTrigger asChild>

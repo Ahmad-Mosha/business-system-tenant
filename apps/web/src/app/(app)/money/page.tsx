@@ -218,7 +218,7 @@ export default async function MoneyOverviewPage({
               <Button variant="ghost" size="sm" asChild>
                 <Link href="/money/treasury">
                   Treasury
-                  <ArrowUpRight />
+                  <ArrowUpRight className="rtl:-scale-x-100" />
                 </Link>
               </Button>
             </CardAction>

@@ -55,7 +55,7 @@ export function TreasuryActions() {
         kind="out"
         trigger={
           <Button variant="outline">
-            <ArrowUpRight />
+            <ArrowUpRight className="rtl:-scale-x-100" />
             Cash out
           </Button>
         }
@@ -64,7 +64,7 @@ export function TreasuryActions() {
         kind="in"
         trigger={
           <Button variant="outline">
-            <ArrowDownLeft />
+            <ArrowDownLeft className="rtl:-scale-x-100" />
             Cash in
           </Button>
         }

@@ -302,9 +302,9 @@ export function OrderForm({
                   <TableHeader>
                     <TableRow>
                       <TableHead>Item</TableHead>
-                      <TableHead className="w-[90px] text-right">Qty</TableHead>
-                      <TableHead className="w-[120px] text-right">Unit price</TableHead>
-                      <TableHead className="w-[110px] text-right">Total</TableHead>
+                      <TableHead className="w-[90px] text-end">Qty</TableHead>
+                      <TableHead className="w-[120px] text-end">Unit price</TableHead>
+                      <TableHead className="w-[110px] text-end">Total</TableHead>
                       <TableHead className="w-12" />
                     </TableRow>
                   </TableHeader>
@@ -361,7 +361,7 @@ export function OrderForm({
                                 aria-label="Quantity"
                                 aria-invalid={over}
                                 disabled={pending}
-                                className={cn(cellInput, 'num text-right', over && 'border-destructive')}
+                                className={cn(cellInput, 'num text-end', over && 'border-destructive')}
                               />
                             </TableCell>
                             <TableCell className="h-auto py-1.5">
@@ -373,10 +373,10 @@ export function OrderForm({
                                 aria-label="Unit price"
                                 placeholder="0.00"
                                 disabled={pending}
-                                className={cn(cellInput, 'num text-right', under && 'border-warning')}
+                                className={cn(cellInput, 'num text-end', under && 'border-warning')}
                               />
                             </TableCell>
-                            <TableCell className="num h-auto py-1.5 text-right leading-8 font-medium">
+                            <TableCell className="num h-auto py-1.5 text-end leading-8 font-medium">
                               {money(lineTotal(l))}
                             </TableCell>
                             <TableCell className="h-auto py-1.5 pe-2">
@@ -470,7 +470,7 @@ export function OrderForm({
                       onFocus={(e) => e.currentTarget.select()}
                       onChange={(e) => setShipping(e.target.value)}
                       disabled={pending}
-                      className="num text-right"
+                      className="num text-end"
                     />
                     <InputGroupAddon align="inline-end">
                       <InputGroupText>EGP</InputGroupText>

@@ -37,7 +37,7 @@ export function OpeningBalanceForm({
               inputMode="decimal"
               defaultValue={openingBalance}
               disabled={pending}
-              className="num text-right"
+              className="num text-end"
             />
             <InputGroupAddon align="inline-end">
               <InputGroupText>EGP</InputGroupText>

@@ -26,7 +26,7 @@ export function PendingCheques({ cheques }: { cheques: ChequeRow[] }) {
           <TableBody>
             {cheques.map((c) => (
               <TableRow key={c.id}>
-                <TableCell className="num w-[140px] text-right font-medium">{money(c.amount)}</TableCell>
+                <TableCell className="num w-[140px] text-end font-medium">{money(c.amount)}</TableCell>
                 <TableCell className="max-w-0 truncate">
                   <bdi>{c.fromParty}</bdi>
                   {c.memo ? <span className="text-muted-foreground"> · {c.memo}</span> : null}
@@ -34,7 +34,7 @@ export function PendingCheques({ cheques }: { cheques: ChequeRow[] }) {
                 <TableCell className="w-[160px] text-muted-foreground">
                   {c.dueDate ? `Due ${date(c.dueDate)}` : `Received ${date(c.receivedDate)}`}
                 </TableCell>
-                <TableCell className="w-[190px] text-right">
+                <TableCell className="w-[190px] text-end">
                   <ChequeActions id={c.id} />
                 </TableCell>
               </TableRow>
