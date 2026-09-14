@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AlertTriangle, ArrowLeft, Pencil } from 'lucide-react';
 import { OrderActions } from '@/components/order-actions';
-import { PaymentBadge, SourceLabel, StatusBadge } from '@/components/order-status';
+import { PaymentBadge, sourceLabel, StatusBadge } from '@/components/order-status';
 import { Screen } from '@/components/shell';
 import { getAssignees, getOrder } from '@/lib/api';
 import { dateTime, money } from '@/lib/format';
@@ -39,7 +39,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         <StatusBadge status={order.status} />
         <PaymentBadge status={order.paymentStatus} />
         <span className="text-xs text-muted-foreground">
-          <SourceLabel source={order.source} /> · placed {dateTime(order.placedAt)}
+          {sourceLabel(order.source)} · placed {dateTime(order.placedAt)}
         </span>
         {editable && (
           <Link
