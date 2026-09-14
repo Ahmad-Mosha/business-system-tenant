@@ -58,6 +58,10 @@ function statusOf(s: ShipmentTracking): { tone: Tone; label: string } {
 
 const COLLECTION_TONE: Record<string, Tone> = { PAID: 'success', UNPAID: 'danger', PENDING: 'muted' };
 
+/** A date inside Arabic text, isolated — otherwise the bidi algorithm drags its
+ *  digits across the words ("17 بحد أقصى Sept"). */
+const when = (v: string) => <bdi>{dateTime(v)}</bdi>;
+
 const MATCHES: Record<Filter, (s: ShipmentTracking) => boolean> = {
   ALL: () => true,
   DELIVERED: isDelivered,
@@ -275,15 +279,15 @@ export function ShipmentsView({ initialShipments }: { initialShipments: Shipment
                     <TableCell className="text-right text-xs text-muted-foreground">
                       {s.deliveredAt ? (
                         <>
-                          <p className="text-[13px] text-foreground">{dateTime(s.deliveredAt)}</p>
+                          <p className="text-[13px] text-foreground">{when(s.deliveredAt)}</p>
                           {s.scheduledDeliveryDate ? (
-                            <p>بحد أقصى {dateTime(s.scheduledDeliveryDate)}</p>
+                            <p>بحد أقصى {when(s.scheduledDeliveryDate)}</p>
                           ) : null}
                         </>
                       ) : s.scheduledDeliveryDate ? (
-                        <p>بحد أقصى {dateTime(s.scheduledDeliveryDate)}</p>
+                        <p>بحد أقصى {when(s.scheduledDeliveryDate)}</p>
                       ) : s.updatedAt ? (
-                        <p>{dateTime(s.updatedAt)}</p>
+                        <p>{when(s.updatedAt)}</p>
                       ) : (
                         '—'
                       )}
@@ -328,11 +332,13 @@ function ShipmentDetail({
     <>
       <SheetHeader className="gap-2 border-b pe-12">
         <div className="flex flex-wrap items-center gap-2">
-          <SheetTitle className="num text-base">توصيل #{s.trackingNumber}</SheetTitle>
+          <SheetTitle className="text-base">
+            توصيل <bdi className="num">#{s.trackingNumber}</bdi>
+          </SheetTitle>
           <ToneBadge tone={status.tone}>{status.label}</ToneBadge>
         </div>
         <SheetDescription>
-          انشئ: {s.createdAt ? dateTime(s.createdAt) : 'عبر Bosta'}
+          انشئ: {s.createdAt ? when(s.createdAt) : 'عبر Bosta'}
         </SheetDescription>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" disabled={refreshing} onClick={onRefresh}>
@@ -357,7 +363,7 @@ function ShipmentDetail({
           <Alert variant="success">
             <CheckCircle2 />
             <AlertDescription>
-              تم تسليم الأوردر لعميلك بنجاح{s.deliveredAt ? ` في ${dateTime(s.deliveredAt)}` : ''}.
+              تم تسليم الأوردر لعميلك بنجاح{s.deliveredAt ? <> في {when(s.deliveredAt)}</> : null}.
             </AlertDescription>
           </Alert>
         ) : null}
@@ -366,7 +372,7 @@ function ShipmentDetail({
             <MessageSquare />
             <AlertDescription>
               تواصل مع العميل عبر الواتس آب: تم تأكيد التوصيل{' '}
-              {s.whatsAppConfirmation.confirmedAt ? dateTime(s.whatsAppConfirmation.confirmedAt) : ''}
+              {s.whatsAppConfirmation.confirmedAt ? when(s.whatsAppConfirmation.confirmedAt) : null}
             </AlertDescription>
           </Alert>
         ) : null}
@@ -388,7 +394,7 @@ function ShipmentDetail({
                   <div className="min-w-0">
                     <p className={cn('font-medium', !step.isDone && 'text-muted-foreground')}>{step.label}</p>
                     {step.date ? (
-                      <p className="text-xs text-muted-foreground">{dateTime(step.date)}</p>
+                      <p className="text-xs text-muted-foreground">{when(step.date)}</p>
                     ) : null}
                     {step.description ? (
                       <p className="text-xs text-muted-foreground">{step.description}</p>
