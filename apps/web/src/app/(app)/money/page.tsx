@@ -31,7 +31,7 @@ import {
   getPeriodSummary,
   type CashFlow,
 } from '@/lib/api';
-import { daysAgo, isoDate, money } from '@/lib/format';
+import { date, daysAgo, isoDate, money } from '@/lib/format';
 import { accountByCode, flowLabel, groupAccounts } from '@/lib/money';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
@@ -51,6 +51,8 @@ const sum = (series: CashFlow['series'], key: 'in' | 'out') =>
 
 /** Change against the window before, in percent — only when there was something to compare with. */
 const change = (now: number, before: number) => (before > 0 ? ((now - before) / before) * 100 : null);
+
+const span = (label: string) => `the last ${label}`;
 
 export default async function MoneyOverviewPage({
   searchParams,
@@ -90,7 +92,7 @@ export default async function MoneyOverviewPage({
   // The same length of time just before, for "vs the previous 30 days".
   const before = { from: daysAgo(range.days * 2 - 1), to: daysAgo(range.days) };
 
-  const [accounts, series, flow, previous, summary] = await Promise.all([
+  const [accounts, days, flow, previous, summary] = await Promise.all([
     getMoneyAccounts(),
     getCashSeries(range.days),
     getCashFlow(from, to, range.bucket),
@@ -98,15 +100,23 @@ export default async function MoneyOverviewPage({
     getPeriodSummary(from, to),
   ]);
 
+  // Before the opening balance there were no books, not a zero balance — so
+  // the chart and the change start where the books do.
+  const opened = overview.openingAsOf;
+  const series = days.filter((p) => p.date >= opened);
+  const sinceOpening = series.length < days.length;
   const cash = accountByCode(accounts, 'CASH')?.balance ?? '0';
   const balances = series.map((p) => Number(p.balance));
   const moved = balances.length > 1 ? balances[balances.length - 1] - balances[0] : null;
+  const balanceSpan = sinceOpening ? `since the books began on ${date(opened)}` : span(range.label);
   const moneyIn = sum(flow.series, 'in');
   const moneyOut = sum(flow.series, 'out');
   const net = moneyIn - moneyOut;
-  const inChange = change(moneyIn, sum(previous.series, 'in'));
-  const outChange = change(moneyOut, sum(previous.series, 'out'));
-  const span = `the last ${range.label}`;
+  // A window that starts before the books did holds only part of its days —
+  // "+8,700% vs the 90 days before" would be comparing against nothing.
+  const comparable = before.from >= opened;
+  const inChange = comparable ? change(moneyIn, sum(previous.series, 'in')) : null;
+  const outChange = comparable ? change(moneyOut, sum(previous.series, 'out')) : null;
   const ledgerFor = (code: string) => `/money/ledger?code=${code}&from=${from}&to=${to}`;
 
   const sources = (direction: 'in' | 'out'): BarItem[] =>
@@ -160,7 +170,7 @@ export default async function MoneyOverviewPage({
                   signed
                   className={cn(moved > 0 && 'text-success', moved < 0 && 'text-destructive')}
                 />{' '}
-                over {span.replace('the last ', '')}
+                {sinceOpening ? `since ${date(opened)}` : `over ${range.label}`}
               </>
             )
           }
@@ -171,13 +181,13 @@ export default async function MoneyOverviewPage({
           label="Money in"
           value={<Amount value={moneyIn} />}
           badge={inChange !== null ? <Delta value={inChange} /> : undefined}
-          hint={inChange !== null ? `vs the ${range.label} before` : `In ${span}`}
+          hint={inChange !== null ? `vs the ${range.label} before` : `In ${span(range.label)}`}
         />
         <MetricCard
           label="Money out"
           value={<Amount value={moneyOut} />}
           badge={outChange !== null ? <Delta value={outChange} invert /> : undefined}
-          hint={outChange !== null ? `vs the ${range.label} before` : `In ${span}`}
+          hint={outChange !== null ? `vs the ${range.label} before` : `In ${span(range.label)}`}
         />
         <MetricCard
           label="Net cash flow"
@@ -203,7 +213,7 @@ export default async function MoneyOverviewPage({
         <Card className="flex flex-col xl:col-span-2">
           <CardHeader>
             <CardTitle>Cash on hand</CardTitle>
-            <CardDescription>The treasury’s balance at the end of each day, {span}.</CardDescription>
+            <CardDescription>The treasury’s balance at the end of each day, {balanceSpan}.</CardDescription>
             <CardAction>
               <Button variant="ghost" size="sm" asChild>
                 <Link href="/money/treasury">
@@ -236,14 +246,14 @@ export default async function MoneyOverviewPage({
         <CardHeader>
           <CardTitle>Money in and out</CardTitle>
           <CardDescription>
-            Per {range.bucket}, {span}. The opening balance isn’t counted — it’s where the books began.
+            Per {range.bucket}, {span(range.label)}. The opening balance isn’t counted — it’s where the books began.
           </CardDescription>
-          <CardAction className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-muted-foreground">
+        </CardHeader>
+        <CardContent className="grid gap-3">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-muted-foreground">
             <Legend swatch="bg-success" label="In" value={moneyIn} />
             <Legend swatch="bg-destructive" label="Out" value={-moneyOut} />
-          </CardAction>
-        </CardHeader>
-        <CardContent>
+          </div>
           <CashFlowChart series={flow.series} bucket={range.bucket} />
         </CardContent>
       </Card>
@@ -252,7 +262,7 @@ export default async function MoneyOverviewPage({
         <Card>
           <CardHeader>
             <CardTitle>Where it came from</CardTitle>
-            <CardDescription>Money into the treasury, {span}. Open a bar for its entries.</CardDescription>
+            <CardDescription>Money into the treasury, {span(range.label)}. Open a bar for its entries.</CardDescription>
           </CardHeader>
           <CardContent>
             <BarList items={sources('in')} empty="Nothing came in." />
@@ -261,7 +271,7 @@ export default async function MoneyOverviewPage({
         <Card>
           <CardHeader>
             <CardTitle>Where it went</CardTitle>
-            <CardDescription>Money out of the treasury, {span}. Open a bar for its entries.</CardDescription>
+            <CardDescription>Money out of the treasury, {span(range.label)}. Open a bar for its entries.</CardDescription>
           </CardHeader>
           <CardContent>
             <BarList items={sources('out')} empty="Nothing went out." />
@@ -270,7 +280,7 @@ export default async function MoneyOverviewPage({
         <Card className="lg:col-span-2 xl:col-span-1">
           <CardHeader>
             <CardTitle>Revenue and costs</CardTitle>
-            <CardDescription>As the books recorded them, {span}.</CardDescription>
+            <CardDescription>As the books recorded them, {span(range.label)}.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
             <BarList items={costs} empty="No sales or costs recorded." />
