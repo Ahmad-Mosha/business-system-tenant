@@ -4,8 +4,11 @@ import { Check, Pencil, Trash2, X } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { archiveProduct, updateProduct } from '@/app/(app)/inventory/actions';
+import { Amount } from '@/components/amount';
 import { ChannelListings } from '@/components/channel-listings';
+import { MetricCard, MetricGrid, type MetricTone } from '@/components/metric-card';
 import { Page, PageHeader } from '@/components/page';
+import type { Tone } from '@/components/tone-badge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,9 +30,14 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { VariantPanel, type Movement } from '@/components/variant-panel';
 import type { ProductDetail } from '@/lib/api';
 import { CATEGORIES, categoryLabel } from '@/lib/categories';
+import { money } from '@/lib/format';
+import { LOW_STOCK, stockState, units } from '@/lib/stock';
 
 /** "No category" in a toggle group that can't hold an empty value. */
 const NONE = 'none';
+
+/** In stock is the normal state — only low and out earn a mark. */
+const STATE_MARK: Partial<Record<Tone, MetricTone>> = { warning: 'warning', danger: 'destructive' };
 
 /**
  * The whole product screen — header and body share one `editing` toggle, so
@@ -65,12 +73,31 @@ export function ProductScreen({
     setEditing(false);
   };
 
+  // Every product is single-variant today; the figures still add up if one isn't.
+  const only = product.variants.length === 1 ? product.variants[0] : null;
+  const onHand = product.variants.reduce((n, v) => n + v.onHand, 0);
+  const inOrders = product.variants.reduce((n, v) => n + v.inOpenOrders, 0);
+  const value = product.variants.reduce(
+    (n, v) => n + (v.unitCost && v.onHand > 0 ? v.onHand * Number(v.unitCost) : 0),
+    0,
+  );
+  const state = stockState(onHand);
+
   return (
     <Page>
       <PageHeader
         back={{ href: '/inventory', label: 'Back to inventory' }}
         title={<bdi>{product.name}</bdi>}
-        meta={<Badge variant="outline">{categoryLabel(product.category)}</Badge>}
+        meta={
+          <>
+            <Badge variant="outline">{categoryLabel(product.category)}</Badge>
+            {only?.sku ? (
+              <Badge variant="secondary" className="font-mono">
+                {only.sku}
+              </Badge>
+            ) : null}
+          </>
+        }
         description={
           product.variants.length > 1
             ? `${product.variants.length} variants`
@@ -179,12 +206,48 @@ export function ProductScreen({
         </Card>
       ) : null}
 
+      <MetricGrid>
+        <MetricCard
+          label="On hand"
+          value={units(onHand)}
+          tone={STATE_MARK[state.tone]}
+          hint={
+            state.tone === 'success'
+              ? 'In stock'
+              : state.tone === 'warning'
+                ? `Low — ${LOW_STOCK} or fewer left`
+                : 'Nothing left to sell'
+          }
+        />
+        <MetricCard
+          label="In open orders"
+          value={units(inOrders)}
+          hint={inOrders > 0 ? 'Already off on-hand, not delivered yet' : 'Nothing waiting'}
+        />
+        <MetricCard
+          label="Unit cost"
+          value={only ? <Amount value={only.unitCost} /> : 'Varies'}
+          tone={only && !only.unitCost ? 'warning' : 'default'}
+          hint={
+            !only
+              ? `Differs across ${product.variants.length} variants`
+              : !only.unitCost
+                ? 'Not set — left out of stock value'
+                : only.sellingPrice
+                  ? `Sells for ${money(only.sellingPrice)}`
+                  : 'No selling price yet'
+          }
+        />
+        <MetricCard label="Stock value" value={<Amount value={value} />} hint="On hand at unit cost" />
+      </MetricGrid>
+
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_400px]">
         <section className="grid min-w-0 gap-6">
           {product.variants.map((v) => (
             <VariantPanel
               key={v.id}
               variant={v}
+              single={!!only}
               movements={history.find((h) => h.variantId === v.id)?.movements ?? []}
             />
           ))}

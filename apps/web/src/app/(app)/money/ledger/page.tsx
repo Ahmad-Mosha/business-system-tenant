@@ -1,9 +1,20 @@
 import { ArrowRight, BookText } from 'lucide-react';
 import Link from 'next/link';
+import { Fragment } from 'react';
+import { Amount } from '@/components/amount';
 import { FilterBar } from '@/components/filter-bar';
+import {
+  AccountChip,
+  BALANCE,
+  DayRow,
+  directionOf,
+  EntryCell,
+  MONEY,
+  type Direction,
+  type Mark,
+} from '@/components/ledger-entry';
 import { Page, PageHeader } from '@/components/page';
 import { TableEmpty, TablePagination, TablePanel } from '@/components/table-panel';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -13,13 +24,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { getLedger, getMoneyAccounts } from '@/lib/api';
-import { dateTime, money } from '@/lib/format';
-import { kindLabel } from '@/lib/money';
+import { getLedger, getMoneyAccounts, type AccountBalance } from '@/lib/api';
+import { byDay, timeOf } from '@/lib/format';
+import { effectOn } from '@/lib/money';
 import { requireAdmin } from '@/lib/session';
+import { cn } from '@/lib/utils';
 
 const PAGE_SIZE = 30;
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
+
+/** With no account chosen, the ledger is read from the treasury — the money itself. */
+const TREASURY = 'CASH';
 
 export default async function LedgerPage({
   searchParams,
@@ -47,12 +62,21 @@ export default async function LedgerPage({
     getLedger(query.toString()),
   ]);
   const account = accounts.find((a) => a.code === code);
+  // The account every amount is signed against.
+  const lens = account ?? accounts.find((a) => a.code === TREASURY);
+  const marks = lens?.kind === 'ASSET' ? MONEY : BALANCE;
+  const english = new Map(accounts.map((a) => [a.code, a.nameEn]));
 
   const pageHref = (p: number) => {
     const next = new URLSearchParams(keep);
     if (p > 1) next.set('page', String(p));
     const qs = next.toString();
     return qs ? `/money/ledger?${qs}` : '/money/ledger';
+  };
+  const accountHref = (c: string) => {
+    const next = new URLSearchParams(keep);
+    next.set('code', c);
+    return `/money/ledger?${next}`;
   };
 
   return (
@@ -62,11 +86,11 @@ export default async function LedgerPage({
         description={
           account ? (
             <>
-              Every movement through <span className="text-foreground">{account.nameEn}</span>{' '}
-              <bdi>({account.nameAr})</bdi>.
+              Every movement in and out of <span className="text-foreground">{account.nameEn}</span>{' '}
+              <bdi>({account.nameAr})</bdi>, newest first.
             </>
           ) : (
-            'Every recorded movement of value, newest first.'
+            'Every movement of value, newest first — signed by what it did to the treasury.'
           )
         }
       />
@@ -84,7 +108,8 @@ export default async function LedgerPage({
       />
 
       <TablePanel
-        minWidth="48rem"
+        minWidth="22rem"
+        toolbar={lens ? <Lens account={lens} marks={marks} all={!account} /> : undefined}
         footer={
           <TablePagination
             page={page}
@@ -113,37 +138,102 @@ export default async function LedgerPage({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[150px]">When</TableHead>
                 <TableHead>Entry</TableHead>
-                <TableHead className="w-[300px]">From → to</TableHead>
-                <TableHead className="w-[140px] text-right">Amount</TableHead>
+                <TableHead className="hidden w-[340px] md:table-cell">From → to</TableHead>
+                <TableHead className="w-[160px] text-right">Amount</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {entries.map((e) => (
-                <TableRow key={e.id}>
-                  <TableCell className="text-muted-foreground">{dateTime(e.occurredAt)}</TableCell>
-                  <TableCell className="max-w-0">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className="shrink-0 font-medium">{kindLabel(e.kind)}</span>
-                      {e.reversesId ? <Badge variant="outline">Reversal</Badge> : null}
-                      {e.memo ? <span className="truncate text-muted-foreground">{e.memo}</span> : null}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    <span className="inline-flex items-center gap-1.5">
-                      <bdi>{e.creditAr}</bdi>
-                      <ArrowRight className="size-3.5 shrink-0 opacity-60" />
-                      <bdi>{e.debitAr}</bdi>
-                    </span>
-                  </TableCell>
-                  <TableCell className="num text-right font-medium">{money(e.amount)}</TableCell>
-                </TableRow>
+              {byDay(entries).map((day) => (
+                <Fragment key={day.key}>
+                  <DayRow label={day.label} span={3} />
+                  {day.rows.map((e) => {
+                    const effect = lens ? effectOn(e, lens) : null;
+                    const mark = marks[directionOf(effect)];
+                    return (
+                      <TableRow key={e.id}>
+                        <TableCell className="h-14 max-w-0">
+                          <EntryCell entry={e} mark={mark} when={timeOf(e.occurredAt)} />
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            <AccountChip
+                              name={e.creditAr}
+                              title={english.get(e.creditCode)}
+                              href={accountHref(e.creditCode)}
+                              lens={e.creditCode === lens?.code}
+                            />
+                            <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
+                            <AccountChip
+                              name={e.debitAr}
+                              title={english.get(e.debitCode)}
+                              href={accountHref(e.debitCode)}
+                              lens={e.debitCode === lens?.code}
+                            />
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Amount
+                            value={effect ?? e.amount}
+                            signed={effect !== null}
+                            className={cn(
+                              'text-sm font-semibold',
+                              effect === null ? 'text-muted-foreground' : mark.tone,
+                            )}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </Fragment>
               ))}
             </TableBody>
           </Table>
         )}
       </TablePanel>
     </Page>
+  );
+}
+
+/** Which account the amounts are signed against, how to read them, and where it stands now. */
+function Lens({
+  account,
+  marks,
+  all,
+}: {
+  account: AccountBalance;
+  marks: Record<Direction, Mark>;
+  all: boolean;
+}) {
+  // Filtered to one account, every entry touches it.
+  const shown: Direction[] = all ? ['up', 'down', 'none'] : ['up', 'down'];
+  return (
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-2 text-xs text-muted-foreground">
+      <span className="flex items-center gap-2">
+        Seen from
+        <AccountChip name={account.nameAr} title={account.nameEn} lens />
+      </span>
+      <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        {shown.map((d) => {
+          const mark = marks[d];
+          return (
+            <span key={d} className="inline-flex items-center gap-1">
+              <mark.icon className={cn('size-3.5', mark.tone)} />
+              {mark.label}
+            </span>
+          );
+        })}
+      </span>
+      <span className="ms-auto flex items-baseline gap-2">
+        Balance now
+        <Amount
+          value={account.balance}
+          className={cn(
+            'text-[13px] font-semibold text-foreground',
+            Number(account.balance) < 0 && 'text-destructive',
+          )}
+        />
+      </span>
+    </div>
   );
 }

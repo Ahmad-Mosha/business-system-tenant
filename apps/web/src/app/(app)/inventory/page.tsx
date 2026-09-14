@@ -7,6 +7,7 @@ import { ChannelBadge } from '@/components/order-status';
 import { Page, PageHeader } from '@/components/page';
 import { SyncWebsiteButton } from '@/components/sync-website-button';
 import { TableEmpty, TablePagination, TablePanel } from '@/components/table-panel';
+import { ToneBadge } from '@/components/tone-badge';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -17,14 +18,18 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { getProductsCatalog, getProductsSummary } from '@/lib/api';
-import { CATEGORIES, categoryLabel } from '@/lib/categories';
-import { money } from '@/lib/format';
+import { CATEGORIES, categoryIcon, categoryLabel } from '@/lib/categories';
 import { requireAdmin } from '@/lib/session';
+import { LOW_STOCK, stockState, units } from '@/lib/stock';
 import { cn } from '@/lib/utils';
 
 const PAGE_SIZE = 20;
-/** Mirrors the API's `low_stock` filter. */
-const LOW_STOCK = 5;
+
+const STOCK_LEVELS = [
+  { value: 'in_stock', label: 'In stock' },
+  { value: 'low_stock', label: 'Low stock' },
+  { value: 'out_of_stock', label: 'Out of stock' },
+] as const;
 
 export default async function InventoryPage({
   searchParams,
@@ -34,22 +39,33 @@ export default async function InventoryPage({
   await requireAdmin();
   const params = await searchParams;
 
-  const filterQuery = new URLSearchParams();
-  for (const key of ['search', 'channel', 'category', 'stock'] as const) {
-    if (params[key]) filterQuery.set(key, params[key]);
+  // Everything but the stock level: the figures and the stock-level counts
+  // describe this set, so choosing a level never zeroes the others.
+  const scope = new URLSearchParams();
+  for (const key of ['search', 'channel', 'category'] as const) {
+    if (params[key]) scope.set(key, params[key]);
   }
+  const stock = STOCK_LEVELS.find((s) => s.value === params.stock)?.value;
+  const withStock = (level: string) => {
+    const q = new URLSearchParams(scope);
+    q.set('stock', level);
+    return q.toString();
+  };
+  const filterQuery = stock ? new URLSearchParams(withStock(stock)) : scope;
 
   const page = Math.max(Number(params.page) || 1, 1);
   const listQuery = new URLSearchParams(filterQuery);
   listQuery.set('limit', String(PAGE_SIZE));
   listQuery.set('offset', String((page - 1) * PAGE_SIZE));
 
-  const [products, summary] = await Promise.all([
+  const [products, summary, ...levels] = await Promise.all([
     getProductsCatalog(listQuery.toString()),
-    getProductsSummary(filterQuery.toString()),
+    getProductsSummary(scope.toString()),
+    ...STOCK_LEVELS.map((s) => getProductsSummary(withStock(s.value))),
   ]);
+  const count = Object.fromEntries(STOCK_LEVELS.map((s, i) => [s.value, levels[i].products]));
+  const total = products[0]?.totalCount ?? (stock ? count[stock] : summary.products);
 
-  const total = products[0]?.totalCount ?? summary.products;
   const pageHref = (p: number) => {
     const next = new URLSearchParams(filterQuery);
     if (p > 1) next.set('page', String(p));
@@ -61,7 +77,7 @@ export default async function InventoryPage({
     <Page fill>
       <PageHeader
         title="Inventory"
-        description="Every product, its stock, and what's tied up in open orders."
+        description="What you have, what it's worth, and what needs restocking."
         actions={
           <>
             <SyncWebsiteButton />
@@ -76,25 +92,49 @@ export default async function InventoryPage({
       />
 
       <MetricGrid>
-        <MetricCard label="Products" value={summary.products} hint="In the active catalogue" />
-        <MetricCard label="Units on hand" value={summary.unitsOnHand} hint="Across every product" />
         <MetricCard
           label="Stock value"
           value={<Amount value={summary.stockValue} />}
-          hint="EGP, at unit cost"
+          tone={summary.missingCost > 0 ? 'warning' : 'default'}
+          hint={
+            summary.missingCost > 0
+              ? `${summary.missingCost} ${summary.missingCost === 1 ? 'product has' : 'products have'} no cost yet`
+              : 'EGP, at unit cost'
+          }
         />
         <MetricCard
-          label="Missing cost"
-          value={summary.missingCost}
-          tone={summary.missingCost > 0 ? 'warning' : 'default'}
-          hint={summary.missingCost > 0 ? 'Stock value is understated' : 'Every product is costed'}
+          label="Units on hand"
+          value={units(summary.unitsOnHand)}
+          hint={
+            summary.unitsInOrders > 0
+              ? `Plus ${units(summary.unitsInOrders)} in open orders`
+              : 'None waiting in open orders'
+          }
         />
-        <MetricCard label="Units in orders" value={summary.unitsInOrders} hint="Not yet delivered" />
+        <MetricCard
+          label="Low stock"
+          value={units(count.low_stock)}
+          tone={count.low_stock > 0 ? 'warning' : 'default'}
+          hint={`${LOW_STOCK} or fewer left`}
+        />
+        <MetricCard
+          label="Out of stock"
+          value={units(count.out_of_stock)}
+          tone={count.out_of_stock > 0 ? 'destructive' : 'default'}
+          hint="Nothing left to sell"
+        />
       </MetricGrid>
 
       <FilterBar
-        search={{ param: 'search', placeholder: 'Search products or SKUs…' }}
+        search={{ param: 'search', placeholder: 'Search products…' }}
         filters={[
+          {
+            kind: 'segments',
+            param: 'stock',
+            label: 'Stock level',
+            all: { value: '', label: 'All', count: summary.products },
+            options: STOCK_LEVELS.map((s) => ({ ...s, count: count[s.value] })),
+          },
           { kind: 'select', param: 'category', all: 'All categories', options: [...CATEGORIES] },
           {
             kind: 'select',
@@ -108,21 +148,11 @@ export default async function InventoryPage({
               { value: 'unlisted', label: 'Not on any channel' },
             ],
           },
-          {
-            kind: 'select',
-            param: 'stock',
-            all: 'Any stock level',
-            options: [
-              { value: 'in_stock', label: 'In stock' },
-              { value: 'low_stock', label: `Low stock (≤${LOW_STOCK})` },
-              { value: 'out_of_stock', label: 'Out of stock' },
-            ],
-          },
         ]}
       />
 
       <TablePanel
-        minWidth="56rem"
+        minWidth="62rem"
         footer={
           <TablePagination
             page={page}
@@ -163,60 +193,87 @@ export default async function InventoryPage({
             <TableHeader>
               <TableRow>
                 <TableHead>Product</TableHead>
-                <TableHead className="w-[130px]">Category</TableHead>
-                <TableHead className="w-[200px]">Channels</TableHead>
-                <TableHead className="w-[100px] text-right">On hand</TableHead>
-                <TableHead className="w-[100px] text-right">In orders</TableHead>
-                <TableHead className="w-[120px] text-right">Unit cost</TableHead>
+                <TableHead className="w-[120px]">Stock</TableHead>
+                <TableHead className="w-[84px] text-right">On hand</TableHead>
+                <TableHead className="w-[84px] text-right">In orders</TableHead>
+                <TableHead className="w-[110px] text-right">Unit cost</TableHead>
+                <TableHead className="w-[130px] text-right">Stock value</TableHead>
+                <TableHead className="w-[210px] pl-6">Channels</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {products.map((p) => (
-                <TableRow key={p.id} className="relative">
-                  <TableCell className="max-w-0">
-                    <Link
-                      href={`/inventory/${p.id}`}
-                      className="block truncate font-medium after:absolute after:inset-0 hover:underline focus-visible:underline focus-visible:outline-none"
-                      title={p.name}
-                    >
-                      <bdi>{p.name}</bdi>
-                    </Link>
-                    {p.variantCount > 1 ? (
-                      <span className="num text-xs text-muted-foreground">{p.variantCount} variants</span>
-                    ) : null}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{categoryLabel(p.category)}</TableCell>
-                  <TableCell>
-                    {p.channels.length ? (
-                      <div className="flex flex-wrap gap-1">
-                        {p.channels.map((c) => (
-                          <ChannelBadge key={c} channel={c} />
-                        ))}
+              {products.map((p) => {
+                const state = stockState(p.onHand);
+                const Icon = categoryIcon(p.category);
+                return (
+                  <TableRow key={p.id} className="relative">
+                    <TableCell className="h-14 max-w-0">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span
+                          aria-hidden
+                          className="flex size-9 shrink-0 items-center justify-center bg-muted text-muted-foreground"
+                        >
+                          <Icon className="size-4" />
+                        </span>
+                        <div className="min-w-0">
+                          <Link
+                            href={`/inventory/${p.id}`}
+                            className="block truncate font-medium after:absolute after:inset-0 hover:underline focus-visible:underline focus-visible:outline-none"
+                            title={p.name}
+                          >
+                            <bdi>{p.name}</bdi>
+                          </Link>
+                          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                            {categoryLabel(p.category)}
+                            {p.variantCount > 1 ? (
+                              <>
+                                {' · '}
+                                <span className="num">{p.variantCount}</span> variants
+                              </>
+                            ) : null}
+                          </p>
+                        </div>
                       </div>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell
-                    className={cn(
-                      'num text-right font-medium',
-                      p.onHand <= 0 ? 'text-destructive' : p.onHand <= LOW_STOCK && 'text-warning',
-                    )}
-                  >
-                    {p.onHand}
-                  </TableCell>
-                  <TableCell className="num text-right text-muted-foreground">
-                    {p.inOrders > 0 ? p.inOrders : '—'}
-                  </TableCell>
-                  <TableCell className="num text-right">
-                    {p.unitCost ? (
-                      money(p.unitCost)
-                    ) : (
-                      <span className="text-xs text-warning">Not set</span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
+                    </TableCell>
+                    <TableCell>
+                      <ToneBadge tone={state.tone}>{state.label}</ToneBadge>
+                    </TableCell>
+                    <TableCell
+                      className={cn('num text-right font-medium', p.onHand < 0 && 'text-destructive')}
+                    >
+                      {units(p.onHand)}
+                    </TableCell>
+                    <TableCell className="num text-right text-muted-foreground">
+                      {p.inOrders > 0 ? units(p.inOrders) : '—'}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {p.unitCost ? (
+                        <Amount value={p.unitCost} />
+                      ) : (
+                        <span className="text-xs text-warning">Not set</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {p.unitCost && p.onHand > 0 ? (
+                        <Amount value={p.onHand * Number(p.unitCost)} className="font-medium" />
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="pl-6">
+                      {p.channels.length ? (
+                        <div className="flex flex-wrap gap-1">
+                          {p.channels.map((c) => (
+                            <ChannelBadge key={c} channel={c} />
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         )}

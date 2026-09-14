@@ -2,6 +2,7 @@ import { ArrowUpRight, Wallet } from 'lucide-react';
 import Link from 'next/link';
 import { Amount } from '@/components/amount';
 import { BreakdownBar, CashAreaChart, Sparkline } from '@/components/charts';
+import { directionOf, EntryCell, MONEY } from '@/components/ledger-entry';
 import { Delta, MetricCard, MetricGrid } from '@/components/metric-card';
 import { MoneyAnchorForm } from '@/components/money-anchor-form';
 import { Page, PageHeader } from '@/components/page';
@@ -30,8 +31,8 @@ import {
   getMoneyAccounts,
   getPeriodSummary,
 } from '@/lib/api';
-import { date, money, signedTone } from '@/lib/format';
-import { accountByCode, groupAccounts, kindLabel } from '@/lib/money';
+import { dateTime, money } from '@/lib/format';
+import { accountByCode, groupAccounts } from '@/lib/money';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
 
@@ -212,26 +213,25 @@ export default async function MoneyOverviewPage() {
                   <TableHead>Movement</TableHead>
                   <TableHead className="w-[140px] text-right">Amount</TableHead>
                   <TableHead className="hidden w-[140px] text-right sm:table-cell">Balance</TableHead>
-                  <TableHead className="w-[110px] text-right">Date</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recent.map((e) => (
-                  <TableRow key={e.id}>
-                    <TableCell className="max-w-0 truncate">
-                      <span className="font-medium">{kindLabel(e.kind)}</span>
-                      {e.memo ? <span className="text-muted-foreground"> · {e.memo}</span> : null}
-                    </TableCell>
-                    <TableCell className={cn('num text-right font-medium', signedTone(e.effect))}>
-                      {Number(e.effect) > 0 ? '+' : ''}
-                      {money(e.effect)}
-                    </TableCell>
-                    <TableCell className="num hidden text-right text-muted-foreground sm:table-cell">
-                      {money(e.runningBalance)}
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground">{date(e.occurredAt)}</TableCell>
-                  </TableRow>
-                ))}
+                {recent.map((e) => {
+                  const mark = MONEY[directionOf(Number(e.effect))];
+                  return (
+                    <TableRow key={e.id}>
+                      <TableCell className="h-14 max-w-0">
+                        <EntryCell entry={e} mark={mark} when={dateTime(e.occurredAt)} />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Amount value={e.effect} signed className={cn('font-semibold', mark.tone)} />
+                      </TableCell>
+                      <TableCell className="hidden text-right sm:table-cell">
+                        <Amount value={e.runningBalance} className="text-muted-foreground" />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
