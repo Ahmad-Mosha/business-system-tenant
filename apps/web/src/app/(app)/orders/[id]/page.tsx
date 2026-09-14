@@ -1,9 +1,23 @@
+import { AlertTriangle, Pencil } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { AlertTriangle, ArrowLeft, Pencil } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { Amount } from '@/components/amount';
 import { OrderActions } from '@/components/order-actions';
 import { PaymentBadge, sourceLabel, StatusBadge } from '@/components/order-status';
-import { Screen } from '@/components/shell';
+import { Page, PageHeader } from '@/components/page';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { getAssignees, getOrder } from '@/lib/api';
 import { dateTime, money } from '@/lib/format';
 import { requireSession } from '@/lib/session';
@@ -22,137 +36,163 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const assignees = isAdmin ? await getAssignees() : [];
   const unmapped = order.items.filter((i) => !i.variantId).length;
   const editable = EDITABLE.includes(order.status);
+  const units = order.items.reduce((n, i) => n + i.quantity, 0);
 
   return (
-    <Screen>
-      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-card px-5">
-        <Link
-          href="/orders"
-          aria-label="Back to orders"
-          className="-ms-2 inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-        >
-          <ArrowLeft className="size-4.5" />
-        </Link>
-        <h1 className="text-lg font-semibold tracking-[-0.02em] tabular-nums">
-          {order.orderNumber}
-        </h1>
-        <StatusBadge status={order.status} />
-        <PaymentBadge status={order.paymentStatus} />
-        <span className="text-xs text-muted-foreground">
-          {sourceLabel(order.source)} · placed {dateTime(order.placedAt)}
-        </span>
-        {editable && (
-          <Link
-            href={`/orders/${order.id}/edit`}
-            className="ms-auto inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-card px-4 text-[13px] font-medium transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-          >
-            <Pencil className="size-3.5" />
-            Edit order
-          </Link>
-        )}
-      </header>
+    <Page>
+      <PageHeader
+        back={{ href: '/orders', label: 'Back to orders' }}
+        title={<span className="num">{order.orderNumber}</span>}
+        meta={
+          <>
+            <StatusBadge status={order.status} />
+            <PaymentBadge status={order.paymentStatus} />
+          </>
+        }
+        description={`${sourceLabel(order.source)} order · placed ${dateTime(order.placedAt)}`}
+        actions={
+          editable ? (
+            <Button variant="outline" asChild>
+              <Link href={`/orders/${order.id}/edit`}>
+                <Pencil />
+                Edit order
+              </Link>
+            </Button>
+          ) : null
+        }
+      />
 
-      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_340px] items-start gap-4 overflow-y-auto p-4">
-        <div className="grid content-start gap-4">
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Card title="Customer">
-              <dl className="text-[13px]">
-                <Row label="Name" value={order.customerName} />
-                <Row label="Phone" value={order.customerPhone} />
-                <Row label="Payment" value={order.paymentMethod} />
-              </dl>
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="grid min-w-0 gap-6">
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Customer</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <dl className="grid gap-3">
+                  <Detail label="Name">
+                    <bdi>{order.customerName}</bdi>
+                  </Detail>
+                  <Detail label="Phone">
+                    <a href={`tel:${order.customerPhone}`} className="num hover:underline">
+                      {order.customerPhone}
+                    </a>
+                  </Detail>
+                  <Detail label="Payment method">{order.paymentMethod}</Detail>
+                </dl>
+              </CardContent>
             </Card>
-            <Card title="Shipping">
-              <dl className="text-[13px]">
-                <Row label="Governorate" value={order.governorate} />
-                <Row label="Address" value={order.address} />
-                <Row label="Tracking" value={order.trackingNumber} />
-              </dl>
+            <Card>
+              <CardHeader>
+                <CardTitle>Delivery</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <dl className="grid gap-3">
+                  <Detail label="Governorate">
+                    {order.governorate ? <bdi>{order.governorate}</bdi> : null}
+                  </Detail>
+                  <Detail label="Address">
+                    {order.address ? <bdi>{order.address}</bdi> : null}
+                  </Detail>
+                  <Detail label="Bosta tracking">
+                    {order.trackingNumber ? (
+                      <span className="num">{order.trackingNumber}</span>
+                    ) : null}
+                  </Detail>
+                </dl>
+              </CardContent>
             </Card>
           </div>
 
-          <Card title="Items" hint={`${order.items.length}`}>
-            {unmapped > 0 && (
-              <p className="mb-2 flex items-start gap-1.5 rounded-md border border-warning/30 bg-warning-subtle px-2.5 py-2 text-[11px] text-warning">
-                <AlertTriangle className="mt-px size-3.5 shrink-0" strokeWidth={2} />
-                {unmapped} {unmapped === 1 ? 'line is' : 'lines are'} not matched to inventory, so{' '}
-                {unmapped === 1 ? 'it does' : 'they do'} not affect stock.
-              </p>
-            )}
-            <div className="overflow-hidden rounded-lg border border-border">
-              <table className="w-full border-collapse text-[13px]">
-                <thead>
-                  <tr className="border-b border-border bg-muted/50 text-[11px] tracking-[0.06em] text-muted-foreground uppercase">
-                    <th className="px-3 py-2 text-left font-medium">Item</th>
-                    <th className="w-[70px] px-3 py-2 text-right font-medium">Qty</th>
-                    <th className="w-[110px] px-3 py-2 text-right font-medium">Unit Price</th>
-                    <th className="w-[110px] px-3 py-2 text-right font-medium">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {order.items.map((i) => (
-                    <tr key={i.id} className="border-b border-border/60 last:border-b-0">
-                      <td className="px-3 py-2">
-                        {i.title}
-                        {!i.variantId && (
-                          <span className="ms-1.5 text-[11px] text-warning">unmatched</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums">{i.quantity}</td>
-                      <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
-                        {money(i.unitPrice)}
-                      </td>
-                      <td className="px-3 py-2 text-right font-medium tabular-nums">
-                        {money(i.lineTotal)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {order.notes && (
-              <p className="mt-3 text-[13px]">
-                <span className="text-muted-foreground">Notes: </span>
-                {order.notes}
-              </p>
-            )}
+          <Card className="pb-0">
+            <CardHeader>
+              <CardTitle>Items</CardTitle>
+              <CardAction>
+                <Badge variant="secondary" className="num">
+                  {units} {units === 1 ? 'unit' : 'units'}
+                </Badge>
+              </CardAction>
+            </CardHeader>
+            {unmapped > 0 ? (
+              <CardContent>
+                <Alert variant="warning">
+                  <AlertTriangle />
+                  <AlertDescription>
+                    {unmapped} {unmapped === 1 ? 'line isn’t' : 'lines aren’t'} linked to inventory,
+                    so {unmapped === 1 ? 'it doesn’t' : 'they don’t'} move stock.
+                  </AlertDescription>
+                </Alert>
+              </CardContent>
+            ) : null}
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Item</TableHead>
+                  <TableHead className="w-[70px] text-right">Qty</TableHead>
+                  <TableHead className="w-[120px] text-right">Unit price</TableHead>
+                  <TableHead className="w-[120px] text-right">Total</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {order.items.map((i) => (
+                  <TableRow key={i.id}>
+                    <TableCell className="max-w-0 whitespace-normal">
+                      <bdi className="font-medium">{i.title}</bdi>
+                      {!i.variantId ? (
+                        <span className="ms-2 text-xs text-warning">not in inventory</span>
+                      ) : null}
+                    </TableCell>
+                    <TableCell className="num text-right">{i.quantity}</TableCell>
+                    <TableCell className="num text-right text-muted-foreground">
+                      {money(i.unitPrice)}
+                    </TableCell>
+                    <TableCell className="num text-right font-medium">{money(i.lineTotal)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </Card>
 
-          <Card title="History">
-            <ul className="text-[13px]">
-              {order.events.map((e) => (
-                <li key={e.id} className="flex items-baseline gap-3 py-1">
-                  <span className="min-w-0 flex-1">{describe(e)}</span>
-                  <span className="shrink-0 text-[11px] text-muted-foreground">
-                    {e.actorName ?? 'Integration'} · {dateTime(e.createdAt)}
-                  </span>
-                </li>
-              ))}
-            </ul>
+          {order.notes ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Notes</CardTitle>
+              </CardHeader>
+              <CardContent className="text-[13px] whitespace-pre-line">
+                <bdi>{order.notes}</bdi>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          <Card>
+            <CardHeader>
+              <CardTitle>History</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ol className="relative grid gap-4 before:absolute before:inset-y-1.5 before:left-[3px] before:w-px before:bg-border">
+                {order.events.map((e, i) => (
+                  <li key={e.id} className="relative flex items-baseline gap-3 ps-5">
+                    <span
+                      aria-hidden
+                      className={
+                        i === order.events.length - 1
+                          ? 'absolute top-1.5 left-0 size-[7px] bg-primary'
+                          : 'absolute top-1.5 left-0 size-[7px] border border-muted-foreground/50 bg-card'
+                      }
+                    />
+                    <span className="min-w-0 flex-1 text-[13px]">{describe(e)}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {e.actorName ?? 'Integration'} · {dateTime(e.createdAt)}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </CardContent>
           </Card>
         </div>
 
-        <aside className="grid content-start gap-4">
-          <div className="rounded-xl border border-border bg-card p-5 shadow-xs">
-            <h2 className="text-[15px] font-semibold">Order Summary</h2>
-            <div className="mt-4 space-y-2 border-t border-border pt-4 text-[13px]">
-              <div className="flex justify-between gap-3">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span className="tabular-nums">{money(order.subtotal)}</span>
-              </div>
-              <div className="flex justify-between gap-3">
-                <span className="text-muted-foreground">Shipping</span>
-                <span className="tabular-nums">{money(order.shippingCost)}</span>
-              </div>
-            </div>
-            <div className="mt-4 flex items-baseline justify-between gap-3 border-t border-border pt-4">
-              <span className="text-[15px] font-semibold">Total</span>
-              <span className="text-2xl font-semibold tracking-[-0.02em] tabular-nums">
-                {money(order.total)}
-              </span>
-            </div>
-          </div>
-
+        <aside className="grid gap-6 lg:sticky lg:top-0">
           <OrderActions
             orderId={order.id}
             status={order.status}
@@ -162,38 +202,38 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             assignees={assignees.map((a) => ({ id: a.id, name: a.name }))}
             canAssign={isAdmin}
           />
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Summary</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-2 text-[13px]">
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span className="num">{money(order.subtotal)}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">Shipping</span>
+                <span className="num">{money(order.shippingCost)}</span>
+              </div>
+              <div className="mt-2 flex items-baseline justify-between gap-3 border-t pt-3">
+                <span className="font-medium">Total</span>
+                <Amount value={order.total} className="text-2xl font-semibold tracking-tight" />
+              </div>
+            </CardContent>
+          </Card>
         </aside>
       </div>
-    </Screen>
+    </Page>
   );
 }
 
-function Card({
-  title,
-  hint,
-  children,
-}: {
-  title: string;
-  hint?: string;
-  children: React.ReactNode;
-}) {
+function Detail({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <section className="rounded-xl border border-border bg-card p-4 shadow-xs">
-      <div className="mb-3 flex items-baseline justify-between gap-2">
-        <h2 className="text-[14px] font-semibold tracking-[-0.01em]">{title}</h2>
-        {hint ? <span className="text-[11px] text-muted-foreground">{hint}</span> : null}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string | null }) {
-  return (
-    <div className="flex gap-3 py-1">
-      <dt className="w-[100px] shrink-0 text-muted-foreground">{label}</dt>
-      <dd className="min-w-0 flex-1 break-words">
-        {value || <span className="text-muted-foreground/40">—</span>}
+    <div className="grid gap-0.5">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="text-[13px] break-words">
+        {children || <span className="text-muted-foreground/60">Not set</span>}
       </dd>
     </div>
   );
