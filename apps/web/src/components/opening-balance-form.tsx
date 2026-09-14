@@ -1,14 +1,17 @@
 'use client';
 
-import { Check, Loader2 } from 'lucide-react';
-import { useActionState, useEffect } from 'react';
+import { AlertTriangle } from 'lucide-react';
+import { useActionState } from 'react';
 import { toast } from 'sonner';
 import { setOpeningBalance, type AnchorState } from '@/app/(app)/months/actions';
+import { DatePicker } from '@/components/date-picker';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Field, FieldLabel } from '@/components/ui/field';
+import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from '@/components/ui/input-group';
+import { Spinner } from '@/components/ui/spinner';
 
-const INITIAL: AnchorState = { status: 'idle' };
-
+/** The noon balance every later month is measured from. It can be negative. */
 export function OpeningBalanceForm({
   openingBalance,
   openingAsOf,
@@ -16,55 +19,46 @@ export function OpeningBalanceForm({
   openingBalance: string;
   openingAsOf: string | null;
 }) {
-  const [state, submit, pending] = useActionState(setOpeningBalance, INITIAL);
-
-  useEffect(() => {
-    if (state.status === 'error') toast.error(state.message);
-    if (state.status === 'saved') toast.success('Opening balance updated.');
-  }, [state]);
+  const [state, submit, pending] = useActionState<AnchorState, FormData>(async (prev, form) => {
+    const next = await setOpeningBalance(prev, form);
+    if (next.status === 'saved') toast.success('Opening balance updated.');
+    return next;
+  }, { status: 'idle' });
 
   return (
-    <form action={submit} className="flex flex-wrap items-end gap-3">
-      <div className="min-w-[150px] flex-1 space-y-1.5">
-        <label htmlFor="openingBalance" className="text-xs font-medium text-muted-foreground">
-          Balance (EGP)
-        </label>
-        <Input
-          id="openingBalance"
-          name="openingBalance"
-          inputMode="decimal"
-          defaultValue={openingBalance}
-          disabled={pending}
-          className="tabular-nums"
-        />
+    <form action={submit} className="grid gap-4">
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
+        <Field>
+          <FieldLabel htmlFor="openingBalance">Balance</FieldLabel>
+          <InputGroup>
+            <InputGroupInput
+              id="openingBalance"
+              name="openingBalance"
+              inputMode="decimal"
+              defaultValue={openingBalance}
+              disabled={pending}
+              className="num text-right"
+            />
+            <InputGroupAddon align="inline-end">
+              <InputGroupText>EGP</InputGroupText>
+            </InputGroupAddon>
+          </InputGroup>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="openingAsOf">As of</FieldLabel>
+          <DatePicker id="openingAsOf" name="openingAsOf" defaultValue={openingAsOf ?? ''} disabled={pending} />
+        </Field>
+        <Button type="submit" variant="outline" disabled={pending}>
+          {pending ? <Spinner /> : null}
+          Save
+        </Button>
       </div>
-      <div className="min-w-[150px] flex-1 space-y-1.5">
-        <label htmlFor="openingAsOf" className="text-xs font-medium text-muted-foreground">
-          As of
-        </label>
-        <Input
-          id="openingAsOf"
-          name="openingAsOf"
-          type="date"
-          defaultValue={openingAsOf ?? ''}
-          disabled={pending}
-        />
-      </div>
-      <Button type="submit" variant="outline" disabled={pending} className="min-w-[92px]">
-        {pending ? (
-          <>
-            <Loader2 className="size-4 animate-spin" />
-            Saving
-          </>
-        ) : state.status === 'saved' ? (
-          <>
-            <Check className="size-4 text-success" />
-            Saved
-          </>
-        ) : (
-          'Save'
-        )}
-      </Button>
+      {state.status === 'error' ? (
+        <Alert variant="destructive">
+          <AlertTriangle />
+          <AlertDescription>{state.message}</AlertDescription>
+        </Alert>
+      ) : null}
     </form>
   );
 }
