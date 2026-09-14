@@ -26,6 +26,17 @@ export function date(v: string | null | undefined): string {
   });
 }
 
+/** A calendar date as `YYYY-MM-DD`, in local time — not UTC's, which is a day behind after midnight. */
+export const isoDate = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+/** The local calendar date `n` days before today. */
+export function daysAgo(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return isoDate(d);
+}
+
 /**
  * Recorded from a date alone — a voucher, an invoice, an opening balance. The
  * API stores those at midnight UTC, and printing that as "03:00" would invent

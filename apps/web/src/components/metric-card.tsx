@@ -85,13 +85,23 @@ export function MetricCard({
 
 /**
  * A period-over-period change, as a badge. Only ever fed real history — no
- * figure in this system gets a trend it doesn't have data for.
+ * figure in this system gets a trend it doesn't have data for. `invert` is for
+ * figures where more is worse, like money out: up reads red.
  */
-export function Delta({ value, suffix = '%' }: { value: number; suffix?: string }) {
+export function Delta({
+  value,
+  suffix = '%',
+  invert = false,
+}: {
+  value: number;
+  suffix?: string;
+  invert?: boolean;
+}) {
   const flat = Math.abs(value) < 0.05;
   const Icon = flat ? Minus : value > 0 ? ArrowUpRight : ArrowDownRight;
+  const good = invert ? value < 0 : value > 0;
   return (
-    <Badge variant={flat ? 'outline' : value > 0 ? 'success' : 'destructive'} className="num">
+    <Badge variant={flat ? 'outline' : good ? 'success' : 'destructive'} className="num">
       <Icon />
       {value > 0 ? '+' : ''}
       {value.toFixed(1)}
