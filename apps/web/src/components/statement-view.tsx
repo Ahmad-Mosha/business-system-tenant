@@ -143,7 +143,10 @@ export async function StatementView({ from, to }: { from: string; to: string }) 
           <CardDescription>By net, after noon’s fees.</CardDescription>
         </CardHeader>
         {products.length === 0 ? (
-          <p className="border-t p-10 text-center text-[13px] text-muted-foreground">No products sold in this period.</p>
+          <p className="border-t p-10 text-center text-[13px] text-muted-foreground">
+            No product-level sales yet — they appear once noon SKUs are linked to products in
+            Inventory.
+          </p>
         ) : (
           <Table>
             <TableHeader>
