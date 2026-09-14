@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Fragment } from 'react';
-import { CommandMenu } from '@/components/command-menu';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -16,7 +15,6 @@ import { Separator } from '@/components/ui/separator';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { monthLabel } from '@/lib/format';
 import { locate } from '@/lib/nav';
-import type { SessionUser } from '@/lib/session';
 
 /** What the path under a screen reads as: `new`, `edit`, a month, or a record. */
 function tailLabel(segment: string): string {
@@ -27,10 +25,10 @@ function tailLabel(segment: string): string {
 }
 
 /**
- * The strip above every screen: the sidebar toggle, where you are, and the
- * command menu. Screen titles and actions live in the page itself.
+ * The strip above every screen: the sidebar toggle and where you are. Screen
+ * titles and actions live in the page itself.
  */
-export function SiteHeader({ user }: { user: SessionUser }) {
+export function SiteHeader() {
   const pathname = usePathname();
   const here = locate(pathname);
   const tail = here
@@ -70,9 +68,6 @@ export function SiteHeader({ user }: { user: SessionUser }) {
           </BreadcrumbList>
         </Breadcrumb>
       ) : null}
-      <div className="ml-auto">
-        <CommandMenu role={user.role} />
-      </div>
     </header>
   );
 }
