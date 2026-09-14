@@ -26,7 +26,12 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
   return (
     <thead
       data-slot="table-header"
-      className={cn("bg-muted [&_tr]:border-b [&_tr]:hover:bg-transparent", className)}
+      // Half muted, half card, and opaque (the header is sticky): muted text
+      // on full `muted` measures 4.3:1, under AA for 12px — this reaches 4.5.
+      className={cn(
+        "bg-[color-mix(in_oklch,var(--muted)_50%,var(--card))] [&_tr]:border-b [&_tr]:hover:bg-transparent",
+        className
+      )}
       {...props}
     />
   )
