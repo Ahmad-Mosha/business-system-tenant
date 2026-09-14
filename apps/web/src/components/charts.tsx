@@ -197,13 +197,21 @@ export function BreakdownBar({
             <span className="text-muted-foreground">{s.label}</span>
             <span className="num ms-auto">{money(s.value)}</span>
             <span className="num w-12 text-right text-xs text-muted-foreground">
-              {revenue > 0 ? `${((Math.abs(s.value) / revenue) * 100).toFixed(0)}%` : '—'}
+              {share(s.value, revenue)}
             </span>
           </li>
         ))}
       </ul>
     </div>
   );
+}
+
+/** A segment's share of revenue. Past 999% it stops meaning anything — a month
+ *  of big costs against a little revenue — so it says so instead of "83333%". */
+function share(value: number, revenue: number) {
+  if (revenue <= 0) return '—';
+  const pct = (Math.abs(value) / revenue) * 100;
+  return pct > 999 ? '>999%' : `${pct.toFixed(0)}%`;
 }
 
 /** `1,250,000` → `1.25M` — axis labels only, where the exact figure is noise. */
