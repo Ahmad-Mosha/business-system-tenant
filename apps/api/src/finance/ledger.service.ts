@@ -311,6 +311,65 @@ export class LedgerService {
   }
 
   /**
+   * Money into and out of one account across a window: per day, week or month
+   * (every bucket present, empty ones as zero, so a chart's time axis never
+   * skips), and in total by the account on the other side — where it came
+   * from and where it went. The opening balance isn't a flow, it's where the
+   * ledger started, so it's left out.
+   */
+  async flow(
+    code: LedgerAccountCode,
+    from: string,
+    to: string,
+    bucket: 'day' | 'week' | 'month',
+    tx: EntityManager = this.db.manager,
+  ): Promise<{
+    series: Array<{ period: string; in: string; out: string }>;
+    sources: Array<{ direction: 'in' | 'out'; code: string; nameEn: string; nameAr: string; amount: string }>;
+  }> {
+    const window = `(e.debit_code = $1 OR e.credit_code = $1)
+       AND e.kind <> 'OPENING_BALANCE'
+       AND e.occurred_at::date BETWEEN $2::date AND $3::date`;
+
+    const series = await tx.query(
+      `WITH moves AS (
+         SELECT date_trunc($4, e.occurred_at::date::timestamp)::date AS period,
+                SUM(e.amount) FILTER (WHERE e.debit_code = $1)  AS inflow,
+                SUM(e.amount) FILTER (WHERE e.credit_code = $1) AS outflow
+         FROM ledger_entry e
+         WHERE ${window}
+         GROUP BY 1
+       )
+       SELECT g::date::text AS period,
+              COALESCE(m.inflow, 0)::text  AS "in",
+              COALESCE(m.outflow, 0)::text AS "out"
+       FROM generate_series(
+              date_trunc($4, $2::date::timestamp),
+              $3::date::timestamp,
+              ('1 ' || $4)::interval
+            ) g
+       LEFT JOIN moves m ON m.period = g::date
+       ORDER BY g`,
+      [code, from, to, bucket],
+    );
+
+    const sources = await tx.query(
+      `SELECT CASE WHEN e.debit_code = $1 THEN 'in' ELSE 'out' END AS direction,
+              a.code, a.name_en AS "nameEn", a.name_ar AS "nameAr",
+              SUM(e.amount)::text AS amount
+       FROM ledger_entry e
+       JOIN ledger_account a
+         ON a.code = CASE WHEN e.debit_code = $1 THEN e.credit_code ELSE e.debit_code END
+       WHERE ${window}
+       GROUP BY 1, a.code, a.name_en, a.name_ar
+       ORDER BY SUM(e.amount) DESC`,
+      [code, from, to],
+    );
+
+    return { series, sources };
+  }
+
+  /**
    * Revenue and cost components for a period, from the profit accounts. The
    * gross/net split is a choice of which of these to subtract — open decision
    * #6 — so the raw components are returned and the interpretation stays thin.
