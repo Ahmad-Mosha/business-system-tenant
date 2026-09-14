@@ -15,33 +15,29 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { getAccountLedger, getCheques, getMoneyAccounts } from '@/lib/api';
-import { byDay, date, timeOf } from '@/lib/format';
+import { getAccountLedger, getCashFlow, getCheques, getMoneyAccounts } from '@/lib/api';
+import { byDay, date, isoDate, timeOf } from '@/lib/format';
 import { accountByCode } from '@/lib/money';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
 
 const LIMIT = 150;
 
-/** First day of the current month, ISO — the window "this month" totals cover. */
-function monthStart() {
-  const d = new Date();
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)).toISOString().slice(0, 10);
-}
-
 export default async function TreasuryPage() {
   await requireAdmin();
-  const [accounts, movements, cheques] = await Promise.all([
+  const today = new Date();
+  const since = isoDate(new Date(today.getFullYear(), today.getMonth(), 1));
+  const [accounts, movements, cheques, month] = await Promise.all([
     getMoneyAccounts(),
     getAccountLedger('CASH', LIMIT),
     getCheques('PENDING'),
+    // Totals from the API, not from the rows below — those stop at LIMIT.
+    getCashFlow(since, isoDate(today), 'month'),
   ]);
 
   const cash = accountByCode(accounts, 'CASH')?.balance ?? '0';
-  const since = monthStart();
-  const thisMonth = movements.filter((m) => m.occurredAt.slice(0, 10) >= since);
-  const monthIn = thisMonth.filter((m) => Number(m.effect) > 0).reduce((n, m) => n + Number(m.effect), 0);
-  const monthOut = thisMonth.filter((m) => Number(m.effect) < 0).reduce((n, m) => n + Number(m.effect), 0);
+  const monthIn = month.series.reduce((n, p) => n + Number(p.in), 0);
+  const monthOut = -month.series.reduce((n, p) => n + Number(p.out), 0);
   const chequesTotal = cheques.reduce((n, c) => n + Number(c.amount), 0);
   const sinceLabel = `Since ${date(since)}`;
 
