@@ -16,10 +16,15 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import type { Role } from '@/lib/session';
+import type messages from '@/messages/en.json';
+
+/** Names live in the messages (`nav.items.*`, `nav.groups.*`); this file only says where things are. */
+type ItemKey = keyof (typeof messages)['nav']['items'];
+type GroupKey = keyof (typeof messages)['nav']['groups'];
 
 export interface NavItem {
   href: string;
-  label: string;
+  key: ItemKey;
   icon: LucideIcon;
   roles?: Role[];
   /** Match the path exactly, for a section root that has children. */
@@ -27,7 +32,7 @@ export interface NavItem {
 }
 
 export interface NavGroup {
-  label: string;
+  key: GroupKey;
   /** The module's icon in the sidebar. */
   icon: LucideIcon;
   /** Listed as plain links rather than a collapsible module. */
@@ -36,47 +41,47 @@ export interface NavGroup {
 }
 
 /**
- * The one definition of where things live — the sidebar, the breadcrumbs and
- * the command menu all read it. `roles` hides what a user cannot use; the API
+ * The one definition of where things live — the sidebar and the breadcrumbs
+ * both read it. `roles` hides what a user cannot use; the API
  * refuses it regardless.
  */
 export const NAVIGATION: NavGroup[] = [
   {
-    label: 'Operations',
+    key: 'operations',
     icon: ShoppingBag,
     items: [
-      { href: '/orders', label: 'Orders', icon: ShoppingBag },
-      { href: '/shipments', label: 'Shipments', icon: Truck },
-      { href: '/inventory', label: 'Inventory', icon: Package, roles: ['ADMIN'] },
+      { href: '/orders', key: 'orders', icon: ShoppingBag },
+      { href: '/shipments', key: 'shipments', icon: Truck },
+      { href: '/inventory', key: 'inventory', icon: Package, roles: ['ADMIN'] },
     ],
   },
   {
-    label: 'Money',
+    key: 'money',
     icon: Wallet,
     items: [
-      { href: '/money', label: 'Overview', icon: Wallet, roles: ['ADMIN'], exact: true },
-      { href: '/money/treasury', label: 'Treasury', icon: Receipt, roles: ['ADMIN'] },
-      { href: '/money/purchases', label: 'Purchases', icon: ClipboardList, roles: ['ADMIN'] },
-      { href: '/money/suppliers', label: 'Suppliers', icon: Users, roles: ['ADMIN'] },
-      { href: '/money/ledger', label: 'Ledger', icon: BookText, roles: ['ADMIN'] },
+      { href: '/money', key: 'moneyOverview', icon: Wallet, roles: ['ADMIN'], exact: true },
+      { href: '/money/treasury', key: 'treasury', icon: Receipt, roles: ['ADMIN'] },
+      { href: '/money/purchases', key: 'purchases', icon: ClipboardList, roles: ['ADMIN'] },
+      { href: '/money/suppliers', key: 'suppliers', icon: Users, roles: ['ADMIN'] },
+      { href: '/money/ledger', key: 'ledger', icon: BookText, roles: ['ADMIN'] },
     ],
   },
   {
     // These four screens all answer one question — what noon owes and why.
-    label: 'noon',
+    key: 'noon',
     icon: Store,
     items: [
-      { href: '/', label: 'Overview', icon: LayoutGrid, roles: ['ADMIN'], exact: true },
-      { href: '/months', label: 'Months', icon: CalendarRange, roles: ['ADMIN'] },
-      { href: '/products', label: 'Products', icon: BarChart3, roles: ['ADMIN'] },
-      { href: '/imports', label: 'Imports', icon: Upload, roles: ['ADMIN'] },
+      { href: '/', key: 'noonOverview', icon: LayoutGrid, roles: ['ADMIN'], exact: true },
+      { href: '/months', key: 'months', icon: CalendarRange, roles: ['ADMIN'] },
+      { href: '/products', key: 'products', icon: BarChart3, roles: ['ADMIN'] },
+      { href: '/imports', key: 'imports', icon: Upload, roles: ['ADMIN'] },
     ],
   },
   {
-    label: 'Admin',
+    key: 'admin',
     icon: UserCog,
     flat: true,
-    items: [{ href: '/team', label: 'Team', icon: UserCog, roles: ['ADMIN'] }],
+    items: [{ href: '/team', key: 'team', icon: UserCog, roles: ['ADMIN'] }],
   },
 ];
 
