@@ -196,6 +196,14 @@
   letter-spacing: normal;
 }
 
+/* A dir="auto" field takes its direction from what's typed — names can be
+   Arabic or English. Empty, it has nothing to go on and falls back to LTR,
+   which puts an Arabic placeholder at the wrong edge; until then it follows
+   the page. */
+[dir='auto']:placeholder-shown {
+  direction: inherit;
+}
+
 /* iOS zooms into any focused field under 16px. */
 @media (pointer: coarse) {
   input,

@@ -95,7 +95,8 @@
     "entries": "{count, plural, =0 {No entries} one {# entry} other {# entries}}",
     "items": "{count, plural, =0 {No items} one {# item} other {# items}}",
     "units": "{count, plural, =0 {No units} one {# unit} other {# units}}",
-    "shipments": "{count, plural, =0 {No shipments} one {# shipment} other {# shipments}}"
+    "shipments": "{count, plural, =0 {No shipments} one {# shipment} other {# shipments}}",
+    "variants": "{count, plural, =0 {No variants} one {# variant} other {# variants}}"
   },
   "filters": {
     "reset": "Reset",
@@ -160,17 +161,9 @@
     "backHome": "Back to Prime Market"
   },
   "errors": {
+    "unreachable": "Could not reach the server. Check your connection and try again.",
     "requestFailed": "Request failed ({status}).",
-    "updateStatus": "Could not update the status.",
-    "updatePayment": "Could not update the payment.",
-    "assign": "Could not assign the order.",
-    "createOrder": "Could not create the order.",
-    "saveOrder": "Could not save the order.",
-    "updateTracking": "Could not update the tracking number.",
-    "trackingRequired": "Enter a tracking number.",
-    "trackingFailed": "Tracking failed.",
-    "shipmentNotFound": "Shipment not found on Bosta.",
-    "trackingUnreachable": "Could not reach the tracking service."
+    "trackingRequired": "Enter a tracking number."
   },
   "orders": {
     "title": "Orders",
@@ -370,6 +363,146 @@
     "attempts": "Delivery attempts",
     "attemptsValue": "<num>{count}</num> of <num>{max}</num>",
     "allowOpen": "Customer may open the package?"
+  },
+  "inventory": {
+    "title": "Inventory",
+    "description": "What you have, what it's worth, and what needs restocking.",
+    "add": "Add product",
+    "stockValue": "Stock value",
+    "missingCost": "{count, plural, one {# product has no cost yet} other {# products have no cost yet}}",
+    "atCost": "EGP, at unit cost",
+    "unitsOnHand": "Units on hand",
+    "inOpenOrders": "Plus {count} in open orders",
+    "noneInOrders": "None waiting in open orders",
+    "lowHint": "{count} or fewer left",
+    "outHint": "Nothing left to sell",
+    "search": "Search products…",
+    "stockLevel": "Stock level",
+    "allCategories": "All categories",
+    "anyChannel": "Any channel",
+    "noMatch": "No products match",
+    "noMatchHint": "Try another filter, or clear the search.",
+    "none": "No products yet",
+    "noneHint": "Add the first product, with its cost and opening stock.",
+    "columns": {
+      "product": "Product",
+      "stock": "Stock",
+      "onHand": "On hand",
+      "inOrders": "In orders",
+      "unitCost": "Unit cost",
+      "stockValue": "Stock value",
+      "channels": "Channels"
+    },
+    "sync": "Sync website",
+    "synced": "Website catalogue synced: {updated} updated, {unmatched} unmatched."
+  },
+  "product": {
+    "back": "Back to inventory",
+    "description": "Stock, cost and the channels that sell it.",
+    "edit": "Edit",
+    "delete": "Delete",
+    "deleteTitle": "Delete “<bdi>{name}</bdi>”?",
+    "deleteDescription": "It leaves Inventory. Its order and stock history is kept, not erased — nothing that already references this product changes.",
+    "deleteConfirm": "Delete product",
+    "updated": "Product updated.",
+    "details": "Product details",
+    "name": "Name",
+    "nameRequired": "A product needs a name.",
+    "category": "Category",
+    "noCategory": "None",
+    "onHand": "On hand",
+    "lowHint": "Low — {count} or fewer left",
+    "inOpenOrders": "In open orders",
+    "inOpenOrdersHint": "Already off on-hand, not delivered yet",
+    "nothingWaiting": "Nothing waiting",
+    "unitCost": "Unit cost",
+    "varies": "Varies",
+    "differs": "Differs across {variants}",
+    "costNotSet": "Not set — left out of stock value",
+    "sellsFor": "Sells for {price}",
+    "noPrice": "No selling price yet",
+    "stockValueHint": "On hand at unit cost",
+    "channels": "Channels",
+    "channelsHint": "The SKU each channel uses for this product — a sale there moves this stock.",
+    "stock": {
+      "title": "Stock and pricing",
+      "description": "What it costs and sells for, and every unit in or out.",
+      "inOpenOrders": "<num>{count}</num> in open orders — already off the shelf count",
+      "noneWaiting": "Nothing waiting in open orders",
+      "onHand": "on hand",
+      "pricing": "Pricing",
+      "sellingPrice": "Selling price",
+      "savePrices": "Save prices",
+      "saved": "Saved.",
+      "record": "Record a movement",
+      "direction": "Direction",
+      "in": "Stock in",
+      "out": "Stock out",
+      "quantity": "Quantity",
+      "reason": "Reason",
+      "add": "Add {units}",
+      "remove": "Remove {units}",
+      "increased": "Stock increased by {count}.",
+      "reduced": "Stock reduced by {count}.",
+      "onlyOnHand": "Only <num>{count}</num> on hand",
+      "nothingToRemove": "Nothing on hand to remove",
+      "movement": "Movement",
+      "change": "Change",
+      "balance": "Balance",
+      "noMovements": "No stock movements yet."
+    },
+    "listings": {
+      "variantsNotBuilt": "This product has variants. Per-variant channel mapping isn’t built yet — say the word when you need it.",
+      "socialNote": "Social orders are entered by hand against this product — nothing to set up here.",
+      "linked": "Linked",
+      "notLinked": "Not linked",
+      "sku": "{channel} SKU",
+      "link": "Link",
+      "unlink": "Unlink from {channel}",
+      "skuUpdated": "{channel} SKU updated.",
+      "linkedTo": "Linked to {channel}.",
+      "unlinked": "Unlinked from {channel}."
+    },
+    "channelSku": {
+      "noon": {
+        "placeholder": "Partner SKU, e.g. CCC-0001",
+        "hint": "Exactly as it appears in the noon settlement report"
+      },
+      "amazon": {
+        "placeholder": "Seller SKU",
+        "hint": "The SKU you set in Seller Central"
+      },
+      "easyorders": {
+        "placeholder": "Easy Orders product ID",
+        "hint": "From the product’s page in Easy Orders"
+      }
+    },
+    "new": {
+      "description": "Its identity, cost and opening stock. Price is set on each order.",
+      "details": "Details",
+      "namePlaceholder": "e.g. اكسجين بلوب 1 لتر مشكل",
+      "categoryHint": "Optional — click again to clear.",
+      "costAndStock": "Cost and stock",
+      "ourSku": "Our SKU",
+      "optional": "Optional",
+      "costPlaceholder": "What we paid",
+      "costInvalid": "An amount like 120 or 120.50.",
+      "openingStock": "Opening stock",
+      "stockInvalid": "A whole number, 0 or more.",
+      "noPrice": "No selling price here — it differs by channel, so it comes from each order. A product carries cost, not price.",
+      "alsoSoldOn": "Also sold on",
+      "alsoSoldOnHint": "Optional. The SKU each channel uses — a sale there moves this product’s stock. You can add these later from the product page.",
+      "adding": "Adding"
+    },
+    "dialog": {
+      "title": "New product",
+      "description": "Created in Inventory and added to this invoice.",
+      "optional": "(optional)",
+      "skuPlaceholder": "Leave blank if none yet",
+      "alsoSoldOnHint": "Optional — a sale there will move this product’s stock.",
+      "created": "Product created.",
+      "create": "Create and add"
+    }
   },
   "enums": {
     "orderStatus": {
