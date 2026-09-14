@@ -87,6 +87,10 @@ export function VariantPanel({
   const [price, setPrice] = useState(variant.sellingPrice ?? '');
 
   const pricesDirty = cost !== (variant.unitCost ?? '') || price !== (variant.sellingPrice ?? '');
+  // The API refuses a removal below zero too; this just says so before asking.
+  const count = Number(qty) || 0;
+  const available = Math.max(variant.onHand, 0);
+  const tooMany = direction === 'out' && count > available;
 
   const save = () =>
     start(async () => {
@@ -211,11 +215,24 @@ export function VariantPanel({
               </Select>
             </Field>
           </div>
-          <Button onClick={move} disabled={pending || !Number(qty)} className="w-fit">
-            {pending ? <Spinner /> : direction === 'in' ? <Plus /> : <Minus />}
-            {direction === 'in' ? 'Add' : 'Remove'} <span className="num">{Number(qty) || 0}</span>{' '}
-            {Number(qty) === 1 ? 'unit' : 'units'}
-          </Button>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button onClick={move} disabled={pending || !count || tooMany} className="w-fit">
+              {pending ? <Spinner /> : direction === 'in' ? <Plus /> : <Minus />}
+              {direction === 'in' ? 'Add' : 'Remove'} <span className="num">{count}</span>{' '}
+              {count === 1 ? 'unit' : 'units'}
+            </Button>
+            {tooMany ? (
+              <p role="status" className="text-xs text-destructive">
+                {available > 0 ? (
+                  <>
+                    Only <span className="num">{available}</span> on hand
+                  </>
+                ) : (
+                  'Nothing on hand to remove'
+                )}
+              </p>
+            ) : null}
+          </div>
         </FieldGroup>
       </CardContent>
 

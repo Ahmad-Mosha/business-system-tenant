@@ -486,7 +486,17 @@ export interface PeriodSummary {
 
 export const getCashSeries = (days = 90) =>
   get<Array<{ date: string; balance: string }>>(`/finance/cash-series?days=${days}`);
-export const getPeriodSummary = () => get<PeriodSummary>('/finance/summary');
+export const getPeriodSummary = (from?: string, to?: string) =>
+  get<PeriodSummary>(`/finance/summary${from && to ? `?from=${from}&to=${to}` : ''}`);
+
+/** Money into and out of the treasury between two dates — per bucket, and by where. */
+export interface CashFlow {
+  series: Array<{ period: string; in: string; out: string }>;
+  sources: Array<{ direction: 'in' | 'out'; code: string; nameEn: string; nameAr: string; amount: string }>;
+}
+
+export const getCashFlow = (from: string, to: string, bucket: 'day' | 'week' | 'month') =>
+  get<CashFlow>(`/finance/cash-flow?from=${from}&to=${to}&bucket=${bucket}`);
 
 export const getSuppliers = () => get<SupplierRow[]>('/suppliers');
 export const getSupplier = (id: string) => get<SupplierDetail>(`/suppliers/${id}`);

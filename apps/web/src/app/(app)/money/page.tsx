@@ -1,11 +1,18 @@
 import { ArrowUpRight, Wallet } from 'lucide-react';
 import Link from 'next/link';
 import { Amount } from '@/components/amount';
-import { BreakdownBar, CashAreaChart, Sparkline } from '@/components/charts';
-import { directionOf, EntryCell, MONEY } from '@/components/ledger-entry';
+import {
+  BarList,
+  CashBalanceChart,
+  CashFlowChart,
+  Sparkline,
+  type BarItem,
+  type Bucket,
+} from '@/components/charts';
 import { Delta, MetricCard, MetricGrid } from '@/components/metric-card';
 import { MoneyAnchorForm } from '@/components/money-anchor-form';
 import { Page, PageHeader } from '@/components/page';
+import { PeriodTabs } from '@/components/period-tabs';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -17,26 +24,41 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  getAccountLedger,
+  getCashFlow,
   getCashSeries,
   getFinanceOverview,
   getMoneyAccounts,
   getPeriodSummary,
+  type CashFlow,
 } from '@/lib/api';
-import { dateTime, money } from '@/lib/format';
-import { accountByCode, groupAccounts } from '@/lib/money';
+import { date, daysAgo, isoDate, money } from '@/lib/format';
+import { accountByCode, flowLabel, groupAccounts } from '@/lib/money';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
 
-export default async function MoneyOverviewPage() {
+/** The windows the overview can cover, and how finely each one is bucketed. */
+const RANGES = [
+  { value: '7d', label: '7 days', days: 7, bucket: 'day' },
+  { value: '30d', label: '30 days', days: 30, bucket: 'day' },
+  { value: '90d', label: '90 days', days: 90, bucket: 'week' },
+  { value: '12m', label: '12 months', days: 365, bucket: 'month' },
+] as const satisfies ReadonlyArray<{ value: string; label: string; days: number; bucket: Bucket }>;
+
+const DEFAULT_RANGE = '30d';
+
+const sum = (series: CashFlow['series'], key: 'in' | 'out') =>
+  series.reduce((n, p) => n + Number(p[key]), 0);
+
+/** Change against the window before, in percent — only when there was something to compare with. */
+const change = (now: number, before: number) => (before > 0 ? ((now - before) / before) * 100 : null);
+
+const span = (label: string) => `the last ${label}`;
+
+export default async function MoneyOverviewPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
   await requireAdmin();
   const overview = await getFinanceOverview();
 
@@ -63,77 +85,120 @@ export default async function MoneyOverviewPage() {
     );
   }
 
-  const [accounts, recent, series, summary] = await Promise.all([
+  const params = await searchParams;
+  const range = RANGES.find((r) => r.value === params.range) ?? RANGES.find((r) => r.value === DEFAULT_RANGE)!;
+  const to = isoDate(new Date());
+  const from = daysAgo(range.days - 1);
+  // The same length of time just before, for "vs the previous 30 days".
+  const before = { from: daysAgo(range.days * 2 - 1), to: daysAgo(range.days) };
+
+  const [accounts, days, flow, previous, summary] = await Promise.all([
     getMoneyAccounts(),
-    getAccountLedger('CASH', 12),
-    getCashSeries(90),
-    getPeriodSummary(),
+    getCashSeries(range.days),
+    getCashFlow(from, to, range.bucket),
+    getCashFlow(before.from, before.to, 'month'),
+    getPeriodSummary(from, to),
   ]);
 
-  const bal = (code: string) => accountByCode(accounts, code)?.balance ?? '0';
+  // Before the opening balance there were no books, not a zero balance — so
+  // the chart and the change start where the books do.
+  const opened = overview.openingAsOf;
+  const series = days.filter((p) => p.date >= opened);
+  const sinceOpening = series.length < days.length;
+  const cash = accountByCode(accounts, 'CASH')?.balance ?? '0';
+  const balances = series.map((p) => Number(p.balance));
+  const moved = balances.length > 1 ? balances[balances.length - 1] - balances[0] : null;
+  const balanceSpan = sinceOpening ? `since the books began on ${date(opened)}` : span(range.label);
+  const moneyIn = sum(flow.series, 'in');
+  const moneyOut = sum(flow.series, 'out');
+  const net = moneyIn - moneyOut;
+  // A window that starts before the books did holds only part of its days —
+  // "+8,700% vs the 90 days before" would be comparing against nothing.
+  const comparable = before.from >= opened;
+  const inChange = comparable ? change(moneyIn, sum(previous.series, 'in')) : null;
+  const outChange = comparable ? change(moneyOut, sum(previous.series, 'out')) : null;
+  const ledgerFor = (code: string) => `/money/ledger?code=${code}&from=${from}&to=${to}`;
+
+  const sources = (direction: 'in' | 'out'): BarItem[] =>
+    flow.sources
+      .filter((s) => s.direction === direction)
+      .map((s) => ({
+        key: s.code,
+        label: flowLabel(direction, s.code, s.nameEn),
+        value: Number(s.amount),
+        fill: direction === 'in' ? 'var(--success)' : 'var(--destructive)',
+        href: ledgerFor(s.code),
+      }));
+
+  const costs: BarItem[] = [
+    { key: 'SALES', label: 'Sales revenue', value: Number(summary.revenue), fill: 'var(--chart-4)' },
+    { key: 'CHANNEL_FEES', label: 'Fees and ads', value: Number(summary.channelFees), fill: 'var(--muted-foreground)' },
+    { key: 'SHIPPING', label: 'Shipping', value: Number(summary.shipping), fill: 'var(--muted-foreground)' },
+    { key: 'OTHER_EXPENSE', label: 'Other expenses', value: Number(summary.otherExpense), fill: 'var(--muted-foreground)' },
+  ]
+    .filter((c) => Math.abs(c.value) > 0.005)
+    .map((c) => ({ ...c, href: ledgerFor(c.key) }));
+
   const groups = groupAccounts(accounts);
-  const values = series.map((p) => Number(p.balance));
-
-  // A real 30-day change, from the recorded series — shown only when there is
-  // a non-zero starting point to compare against.
-  const then = values.length > 30 ? values[values.length - 31] : null;
-  const now = values.length ? values[values.length - 1] : null;
-  const change = then && now !== null ? ((now - then) / Math.abs(then)) * 100 : null;
-
-  const rev = Number(summary.revenue);
-  const segments = [
-    { label: 'Cost of goods', value: Number(summary.cogs), tone: 'cost' as const },
-    { label: 'Channel fees', value: Number(summary.channelFees), tone: 'cost' as const },
-    { label: 'Shipping', value: Number(summary.shipping), tone: 'cost' as const },
-    { label: 'Other', value: Number(summary.otherExpense), tone: 'cost' as const },
-    { label: 'Net profit', value: Number(summary.netProfit), tone: 'profit' as const },
-  ].filter((s) => Math.abs(s.value) > 0.005);
-  const margin = rev > 0 ? (Number(summary.grossProfit) / rev) * 100 : null;
-  const chequesPending = Number(bal('CHEQUES_PENDING'));
 
   return (
     <Page>
       <PageHeader
         title="Money"
-        description="Every figure here is built from recorded events — open any of them to see which."
+        description="Where the money is, which way it's moving, and why — built from recorded events only."
         actions={
-          <Button variant="outline" asChild>
-            <Link href="/money/ledger">
-              Full ledger
-              <ArrowUpRight />
-            </Link>
-          </Button>
+          <PeriodTabs
+            value={range.value}
+            options={RANGES}
+            href={(v) => (v === DEFAULT_RANGE ? '/money' : `/money?range=${v}`)}
+          />
         }
       />
 
       <MetricGrid>
         <MetricCard
           label="Cash on hand"
-          value={<Amount value={bal('CASH')} />}
-          badge={change !== null ? <Delta value={change} /> : undefined}
-          link={{ href: '/money/ledger?code=CASH', label: 'Open in the ledger' }}
-          hint={change !== null ? 'vs 30 days ago' : 'الخزينة'}
+          value={<Amount value={cash} className={cn(Number(cash) < 0 && 'text-destructive')} />}
+          link={{ href: '/money/treasury', label: 'Open Treasury' }}
+          hint={
+            moved === null ? (
+              'الخزينة'
+            ) : (
+              <>
+                <Amount
+                  value={moved}
+                  signed
+                  className={cn(moved > 0 && 'text-success', moved < 0 && 'text-destructive')}
+                />{' '}
+                {sinceOpening ? `since ${date(opened)}` : `over ${range.label}`}
+              </>
+            )
+          }
         >
-          <Sparkline points={values} />
+          <Sparkline points={balances} />
         </MetricCard>
         <MetricCard
-          label="noon owes us"
-          value={<Amount value={bal('NOON_RECEIVABLE')} />}
-          link={{ href: '/money/ledger?code=NOON_RECEIVABLE', label: 'Open in the ledger' }}
-          hint="Sold, not yet paid out"
+          label="Money in"
+          value={<Amount value={moneyIn} />}
+          badge={inChange !== null ? <Delta value={inChange} /> : undefined}
+          hint={inChange !== null ? `vs the ${range.label} before` : `In ${span(range.label)}`}
         />
         <MetricCard
-          label="Bosta is holding"
-          value={<Amount value={bal('BOSTA_COD')} />}
-          link={{ href: '/money/ledger?code=BOSTA_COD', label: 'Open in the ledger' }}
-          hint="Cash collected, not transferred"
+          label="Money out"
+          value={<Amount value={moneyOut} />}
+          badge={outChange !== null ? <Delta value={outChange} invert /> : undefined}
+          hint={outChange !== null ? `vs the ${range.label} before` : `In ${span(range.label)}`}
         />
         <MetricCard
-          label="Cheques pending"
-          value={<Amount value={chequesPending} />}
-          tone={chequesPending > 0 ? 'warning' : 'default'}
-          link={{ href: '/money/treasury', label: 'Open Treasury' }}
-          hint={chequesPending > 0 ? 'Not cleared yet' : 'Nothing waiting to clear'}
+          label="Net cash flow"
+          value={
+            <Amount
+              value={net}
+              signed
+              className={cn(net > 0 && 'text-success', net < 0 && 'text-destructive')}
+            />
+          }
+          hint={net >= 0 ? 'More came in than went out' : 'More went out than came in'}
         />
         <MetricCard
           label="Stock value"
@@ -144,57 +209,11 @@ export default async function MoneyOverviewPage() {
       </MetricGrid>
 
       <div className="grid gap-6 xl:grid-cols-3">
-        <Card className="xl:col-span-2">
+        {/* Stretches to The books beside it, and the chart takes the height. */}
+        <Card className="flex flex-col xl:col-span-2">
           <CardHeader>
-            <CardTitle>Cash — last 90 days</CardTitle>
-            <CardDescription>The till balance at the end of each day.</CardDescription>
-          </CardHeader>
-          <CardContent className="h-64">
-            <CashAreaChart series={series} />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>This month</CardTitle>
-            <CardDescription>Where the revenue went.</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-5">
-            {rev === 0 && segments.length === 0 ? (
-              <p className="py-10 text-center text-[13px] text-muted-foreground">
-                No sales or costs recorded this month yet.
-              </p>
-            ) : (
-              <>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Revenue</p>
-                    <Amount value={summary.revenue} className="text-xl font-semibold tracking-tight" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">
-                      Gross profit{margin !== null ? ` · ${margin.toFixed(1)}%` : ''}
-                    </p>
-                    <Amount
-                      value={summary.grossProfit}
-                      className={cn(
-                        'text-xl font-semibold tracking-tight',
-                        Number(summary.grossProfit) < 0 && 'text-destructive',
-                      )}
-                    />
-                  </div>
-                </div>
-                <BreakdownBar revenue={rev} segments={segments} />
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-3">
-        <Card className="pb-0 xl:col-span-2">
-          <CardHeader>
-            <CardTitle>Recent cash movements</CardTitle>
+            <CardTitle>Cash on hand</CardTitle>
+            <CardDescription>The treasury’s balance at the end of each day, {balanceSpan}.</CardDescription>
             <CardAction>
               <Button variant="ghost" size="sm" asChild>
                 <Link href="/money/treasury">
@@ -204,37 +223,9 @@ export default async function MoneyOverviewPage() {
               </Button>
             </CardAction>
           </CardHeader>
-          {recent.length === 0 ? (
-            <p className="border-t p-10 text-center text-[13px] text-muted-foreground">No cash movements yet.</p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Movement</TableHead>
-                  <TableHead className="w-[140px] text-right">Amount</TableHead>
-                  <TableHead className="hidden w-[140px] text-right sm:table-cell">Balance</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {recent.map((e) => {
-                  const mark = MONEY[directionOf(Number(e.effect))];
-                  return (
-                    <TableRow key={e.id}>
-                      <TableCell className="h-14 max-w-0">
-                        <EntryCell entry={e} mark={mark} when={dateTime(e.occurredAt)} />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Amount value={e.effect} signed className={cn('font-semibold', mark.tone)} />
-                      </TableCell>
-                      <TableCell className="hidden text-right sm:table-cell">
-                        <Amount value={e.runningBalance} className="text-muted-foreground" />
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
+          <CardContent className="flex-1">
+            <CashBalanceChart series={series} className="h-full min-h-72" />
+          </CardContent>
         </Card>
 
         <Card>
@@ -250,7 +241,69 @@ export default async function MoneyOverviewPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Money in and out</CardTitle>
+          <CardDescription>
+            Per {range.bucket}, {span(range.label)}. The opening balance isn’t counted — it’s where the books began.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-muted-foreground">
+            <Legend swatch="bg-success" label="In" value={moneyIn} />
+            <Legend swatch="bg-destructive" label="Out" value={-moneyOut} />
+          </div>
+          <CashFlowChart series={flow.series} bucket={range.bucket} />
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle>Where it came from</CardTitle>
+            <CardDescription>Money into the treasury, {span(range.label)}. Open a bar for its entries.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <BarList items={sources('in')} empty="Nothing came in." />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Where it went</CardTitle>
+            <CardDescription>Money out of the treasury, {span(range.label)}. Open a bar for its entries.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <BarList items={sources('out')} empty="Nothing went out." />
+          </CardContent>
+        </Card>
+        <Card className="lg:col-span-2 xl:col-span-1">
+          <CardHeader>
+            <CardTitle>Revenue and costs</CardTitle>
+            <CardDescription>As the books recorded them, {span(range.label)}.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            <BarList items={costs} empty="No sales or costs recorded." />
+            {/* Nothing posts cost of goods sold yet, so a profit figure here would
+                be revenue minus fees — flattering and wrong. */}
+            <p className="border-t pt-3 text-xs text-muted-foreground">
+              Cost of goods sold isn’t posted to the books yet, so there’s no profit figure here.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     </Page>
+  );
+}
+
+/** A chart's series key with its total — the legend and the headline in one. */
+function Legend({ swatch, label, value }: { swatch: string; label: string; value: number }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span aria-hidden className={cn('size-2 shrink-0', swatch)} />
+      {label}
+      <Amount value={value} signed className="text-[13px] font-semibold text-foreground" />
+    </span>
   );
 }
 
