@@ -39,7 +39,7 @@ export function MetricCard({
   value: ReactNode;
   hint?: ReactNode;
   tone?: MetricTone;
-  /** Top-right: a trend (<Delta/>) or a short status. */
+  /** A trend (<Delta/>) — it leads the hint line: "+4.2% vs 30 days ago". */
   badge?: ReactNode;
   link?: { href: string; label: string };
   /** A visual under the figure — sparkline, progress bar. */
@@ -50,35 +50,33 @@ export function MetricCard({
     <Card className={cn('@container/metric gap-0 px-4', className)}>
       <div className="flex min-h-6 items-start justify-between gap-2">
         <p className="pt-0.5 text-xs font-medium text-muted-foreground">{label}</p>
-        {badge || link ? (
-          <div className="-mt-0.5 -mr-1.5 flex shrink-0 items-center gap-1">
-            {badge}
-            {link ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon-xs" asChild>
-                    <Link href={link.href} aria-label={link.label}>
-                      <ArrowUpRight />
-                    </Link>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{link.label}</TooltipContent>
-              </Tooltip>
-            ) : null}
-          </div>
+        {link ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon-xs" asChild className="-mt-0.5 -mr-1.5 shrink-0">
+                <Link href={link.href} aria-label={link.label}>
+                  <ArrowUpRight />
+                </Link>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{link.label}</TooltipContent>
+          </Tooltip>
         ) : null}
       </div>
       {/* Never truncated — a clipped amount is a wrong amount. The size steps
           down with the card instead. */}
-      <div className="num mt-2 text-[22px] leading-none font-semibold tracking-tight whitespace-nowrap @[14rem]/metric:text-2xl @[17rem]/metric:text-[28px]">
+      <div className="num mt-2 text-lg leading-none font-semibold tracking-tight whitespace-nowrap @[11rem]/metric:text-[22px] @[14rem]/metric:text-2xl @[17rem]/metric:text-[28px]">
         {value}
       </div>
       {children ? <div className="mt-3">{children}</div> : null}
-      {hint ? (
-        <p className={cn('mt-2.5 flex items-center gap-1.5 truncate text-xs', TONE_TEXT[tone])}>
-          {tone !== 'default' ? <span aria-hidden className="size-1.5 shrink-0 bg-current" /> : null}
-          <span className="truncate">{hint}</span>
-        </p>
+      {hint || badge ? (
+        <div className={cn('mt-2.5 flex items-center gap-1.5 text-xs', TONE_TEXT[tone])}>
+          {badge}
+          {tone !== 'default' && !badge ? (
+            <span aria-hidden className="size-1.5 shrink-0 bg-current" />
+          ) : null}
+          <span className="line-clamp-2">{hint}</span>
+        </div>
       ) : null}
     </Card>
   );
@@ -116,9 +114,11 @@ export function MetricGrid({ children }: { children: ReactNode }) {
         : count === 3
           ? '@2xl:grid-cols-3'
           : '';
+  // Two up even on a phone — stacked one per row, a moderator scrolls past
+  // several screens of figures before reaching their orders.
   return (
     <div className="@container">
-      <div className={cn('grid grid-cols-1 gap-4 @md:grid-cols-2', cols)}>{children}</div>
+      <div className={cn('grid grid-cols-2 gap-3 @md:gap-4', cols)}>{children}</div>
     </div>
   );
 }

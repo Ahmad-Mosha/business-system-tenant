@@ -122,6 +122,7 @@ export default async function InventoryPage({
       />
 
       <TablePanel
+        minWidth="56rem"
         footer={
           <TablePagination
             page={page}

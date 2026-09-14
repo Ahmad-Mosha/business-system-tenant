@@ -87,6 +87,7 @@ export default async function TreasuryPage() {
       <PendingCheques cheques={cheques} />
 
       <TablePanel
+        minWidth="48rem"
         footer={
           <TableCount>
             {movements.length >= LIMIT

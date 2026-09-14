@@ -33,12 +33,15 @@ export function TablePanel({
   children,
   footer,
   toolbar,
+  minWidth = '42rem',
   className,
 }: {
   children: ReactNode;
   footer?: ReactNode;
   /** A strip above the table, inside the card — a title or tabs. */
   toolbar?: ReactNode;
+  /** Narrower than this, the table scrolls sideways instead of crushing its columns. */
+  minWidth?: string;
   className?: string;
 }) {
   return (
@@ -49,7 +52,10 @@ export function TablePanel({
       )}
     >
       {toolbar ? <div className="shrink-0 border-b">{toolbar}</div> : null}
-      <div className="min-h-0 flex-1 overflow-auto [&_[data-slot=table-container]]:overflow-visible [&_thead]:sticky [&_thead]:top-0 [&_thead]:z-10">
+      <div
+        style={{ '--table-min': minWidth } as React.CSSProperties}
+        className="min-h-0 flex-1 overflow-auto [&_[data-slot=table-container]]:overflow-visible [&_table]:min-w-(--table-min) [&_thead]:sticky [&_thead]:top-0 [&_thead]:z-10"
+      >
         {children}
       </div>
       {footer ? (

@@ -78,6 +78,7 @@ export default async function PurchasesPage() {
       </MetricGrid>
 
       <TablePanel
+        minWidth="52rem"
         footer={
           <TableCount>
             <span className="num font-medium text-foreground">{invoices.length}</span>{' '}
