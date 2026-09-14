@@ -1,30 +1,48 @@
 'use client';
 
-import { AlertCircle, ArrowLeft, CheckCircle2, Loader2, Package } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { useActionState, useState } from 'react';
 import { addProduct, type CreateProductState } from '@/app/(app)/inventory/actions';
-import { Screen } from '@/components/shell';
+import { Page, PageHeader } from '@/components/page';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSeparator,
+  FieldSet,
+} from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from '@/components/ui/input-group';
+import { Spinner } from '@/components/ui/spinner';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { CATEGORIES } from '@/lib/categories';
-import { cn } from '@/lib/utils';
 
 const INITIAL: CreateProductState = { status: 'idle' };
 
 /** Mirrors MONEY on the API — `120`, `120.5` or `120.50`. */
 const MONEY = /^\d+(\.\d{1,2})?$/;
 
-const field =
-  'h-9 w-full rounded-md border border-border bg-card px-3 text-[13px] focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-60';
+const CHANNELS = [
+  { name: 'sku_noon', label: 'noon', placeholder: 'Partner SKU, e.g. CCC-0001' },
+  { name: 'sku_amazon', label: 'Amazon', placeholder: 'Seller SKU' },
+  { name: 'sku_easyorders', label: 'Website', placeholder: 'Easy Orders product ID' },
+] as const;
 
 /**
- * Every rule here mirrors CatalogService.createProduct — checked as the mod
- * types, not after a round trip that comes back with the same message.
+ * Every rule here mirrors CatalogService.createProduct — checked as it's
+ * typed, not after a round trip that comes back with the same message.
  */
 export function NewProductForm() {
   const [state, submit, pending] = useActionState(addProduct, INITIAL);
   const [name, setName] = useState('');
-  const [category, setCategory] = useState<string | null>(null);
-  const [sku, setSku] = useState('');
+  const [category, setCategory] = useState('');
   const [unitCost, setUnitCost] = useState('');
   const [openingStock, setOpeningStock] = useState('0');
 
@@ -35,41 +53,25 @@ export function NewProductForm() {
   const ready = nameOk && costOk && stockOk;
 
   return (
-    <form action={submit} className="contents">
-      <Screen>
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-card px-5">
-          <Link
-            href="/inventory"
-            aria-label="Back to inventory"
-            className="-ms-2 inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-          >
-            <ArrowLeft className="size-4.5" />
-          </Link>
-          <h1 className="text-lg font-semibold tracking-[-0.02em]">Add Product</h1>
-          <Link
-            href="/inventory"
-            className="ms-auto inline-flex h-9 items-center rounded-md border border-border bg-card px-4 text-[13px] font-medium transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-          >
-            Cancel
-          </Link>
-        </header>
+    <Page width="narrow">
+      <PageHeader
+        back={{ href: '/inventory', label: 'Back to inventory' }}
+        title="Add product"
+        description="Its identity, cost and opening stock. Price is set on each order."
+      />
 
-        <div className="flex min-h-0 flex-1 justify-center overflow-y-auto p-6">
-          <div className="w-full max-w-xl">
-            <section className="rounded-xl border border-border bg-card p-5 shadow-xs">
-              <h2 className="mb-4 flex items-center gap-2 text-[15px] font-semibold">
-                <Package className="size-4.5 text-muted-foreground" strokeWidth={1.9} />
-                Product details
-              </h2>
-
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="name" className="mb-1.5 block text-[11px] text-muted-foreground">
-                    Name
-                  </label>
-                  <input
+      <form action={submit}>
+        <Card>
+          <CardContent>
+            <FieldGroup>
+              <FieldSet>
+                <FieldLegend>Details</FieldLegend>
+                <Field data-invalid={touched && !nameOk}>
+                  <FieldLabel htmlFor="name">Name</FieldLabel>
+                  <Input
                     id="name"
                     name="name"
+                    dir="auto"
                     required
                     autoFocus
                     placeholder="e.g. اكسجين بلوب 1 لتر مشكل"
@@ -77,153 +79,137 @@ export function NewProductForm() {
                     onChange={(e) => setName(e.target.value)}
                     aria-invalid={touched && !nameOk}
                     disabled={pending}
-                    className={cn(field, touched && !nameOk && 'border-destructive')}
                   />
-                  {touched && !nameOk && (
-                    <p className="mt-1 text-[11px] text-destructive">A product needs a name.</p>
-                  )}
-                </div>
-
-                <div>
-                  <p className="mb-1.5 text-[11px] text-muted-foreground">Category (optional)</p>
-                  <input type="hidden" name="category" value={category ?? ''} />
-                  <div className="flex flex-wrap gap-1.5">
+                  {touched && !nameOk ? <FieldError>A product needs a name.</FieldError> : null}
+                </Field>
+                <Field>
+                  <FieldLabel>Category</FieldLabel>
+                  <input type="hidden" name="category" value={category} />
+                  <ToggleGroup
+                    type="single"
+                    variant="outline"
+                    spacing={0}
+                    value={category}
+                    onValueChange={setCategory}
+                    disabled={pending}
+                    aria-label="Category"
+                    className="flex-wrap"
+                  >
                     {CATEGORIES.map((c) => (
-                      <button
-                        key={c.value}
-                        type="button"
-                        onClick={() => setCategory(category === c.value ? null : c.value)}
-                        disabled={pending}
-                        aria-pressed={category === c.value}
-                        className={cn(
-                          'h-8 rounded-md border px-3 text-[12.5px] transition-colors',
-                          category === c.value
-                            ? 'border-foreground bg-foreground font-medium text-background'
-                            : 'border-border text-muted-foreground hover:bg-accent hover:text-foreground',
-                        )}
-                      >
+                      <ToggleGroupItem key={c.value} value={c.value}>
                         {c.label}
-                      </button>
+                      </ToggleGroupItem>
                     ))}
-                  </div>
-                </div>
+                  </ToggleGroup>
+                  <FieldDescription>Optional — click again to clear.</FieldDescription>
+                </Field>
+              </FieldSet>
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label htmlFor="sku" className="mb-1.5 block text-[11px] text-muted-foreground">
-                      Our SKU (optional)
-                    </label>
-                    <input
+              <FieldSeparator />
+
+              <FieldSet>
+                <FieldLegend>Cost and stock</FieldLegend>
+                <div className="grid gap-5 sm:grid-cols-3">
+                  <Field>
+                    <FieldLabel htmlFor="sku">Our SKU</FieldLabel>
+                    <Input
                       id="sku"
                       name="sku"
-                      value={sku}
-                      onChange={(e) => setSku(e.target.value)}
-                      placeholder="Leave blank if none yet"
+                      placeholder="Optional"
                       disabled={pending}
-                      className={field}
+                      className="font-mono"
                     />
-                  </div>
-                  <div>
-                    <label htmlFor="unitCost" className="mb-1.5 block text-[11px] text-muted-foreground">
-                      Unit cost, EGP (optional)
-                    </label>
-                    <input
-                      id="unitCost"
-                      name="unitCost"
-                      inputMode="decimal"
-                      value={unitCost}
+                  </Field>
+                  <Field data-invalid={unitCost.length > 0 && !costOk}>
+                    <FieldLabel htmlFor="unitCost">Unit cost</FieldLabel>
+                    <InputGroup>
+                      <InputGroupInput
+                        id="unitCost"
+                        name="unitCost"
+                        inputMode="decimal"
+                        value={unitCost}
+                        onFocus={(e) => e.currentTarget.select()}
+                        onChange={(e) => setUnitCost(e.target.value)}
+                        placeholder="What we paid"
+                        aria-invalid={unitCost.length > 0 && !costOk}
+                        disabled={pending}
+                        className="num"
+                      />
+                      <InputGroupAddon align="inline-end">
+                        <InputGroupText>EGP</InputGroupText>
+                      </InputGroupAddon>
+                    </InputGroup>
+                    {unitCost.length > 0 && !costOk ? (
+                      <FieldError>An amount like 120 or 120.50.</FieldError>
+                    ) : null}
+                  </Field>
+                  <Field data-invalid={!stockOk}>
+                    <FieldLabel htmlFor="openingStock">Opening stock</FieldLabel>
+                    <Input
+                      id="openingStock"
+                      name="openingStock"
+                      inputMode="numeric"
+                      value={openingStock}
                       onFocus={(e) => e.currentTarget.select()}
-                      onChange={(e) => setUnitCost(e.target.value)}
-                      placeholder="What we paid"
-                      aria-invalid={unitCost.length > 0 && !costOk}
+                      onChange={(e) => setOpeningStock(e.target.value)}
+                      aria-invalid={!stockOk}
                       disabled={pending}
-                      className={cn(field, 'tabular-nums', unitCost.length > 0 && !costOk && 'border-destructive')}
+                      className="num"
                     />
-                    {unitCost.length > 0 && !costOk && (
-                      <p className="mt-1 text-[11px] text-destructive">
-                        An amount like 120 or 120.50.
-                      </p>
-                    )}
-                  </div>
+                    {!stockOk ? <FieldError>A whole number, 0 or more.</FieldError> : null}
+                  </Field>
                 </div>
+                <FieldDescription>
+                  No selling price here — it differs by channel, so it comes from each order. A
+                  product carries cost, not price.
+                </FieldDescription>
+              </FieldSet>
 
-                <div className="w-1/2 sm:pr-2">
-                  <label htmlFor="openingStock" className="mb-1.5 block text-[11px] text-muted-foreground">
-                    Opening stock
-                  </label>
-                  <input
-                    id="openingStock"
-                    name="openingStock"
-                    inputMode="numeric"
-                    value={openingStock}
-                    onFocus={(e) => e.currentTarget.select()}
-                    onChange={(e) => setOpeningStock(e.target.value)}
-                    aria-invalid={!stockOk}
-                    disabled={pending}
-                    className={cn(field, 'tabular-nums', !stockOk && 'border-destructive')}
-                  />
-                  {!stockOk && (
-                    <p className="mt-1 text-[11px] text-destructive">A whole number, 0 or more.</p>
-                  )}
-                </div>
-              </div>
+              <FieldSeparator />
 
-              <p className="mt-5 border-t border-border pt-4 text-[11px] text-muted-foreground">
-                No selling price here — price is set per order, since it differs by channel. A
-                product carries cost, not price.
-              </p>
-
-              <div className="mt-5 border-t border-border pt-4">
-                <p className="text-[11px] text-muted-foreground">
-                  Also sold on (optional) — the SKU each channel uses. A sale there will move this
-                  product’s stock. Leave blank if you don’t sell it there; you can add these later
-                  from the product page.
-                </p>
-                <div className="mt-3 space-y-3">
-                  {[
-                    { name: 'sku_noon', label: 'noon', placeholder: 'Partner SKU, e.g. CCC-0001' },
-                    { name: 'sku_amazon', label: 'Amazon', placeholder: 'Seller SKU' },
-                    { name: 'sku_easyorders', label: 'Website', placeholder: 'Easy Orders product ID' },
-                  ].map((c) => (
-                    <div key={c.name} className="flex items-center gap-3">
-                      <span className="w-16 shrink-0 text-[11px] text-muted-foreground">{c.label}</span>
-                      <input
+              <FieldSet>
+                <FieldLegend>Also sold on</FieldLegend>
+                <FieldDescription>
+                  Optional. The SKU each channel uses — a sale there moves this product’s stock. You
+                  can add these later from the product page.
+                </FieldDescription>
+                <div className="grid gap-3">
+                  {CHANNELS.map((c) => (
+                    <Field key={c.name} orientation="horizontal">
+                      <FieldLabel htmlFor={c.name} className="w-20 shrink-0 font-normal text-muted-foreground">
+                        {c.label}
+                      </FieldLabel>
+                      <Input
+                        id={c.name}
                         name={c.name}
                         placeholder={c.placeholder}
                         disabled={pending}
-                        className={cn(field, 'font-mono')}
+                        className="font-mono"
                       />
-                    </div>
+                    </Field>
                   ))}
                 </div>
-              </div>
+              </FieldSet>
 
-              {state.status === 'error' && (
-                <p
-                  role="alert"
-                  className="mt-4 flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive-subtle px-3 py-2 text-[13px] text-destructive"
-                >
-                  <AlertCircle className="mt-0.5 size-4 shrink-0" strokeWidth={2} />
-                  {state.message}
-                </p>
-              )}
-
-              <button
-                type="submit"
-                disabled={!ready || pending}
-                className="mt-5 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-foreground text-sm font-medium text-background transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-40"
-              >
-                {pending ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="size-4" />
-                )}
-                {pending ? 'Adding' : 'Add Product'}
-              </button>
-            </section>
-          </div>
-        </div>
-      </Screen>
-    </form>
+              {state.status === 'error' ? (
+                <Alert variant="destructive">
+                  <AlertTriangle />
+                  <AlertDescription>{state.message}</AlertDescription>
+                </Alert>
+              ) : null}
+            </FieldGroup>
+          </CardContent>
+          <CardFooter className="justify-end gap-2">
+            <Button variant="ghost" asChild>
+              <Link href="/inventory">Cancel</Link>
+            </Button>
+            <Button type="submit" disabled={!ready || pending}>
+              {pending ? <Spinner /> : null}
+              {pending ? 'Adding' : 'Add product'}
+            </Button>
+          </CardFooter>
+        </Card>
+      </form>
+    </Page>
   );
 }
