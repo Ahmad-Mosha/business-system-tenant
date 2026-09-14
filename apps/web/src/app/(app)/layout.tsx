@@ -25,7 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     >
       <AppSidebar user={user} />
       <SidebarInset className="min-h-0 min-w-0 overflow-hidden">
-        <SiteHeader user={user} />
+        <SiteHeader />
         {children}
       </SidebarInset>
     </SidebarProvider>
