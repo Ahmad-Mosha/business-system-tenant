@@ -2,6 +2,7 @@
 
 import { AlertTriangle, CheckCircle2, Plus, Trash2 } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { useActionState, useRef, useState } from 'react';
 import { createOrder, updateOrder, type CreateOrderState } from '@/app/(app)/orders/actions';
 import { Amount } from '@/components/amount';
@@ -44,6 +45,7 @@ import type { OrderDetail } from '@/lib/api';
 import { money } from '@/lib/format';
 import { GOVERNORATES } from '@/lib/governorates';
 import { cn } from '@/lib/utils';
+import { bdi, num } from '@/i18n/rich';
 
 const INITIAL: CreateOrderState = { status: 'idle' };
 
@@ -64,9 +66,9 @@ interface Line {
 }
 
 const PAYMENT_METHODS = [
-  { value: 'COD', label: 'Cash on delivery', hint: 'Bosta collects it' },
-  { value: 'WALLET', label: 'Mobile wallet', hint: 'Usually paid first' },
-  { value: 'INSTAPAY', label: 'InstaPay', hint: 'Usually paid first' },
+  { value: 'COD', hint: 'codHint' },
+  { value: 'WALLET', hint: 'prepaidHint' },
+  { value: 'INSTAPAY', hint: 'prepaidHint' },
 ] as const;
 
 /** An inline table input that reads as text until it's pointed at. */
@@ -85,6 +87,10 @@ export function OrderForm({
   assignsToSelf?: boolean;
   order?: OrderDetail;
 }) {
+  const t = useTranslations('orders');
+  const tc = useTranslations('common');
+  const te = useTranslations('enums');
+  const tn = useTranslations('nouns');
   const editing = !!order;
   const [state, submit, pending] = useActionState(
     editing ? updateOrder.bind(null, order.id) : createOrder,
@@ -140,13 +146,13 @@ export function OrderForm({
   // The first thing still missing, said under the disabled button — a button
   // that won't press without saying why is the worst kind of form.
   const missing = !lines.length
-    ? 'Add at least one item.'
+    ? t('form.needsItem')
     : unpriced.length
-      ? 'Every item needs a name and a price.'
+      ? t('form.needsNameAndPrice')
       : !phoneOk
-        ? 'Add a valid phone number.'
+        ? t('form.needsPhone')
         : !governorate
-          ? 'Pick a governorate.'
+          ? t('form.needsGovernorate')
           : null;
   const ready = !missing && !overStock.length;
   const back = editing ? `/orders/${order.id}` : '/orders';
@@ -175,18 +181,18 @@ export function OrderForm({
 
       <Page>
         <PageHeader
-          back={{ href: back, label: editing ? 'Back to the order' : 'Back to orders' }}
-          title={editing ? `Edit ${order.orderNumber}` : 'New order'}
+          back={{ href: back, label: editing ? t('form.backToOrder') : t('back') }}
+          title={editing ? t('form.editTitle', { number: order.orderNumber }) : t('new')}
           description={
             editing
-              ? 'Changing the items adjusts stock.'
+              ? t('form.editDescription')
               : assignsToSelf
-                ? 'For an order taken on social — it’s assigned to you.'
-                : 'For an order taken on social — unassigned until an admin assigns it.'
+                ? t('form.newDescriptionMine')
+                : t('form.newDescriptionAdmin')
           }
           actions={
             <Button variant="outline" asChild>
-              <Link href={back}>Cancel</Link>
+              <Link href={back}>{tc('cancel')}</Link>
             </Button>
           }
         />
@@ -196,24 +202,24 @@ export function OrderForm({
             <div className="grid gap-6 xl:grid-cols-2">
               <Card>
                 <CardHeader>
-                  <CardTitle>Customer</CardTitle>
+                  <CardTitle>{t('detail.customer')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <FieldGroup className="grid gap-4 sm:grid-cols-2">
                     <Field>
-                      <FieldLabel htmlFor="customerName">Full name</FieldLabel>
+                      <FieldLabel htmlFor="customerName">{t('form.fullName')}</FieldLabel>
                       <Input
                         id="customerName"
                         name="customerName"
                         dir="auto"
                         required
                         defaultValue={order?.customerName ?? ''}
-                        placeholder="e.g. أحمد جمال"
+                        placeholder={t('form.namePlaceholder')}
                         disabled={pending}
                       />
                     </Field>
                     <Field data-invalid={phoneBad}>
-                      <FieldLabel htmlFor="customerPhone">Phone number</FieldLabel>
+                      <FieldLabel htmlFor="customerPhone">{t('form.phone')}</FieldLabel>
                       <Input
                         id="customerPhone"
                         name="customerPhone"
@@ -226,7 +232,7 @@ export function OrderForm({
                         disabled={pending}
                         className="num"
                       />
-                      {phoneBad ? <FieldError>Not a valid Egyptian mobile number</FieldError> : null}
+                      {phoneBad ? <FieldError>{t('form.phoneInvalid')}</FieldError> : null}
                     </Field>
                   </FieldGroup>
                 </CardContent>
@@ -234,12 +240,12 @@ export function OrderForm({
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Delivery</CardTitle>
+                  <CardTitle>{t('detail.delivery')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <FieldGroup className="grid gap-4 sm:grid-cols-[160px_minmax(0,1fr)]">
                     <Field>
-                      <FieldLabel htmlFor="governorate">Governorate</FieldLabel>
+                      <FieldLabel htmlFor="governorate">{t('detail.governorate')}</FieldLabel>
                       <Select
                         name="governorate"
                         value={governorate}
@@ -247,7 +253,7 @@ export function OrderForm({
                         disabled={pending}
                       >
                         <SelectTrigger id="governorate" className="w-full">
-                          <SelectValue placeholder="Select…" />
+                          <SelectValue placeholder={t('form.select')} />
                         </SelectTrigger>
                         <SelectContent position="popper" className="max-h-72">
                           {governorates.map((g) => (
@@ -259,13 +265,13 @@ export function OrderForm({
                       </Select>
                     </Field>
                     <Field>
-                      <FieldLabel htmlFor="address">Street address</FieldLabel>
+                      <FieldLabel htmlFor="address">{t('form.address')}</FieldLabel>
                       <Input
                         id="address"
                         name="address"
                         dir="auto"
                         defaultValue={order?.address ?? ''}
-                        placeholder="Street, building, apartment, landmark"
+                        placeholder={t('form.addressPlaceholder')}
                         disabled={pending}
                       />
                     </Field>
@@ -276,35 +282,35 @@ export function OrderForm({
 
             <Card className="pb-0">
               <CardHeader>
-                <CardTitle>Items</CardTitle>
-                <CardDescription>
-                  Pick from inventory so stock moves, or add a custom line.
-                </CardDescription>
+                <CardTitle>{t('detail.items')}</CardTitle>
+                <CardDescription>{t('form.itemsHint')}</CardDescription>
               </CardHeader>
               <CardContent className="flex flex-wrap gap-2">
                 <div className="min-w-0 flex-1">
                   <VariantSearch
                     onPick={addLine}
                     disabled={pending}
-                    disabledReason={(h) => (h.onHand <= 0 ? 'Out of stock' : null)}
+                    disabledReason={(h) => (h.onHand <= 0 ? te('stockState.out') : null)}
                     meta={(h) =>
-                      `${h.onHand} in stock${h.sellingPrice ? ` · ${money(h.sellingPrice)}` : ''}`
+                      [t('form.inStock', { count: h.onHand }), h.sellingPrice && money(h.sellingPrice)]
+                        .filter(Boolean)
+                        .join(' · ')
                     }
                   />
                 </div>
                 <Button type="button" variant="outline" onClick={() => addLine()} disabled={pending}>
                   <Plus />
-                  Custom item
+                  {t('form.customItem')}
                 </Button>
               </CardContent>
               <div className="mt-4 border-t">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Item</TableHead>
-                      <TableHead className="w-[90px] text-end">Qty</TableHead>
-                      <TableHead className="w-[120px] text-end">Unit price</TableHead>
-                      <TableHead className="w-[110px] text-end">Total</TableHead>
+                      <TableHead>{t('columns.item')}</TableHead>
+                      <TableHead className="w-[90px] text-end">{t('columns.qty')}</TableHead>
+                      <TableHead className="w-[120px] text-end">{t('columns.unitPrice')}</TableHead>
+                      <TableHead className="w-[110px] text-end">{t('columns.total')}</TableHead>
                       <TableHead className="w-12" />
                     </TableRow>
                   </TableHeader>
@@ -312,7 +318,7 @@ export function OrderForm({
                     {lines.length === 0 ? (
                       <TableRow className="hover:bg-transparent">
                         <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                          No items yet — search above, or add a custom item.
+                          {t('form.noItems')}
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -328,23 +334,27 @@ export function OrderForm({
                               <Input
                                 value={l.title}
                                 onChange={(e) => patch(l.key, { title: e.target.value })}
-                                placeholder="Item name"
-                                aria-label="Item name"
+                                placeholder={t('form.itemName')}
+                                aria-label={t('form.itemName')}
                                 dir="auto"
                                 disabled={pending}
                                 className={cn(cellInput, 'font-medium')}
                               />
                               <p className="px-2 text-xs text-muted-foreground">
                                 {!l.variantId ? (
-                                  <span className="text-warning">Not linked to inventory</span>
+                                  <span className="text-warning">{t('form.notLinked')}</span>
                                 ) : l.onHand === undefined ? (
                                   // Loaded from a saved order — linked, but
                                   // today's stock isn't known here.
-                                  'Linked to inventory'
+                                  t('form.linked')
                                 ) : (
                                   <span className="num">
-                                    {l.onHand} in stock
-                                    {l.unitCost ? ` · cost ${money(l.unitCost)}` : ''}
+                                    {[
+                                      t('form.inStock', { count: l.onHand }),
+                                      l.unitCost && t('form.cost', { amount: money(l.unitCost) }),
+                                    ]
+                                      .filter(Boolean)
+                                      .join(' · ')}
                                   </span>
                                 )}
                               </p>
@@ -358,7 +368,7 @@ export function OrderForm({
                                 onChange={(e) =>
                                   patch(l.key, { quantity: Math.max(1, Number(e.target.value)) })
                                 }
-                                aria-label="Quantity"
+                                aria-label={t('form.quantity')}
                                 aria-invalid={over}
                                 disabled={pending}
                                 className={cn(cellInput, 'num text-end', over && 'border-destructive')}
@@ -370,7 +380,7 @@ export function OrderForm({
                                 value={l.unitPrice}
                                 onFocus={(e) => e.currentTarget.select()}
                                 onChange={(e) => patch(l.key, { unitPrice: e.target.value })}
-                                aria-label="Unit price"
+                                aria-label={t('columns.unitPrice')}
                                 placeholder="0.00"
                                 disabled={pending}
                                 className={cn(cellInput, 'num text-end', under && 'border-warning')}
@@ -385,7 +395,9 @@ export function OrderForm({
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => setLines((x) => x.filter((y) => y.key !== l.key))}
-                                aria-label={`Remove ${l.title || 'item'}`}
+                                aria-label={
+                                  l.title ? t('form.remove', { name: l.title }) : t('form.removeItem')
+                                }
                                 disabled={pending}
                                 className="text-muted-foreground hover:bg-destructive-subtle hover:text-destructive"
                               >
@@ -403,7 +415,7 @@ export function OrderForm({
 
             <Card>
               <CardHeader>
-                <CardTitle>Payment and notes</CardTitle>
+                <CardTitle>{t('form.paymentAndNotes')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <FieldGroup>
@@ -412,7 +424,7 @@ export function OrderForm({
                     value={method}
                     onValueChange={setMethod}
                     disabled={pending}
-                    aria-label="Payment method"
+                    aria-label={t('detail.paymentMethod')}
                     className="grid gap-2 sm:grid-cols-3"
                   >
                     {PAYMENT_METHODS.map((m) => (
@@ -420,22 +432,22 @@ export function OrderForm({
                         <Field orientation="horizontal">
                           <RadioGroupItem value={m.value} id={`pm-${m.value}`} />
                           <FieldContent>
-                            <FieldTitle className="font-medium">{m.label}</FieldTitle>
-                            <FieldDescription>{m.hint}</FieldDescription>
+                            <FieldTitle className="font-medium">{te(`paymentMethod.${m.value}`)}</FieldTitle>
+                            <FieldDescription>{t(`form.${m.hint}`)}</FieldDescription>
                           </FieldContent>
                         </Field>
                       </FieldLabel>
                     ))}
                   </RadioGroup>
                   <Field>
-                    <FieldLabel htmlFor="notes">Notes</FieldLabel>
+                    <FieldLabel htmlFor="notes">{t('detail.notes')}</FieldLabel>
                     <Textarea
                       id="notes"
                       name="notes"
                       dir="auto"
                       rows={2}
                       defaultValue={order?.notes ?? ''}
-                      placeholder="Any special instructions…"
+                      placeholder={t('form.notesPlaceholder')}
                       disabled={pending}
                       className="min-h-16 resize-none"
                     />
@@ -448,18 +460,18 @@ export function OrderForm({
           <aside className="lg:sticky lg:top-0">
             <Card>
               <CardHeader>
-                <CardTitle>Summary</CardTitle>
+                <CardTitle>{t('detail.summary')}</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-3 text-[13px]">
                 <div className="flex items-baseline justify-between gap-3">
                   <span className="text-muted-foreground">
-                    Subtotal · <span className="num">{units}</span> {units === 1 ? 'item' : 'items'}
+                    {t('form.subtotal', { items: tn('items', { count: units }) })}
                   </span>
                   <span className="num">{money(subtotal)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <label htmlFor="shippingCost" className="text-muted-foreground">
-                    Shipping
+                    {t('detail.shipping')}
                   </label>
                   <InputGroup className="w-32">
                     <InputGroupInput
@@ -473,12 +485,12 @@ export function OrderForm({
                       className="num text-end"
                     />
                     <InputGroupAddon align="inline-end">
-                      <InputGroupText>EGP</InputGroupText>
+                      <InputGroupText>{tc('egp')}</InputGroupText>
                     </InputGroupAddon>
                   </InputGroup>
                 </div>
                 <div className="flex items-baseline justify-between gap-3 border-t pt-3">
-                  <span className="font-medium">Total</span>
+                  <span className="font-medium">{t('detail.total')}</span>
                   <Amount value={total} className="text-[28px] font-semibold tracking-tight" />
                 </div>
 
@@ -486,14 +498,14 @@ export function OrderForm({
                   <Field orientation="horizontal" className="mt-1">
                     <Checkbox id="paymentCollected" name="paymentCollected" disabled={pending} />
                     <FieldLabel htmlFor="paymentCollected" className="font-normal">
-                      Payment already collected
+                      {t('form.paymentCollected')}
                     </FieldLabel>
                   </Field>
                 ) : null}
 
                 <Button type="submit" size="lg" disabled={!ready || pending} className="mt-1 w-full">
                   {pending ? <Spinner /> : <CheckCircle2 />}
-                  {pending ? 'Saving' : editing ? 'Save changes' : 'Create order'}
+                  {pending ? tc('saving') : editing ? tc('saveChanges') : t('form.create')}
                 </Button>
 
                 {missing && !pending ? (
@@ -504,7 +516,7 @@ export function OrderForm({
                   <Alert key={`o${l.key}`} variant="destructive">
                     <AlertTriangle />
                     <AlertDescription>
-                      Only <span className="num">{l.onHand}</span> of <bdi>{l.title}</bdi> in stock.
+                      {t.rich('form.overStock', { count: l.onHand ?? 0, name: l.title, bdi, num })}
                     </AlertDescription>
                   </Alert>
                 ))}
@@ -512,7 +524,7 @@ export function OrderForm({
                   <Alert key={`b${l.key}`} variant="warning">
                     <AlertTriangle />
                     <AlertDescription>
-                      <bdi>{l.title}</bdi> is priced below its {money(l.unitCost)} cost.
+                      {t.rich('form.belowCost', { name: l.title, cost: money(l.unitCost), bdi, num })}
                     </AlertDescription>
                   </Alert>
                 ))}

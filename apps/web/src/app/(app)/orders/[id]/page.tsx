@@ -5,10 +5,9 @@ import type { ReactNode } from 'react';
 import { Amount } from '@/components/amount';
 import { OrderActions } from '@/components/order-actions';
 import {
-  PAYMENT_LABELS,
+  ALL_ORDER_STATUSES,
+  ALL_PAYMENT_STATUSES,
   PaymentBadge,
-  sourceLabel,
-  STATUS_LABELS,
   StatusBadge,
 } from '@/components/order-status';
 import { Page, PageHeader } from '@/components/page';
@@ -27,13 +26,21 @@ import {
 import { getAssignees, getOrder } from '@/lib/api';
 import { money } from '@/lib/format';
 import { requireSession } from '@/lib/session';
+import { isOneOf } from '@/lib/utils';
+import { useTranslations } from 'next-intl';
+import { getTranslations } from 'next-intl/server';
 import { getFormat } from '@/i18n/get-format';
 
 /** Mirrors OrdersService.EDITABLE — once it ships, the goods have left. */
 const EDITABLE = ['NEW', 'ASSIGNED', 'CONFIRMED'];
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
-  const f = await getFormat();
+  const [f, t, te, tn] = await Promise.all([
+    getFormat(),
+    getTranslations('orders'),
+    getTranslations('enums'),
+    getTranslations('nouns'),
+  ]);
   const user = await requireSession();
   const { id } = await params;
 
@@ -49,7 +56,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   return (
     <Page>
       <PageHeader
-        back={{ href: '/orders', label: 'Back to orders' }}
+        back={{ href: '/orders', label: t('back') }}
         title={<span className="num">{order.orderNumber}</span>}
         meta={
           <>
@@ -57,13 +64,16 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             <PaymentBadge status={order.paymentStatus} />
           </>
         }
-        description={`${sourceLabel(order.source)} order · placed ${f.dateTime(order.placedAt)}`}
+        description={t('detail.description', {
+          source: te(`orderSource.${order.source}`),
+          date: f.dateTime(order.placedAt),
+        })}
         actions={
           editable ? (
             <Button variant="outline" asChild>
               <Link href={`/orders/${order.id}/edit`}>
                 <Pencil />
-                Edit order
+                {t('detail.edit')}
               </Link>
             </Button>
           ) : null
@@ -75,35 +85,37 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           <div className="grid gap-6 md:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Customer</CardTitle>
+                <CardTitle>{t('detail.customer')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <dl className="grid gap-3">
-                  <Detail label="Name">
+                  <Detail label={t('detail.name')}>
                     <bdi>{order.customerName}</bdi>
                   </Detail>
-                  <Detail label="Phone">
+                  <Detail label={t('detail.phone')}>
                     <a href={`tel:${order.customerPhone}`} className="num hover:underline">
-                      {order.customerPhone}
+                      <bdi>{order.customerPhone}</bdi>
                     </a>
                   </Detail>
-                  <Detail label="Payment method">{order.paymentMethod}</Detail>
+                  <Detail label={t('detail.paymentMethod')}>
+                    {te(`paymentMethod.${order.paymentMethod}`)}
+                  </Detail>
                 </dl>
               </CardContent>
             </Card>
             <Card>
               <CardHeader>
-                <CardTitle>Delivery</CardTitle>
+                <CardTitle>{t('detail.delivery')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <dl className="grid gap-3">
-                  <Detail label="Governorate">
+                  <Detail label={t('detail.governorate')}>
                     {order.governorate ? <bdi>{order.governorate}</bdi> : null}
                   </Detail>
-                  <Detail label="Address">
+                  <Detail label={t('detail.address')}>
                     {order.address ? <bdi>{order.address}</bdi> : null}
                   </Detail>
-                  <Detail label="Bosta tracking">
+                  <Detail label={t('detail.tracking')}>
                     {order.trackingNumber ? (
                       <span className="num">{order.trackingNumber}</span>
                     ) : null}
@@ -115,31 +127,26 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
 
           <Card className="pb-0">
             <CardHeader>
-              <CardTitle>Items</CardTitle>
+              <CardTitle>{t('detail.items')}</CardTitle>
               <CardAction>
-                <Badge variant="secondary" className="num">
-                  {units} {units === 1 ? 'unit' : 'units'}
-                </Badge>
+                <Badge variant="secondary">{tn('units', { count: units })}</Badge>
               </CardAction>
             </CardHeader>
             {unmapped > 0 ? (
               <CardContent>
                 <Alert variant="warning">
                   <AlertTriangle />
-                  <AlertDescription>
-                    {unmapped} {unmapped === 1 ? 'line isn’t' : 'lines aren’t'} linked to inventory,
-                    so {unmapped === 1 ? 'it doesn’t' : 'they don’t'} move stock.
-                  </AlertDescription>
+                  <AlertDescription>{t('unmapped', { count: unmapped })}</AlertDescription>
                 </Alert>
               </CardContent>
             ) : null}
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Item</TableHead>
-                  <TableHead className="w-[70px] text-end">Qty</TableHead>
-                  <TableHead className="w-[120px] text-end">Unit price</TableHead>
-                  <TableHead className="w-[120px] text-end">Total</TableHead>
+                  <TableHead>{t('columns.item')}</TableHead>
+                  <TableHead className="w-[70px] text-end">{t('columns.qty')}</TableHead>
+                  <TableHead className="w-[120px] text-end">{t('columns.unitPrice')}</TableHead>
+                  <TableHead className="w-[120px] text-end">{t('columns.total')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -148,7 +155,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                     <TableCell className="max-w-0 whitespace-normal">
                       <bdi className="font-medium">{i.title}</bdi>
                       {!i.variantId ? (
-                        <span className="ms-2 text-xs text-warning">not in inventory</span>
+                        <span className="ms-2 text-xs text-warning">{t('detail.notInInventory')}</span>
                       ) : null}
                     </TableCell>
                     <TableCell className="num text-end">{i.quantity}</TableCell>
@@ -165,7 +172,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           {order.notes ? (
             <Card>
               <CardHeader>
-                <CardTitle>Notes</CardTitle>
+                <CardTitle>{t('detail.notes')}</CardTitle>
               </CardHeader>
               <CardContent className="text-[13px] whitespace-pre-line">
                 <bdi>{order.notes}</bdi>
@@ -175,7 +182,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
 
           <Card>
             <CardHeader>
-              <CardTitle>History</CardTitle>
+              <CardTitle>{t('detail.history')}</CardTitle>
             </CardHeader>
             <CardContent>
               <ol className="relative grid gap-4 before:absolute before:inset-y-1.5 before:start-[3px] before:w-px before:bg-border">
@@ -190,9 +197,9 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                           : 'absolute top-1.5 start-0 size-[7px] border border-muted-foreground/50 bg-card'
                       }
                     />
-                    <span className="min-w-0 flex-1 text-[13px]">{describe(e)}</span>
+                    <span className="min-w-0 flex-1 text-[13px]"><EventLine e={e} /></span>
                     <span className="shrink-0 text-xs text-muted-foreground">
-                      {e.actorName ?? 'Integration'} · {f.dateTime(e.createdAt)}
+                      <bdi>{e.actorName ?? t('detail.system')}</bdi> · {f.dateTime(e.createdAt)}
                     </span>
                   </li>
                 ))}
@@ -214,19 +221,19 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
 
           <Card>
             <CardHeader>
-              <CardTitle>Summary</CardTitle>
+              <CardTitle>{t('detail.summary')}</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-2 text-[13px]">
               <div className="flex justify-between gap-3">
-                <span className="text-muted-foreground">Subtotal</span>
+                <span className="text-muted-foreground">{t('detail.subtotal')}</span>
                 <span className="num">{money(order.subtotal)}</span>
               </div>
               <div className="flex justify-between gap-3">
-                <span className="text-muted-foreground">Shipping</span>
+                <span className="text-muted-foreground">{t('detail.shipping')}</span>
                 <span className="num">{money(order.shippingCost)}</span>
               </div>
               <div className="mt-2 flex items-baseline justify-between gap-3 border-t pt-3">
-                <span className="font-medium">Total</span>
+                <span className="font-medium">{t('detail.total')}</span>
                 <Amount value={order.total} className="text-2xl font-semibold tracking-tight" />
               </div>
             </CardContent>
@@ -238,31 +245,37 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
 }
 
 function Detail({ label, children }: { label: string; children: ReactNode }) {
+  const t = useTranslations('common');
   return (
     <div className="grid gap-0.5">
       <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd className="text-[13px] break-words">
-        {children || <span className="text-muted-foreground/60">Not set</span>}
+        {children || <span className="text-muted-foreground/60">{t('notSet')}</span>}
       </dd>
     </div>
   );
 }
 
-function describe(e: { type: string; fromValue: string | null; toValue: string | null }): string {
-  // Enum values read as words: "Status Confirmed → Shipped", not CONFIRMED.
-  const label = (map: Record<string, string>, v: string | null) => (v ? (map[v] ?? v) : '—');
+/** One line of the order's history. Enum values read as words, not CONFIRMED. */
+function EventLine({ e }: { e: { type: string; fromValue: string | null; toValue: string | null } }) {
+  const t = useTranslations('orders.history');
+  const te = useTranslations('enums');
+  const status = (v: string | null) =>
+    !v ? '—' : isOneOf(ALL_ORDER_STATUSES, v) ? te(`orderStatus.${v}`) : v;
+  const payment = (v: string | null) =>
+    !v ? '—' : isOneOf(ALL_PAYMENT_STATUSES, v) ? te(`paymentStatus.${v}`) : v;
   switch (e.type) {
     case 'CREATED':
-      return `Created from ${e.toValue === 'EASYORDERS' ? 'the website' : 'social'}`;
+      return t('created', { source: e.toValue ?? '' });
     case 'EDITED':
-      return 'Order edited';
+      return t('edited');
     case 'ASSIGNED':
-      return e.toValue === 'unassigned' ? 'Unassigned' : 'Assigned to a moderator';
+      return e.toValue === 'unassigned' ? t('unassigned') : t('assigned');
     case 'STATUS_CHANGED':
-      return `Status ${label(STATUS_LABELS, e.fromValue)} → ${label(STATUS_LABELS, e.toValue)}`;
+      return t('status', { from: status(e.fromValue), to: status(e.toValue) });
     case 'PAYMENT_CHANGED':
-      return `Payment ${label(PAYMENT_LABELS, e.fromValue)} → ${label(PAYMENT_LABELS, e.toValue)}`;
+      return t('payment', { from: payment(e.fromValue), to: payment(e.toValue) });
     default:
-      return e.toValue ? `Updated to ${e.toValue}` : 'Updated';
+      return e.toValue ? t('updatedTo', { value: e.toValue }) : t('updated');
   }
 }

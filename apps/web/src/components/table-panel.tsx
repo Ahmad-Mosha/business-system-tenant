@@ -21,6 +21,7 @@ import {
   PaginationPrevious,
 } from '@/components/ui/pagination';
 import { cn } from '@/lib/utils';
+import { b } from '@/i18n/rich';
 import type messages from '@/messages/en.json';
 
 /**
@@ -122,7 +123,7 @@ export function TablePagination({
               from,
               to,
               items,
-              b: (chunks) => <span className="num font-medium text-foreground">{chunks}</span>,
+              b,
             })}
       </TableCount>
       {last > 1 ? (
