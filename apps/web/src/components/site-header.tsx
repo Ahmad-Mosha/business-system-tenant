@@ -41,8 +41,8 @@ export function SiteHeader() {
 
   return (
     <header className="flex h-12 shrink-0 items-center gap-2 border-b bg-background px-4">
-      <SidebarTrigger className="-ml-1.5" />
-      <Separator orientation="vertical" className="mr-1 data-vertical:h-4" />
+      <SidebarTrigger className="-ms-1.5" />
+      <Separator orientation="vertical" className="me-1 data-vertical:h-4" />
       {here ? (
         <Breadcrumb className="min-w-0">
           <BreadcrumbList className="flex-nowrap">

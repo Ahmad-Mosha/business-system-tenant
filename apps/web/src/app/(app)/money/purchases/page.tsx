@@ -102,7 +102,7 @@ export default async function PurchasesPage() {
                 <TableHead className="w-[120px]">Date</TableHead>
                 <TableHead className="w-[110px]">Payment</TableHead>
                 <TableHead className="w-[130px]">Status</TableHead>
-                <TableHead className="w-[140px] text-right">Total</TableHead>
+                <TableHead className="w-[140px] text-end">Total</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -129,7 +129,7 @@ export default async function PurchasesPage() {
                   <TableCell>
                     <PaidChip status={i.paidStatus} />
                   </TableCell>
-                  <TableCell className="num text-right font-medium">{money(i.landedTotal)}</TableCell>
+                  <TableCell className="num text-end font-medium">{money(i.landedTotal)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

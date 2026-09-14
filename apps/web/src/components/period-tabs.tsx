@@ -25,7 +25,7 @@ export function PeriodTabs({
             scroll={false}
             aria-current={active ? 'true' : undefined}
             className={cn(
-              'inline-flex h-8 shrink-0 items-center border-l border-input px-3 text-xs font-medium whitespace-nowrap transition-colors first:border-l-0',
+              'inline-flex h-8 shrink-0 items-center border-s border-input px-3 text-xs font-medium whitespace-nowrap transition-colors first:border-s-0',
               active ? 'bg-highlight/10 text-highlight' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
             )}
           >

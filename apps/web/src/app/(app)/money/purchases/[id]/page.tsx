@@ -75,10 +75,10 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
             <TableHeader>
               <TableRow>
                 <TableHead>Product</TableHead>
-                <TableHead className="w-[80px] text-right">Qty</TableHead>
-                <TableHead className="w-[130px] text-right">Unit cost</TableHead>
-                {hasExtras ? <TableHead className="w-[130px] text-right">Landed unit</TableHead> : null}
-                <TableHead className="w-[140px] text-right">Line total</TableHead>
+                <TableHead className="w-[80px] text-end">Qty</TableHead>
+                <TableHead className="w-[130px] text-end">Unit cost</TableHead>
+                {hasExtras ? <TableHead className="w-[130px] text-end">Landed unit</TableHead> : null}
+                <TableHead className="w-[140px] text-end">Line total</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -87,14 +87,14 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
                   <TableCell className="max-w-0 truncate font-medium">
                     <bdi>{l.label}</bdi>
                   </TableCell>
-                  <TableCell className="num text-right">{l.quantity}</TableCell>
-                  <TableCell className="num text-right">{money(l.unitCost)}</TableCell>
+                  <TableCell className="num text-end">{l.quantity}</TableCell>
+                  <TableCell className="num text-end">{money(l.unitCost)}</TableCell>
                   {hasExtras ? (
-                    <TableCell className="num text-right text-muted-foreground">
+                    <TableCell className="num text-end text-muted-foreground">
                       {l.landedUnitCost ? money(l.landedUnitCost) : '—'}
                     </TableCell>
                   ) : null}
-                  <TableCell className="num text-right font-medium">{money(l.lineTotal)}</TableCell>
+                  <TableCell className="num text-end font-medium">{money(l.lineTotal)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

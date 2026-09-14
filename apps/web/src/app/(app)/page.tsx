@@ -36,7 +36,7 @@ export default async function OverviewPage() {
           <Button variant="outline" asChild>
             <Link href="/months">
               View by month
-              <ArrowUpRight />
+              <ArrowUpRight className="rtl:-scale-x-100" />
             </Link>
           </Button>
         }
@@ -53,7 +53,7 @@ export default async function OverviewPage() {
               <Button variant="ghost" size="sm" asChild>
                 <Link href="/months">
                   All months
-                  <ArrowUpRight />
+                  <ArrowUpRight className="rtl:-scale-x-100" />
                 </Link>
               </Button>
             </CardAction>

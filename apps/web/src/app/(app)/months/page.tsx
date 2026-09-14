@@ -41,12 +41,12 @@ export default async function MonthsPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Month</TableHead>
-              <TableHead className="text-right">Units</TableHead>
-              <TableHead className="text-right">Proceeds</TableHead>
-              <TableHead className="text-right">Fees</TableHead>
-              <TableHead className="text-right">Cash to bank</TableHead>
-              <TableHead className="text-right">Movement</TableHead>
-              <TableHead className="text-right">Owed by noon</TableHead>
+              <TableHead className="text-end">Units</TableHead>
+              <TableHead className="text-end">Proceeds</TableHead>
+              <TableHead className="text-end">Fees</TableHead>
+              <TableHead className="text-end">Cash to bank</TableHead>
+              <TableHead className="text-end">Movement</TableHead>
+              <TableHead className="text-end">Owed by noon</TableHead>
               <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
@@ -61,20 +61,20 @@ export default async function MonthsPage() {
                     {monthLabel(p.month)}
                   </Link>
                 </TableCell>
-                <TableCell className="num text-right">{p.unitsSold}</TableCell>
-                <TableCell className="num text-right">{money(p.netProceeds)}</TableCell>
-                <TableCell className="num text-right text-muted-foreground">{money(p.fees)}</TableCell>
-                <TableCell className="num text-right text-muted-foreground">{money(p.payouts)}</TableCell>
-                <TableCell className="num text-right font-medium">{money(p.movement)}</TableCell>
-                <TableCell className="num text-right font-medium">
+                <TableCell className="num text-end">{p.unitsSold}</TableCell>
+                <TableCell className="num text-end">{money(p.netProceeds)}</TableCell>
+                <TableCell className="num text-end text-muted-foreground">{money(p.fees)}</TableCell>
+                <TableCell className="num text-end text-muted-foreground">{money(p.payouts)}</TableCell>
+                <TableCell className="num text-end font-medium">{money(p.movement)}</TableCell>
+                <TableCell className="num text-end font-medium">
                   {p.closingBalance === null ? (
                     <span className="text-muted-foreground">—</span>
                   ) : (
                     money(p.closingBalance)
                   )}
                 </TableCell>
-                <TableCell className="text-right">
-                  <ChevronRight className="inline size-4 text-muted-foreground/50 transition-colors group-hover:text-foreground" />
+                <TableCell className="text-end">
+                  <ChevronRight className="inline size-4 rtl:rotate-180 text-muted-foreground/50 transition-colors group-hover:text-foreground" />
                 </TableCell>
               </TableRow>
             ))}

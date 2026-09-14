@@ -130,8 +130,8 @@ export function TablePagination({
               {page > 1 ? (
                 <PaginationPrevious href={href(page - 1)} />
               ) : (
-                <Button variant="ghost" disabled className="pl-1.5!">
-                  <ChevronLeftIcon data-icon="inline-start" />
+                <Button variant="ghost" disabled className="ps-1.5!">
+                  <ChevronLeftIcon data-icon="inline-start" className="rtl:rotate-180" />
                   <span className="hidden sm:block">Previous</span>
                 </Button>
               )}
@@ -153,9 +153,9 @@ export function TablePagination({
               {page < last ? (
                 <PaginationNext href={href(page + 1)} />
               ) : (
-                <Button variant="ghost" disabled className="pr-1.5!">
+                <Button variant="ghost" disabled className="pe-1.5!">
                   <span className="hidden sm:block">Next</span>
-                  <ChevronRightIcon data-icon="inline-end" />
+                  <ChevronRightIcon data-icon="inline-end" className="rtl:rotate-180" />
                 </Button>
               )}
             </PaginationItem>

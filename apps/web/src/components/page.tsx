@@ -61,7 +61,7 @@ export function PageHeader({
         {back ? (
           <Button variant="outline" size="icon" asChild className="shrink-0">
             <Link href={back.href} aria-label={back.label} title={back.label}>
-              <ArrowLeft />
+              <ArrowLeft className="rtl:rotate-180" />
             </Link>
           </Button>
         ) : null}

@@ -73,7 +73,7 @@ export default async function SupplierDetailPage({ params }: { params: Promise<{
                   <TableHead>Invoice</TableHead>
                   <TableHead className="w-[120px]">Date</TableHead>
                   <TableHead className="w-[130px]">Status</TableHead>
-                  <TableHead className="w-[140px] text-right">Total</TableHead>
+                  <TableHead className="w-[140px] text-end">Total</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -94,7 +94,7 @@ export default async function SupplierDetailPage({ params }: { params: Promise<{
                     <TableCell>
                       <PaidChip status={i.paidStatus} />
                     </TableCell>
-                    <TableCell className="num text-right font-medium">{money(i.landedTotal)}</TableCell>
+                    <TableCell className="num text-end font-medium">{money(i.landedTotal)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -120,7 +120,7 @@ export default async function SupplierDetailPage({ params }: { params: Promise<{
                       </p>
                       <p className="text-xs text-muted-foreground">{dateTime(p.occurredAt)}</p>
                     </TableCell>
-                    <TableCell className="num w-[130px] text-right font-medium text-destructive">
+                    <TableCell className="num w-[130px] text-end font-medium text-destructive">
                       −{money(p.amount)}
                     </TableCell>
                   </TableRow>

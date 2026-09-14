@@ -140,7 +140,7 @@ function Outcome({ state }: { state: Extract<UploadState, { status: 'done' }> })
           { label: 'Already held', value: r.rowsSkipped },
           { label: 'Unmapped SKUs', value: r.unmappedListings },
         ].map((cell, i) => (
-          <div key={cell.label} className={cn('px-4 py-3', i > 0 && 'border-l')}>
+          <div key={cell.label} className={cn('px-4 py-3', i > 0 && 'border-s')}>
             <dt className="text-xs text-muted-foreground">{cell.label}</dt>
             <dd className="num mt-1 text-lg font-semibold">{cell.value}</dd>
           </div>

@@ -26,7 +26,7 @@ export function MoneyAnchorForm({
   }, { status: 'idle' });
 
   return (
-    <form action={submit} className="grid w-full gap-4 text-left">
+    <form action={submit} className="grid w-full gap-4 text-start">
       <div className="grid gap-3 sm:grid-cols-2">
         <Field>
           <FieldLabel htmlFor="openingBalance">Cash on hand</FieldLabel>

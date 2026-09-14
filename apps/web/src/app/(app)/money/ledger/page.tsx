@@ -140,7 +140,7 @@ export default async function LedgerPage({
               <TableRow>
                 <TableHead>Entry</TableHead>
                 <TableHead className="hidden w-[340px] md:table-cell">From → to</TableHead>
-                <TableHead className="w-[160px] text-right">Amount</TableHead>
+                <TableHead className="w-[160px] text-end">Amount</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -163,7 +163,7 @@ export default async function LedgerPage({
                               href={accountHref(e.creditCode)}
                               lens={e.creditCode === lens?.code}
                             />
-                            <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
+                            <ArrowRight className="size-3.5 shrink-0 text-muted-foreground rtl:rotate-180" />
                             <AccountChip
                               name={e.debitAr}
                               title={english.get(e.debitCode)}
@@ -172,7 +172,7 @@ export default async function LedgerPage({
                             />
                           </div>
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-end">
                           <Amount
                             value={effect ?? e.amount}
                             signed={effect !== null}
@@ -218,7 +218,7 @@ function Lens({
           const mark = marks[d];
           return (
             <span key={d} className="inline-flex items-center gap-1">
-              <mark.icon className={cn('size-3.5', mark.tone)} />
+              <mark.icon className={cn('size-3.5 rtl:-scale-x-100', mark.tone)} />
               {mark.label}
             </span>
           );

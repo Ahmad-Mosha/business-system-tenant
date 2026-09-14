@@ -203,12 +203,12 @@ export function ShipmentsView({ initialShipments }: { initialShipments: Shipment
                 <TableHead>رقم التتبع / Type</TableHead>
                 <TableHead>العميل / Customer</TableHead>
                 <TableHead>المنطقة / Destination</TableHead>
-                <TableHead className="text-right">مبلغ التحصيل (COD)</TableHead>
-                <TableHead className="text-right">رسوم فليكس شيب</TableHead>
+                <TableHead className="text-end">مبلغ التحصيل (COD)</TableHead>
+                <TableHead className="text-end">رسوم فليكس شيب</TableHead>
                 <TableHead>الحالة / Status</TableHead>
                 <TableHead className="text-center">المحاولات</TableHead>
                 <TableHead>حالة المبلغ المحصل</TableHead>
-                <TableHead className="text-right">وقت التوصيل</TableHead>
+                <TableHead className="text-end">وقت التوصيل</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -253,13 +253,13 @@ export function ShipmentsView({ initialShipments }: { initialShipments: Shipment
                         </p>
                       ) : null}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-end">
                       <p className="num font-medium">{money(s.cod?.amount ?? 0)}</p>
                       <p className="text-xs text-muted-foreground">
                         {s.cod?.paymentMethodLabel || 'الدفع عند الاستلام'}
                       </p>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-end">
                       <p className="num">{s.flexShipFee ? money(s.flexShipFee) : '—'}</p>
                       <p className="text-xs text-muted-foreground">
                         {s.flexShipStatusLabel || 'غير مستحق بعد'}
@@ -276,7 +276,7 @@ export function ShipmentsView({ initialShipments }: { initialShipments: Shipment
                         {s.cod?.collectionStatusLabel ?? 'قيد التنفيذ'}
                       </ToneBadge>
                     </TableCell>
-                    <TableCell className="text-right text-xs text-muted-foreground">
+                    <TableCell className="text-end text-xs text-muted-foreground">
                       {s.deliveredAt ? (
                         <>
                           <p className="text-[13px] text-foreground">{when(s.deliveredAt)}</p>
