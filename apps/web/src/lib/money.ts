@@ -1,3 +1,4 @@
+import type { Tone } from '@/components/tone-badge';
 import type { AccountBalance } from '@/lib/api';
 
 /** Plain-language label for every ledger entry kind, for the activity feed. */
@@ -25,15 +26,12 @@ export const KIND_LABEL: Record<string, string> = {
 
 export const kindLabel = (kind: string) => KIND_LABEL[kind] ?? kind;
 
-/** How an invoice's paid state reads, and its chip colour. */
-export const PAID_STATUS: Record<
-  string,
-  { label: string; tone: 'ok' | 'warn' | 'muted' }
-> = {
-  DRAFT: { label: 'Draft', tone: 'warn' },
-  UNPAID: { label: 'Unpaid', tone: 'warn' },
-  PARTIAL: { label: 'Partly paid', tone: 'warn' },
-  PAID: { label: 'Paid', tone: 'ok' },
+/** How an invoice's paid state reads, and what it means. */
+export const PAID_STATUS: Record<string, { label: string; tone: Tone }> = {
+  DRAFT: { label: 'Draft', tone: 'neutral' },
+  UNPAID: { label: 'Unpaid', tone: 'warning' },
+  PARTIAL: { label: 'Partly paid', tone: 'warning' },
+  PAID: { label: 'Paid', tone: 'success' },
 };
 
 /** The counter-accounts a hand-entered voucher can move cash against. */
