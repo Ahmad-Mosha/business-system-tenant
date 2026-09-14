@@ -41,8 +41,9 @@ import {
 } from '@/components/ui/table';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import type { ShipmentTracking } from '@/lib/api';
-import { dateTime, money } from '@/lib/format';
+import { money } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { useFormat } from '@/i18n/use-format';
 
 type Filter = 'ALL' | 'DELIVERED' | 'IN_TRANSIT' | 'DELAYED';
 
@@ -60,7 +61,7 @@ const COLLECTION_TONE: Record<string, Tone> = { PAID: 'success', UNPAID: 'danger
 
 /** A date inside Arabic text, isolated — otherwise the bidi algorithm drags its
  *  digits across the words ("17 بحد أقصى Sept"). */
-const when = (v: string) => <bdi>{dateTime(v)}</bdi>;
+const isolate = (text: string) => <bdi>{text}</bdi>;
 
 const MATCHES: Record<Filter, (s: ShipmentTracking) => boolean> = {
   ALL: () => true,
@@ -75,6 +76,8 @@ const MATCHES: Record<Filter, (s: ShipmentTracking) => boolean> = {
  * searching and filtering it in the browser is instant.
  */
 export function ShipmentsView({ initialShipments }: { initialShipments: ShipmentTracking[] }) {
+  const f = useFormat();
+  const when = (v: string) => isolate(f.dateTime(v));
   const [shipments, setShipments] = useState(initialShipments);
   const [selected, setSelected] = useState<ShipmentTracking | null>(null);
   const [search, setSearch] = useState('');
@@ -325,6 +328,8 @@ function ShipmentDetail({
   refreshing: boolean;
   onRefresh: () => void;
 }) {
+  const f = useFormat();
+  const when = (v: string) => isolate(f.dateTime(v));
   const status = statusOf(s);
   const collection = s.cod?.collectionStatus ?? 'PENDING';
 

@@ -15,8 +15,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { getPurchases } from '@/lib/api';
-import { date, money } from '@/lib/format';
+import { money } from '@/lib/format';
 import { requireAdmin } from '@/lib/session';
+import { getFormat } from '@/i18n/get-format';
 
 function monthStart() {
   const d = new Date();
@@ -24,6 +25,7 @@ function monthStart() {
 }
 
 export default async function PurchasesPage() {
+  const f = await getFormat();
   await requireAdmin();
   const invoices = await getPurchases();
 
@@ -122,7 +124,7 @@ export default async function PurchasesPage() {
                   <TableCell>
                     <bdi>{i.supplierName}</bdi>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{date(i.invoiceDate)}</TableCell>
+                  <TableCell className="text-muted-foreground">{f.date(i.invoiceDate)}</TableCell>
                   <TableCell className="text-muted-foreground">
                     {i.payment === 'CASH' ? 'Cash' : 'Credit'}
                   </TableCell>

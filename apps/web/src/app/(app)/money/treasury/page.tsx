@@ -16,14 +16,16 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { getAccountLedger, getCashFlow, getCheques, getMoneyAccounts } from '@/lib/api';
-import { byDay, date, isoDate, timeOf } from '@/lib/format';
+import { isoDate } from '@/lib/format';
 import { accountByCode } from '@/lib/money';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
+import { getFormat } from '@/i18n/get-format';
 
 const LIMIT = 150;
 
 export default async function TreasuryPage() {
+  const f = await getFormat();
   await requireAdmin();
   const today = new Date();
   const since = isoDate(new Date(today.getFullYear(), today.getMonth(), 1));
@@ -39,7 +41,7 @@ export default async function TreasuryPage() {
   const monthIn = month.series.reduce((n, p) => n + Number(p.in), 0);
   const monthOut = -month.series.reduce((n, p) => n + Number(p.out), 0);
   const chequesTotal = cheques.reduce((n, c) => n + Number(c.amount), 0);
-  const sinceLabel = `Since ${date(since)}`;
+  const sinceLabel = `Since ${f.date(since)}`;
 
   return (
     <Page fill>
@@ -111,7 +113,7 @@ export default async function TreasuryPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {byDay(movements).map((day) => (
+              {f.byDay(movements).map((day) => (
                 <Fragment key={day.key}>
                   <DayRow label={day.label} span={4} />
                   {day.rows.map((m) => {
@@ -122,7 +124,7 @@ export default async function TreasuryPage() {
                     return (
                       <TableRow key={m.id}>
                         <TableCell className="h-14 max-w-0">
-                          <EntryCell entry={m} mark={mark} when={timeOf(m.occurredAt)} />
+                          <EntryCell entry={m} mark={mark} when={f.time(m.occurredAt)} />
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
                           <span className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">

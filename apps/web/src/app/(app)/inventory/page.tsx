@@ -20,8 +20,9 @@ import {
 import { getProductsCatalog, getProductsSummary } from '@/lib/api';
 import { CATEGORIES, categoryIcon, categoryLabel } from '@/lib/categories';
 import { requireAdmin } from '@/lib/session';
-import { LOW_STOCK, stockState, units } from '@/lib/stock';
+import { LOW_STOCK, stockState } from '@/lib/stock';
 import { cn } from '@/lib/utils';
+import { getFormat } from '@/i18n/get-format';
 
 const PAGE_SIZE = 20;
 
@@ -36,6 +37,7 @@ export default async function InventoryPage({
 }: {
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
+  const f = await getFormat();
   await requireAdmin();
   const params = await searchParams;
 
@@ -104,22 +106,22 @@ export default async function InventoryPage({
         />
         <MetricCard
           label="Units on hand"
-          value={units(summary.unitsOnHand)}
+          value={f.count(summary.unitsOnHand)}
           hint={
             summary.unitsInOrders > 0
-              ? `Plus ${units(summary.unitsInOrders)} in open orders`
+              ? `Plus ${f.count(summary.unitsInOrders)} in open orders`
               : 'None waiting in open orders'
           }
         />
         <MetricCard
           label="Low stock"
-          value={units(count.low_stock)}
+          value={f.count(count.low_stock)}
           tone={count.low_stock > 0 ? 'warning' : 'default'}
           hint={`${LOW_STOCK} or fewer left`}
         />
         <MetricCard
           label="Out of stock"
-          value={units(count.out_of_stock)}
+          value={f.count(count.out_of_stock)}
           tone={count.out_of_stock > 0 ? 'destructive' : 'default'}
           hint="Nothing left to sell"
         />
@@ -241,10 +243,10 @@ export default async function InventoryPage({
                     <TableCell
                       className={cn('num text-end font-medium', p.onHand < 0 && 'text-destructive')}
                     >
-                      {units(p.onHand)}
+                      {f.count(p.onHand)}
                     </TableCell>
                     <TableCell className="num text-end text-muted-foreground">
-                      {p.inOrders > 0 ? units(p.inOrders) : '—'}
+                      {p.inOrders > 0 ? f.count(p.inOrders) : '—'}
                     </TableCell>
                     <TableCell className="text-end">
                       {p.unitCost ? (

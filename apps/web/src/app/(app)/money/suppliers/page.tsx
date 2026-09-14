@@ -14,10 +14,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { getSuppliers } from '@/lib/api';
-import { date, money } from '@/lib/format';
+import { money } from '@/lib/format';
 import { requireAdmin } from '@/lib/session';
+import { getFormat } from '@/i18n/get-format';
 
 export default async function SuppliersPage() {
+  const f = await getFormat();
   await requireAdmin();
   const suppliers = await getSuppliers();
   const owed = suppliers.reduce((n, s) => n + Number(s.balance), 0);
@@ -90,7 +92,7 @@ export default async function SuppliersPage() {
                       <span className="text-muted-foreground">Settled</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-end text-muted-foreground">{date(s.createdAt)}</TableCell>
+                  <TableCell className="text-end text-muted-foreground">{f.date(s.createdAt)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

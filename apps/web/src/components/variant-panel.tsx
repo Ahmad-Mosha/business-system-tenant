@@ -28,8 +28,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { dateTime } from '@/lib/format';
+
 import { cn } from '@/lib/utils';
+import { useFormat } from '@/i18n/use-format';
 
 const REASONS = [
   { value: 'PURCHASE', label: 'Purchased' },
@@ -79,6 +80,7 @@ export function VariantPanel({
   movements: Movement[];
   single?: boolean;
 }) {
+  const f = useFormat();
   const [pending, start] = useTransition();
   const [qty, setQty] = useState('1');
   const [reason, setReason] = useState<string>('PURCHASE');
@@ -268,7 +270,7 @@ export function VariantPanel({
                           <div className="min-w-0">
                             <p className="truncate font-medium">{REASON_LABEL[m.reason] ?? m.reason}</p>
                             <p className="truncate text-xs text-muted-foreground">
-                              {dateTime(m.occurredAt)}
+                              {f.dateTime(m.occurredAt)}
                               {m.note ? (
                                 <>
                                   {' · '}

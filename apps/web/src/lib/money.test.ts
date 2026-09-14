@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { dateTime, timeOf } from './format';
 import { effectOn, entryMemo } from './money';
 
 const cash = { code: 'CASH', kind: 'ASSET' } as const;
@@ -25,11 +24,4 @@ test('a reversal memo drops what its row already says', () => {
     'Purchase invoice INV-1',
   );
   assert.equal(entryMemo({ memo: 'Purchase invoice', kind: 'PURCHASE', reversesId: null }), 'Purchase invoice');
-});
-
-test('something dated without a time shows none', () => {
-  assert.equal(timeOf('2026-09-04T00:00:00.000Z'), '');
-  assert.notEqual(timeOf('2026-09-14T12:29:00.000Z'), '');
-  assert.doesNotMatch(dateTime('2026-09-04T00:00:00.000Z'), /:/);
-  assert.match(dateTime('2026-09-14T12:29:00.000Z'), /:/);
 });

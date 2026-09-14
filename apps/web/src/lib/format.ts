@@ -17,74 +17,15 @@ export function moneyWhole(v: string | number | null | undefined): string {
   return EGP_WHOLE.format(Number(v));
 }
 
-export function date(v: string | null | undefined): string {
-  if (!v) return '—';
-  return new Date(v).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-}
-
 /** A calendar date as `YYYY-MM-DD`, in local time — not UTC's, which is a day behind after midnight. */
 export const isoDate = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-/** The local calendar date `n` days before today. */
+/** The local calendar date `n` days before today — for API date ranges, not display. */
 export function daysAgo(n: number): string {
   const d = new Date();
   d.setDate(d.getDate() - n);
   return isoDate(d);
-}
-
-/**
- * Recorded from a date alone — a voucher, an invoice, an opening balance. The
- * API stores those at midnight UTC, and printing that as "03:00" would invent
- * a time nobody entered.
- */
-const isDateOnly = (d: Date) => d.getTime() % 86_400_000 === 0;
-
-/** `14 Sept, 15:29` — or `4 Sept` for something that has no time. */
-export function dateTime(v: string): string {
-  const d = new Date(v);
-  return d.toLocaleString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    ...(isDateOnly(d) ? {} : { hour: '2-digit', minute: '2-digit' }),
-  });
-}
-
-/** `15:29`, or '' for something that has no time. */
-export function timeOf(v: string): string {
-  const d = new Date(v);
-  return isDateOnly(d) ? '' : d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-}
-
-/** A day heading for a dated list: "Today", "Yesterday", "Mon 14 Sept". */
-export function dayLabel(v: string, now = new Date()): string {
-  const d = new Date(v);
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  if (d.toDateString() === now.toDateString()) return 'Today';
-  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
-  return d.toLocaleDateString('en-GB', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric',
-  });
-}
-
-/** Rows already newest first, bunched by calendar day, each day with its heading. */
-export function byDay<T extends { occurredAt: string }>(rows: T[]) {
-  const days: Array<{ key: string; label: string; rows: T[] }> = [];
-  for (const row of rows) {
-    const key = new Date(row.occurredAt).toDateString();
-    const day = days.at(-1);
-    if (day?.key === key) day.rows.push(row);
-    else days.push({ key, label: dayLabel(row.occurredAt), rows: [row] });
-  }
-  return days;
 }
 
 export const isNegative = (v: string | number | null | undefined) =>
@@ -117,13 +58,4 @@ export function groupDigits(raw: string): string {
   const decPart = dot === -1 ? '' : '.' + cleaned.slice(dot + 1).replace(/\./g, '').slice(0, 2);
   const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   return (grouped || (dot !== -1 ? '0' : '')) + decPart;
-}
-
-/** `2026-07` -> `July 2026`. */
-export function monthLabel(month: string): string {
-  return new Date(`${month}-01T00:00:00Z`).toLocaleDateString('en-GB', {
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
 }

@@ -12,10 +12,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { getImports } from '@/lib/api';
-import { date, dateTime } from '@/lib/format';
+
 import { requireAdmin } from '@/lib/session';
+import { getFormat } from '@/i18n/get-format';
 
 export default async function ImportsPage() {
+  const f = await getFormat();
   await requireAdmin();
   const imports = await getImports();
 
@@ -66,7 +68,7 @@ export default async function ImportsPage() {
                     </span>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {date(i.periodStart)} – {date(i.periodEnd)}
+                    {f.date(i.periodStart)} – {f.date(i.periodEnd)}
                   </TableCell>
                   <TableCell className="num text-end">{i.rowsInFile}</TableCell>
                   <TableCell className="num text-end font-medium">{i.rowsInserted}</TableCell>
@@ -78,7 +80,7 @@ export default async function ImportsPage() {
                       <span className="text-muted-foreground">—</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-end text-muted-foreground">{dateTime(i.createdAt)}</TableCell>
+                  <TableCell className="text-end text-muted-foreground">{f.dateTime(i.createdAt)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

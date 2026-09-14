@@ -8,10 +8,12 @@ import { StatementView } from '@/components/statement-view';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getDataRange, getPeriods } from '@/lib/api';
-import { date } from '@/lib/format';
+
 import { requireSession } from '@/lib/session';
+import { getFormat } from '@/i18n/get-format';
 
 export default async function OverviewPage() {
+  const f = await getFormat();
   const user = await requireSession();
   if (user.role === 'MODERATOR') redirect('/orders');
 
@@ -31,7 +33,7 @@ export default async function OverviewPage() {
     <Page>
       <PageHeader
         title="noon"
-        description={`Everything imported, ${date(range.from)} – ${date(range.to)}. Every figure matches noon’s own statement.`}
+        description={`Everything imported, ${f.date(range.from)} – ${f.date(range.to)}. Every figure matches noon’s own statement.`}
         actions={
           <Button variant="outline" asChild>
             <Link href="/months">

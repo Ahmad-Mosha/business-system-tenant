@@ -8,10 +8,12 @@ import { Card, CardAction, CardDescription, CardHeader, CardTitle } from '@/comp
 import { Spinner } from '@/components/ui/spinner';
 import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
 import type { ChequeRow } from '@/lib/api';
-import { date, money } from '@/lib/format';
+import { money } from '@/lib/format';
+import { useFormat } from '@/i18n/use-format';
 
 /** Cheques received but not cleared — clear or bounce each one. */
 export function PendingCheques({ cheques }: { cheques: ChequeRow[] }) {
+  const f = useFormat();
   if (cheques.length === 0) return null;
   const total = cheques.reduce((n, c) => n + Number(c.amount), 0);
   return (
@@ -32,7 +34,7 @@ export function PendingCheques({ cheques }: { cheques: ChequeRow[] }) {
                   {c.memo ? <span className="text-muted-foreground"> · {c.memo}</span> : null}
                 </TableCell>
                 <TableCell className="w-[160px] text-muted-foreground">
-                  {c.dueDate ? `Due ${date(c.dueDate)}` : `Received ${date(c.receivedDate)}`}
+                  {c.dueDate ? `Due ${f.date(c.dueDate)}` : `Received ${f.date(c.receivedDate)}`}
                 </TableCell>
                 <TableCell className="w-[190px] text-end">
                   <ChequeActions id={c.id} />
