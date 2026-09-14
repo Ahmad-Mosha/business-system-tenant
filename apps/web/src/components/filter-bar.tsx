@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Toggle } from '@/components/ui/toggle';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { cn } from '@/lib/utils';
 
 export interface FilterOption {
@@ -27,10 +28,14 @@ export interface FilterOption {
   label: string;
   /** Secondary text in the menu only — e.g. an account's Arabic name. */
   hint?: string;
+  /** How many rows choosing it would show — segments print it beside the label. */
+  count?: number;
 }
 
 export type FilterSpec =
   | { kind: 'select'; param: string; all: string; options: FilterOption[] }
+  /** A few options, all on show — for the one filter a list is mostly used by. */
+  | { kind: 'segments'; param: string; label: string; all: FilterOption; options: FilterOption[] }
   | { kind: 'toggle'; param: string; value: string; label: string }
   | { kind: 'dates'; from: string; to: string };
 
@@ -101,6 +106,29 @@ export function FilterBar({
             >
               {f.label}
             </Toggle>
+          );
+        }
+        if (f.kind === 'segments') {
+          const value = params.get(f.param);
+          const current = value && f.options.some((o) => o.value === value) ? value : ALL;
+          return (
+            <ToggleGroup
+              key={f.param}
+              type="single"
+              variant="outline"
+              spacing={0}
+              value={current}
+              onValueChange={(v) => v && update({ [f.param]: v === ALL ? null : v })}
+              aria-label={f.label}
+              className="max-w-full overflow-x-auto"
+            >
+              {[{ ...f.all, value: ALL }, ...f.options].map((o) => (
+                <ToggleGroupItem key={o.value} value={o.value} className="gap-1.5">
+                  {o.label}
+                  {o.count !== undefined ? <span className="num opacity-60">{o.count}</span> : null}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
           );
         }
         if (f.kind === 'dates') {
