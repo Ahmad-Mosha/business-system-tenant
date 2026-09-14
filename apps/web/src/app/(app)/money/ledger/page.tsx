@@ -108,7 +108,7 @@ export default async function LedgerPage({
       />
 
       <TablePanel
-        minWidth="50rem"
+        minWidth="22rem"
         toolbar={lens ? <Lens account={lens} marks={marks} all={!account} /> : undefined}
         footer={
           <TablePagination
@@ -139,7 +139,7 @@ export default async function LedgerPage({
             <TableHeader>
               <TableRow>
                 <TableHead>Entry</TableHead>
-                <TableHead className="w-[340px]">From → to</TableHead>
+                <TableHead className="hidden w-[340px] md:table-cell">From → to</TableHead>
                 <TableHead className="w-[160px] text-right">Amount</TableHead>
               </TableRow>
             </TableHeader>
@@ -155,7 +155,7 @@ export default async function LedgerPage({
                         <TableCell className="h-14 max-w-0">
                           <EntryCell entry={e} mark={mark} when={timeOf(e.occurredAt)} />
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="hidden md:table-cell">
                           <div className="flex min-w-0 items-center gap-1.5">
                             <AccountChip
                               name={e.creditAr}

@@ -89,7 +89,7 @@ export default async function TreasuryPage() {
       <PendingCheques cheques={cheques} />
 
       <TablePanel
-        minWidth="48rem"
+        minWidth="22rem"
         footer={
           <TableCount>
             {movements.length >= LIMIT
@@ -109,9 +109,9 @@ export default async function TreasuryPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Movement</TableHead>
-                <TableHead className="w-[260px]">From or to</TableHead>
+                <TableHead className="hidden w-[240px] md:table-cell">From or to</TableHead>
                 <TableHead className="w-[150px] text-right">Amount</TableHead>
-                <TableHead className="w-[150px] text-right">Balance</TableHead>
+                <TableHead className="hidden w-[150px] text-right sm:table-cell">Balance</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -128,7 +128,7 @@ export default async function TreasuryPage() {
                         <TableCell className="h-14 max-w-0">
                           <EntryCell entry={m} mark={mark} when={timeOf(m.occurredAt)} />
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="hidden md:table-cell">
                           <span className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
                             {effect > 0 ? 'from' : 'to'}
                             <AccountChip
@@ -141,7 +141,7 @@ export default async function TreasuryPage() {
                         <TableCell className="text-right">
                           <Amount value={effect} signed className={cn('text-sm font-semibold', mark.tone)} />
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="hidden text-right sm:table-cell">
                           <Amount
                             value={m.runningBalance}
                             className={cn('font-medium', Number(m.runningBalance) < 0 && 'text-destructive')}
