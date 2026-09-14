@@ -52,7 +52,7 @@ export function AppSidebar({ user }: { user: SessionUser }) {
   const flat = groups.filter((g) => g.flat);
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="icon" variant="inset">
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
