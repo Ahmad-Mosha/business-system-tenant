@@ -9,18 +9,18 @@ import { cn } from '@/lib/utils';
 
 export type MetricTone = 'default' | 'success' | 'warning' | 'destructive';
 
-const TONE_TEXT: Record<MetricTone, string> = {
-  default: 'text-muted-foreground',
-  success: 'text-success',
-  warning: 'text-warning',
-  destructive: 'text-destructive',
+const TONE_MARK: Record<MetricTone, string> = {
+  default: '',
+  success: 'bg-success',
+  warning: 'bg-warning',
+  destructive: 'bg-destructive',
 };
 
 /**
  * A headline figure, built the way an owner scans one: what it is, how much,
- * and whether it needs them. The number stays in the foreground colour —
- * state is carried by the context line under it (tinted, with a marker), so a
- * screen of figures never turns into a wall of colour.
+ * and whether it needs them. The number and its context stay neutral; state
+ * is one small coloured mark beside the context line, so a row of figures that
+ * all need attention still reads calm.
  *
  * Read-only by design. `link` adds a small drill-down to the records behind
  * the figure; the card itself is not a button or a filter.
@@ -70,10 +70,10 @@ export function MetricCard({
       </div>
       {children ? <div className="mt-2">{children}</div> : null}
       {hint || badge ? (
-        <div className={cn('mt-1.5 flex items-center gap-1.5 text-xs', TONE_TEXT[tone])}>
+        <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
           {badge}
           {tone !== 'default' && !badge ? (
-            <span aria-hidden className="size-1.5 shrink-0 bg-current" />
+            <span aria-hidden className={cn('size-1.5 shrink-0', TONE_MARK[tone])} />
           ) : null}
           <span className="line-clamp-2">{hint}</span>
         </div>
