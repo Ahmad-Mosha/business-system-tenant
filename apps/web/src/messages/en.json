@@ -1,0 +1,233 @@
+{
+  "app": {
+    "name": "Prime Market",
+    "tagline": "Operations system",
+    "description": "Operations and commerce platform"
+  },
+  "common": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "close": "Close",
+    "apply": "Apply",
+    "clear": "Clear",
+    "search": "Search",
+    "back": "Back",
+    "more": "More",
+    "previous": "Previous",
+    "next": "Next",
+    "tryAgain": "Try again",
+    "loading": "Loading",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "all": "All"
+  },
+  "language": {
+    "label": "Language",
+    "ar": "العربية",
+    "en": "English"
+  },
+  "nav": {
+    "modules": "Modules",
+    "toggleSidebar": "Toggle sidebar",
+    "groups": {
+      "operations": "Operations",
+      "money": "Money",
+      "noon": "noon",
+      "admin": "Admin"
+    },
+    "items": {
+      "orders": "Orders",
+      "shipments": "Shipments",
+      "inventory": "Inventory",
+      "moneyOverview": "Overview",
+      "treasury": "Treasury",
+      "purchases": "Purchases",
+      "suppliers": "Suppliers",
+      "ledger": "Ledger",
+      "noonOverview": "Overview",
+      "months": "Months",
+      "products": "Products",
+      "imports": "Imports",
+      "team": "Team"
+    },
+    "crumbs": {
+      "new": "New",
+      "edit": "Edit",
+      "details": "Details"
+    }
+  },
+  "user": {
+    "lightTheme": "Light theme",
+    "darkTheme": "Dark theme",
+    "signOut": "Sign out"
+  },
+  "table": {
+    "showing": "Showing {from}–{to} of {items}",
+    "pages": "Pages",
+    "previousPage": "Go to the previous page",
+    "nextPage": "Go to the next page",
+    "morePages": "More pages"
+  },
+  "nouns": {
+    "orders": "{count, plural, =0 {No orders} one {# order} other {# orders}}",
+    "products": "{count, plural, =0 {No products} one {# product} other {# products}}",
+    "entries": "{count, plural, =0 {No entries} one {# entry} other {# entries}}"
+  },
+  "filters": {
+    "reset": "Reset",
+    "clearSearch": "Clear search",
+    "anyDate": "Any date",
+    "pickDate": "Pick a date"
+  },
+  "period": {
+    "label": "Period"
+  },
+  "status": {
+    "moveTo": "Move to",
+    "otherStatuses": "Other statuses",
+    "markAs": "Mark as",
+    "assignTo": "Assign to",
+    "unassigned": "Unassigned",
+    "changeStatus": "Change status, currently {status}",
+    "changePayment": "Change payment, currently {status}",
+    "changeAssignee": "Change who it's assigned to, currently {name}",
+    "movedTo": "Moved to {status}.",
+    "markedAs": "Payment marked {status}.",
+    "assignedTo": "Assigned to {name}.",
+    "unassignedDone": "Unassigned."
+  },
+  "ledger": {
+    "in": "In",
+    "out": "Out",
+    "untouched": "Between other accounts",
+    "grew": "Grew",
+    "shrank": "Shrank",
+    "reversal": "Reversal",
+    "openAccount": "{account} — open its statement"
+  },
+  "charts": {
+    "cashOnHand": "Cash on hand",
+    "moneyIn": "Money in",
+    "moneyOut": "Money out",
+    "netProceeds": "Net proceeds",
+    "amount": "Amount",
+    "weekOf": "Week of {date}",
+    "units": "{count, plural, one {# unit} other {# units}}",
+    "notEnoughHistory": "Not enough history yet — the chart fills in as days pass.",
+    "noMovement": "No money moved in this period."
+  },
+  "noData": {
+    "title": "Nothing imported yet",
+    "description": "Upload a noon settlement export and the products, revenue and fees in it are read automatically.",
+    "action": "Import a report"
+  },
+  "states": {
+    "apiDown": "The API isn’t reachable right now. Check that it’s running, then try again.",
+    "failed": "Something went wrong on our side. Trying again usually fixes it.",
+    "failedShort": "Trying again usually fixes it."
+  },
+  "enums": {
+    "orderStatus": {
+      "NEW": "New",
+      "ASSIGNED": "Assigned",
+      "CONFIRMED": "Confirmed",
+      "SHIPPED": "Shipped",
+      "DELIVERED": "Delivered",
+      "CANCELLED": "Cancelled",
+      "RETURNED": "Returned"
+    },
+    "paymentStatus": {
+      "UNPAID": "Unpaid",
+      "PAID": "Paid",
+      "REFUNDED": "Refunded"
+    },
+    "orderSource": {
+      "EASYORDERS": "Website",
+      "SOCIAL": "Social"
+    },
+    "channel": {
+      "noon": "noon",
+      "amazon": "Amazon",
+      "easyorders": "Website",
+      "website": "Website",
+      "social": "Social",
+      "unlisted": "Not on any channel"
+    },
+    "category": {
+      "COSMETICS": "Cosmetics",
+      "HOME": "Home",
+      "ELECTRONICS": "Electronics",
+      "TV_SHOP": "TV Shop",
+      "NONE": "Uncategorised"
+    },
+    "stockState": {
+      "in": "In stock",
+      "low": "Low stock",
+      "out": "Out of stock"
+    },
+    "stockReason": {
+      "PURCHASE": "Purchased",
+      "SALE": "Sold",
+      "RETURN": "Returned by customer",
+      "DAMAGE": "Damaged or lost",
+      "COUNT": "Physical count",
+      "ADJUSTMENT": "Correction"
+    },
+    "entryKind": {
+      "OPENING_BALANCE": "Opening balance",
+      "CASH_DEPOSIT": "Cash deposit",
+      "CHEQUE_DEPOSIT": "Cheque received",
+      "CHEQUE_CLEAR": "Cheque cleared",
+      "CHEQUE_BOUNCE": "Cheque bounced",
+      "PAYMENT_IN": "Money in",
+      "PAYMENT_OUT": "Payment",
+      "CAPITAL_WITHDRAWAL": "Owner withdrawal",
+      "PURCHASE": "Purchase",
+      "SUPPLIER_PAYMENT": "Supplier payment",
+      "NOON_ACCRUAL": "noon sale",
+      "NOON_FEE": "noon fee",
+      "NOON_PAYOUT": "noon payout",
+      "ORDER_SALE": "Order paid",
+      "COGS": "Cost of goods",
+      "BOSTA_PAYOUT": "Bosta payout",
+      "RETURN": "Return",
+      "STOCK_LOSS": "Stock loss",
+      "ADJUSTMENT": "Adjustment"
+    },
+    "paidStatus": {
+      "DRAFT": "Draft",
+      "UNPAID": "Unpaid",
+      "PARTIAL": "Partly paid",
+      "PAID": "Paid"
+    },
+    "cashIn": {
+      "SALES": "Sales",
+      "OWNER_CAPITAL": "Owner deposits",
+      "SUPPLIER_PAYABLE": "Supplier refunds",
+      "INVENTORY": "Cash purchases reversed",
+      "NOON_RECEIVABLE": "noon payouts",
+      "AMAZON_RECEIVABLE": "Amazon payouts",
+      "BOSTA_COD": "Bosta payouts",
+      "CHEQUES_PENDING": "Cheques cleared"
+    },
+    "cashOut": {
+      "SALES": "Sales reversed",
+      "OWNER_CAPITAL": "Owner withdrawals",
+      "SUPPLIER_PAYABLE": "Supplier payments",
+      "INVENTORY": "Stock bought for cash",
+      "OTHER_EXPENSE": "Expenses",
+      "SHIPPING": "Shipping",
+      "CHANNEL_FEES": "Fees and ads"
+    },
+    "voucherCounter": {
+      "OTHER_EXPENSE": "General expense",
+      "SHIPPING": "Shipping",
+      "CHANNEL_FEES": "Channel fees / ads",
+      "OWNER_CAPITAL": "Owner capital"
+    },
+    "role": {
+      "ADMIN": "Admin",
+      "MODERATOR": "Moderator"
+    }
+  }
+}
