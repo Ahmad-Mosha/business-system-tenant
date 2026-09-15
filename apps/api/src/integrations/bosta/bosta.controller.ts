@@ -12,6 +12,7 @@ import {
 import type { Request } from 'express';
 import type { SessionUser } from '../../auth/auth.guard';
 import { BostaService } from './bosta.service';
+import { problem } from '../../problem';
 
 @Controller('bosta')
 export class BostaController {
@@ -43,7 +44,9 @@ export class BostaController {
 
     const result = await this.bostaService.track(cleanTn);
     if (!result) {
-      throw new NotFoundException(`Shipment not found for tracking number: ${cleanTn}`);
+      throw new NotFoundException(
+        problem('shipment.notFound', `Shipment not found for tracking number: ${cleanTn}`, { trackingNumber: cleanTn }),
+      );
     }
     return result;
   }

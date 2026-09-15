@@ -19,6 +19,7 @@ import {
   type OrderStatus,
   type PaymentStatus,
 } from './order.entity';
+import { problem } from '../problem';
 
 /** Egyptian mobile: 01[0125] + 8 digits, with or without a +20/0020/20 prefix. */
 const EGYPT_PHONE = /^(?:\+?20|0)?1[0125]\d{8}$/;
@@ -129,7 +130,7 @@ export class OrdersService implements OnModuleInit {
       where: user.role === 'ADMIN' ? { id } : { id, assignedToId: user.id },
       relations: { items: true, assignedTo: true },
     });
-    if (!order) throw new NotFoundException('order not found');
+    if (!order) throw new NotFoundException(problem('notFound', 'order not found'));
 
     const events = await this.db.getRepository(OrderEvent).find({
       where: { orderId: id },
@@ -148,25 +149,25 @@ export class OrdersService implements OnModuleInit {
 
   /** Manual creation, used for orders that arrive through social conversations. */
   async create(user: SessionUser, input: CreateOrderInput) {
-    if (!input.customerName?.trim()) throw new BadRequestException('customer name is required');
+    if (!input.customerName?.trim()) throw new BadRequestException(problem('order.customerName', 'customer name is required'));
 
     const phone = (input.customerPhone ?? '').replace(/[\s-]/g, '').replace(/^00/, '+');
     if (!EGYPT_PHONE.test(phone)) {
-      throw new BadRequestException('enter a valid Egyptian mobile number, e.g. 010 1234 5678');
+      throw new BadRequestException(problem('order.phone', 'enter a valid Egyptian mobile number, e.g. 010 1234 5678'));
     }
 
     const governorate = input.governorate?.trim() ?? '';
     if (!GOVERNORATES.has(governorate)) {
-      throw new BadRequestException('choose a governorate');
+      throw new BadRequestException(problem('order.governorate', 'choose a governorate'));
     }
 
-    if (!input.items?.length) throw new BadRequestException('an order needs at least one item');
+    if (!input.items?.length) throw new BadRequestException(problem('order.noItems', 'an order needs at least one item'));
     for (const item of input.items) {
       if (!Number.isInteger(item.quantity) || item.quantity < 1) {
-        throw new BadRequestException('every item needs a whole quantity of at least 1');
+        throw new BadRequestException(problem('order.itemQuantity', 'every item needs a whole quantity of at least 1'));
       }
       if (!/^\d+(\.\d{1,2})?$/.test(item.unitPrice ?? '') || Number(item.unitPrice) <= 0) {
-        throw new BadRequestException('every item needs a price greater than 0');
+        throw new BadRequestException(problem('order.itemPrice', 'every item needs a price greater than 0'));
       }
     }
 
@@ -241,7 +242,11 @@ export class OrdersService implements OnModuleInit {
       const stock = onHand.get(item.variantId as string);
       if (stock && item.quantity > stock.onHand) {
         throw new BadRequestException(
-          `${stock.name}: only ${stock.onHand} in stock, ${item.quantity} requested`,
+          problem('order.stockShort', `${stock.name}: only ${stock.onHand} in stock, ${item.quantity} requested`, {
+            name: stock.name,
+            onHand: stock.onHand,
+            requested: item.quantity,
+          }),
         );
       }
     }
@@ -250,7 +255,7 @@ export class OrdersService implements OnModuleInit {
   async assign(orderId: string, assigneeId: string | null, actor: SessionUser) {
     const repo = this.db.getRepository(Order);
     const order = await repo.findOneBy({ id: orderId });
-    if (!order) throw new NotFoundException('order not found');
+    if (!order) throw new NotFoundException(problem('notFound', 'order not found'));
 
     order.assignedToId = assigneeId;
     // Assigning an untouched order moves it along; a later state is left alone.
@@ -275,23 +280,23 @@ export class OrdersService implements OnModuleInit {
    * saying what actually happened rather than being rewritten.
    */
   async update(user: SessionUser, orderId: string, input: CreateOrderInput) {
-    if (!input.customerName?.trim()) throw new BadRequestException('customer name is required');
+    if (!input.customerName?.trim()) throw new BadRequestException(problem('order.customerName', 'customer name is required'));
 
     const phone = (input.customerPhone ?? '').replace(/[\s-]/g, '').replace(/^00/, '+');
     if (!EGYPT_PHONE.test(phone)) {
-      throw new BadRequestException('enter a valid Egyptian mobile number, e.g. 010 1234 5678');
+      throw new BadRequestException(problem('order.phone', 'enter a valid Egyptian mobile number, e.g. 010 1234 5678'));
     }
 
     const governorate = input.governorate?.trim() ?? '';
-    if (!GOVERNORATES.has(governorate)) throw new BadRequestException('choose a governorate');
+    if (!GOVERNORATES.has(governorate)) throw new BadRequestException(problem('order.governorate', 'choose a governorate'));
 
-    if (!input.items?.length) throw new BadRequestException('an order needs at least one item');
+    if (!input.items?.length) throw new BadRequestException(problem('order.noItems', 'an order needs at least one item'));
     for (const item of input.items) {
       if (!Number.isInteger(item.quantity) || item.quantity < 1) {
-        throw new BadRequestException('every item needs a whole quantity of at least 1');
+        throw new BadRequestException(problem('order.itemQuantity', 'every item needs a whole quantity of at least 1'));
       }
       if (!/^\d+(\.\d{1,2})?$/.test(item.unitPrice ?? '') || Number(item.unitPrice) <= 0) {
-        throw new BadRequestException('every item needs a price greater than 0');
+        throw new BadRequestException(problem('order.itemPrice', 'every item needs a price greater than 0'));
       }
     }
 
@@ -299,11 +304,15 @@ export class OrdersService implements OnModuleInit {
       const order = await tx.findOne(Order, {
         where: user.role === 'ADMIN' ? { id: orderId } : { id: orderId, assignedToId: user.id },
       });
-      if (!order) throw new NotFoundException('order not found');
+      if (!order) throw new NotFoundException(problem('notFound', 'order not found'));
 
       if (!OrdersService.EDITABLE.includes(order.status)) {
         throw new BadRequestException(
-          `a ${order.status.toLowerCase()} order can no longer be edited — it has left the warehouse`,
+          problem(
+            'order.locked',
+            `a ${order.status.toLowerCase()} order can no longer be edited — it has left the warehouse`,
+            { status: order.status },
+          ),
         );
       }
 
@@ -364,7 +373,7 @@ export class OrdersService implements OnModuleInit {
       const order = await tx.findOne(Order, {
         where: user.role === 'ADMIN' ? { id: orderId } : { id: orderId, assignedToId: user.id },
       });
-      if (!order) throw new NotFoundException('order not found');
+      if (!order) throw new NotFoundException(problem('notFound', 'order not found'));
 
       const from = order.status;
       if (from === next) return order;
@@ -373,8 +382,12 @@ export class OrdersService implements OnModuleInit {
         const allowed = ALLOWED_TRANSITIONS[from] ?? [];
         if (!allowed.includes(next)) {
           throw new BadRequestException(
-            `cannot move an order from ${from} to ${next}` +
-              (allowed.length ? ` — allowed: ${allowed.join(', ')}` : ' — it is final'),
+            problem(
+              'order.transition',
+              `cannot move an order from ${from} to ${next}` +
+                (allowed.length ? ` — allowed: ${allowed.join(', ')}` : ' — it is final'),
+              { from, to: next },
+            ),
           );
         }
       }
@@ -405,7 +418,7 @@ export class OrdersService implements OnModuleInit {
       const order = await tx.findOne(Order, {
         where: user.role === 'ADMIN' ? { id: orderId } : { id: orderId, assignedToId: user.id },
       });
-      if (!order) throw new NotFoundException('order not found');
+      if (!order) throw new NotFoundException(problem('notFound', 'order not found'));
 
       const from = order.paymentStatus;
       if (from === next) return order;

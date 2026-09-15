@@ -8,6 +8,7 @@ import {
   type LedgerAccountKind,
 } from './ledger-account.entity';
 import { LedgerEntry, type LedgerEntryKind } from './ledger-entry.entity';
+import { problem } from '../problem';
 
 const MONEY = /^\d+(\.\d{1,2})?$/;
 
@@ -105,7 +106,7 @@ export class LedgerService {
     tx: EntityManager = this.db.manager,
   ): Promise<LedgerEntry> {
     const original = await tx.findOneBy(LedgerEntry, { id: entryId });
-    if (!original) throw new NotFoundException('ledger entry not found');
+    if (!original) throw new NotFoundException(problem('notFound', 'ledger entry not found'));
     if (original.reversesId) {
       throw new BadRequestException('that entry is itself a reversal');
     }
@@ -164,7 +165,7 @@ export class LedgerService {
        GROUP BY a.kind`,
       params,
     );
-    if (!r) throw new NotFoundException(`no such account: ${code}`);
+    if (!r) throw new NotFoundException(problem('notFound', `no such account: ${code}`));
     return naturalBalance(r.kind, Number(r.debited), Number(r.credited)).toFixed(2);
   }
 

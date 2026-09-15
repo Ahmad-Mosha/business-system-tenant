@@ -17,6 +17,7 @@ import { Roles } from '../auth/auth.guard';
 import type { StockReason } from '../inventory/stock-movement.entity';
 import { PRODUCT_CATEGORIES, type ProductCategory } from './product.entity';
 import { CatalogService, type CreateProductInput } from './catalog.service';
+import { problem } from '../problem';
 
 const REASONS: StockReason[] = ['PURCHASE', 'SALE', 'RETURN', 'ADJUSTMENT', 'DAMAGE', 'COUNT'];
 
@@ -180,7 +181,9 @@ export class CatalogController {
       process.env.EASY_ORDER_KEY ??
       process.env.easyorder_api_key ??
       process.env.EASYORDERS_API_KEY;
-    if (!key) throw new BadRequestException('Easy Orders API key is not configured');
+    if (!key) {
+      throw new BadRequestException(problem('sync.notConfigured', 'Easy Orders API key is not configured'));
+    }
     return this.catalog.syncEasyOrders(key);
   }
 }

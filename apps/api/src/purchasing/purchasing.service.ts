@@ -13,6 +13,7 @@ import {
   type PurchasePayment,
 } from './purchase-invoice.entity';
 import { Supplier } from './supplier.entity';
+import { problem } from '../problem';
 
 const MONEY = /^\d+(\.\d{1,2})?$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -86,7 +87,7 @@ export class PurchasingService {
   async updateSupplier(id: string, patch: { name?: string; phone?: string | null; note?: string | null; active?: boolean }) {
     const repo = this.db.getRepository(Supplier);
     const supplier = await repo.findOneBy({ id });
-    if (!supplier) throw new NotFoundException('supplier not found');
+    if (!supplier) throw new NotFoundException(problem('notFound', 'supplier not found'));
     if (patch.name !== undefined) {
       if (!patch.name.trim()) throw new BadRequestException('name cannot be empty');
       supplier.name = patch.name.trim();
@@ -99,7 +100,7 @@ export class PurchasingService {
 
   async supplierDetail(id: string) {
     const supplier = await this.db.getRepository(Supplier).findOneBy({ id });
-    if (!supplier) throw new NotFoundException('supplier not found');
+    if (!supplier) throw new NotFoundException(problem('notFound', 'supplier not found'));
     const invoices = await this.db.getRepository(PurchaseInvoice).find({
       where: { supplierId: id },
       order: { invoiceDate: 'DESC', createdAt: 'DESC' },
@@ -135,7 +136,7 @@ export class PurchasingService {
 
     return this.db.transaction(async (tx) => {
       const supplier = await tx.findOneBy(Supplier, { id: supplierId });
-      if (!supplier) throw new NotFoundException('supplier not found');
+      if (!supplier) throw new NotFoundException(problem('notFound', 'supplier not found'));
 
       const targets = invoiceId
         ? await tx.find(PurchaseInvoice, {
@@ -146,16 +147,23 @@ export class PurchasingService {
             order: { invoiceDate: 'ASC', createdAt: 'ASC' },
           });
       if (invoiceId && !targets.length) {
-        throw new BadRequestException('this invoice cannot take a payment');
+        throw new BadRequestException(problem('payment.invoiceClosed', 'this invoice cannot take a payment'));
       }
 
       const owed = round2(
         targets.reduce((s, i) => s + Math.max(0, Number(i.landedTotal) - Number(i.settledAmount)), 0),
       );
       const scope = invoiceId ? 'left on this invoice' : `owed to ${supplier.name}`;
-      if (owed <= 0.005) throw new BadRequestException(`nothing is ${scope}`);
+      const about = { scope: invoiceId ? 'invoice' : 'supplier', supplier: supplier.name };
+      if (owed <= 0.005) throw new BadRequestException(problem('payment.nothingOwed', `nothing is ${scope}`, about));
       if (value > owed + 0.005) {
-        throw new BadRequestException(`only ${money(owed)} is ${scope} — you tried to pay ${money(value)}`);
+        throw new BadRequestException(
+          problem('payment.overpay', `only ${money(owed)} is ${scope} — you tried to pay ${money(value)}`, {
+            ...about,
+            owed: money(owed),
+            paid: money(value),
+          }),
+        );
       }
 
       const applied = allocateOldestFirst(
@@ -212,7 +220,7 @@ export class PurchasingService {
       where: { id },
       relations: { supplier: true },
     });
-    if (!invoice) throw new NotFoundException('invoice not found');
+    if (!invoice) throw new NotFoundException(problem('notFound', 'invoice not found'));
     const lines = await this.db.query(
       `SELECT l.id, l.variant_id AS "variantId", l.quantity, l.unit_cost AS "unitCost",
               l.landed_unit_cost AS "landedUnitCost", l.line_total AS "lineTotal",
@@ -234,7 +242,7 @@ export class PurchasingService {
     const wantedVariantIds = [...new Set(input.lines.map((l) => l.variantId))];
     const variants = await this.db.getRepository(ProductVariant).findBy({ id: In(wantedVariantIds) });
     if (variants.length !== wantedVariantIds.length) {
-      throw new BadRequestException('one or more products no longer exist');
+      throw new BadRequestException(problem('invoice.productsGone', 'one or more products no longer exist'));
     }
 
     const lines = input.lines.map((l) => ({
@@ -271,9 +279,11 @@ export class PurchasingService {
 
   async deleteDraft(id: string) {
     const invoice = await this.db.getRepository(PurchaseInvoice).findOneBy({ id });
-    if (!invoice) throw new NotFoundException('invoice not found');
+    if (!invoice) throw new NotFoundException(problem('notFound', 'invoice not found'));
     if (invoice.status !== 'DRAFT') {
-      throw new BadRequestException('a posted invoice cannot be deleted — reverse it instead');
+      throw new BadRequestException(
+        problem('invoice.postedDelete', 'a posted invoice cannot be deleted — reverse it instead'),
+      );
     }
     await this.db.getRepository(PurchaseInvoice).delete({ id });
   }
@@ -286,9 +296,9 @@ export class PurchasingService {
   async postInvoice(id: string, userId: string) {
     await this.db.transaction(async (tx) => {
       const invoice = await tx.findOne(PurchaseInvoice, { where: { id }, relations: { lines: true } });
-      if (!invoice) throw new NotFoundException('invoice not found');
-      if (invoice.status === 'POSTED') throw new BadRequestException('this invoice is already posted');
-      if (!invoice.lines.length) throw new BadRequestException('add at least one line before posting');
+      if (!invoice) throw new NotFoundException(problem('notFound', 'invoice not found'));
+      if (invoice.status === 'POSTED') throw new BadRequestException(problem('invoice.posted', 'this invoice is already posted'));
+      if (!invoice.lines.length) throw new BadRequestException(problem('invoice.noLines', 'add at least one line before posting'));
 
       const shares = allocateExtraCosts(
         invoice.lines.map((l) => ({ lineTotal: Number(l.lineTotal), quantity: l.quantity })),

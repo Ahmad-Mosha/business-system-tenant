@@ -7,6 +7,7 @@ import { ChannelListing } from './channel-listing.entity';
 import { PRODUCT_CATEGORIES, type ProductCategory } from './product.entity';
 import { ProductVariant } from './product-variant.entity';
 import { Product } from './product.entity';
+import { problem } from '../problem';
 
 export interface CreateProductInput {
   name: string;
@@ -191,7 +192,7 @@ export class CatalogService {
 
   async getProduct(id: string) {
     const product = await this.db.getRepository(Product).findOne({ where: { id } });
-    if (!product) throw new NotFoundException('product not found');
+    if (!product) throw new NotFoundException(problem('notFound', 'product not found'));
 
     // Two independent lateral joins, not one double join: stock_movement and
     // order_item both fan out per variant, and summing either across a join
@@ -259,7 +260,7 @@ export class CatalogService {
     const sku = input.sku?.trim();
     if (sku) {
       const clash = await this.db.getRepository(ProductVariant).findOne({ where: { sku } });
-      if (clash) throw new BadRequestException(`SKU "${sku}" is already in use`);
+      if (clash) throw new BadRequestException(problem('sku.taken', `SKU "${sku}" is already in use`, { sku }));
     }
 
     return this.db.transaction(async (tx) => {
@@ -308,7 +309,7 @@ export class CatalogService {
   async updateProduct(id: string, patch: { name?: string; category?: ProductCategory | null }) {
     const repo = this.db.getRepository(Product);
     const product = await repo.findOneBy({ id });
-    if (!product) throw new NotFoundException('product not found');
+    if (!product) throw new NotFoundException(problem('notFound', 'product not found'));
 
     if (patch.category && !PRODUCT_CATEGORIES.includes(patch.category)) {
       throw new BadRequestException(`category must be one of: ${PRODUCT_CATEGORIES.join(', ')}`);
@@ -330,7 +331,7 @@ export class CatalogService {
    */
   async archiveProduct(id: string) {
     const product = await this.db.getRepository(Product).findOneBy({ id });
-    if (!product) throw new NotFoundException('product not found');
+    if (!product) throw new NotFoundException(problem('notFound', 'product not found'));
 
     await this.db.transaction(async (tx) => {
       await tx.update(Product, { id }, { active: false });
@@ -344,7 +345,7 @@ export class CatalogService {
   ) {
     const repo = this.db.getRepository(ProductVariant);
     const variant = await repo.findOneBy({ id: variantId });
-    if (!variant) throw new NotFoundException('variant not found');
+    if (!variant) throw new NotFoundException(problem('notFound', 'variant not found'));
 
     for (const [field, value] of [
       ['unitCost', patch.unitCost],
@@ -382,7 +383,7 @@ export class CatalogService {
       where: { id: productId },
       relations: { variants: true },
     });
-    if (!product) throw new NotFoundException('product not found');
+    if (!product) throw new NotFoundException(problem('notFound', 'product not found'));
 
     const variantId = await this.resolveListingVariant(product, input.variantId);
 
@@ -416,7 +417,10 @@ export class CatalogService {
     });
     if (clash) {
       throw new BadRequestException(
-        `${channel} "${externalId}" is already linked to another product`,
+        problem('listing.taken', `${channel} "${externalId}" is already linked to another product`, {
+          channel,
+          externalId,
+        }),
       );
     }
 
@@ -435,7 +439,7 @@ export class CatalogService {
   async updateListing(listingId: string, patch: { externalId?: string }) {
     const repo = this.db.getRepository(ChannelListing);
     const listing = await repo.findOneBy({ id: listingId });
-    if (!listing) throw new NotFoundException('listing not found');
+    if (!listing) throw new NotFoundException(problem('notFound', 'listing not found'));
 
     const externalId = (patch.externalId ?? '').trim();
     if (!externalId) throw new BadRequestException('the channel SKU is required');
@@ -450,7 +454,10 @@ export class CatalogService {
       });
       if (clash) {
         throw new BadRequestException(
-          `${listing.channel} "${externalId}" is already linked to another product`,
+          problem('listing.taken', `${listing.channel} "${externalId}" is already linked to another product`, {
+            channel: listing.channel,
+            externalId,
+          }),
         );
       }
     }
@@ -468,7 +475,7 @@ export class CatalogService {
    */
   async removeListing(listingId: string) {
     const result = await this.db.getRepository(ChannelListing).delete({ id: listingId });
-    if (!result.affected) throw new NotFoundException('listing not found');
+    if (!result.affected) throw new NotFoundException(problem('notFound', 'listing not found'));
   }
 
   /** A single-variant product takes the listing automatically; otherwise say which. */
@@ -499,7 +506,7 @@ export class CatalogService {
       throw new BadRequestException('quantity must be a non-zero whole number');
     }
     const variant = await this.db.getRepository(ProductVariant).findOneBy({ id: variantId });
-    if (!variant) throw new NotFoundException('variant not found');
+    if (!variant) throw new NotFoundException(problem('notFound', 'variant not found'));
 
     return this.db.transaction(async (tx) => {
       // Lock the variant so two removals at once can't both pass the check.
@@ -509,7 +516,9 @@ export class CatalogService {
         [variantId],
       );
       const refused = removalError(onHand, quantity);
-      if (refused) throw new BadRequestException(refused);
+      if (refused) {
+        throw new BadRequestException(problem('stock.remove', refused, { available: Math.max(onHand, 0) }));
+      }
 
       const result = await this.addMovement(tx, variantId, quantity, reason, userId, note, variant.unitCost);
       // A purchase converts cash into stock — record the cash side too, same
@@ -628,7 +637,9 @@ export class CatalogService {
     const res = await fetch('https://api.easy-orders.net/api/v1/external-apps/products', {
       headers: { 'Api-Key': apiKey },
     });
-    if (!res.ok) throw new BadRequestException(`Easy Orders returned ${res.status}`);
+    if (!res.ok) {
+      throw new BadRequestException(problem('sync.failed', `Easy Orders returned ${res.status}`, { status: res.status }));
+    }
 
     const products = (await res.json()) as Array<{
       id: string;

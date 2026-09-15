@@ -4,6 +4,7 @@ import { DataSource, EntityManager } from 'typeorm';
 import { Cheque, type ChequeStatus } from './cheque.entity';
 import type { LedgerAccountCode } from './ledger-account.entity';
 import { LedgerService } from './ledger.service';
+import { problem } from '../problem';
 
 const MONEY = /^\d+(\.\d{1,2})?$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -241,9 +242,11 @@ export class FinanceService {
     }
     return this.db.transaction(async (tx) => {
       const cheque = await tx.findOneBy(Cheque, { id });
-      if (!cheque) throw new BadRequestException('cheque not found');
+      if (!cheque) throw new BadRequestException(problem('notFound', 'cheque not found'));
       if (cheque.status !== 'PENDING') {
-        throw new BadRequestException(`this cheque is already ${cheque.status.toLowerCase()}`);
+        throw new BadRequestException(
+          problem('cheque.settled', `this cheque is already ${cheque.status.toLowerCase()}`, { status: cheque.status }),
+        );
       }
 
       if (next === 'CLEARED') {

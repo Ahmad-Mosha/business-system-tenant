@@ -174,7 +174,62 @@
   "errors": {
     "unreachable": "Could not reach the server. Check your connection and try again.",
     "requestFailed": "Request failed ({status}).",
-    "trackingRequired": "Enter a tracking number."
+    "trackingRequired": "Enter a tracking number.",
+    "api": {
+      "notFound": "This record no longer exists — reload the page.",
+      "auth": {
+        "required": "Your session has ended — sign in again.",
+        "forbidden": "Your role can’t do this.",
+        "name": "Enter a name.",
+        "email": "Enter a valid email address.",
+        "password": "The password needs at least 6 characters.",
+        "emailTaken": "{email} is already in use."
+      },
+      "order": {
+        "customerName": "Enter the customer’s name.",
+        "phone": "Enter a valid Egyptian mobile number, e.g. 010 1234 5678.",
+        "governorate": "Choose a governorate.",
+        "noItems": "An order needs at least one item.",
+        "itemQuantity": "Every item needs a whole quantity of at least 1.",
+        "itemPrice": "Every item needs a price greater than 0.",
+        "stockShort": "{name}: only {onHand} in stock, {requested} requested.",
+        "locked": "This order can no longer be edited — it has left the warehouse.",
+        "transition": "That status change isn’t allowed from the order’s current status."
+      },
+      "cheque": {
+        "settled": "{status, select, CLEARED {This cheque has already cleared.} BOUNCED {This cheque has already bounced.} other {This cheque is no longer pending.}}"
+      },
+      "payment": {
+        "invoiceClosed": "This invoice can’t take a payment.",
+        "nothingOwed": "{scope, select, invoice {Nothing is left to pay on this invoice.} other {Nothing is owed to {supplier}.}}",
+        "overpay": "{scope, select, invoice {Only {owed} is left on this invoice} other {Only {owed} is owed to {supplier}}} — you tried to pay {paid}."
+      },
+      "invoice": {
+        "productsGone": "One or more products no longer exist.",
+        "postedDelete": "A posted invoice can’t be deleted — reverse it instead.",
+        "posted": "This invoice is already posted.",
+        "noLines": "Add at least one line before posting."
+      },
+      "sku": {
+        "taken": "SKU “{sku}” is already in use."
+      },
+      "listing": {
+        "taken": "{channel, select, noon {noon} amazon {Amazon} easyorders {Website} other {{channel}}} SKU “{externalId}” is already linked to another product."
+      },
+      "stock": {
+        "remove": "{available, plural, =0 {Nothing on hand to remove.} other {Only # on hand — you can remove up to #.}}"
+      },
+      "sync": {
+        "notConfigured": "The Easy Orders connection isn’t set up.",
+        "failed": "Easy Orders didn’t answer (error {status})."
+      },
+      "import": {
+        "notNoon": "This file isn’t a noon settlement export."
+      },
+      "shipment": {
+        "notFound": "No Bosta shipment has the tracking number {trackingNumber}."
+      }
+    }
   },
   "orders": {
     "title": "Orders",
