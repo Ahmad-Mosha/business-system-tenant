@@ -28,7 +28,8 @@
     "saving": "Saving",
     "saveChanges": "Save changes",
     "optional": "(optional)",
-    "choose": "Choose…"
+    "choose": "Choose…",
+    "dateRange": "{from} – {to}"
   },
   "language": {
     "label": "Language",
@@ -76,7 +77,8 @@
       "new": "New",
       "edit": "Edit",
       "details": "Details"
-    }
+    },
+    "breadcrumb": "Breadcrumb"
   },
   "user": {
     "lightTheme": "Light theme",
@@ -103,7 +105,9 @@
     "invoices": "{count, plural, =0 {No invoices} one {# invoice} other {# invoices}}",
     "lines": "{count, plural, =0 {No lines} one {# line} other {# lines}}",
     "suppliers": "{count, plural, =0 {No suppliers} one {# supplier} other {# suppliers}}",
-    "payments": "{count, plural, =0 {No payments} one {# payment} other {# payments}}"
+    "payments": "{count, plural, =0 {No payments} one {# payment} other {# payments}}",
+    "imports": "{count, plural, =0 {No imports} one {# import} other {# imports}}",
+    "settlementLines": "{count, plural, =0 {no settlement lines} one {# settlement line} other {# settlement lines}}"
   },
   "filters": {
     "reset": "Reset",
@@ -526,7 +530,8 @@
     "lineProduct": "Every line needs a product.",
     "lineQuantity": "Every line needs a whole quantity.",
     "lineCost": "Every line needs a unit cost.",
-    "extraCosts": "Extra costs must be an amount like 5000.00"
+    "extraCosts": "Extra costs must be an amount like 5000.00",
+    "csvFile": "Choose a CSV file to upload."
   },
   "money": {
     "title": "Money",
@@ -782,6 +787,130 @@
       "payment": "Payment"
     }
   },
+  "noon": {
+    "overview": {
+      "noDataDescription": "What noon owes us, and why.",
+      "description": "Everything imported, {range}. Every figure matches noon’s own statement.",
+      "viewByMonth": "View by month",
+      "byMonth": "By month",
+      "byMonthHint": "Net proceeds per settlement month. Open a bar for its statement.",
+      "allMonths": "All months"
+    },
+    "statement": {
+      "netHint": "{units} across {products}",
+      "fees": "Fees",
+      "feesHint": "{rate} of proceeds",
+      "cashToBank": "Cash to bank",
+      "cashHint": "Actually transferred",
+      "owedByNoon": "Owed by noon",
+      "setOpening": "Set an opening balance to see this",
+      "closingHint": "Balance at the end of the period",
+      "openedAt": "Opened at <b>{opening}</b>, moved <b>{movement}</b> across {lines}.",
+      "feesWent": "Where the fees went",
+      "feesWentHint": "<num>{total}</num> in total, in noon’s own words.",
+      "notAttributable": "Not attributable to a product",
+      "notAttributableHint": "Payouts, advertising and shipping lines.",
+      "nonePeriod": "None in this period.",
+      "best": "Best performing",
+      "bestHint": "By net, after noon’s fees.",
+      "noProducts": "No product-level sales yet — they appear once noon SKUs are linked to products in Inventory.",
+      "units": "Units",
+      "net": "Net"
+    },
+    "months": {
+      "noDataDescription": "noon settlements, month by month.",
+      "description": "noon settlements, month by month — open one for its full statement.",
+      "month": "Month",
+      "proceeds": "Proceeds",
+      "movement": "Movement",
+      "legend": "<strong>Movement</strong> is what the month added to your noon balance. <strong>Cash to bank</strong> is what noon actually transferred. <strong>Owed by noon</strong> is what was still unpaid at month end.",
+      "opening": "Opening balance",
+      "openingHint": "An export only covers the months you downloaded, so the balance it describes is relative. Enter the balance noon showed <strong>before</strong> your earliest import, and every later balance follows from it.",
+      "set": "Set",
+      "back": "Back to months",
+      "settlement": "noon settlement · {range}",
+      "balance": "Balance",
+      "updated": "Opening balance updated."
+    },
+    "products": {
+      "noDataDescription": "How each product did on noon.",
+      "description": "How each product did on noon — units, proceeds, fees, and profit where cost is known.",
+      "descriptionMonth": "How each product did on noon in {month}.",
+      "allTime": "All time",
+      "hasReturns": "Has returns",
+      "missingCost": "Missing cost",
+      "noMatch": "No products match these filters",
+      "noneHint": "A noon sale lands on a product once its SKU is linked — open the product in Inventory and add its noon Partner SKU.",
+      "returned": "Returned",
+      "profit": "Profit",
+      "stub": "Stub",
+      "stubHint": "Created automatically from an import. Add a cost and category to complete it.",
+      "noCost": "No cost recorded, so profit can’t be calculated."
+    },
+    "imports": {
+      "description": "noon settlement exports — how noon’s figures get in.",
+      "upload": "Upload a report",
+      "uploadHint": "Export the settlement report from the noon portal as CSV and drop it here.",
+      "empty": "No reports imported yet",
+      "emptyHint": "Your first upload shows up here.",
+      "columns": {
+        "file": "File",
+        "period": "Period",
+        "rows": "Rows",
+        "new": "New",
+        "skipped": "Skipped",
+        "unmapped": "Unmapped",
+        "imported": "Imported"
+      },
+      "alreadyImported": "This exact file was already imported.",
+      "allKnown": "Every row was already on record.",
+      "importedRows": "{count, plural, one {Imported # new row.} other {Imported # new rows.}}",
+      "notCsv": "That is not a CSV file.",
+      "choose": "Choose a noon settlement export",
+      "remove": "Remove file",
+      "drop": "Drop a settlement export here",
+      "browse": "or click to browse · CSV from the noon portal",
+      "reading": "Reading…",
+      "import": "Import report",
+      "parsing": "Parsing, matching products and storing rows.",
+      "safe": "The same report twice is safe — files are recognised by content, and rows already held are skipped.",
+      "rowsRead": "Rows read",
+      "alreadyHeld": "Already held",
+      "unmappedSkus": "Unmapped SKUs",
+      "alreadyImportedNote": "This exact file had already been imported, so nothing changed.",
+      "allKnownNote": "Every row was already on record from an earlier export.",
+      "fileSize": "{size} KB"
+    }
+  },
+  "team": {
+    "description": "Moderators, and how the orders assigned to them are going.",
+    "empty": "No moderators yet",
+    "emptyHint": "Add one so orders can be assigned to them.",
+    "moderators": "Moderators",
+    "active": "Active: {count}",
+    "assigned": "Orders assigned",
+    "assignedHint": "Across the whole team",
+    "rate": "Delivery rate",
+    "rateHint": "{delivered} of {assigned} delivered",
+    "sales": "Delivered sales",
+    "salesHint": "EGP, delivered orders",
+    "inactive": "Inactive",
+    "rateOf": "{name} delivery rate",
+    "assignedKpi": "Assigned",
+    "deliveredKpi": "Delivered",
+    "cancelledKpi": "Cancelled",
+    "salesValue": "Delivered sales value",
+    "add": "Add moderator",
+    "addHint": "They’ll see Orders and Shipments, and only the orders assigned to them.",
+    "added": "Moderator added.",
+    "canSignIn": "{name} can sign in with {email}.",
+    "name": "Name",
+    "namePlaceholder": "e.g. Aya",
+    "email": "Email",
+    "password": "Password",
+    "passwordPlaceholder": "At least 6 characters",
+    "passwordHint": "Share it with them — they sign in with it directly."
+  },
   "enums": {
     "orderStatus": {
       "NEW": "New",
@@ -908,6 +1037,21 @@
     "purchasePayment": {
       "CASH": "Cash",
       "CREDIT": "Credit"
+    },
+    "noonFee": {
+      "referralFee": "Referral fee",
+      "fulfilmentFee": "Fulfilment & logistics",
+      "advertisingFee": "Advertising",
+      "advertisingSubsidy": "Advertising subsidy",
+      "shippingCredits": "Shipping credits",
+      "otherOrderFees": "Other order fees"
+    },
+    "noonTransaction": {
+      "payment": "Payouts to our bank",
+      "order": "Shipping-only order lines",
+      "order_update": "Post-sale adjustments",
+      "statement_fee": "Advertising & statement fees",
+      "balance_transfer": "Balance transfers"
     }
   }
 }

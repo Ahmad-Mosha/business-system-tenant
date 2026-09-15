@@ -16,17 +16,19 @@ import {
 import { getAccount, getPeriods } from '@/lib/api';
 import { money } from '@/lib/format';
 import { requireAdmin } from '@/lib/session';
+import { getTranslations } from 'next-intl/server';
+import { strong } from '@/i18n/rich';
 import { getFormat } from '@/i18n/get-format';
 
 export default async function MonthsPage() {
-  const f = await getFormat();
+  const [f, t, tr] = await Promise.all([getFormat(), getTranslations('noon'), getTranslations()]);
   await requireAdmin();
   const [periods, account] = await Promise.all([getPeriods(), getAccount()]);
 
   if (!periods.length) {
     return (
       <Page>
-        <PageHeader title="Months" description="noon settlements, month by month." />
+        <PageHeader title={tr('nav.items.months')} description={t('months.noDataDescription')} />
         <NoDataYet />
       </Page>
     );
@@ -36,19 +38,19 @@ export default async function MonthsPage() {
 
   return (
     <Page>
-      <PageHeader title="Months" description="noon settlements, month by month — open one for its full statement." />
+      <PageHeader title={tr('nav.items.months')} description={t('months.description')} />
 
       <Card className="pb-0">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Month</TableHead>
-              <TableHead className="text-end">Units</TableHead>
-              <TableHead className="text-end">Proceeds</TableHead>
-              <TableHead className="text-end">Fees</TableHead>
-              <TableHead className="text-end">Cash to bank</TableHead>
-              <TableHead className="text-end">Movement</TableHead>
-              <TableHead className="text-end">Owed by noon</TableHead>
+              <TableHead>{t('months.month')}</TableHead>
+              <TableHead className="text-end">{t('statement.units')}</TableHead>
+              <TableHead className="text-end">{t('months.proceeds')}</TableHead>
+              <TableHead className="text-end">{t('statement.fees')}</TableHead>
+              <TableHead className="text-end">{t('statement.cashToBank')}</TableHead>
+              <TableHead className="text-end">{t('months.movement')}</TableHead>
+              <TableHead className="text-end">{t('statement.owedByNoon')}</TableHead>
               <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
@@ -83,23 +85,18 @@ export default async function MonthsPage() {
           </TableBody>
         </Table>
         <p className="border-t px-4 py-3 text-xs/relaxed text-muted-foreground">
-          <span className="font-medium text-foreground">Movement</span> is what the month added to your
-          noon balance. <span className="font-medium text-foreground">Cash to bank</span> is what noon
-          actually transferred. <span className="font-medium text-foreground">Owed by noon</span> is
-          what was still unpaid at month end.
+          {t.rich('months.legend', { strong })}
         </p>
       </Card>
 
       <Card className="max-w-2xl">
         <CardHeader>
-          <CardTitle>Opening balance</CardTitle>
-          <CardDescription>
-            An export only covers the months you downloaded, so the balance it describes is relative.
-            Enter the balance noon showed <span className="text-foreground">before</span> your earliest
-            import, and every later balance follows from it.
-          </CardDescription>
+          <CardTitle>{t('months.opening')}</CardTitle>
+          <CardDescription>{t.rich('months.openingHint', { strong })}</CardDescription>
           <CardAction>
-            <ToneBadge tone={anchored ? 'success' : 'warning'}>{anchored ? 'Set' : 'Not set'}</ToneBadge>
+            <ToneBadge tone={anchored ? 'success' : 'warning'}>
+              {anchored ? t('months.set') : tr('common.notSet')}
+            </ToneBadge>
           </CardAction>
         </CardHeader>
         <CardContent>
