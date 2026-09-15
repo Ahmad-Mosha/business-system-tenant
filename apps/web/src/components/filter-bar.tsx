@@ -72,7 +72,6 @@ export function FilterBar({
       else next.delete(key);
     }
     next.delete('page');
-    next.delete('selected');
     const qs = next.toString();
     start(() => router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false }));
   };
@@ -219,11 +218,11 @@ function SearchField({
   useEffect(() => {
     const next = value.trim();
     if (next === pushed.current) return;
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       pushed.current = next;
       onSearch(next);
     }, 300);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
     // onSearch is a fresh closure each render; the typed value is what matters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);

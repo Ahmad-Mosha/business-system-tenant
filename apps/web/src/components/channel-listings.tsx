@@ -63,7 +63,7 @@ function ChannelRow({
 
   const trimmed = value.trim();
   const linked = Boolean(listing);
-  const dirty = linked ? trimmed !== listing!.externalId : trimmed.length > 0;
+  const dirty = listing ? trimmed !== listing.externalId : trimmed.length > 0;
 
   const save = () =>
     start(async () => {
