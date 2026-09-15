@@ -148,7 +148,8 @@
     "amount": "Amount",
     "weekOf": "Week of {date}",
     "notEnoughHistory": "Not enough history yet — the chart fills in as days pass.",
-    "noMovement": "No money moved in this period."
+    "noMovement": "No money moved in this period.",
+    "grossMargin": "Gross margin"
   },
   "noData": {
     "title": "Nothing imported yet",
@@ -531,7 +532,8 @@
       "unlink": "Unlink from {channel}",
       "skuUpdated": "{channel} SKU updated.",
       "linkedTo": "Linked to {channel}.",
-      "unlinked": "Unlinked from {channel}."
+      "unlinked": "Unlinked from {channel}.",
+      "addAnother": "Add another SKU"
     },
     "channelSku": {
       "noon": {
@@ -641,7 +643,12 @@
       "salesRevenue": "Sales revenue",
       "otherExpenses": "Other expenses",
       "noCosts": "No sales or costs recorded.",
-      "noCogs": "Cost of goods sold isn’t posted to the books yet, so there’s no profit figure here."
+      "noCogs": "Cost of goods sold isn’t posted to the books yet, so there’s no profit figure here.",
+      "profitTitle": "Profit",
+      "profitHint": "Revenue, cost of goods, and fees, {span}.",
+      "costOfGoods": "Cost of goods",
+      "grossProfit": "Gross profit",
+      "netProfit": "Net profit"
     },
     "treasury": {
       "description": "Cash on hand, every movement in and out of it, and cheques waiting to clear.",

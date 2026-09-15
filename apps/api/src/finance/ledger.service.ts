@@ -412,6 +412,67 @@ export class LedgerService {
     };
   }
 
+  /**
+   * The same revenue/cost components as `periodSummary`, bucketed over time
+   * (day/week/month) — every bucket present, empty ones as zero, same
+   * `generate_series` pattern as `flow()`. Drives the overview's profit chart.
+   */
+  async profitSeries(
+    from: string,
+    to: string,
+    bucket: 'day' | 'week' | 'month',
+    tx: EntityManager = this.db.manager,
+  ): Promise<
+    Array<{
+      period: string;
+      revenue: string;
+      cogs: string;
+      channelFees: string;
+      shipping: string;
+      grossProfit: string;
+      netProfit: string;
+    }>
+  > {
+    const PROFIT_ACCOUNTS = ['SALES', 'COGS', 'CHANNEL_FEES', 'SHIPPING', 'OTHER_EXPENSE'] as const;
+    const acct = (code: string) =>
+      `COALESCE(SUM(e.amount) FILTER (WHERE e.credit_code = '${code}'), 0)
+       - COALESCE(SUM(e.amount) FILTER (WHERE e.debit_code = '${code}'), 0)`;
+    const expense = (code: string) =>
+      `COALESCE(SUM(e.amount) FILTER (WHERE e.debit_code = '${code}'), 0)
+       - COALESCE(SUM(e.amount) FILTER (WHERE e.credit_code = '${code}'), 0)`;
+
+    return tx.query(
+      `WITH moves AS (
+         SELECT date_trunc($3, e.occurred_at::date::timestamp)::date AS period,
+                ${acct('SALES')}          AS revenue,
+                ${expense('COGS')}         AS cogs,
+                ${expense('CHANNEL_FEES')} AS "channelFees",
+                ${expense('SHIPPING')}     AS shipping,
+                ${expense('OTHER_EXPENSE')} AS "otherExpense"
+         FROM ledger_entry e
+         WHERE (e.debit_code = ANY($4) OR e.credit_code = ANY($4))
+           AND e.occurred_at::date BETWEEN $1::date AND $2::date
+         GROUP BY 1
+       )
+       SELECT g::date::text AS period,
+              COALESCE(m.revenue, 0)::text AS revenue,
+              COALESCE(m.cogs, 0)::text AS cogs,
+              COALESCE(m."channelFees", 0)::text AS "channelFees",
+              COALESCE(m.shipping, 0)::text AS shipping,
+              (COALESCE(m.revenue, 0) - COALESCE(m.cogs, 0) - COALESCE(m."channelFees", 0))::text AS "grossProfit",
+              (COALESCE(m.revenue, 0) - COALESCE(m.cogs, 0) - COALESCE(m."channelFees", 0)
+                - COALESCE(m.shipping, 0) - COALESCE(m."otherExpense", 0))::text AS "netProfit"
+       FROM generate_series(
+              date_trunc($3, $1::date::timestamp),
+              $2::date::timestamp,
+              ('1 ' || $3)::interval
+            ) g
+       LEFT JOIN moves m ON m.period = g::date
+       ORDER BY g`,
+      [from, to, bucket, PROFIT_ACCOUNTS],
+    );
+  }
+
   private normaliseAmount(value: string | number): string {
     const str = typeof value === 'number' ? value.toFixed(2) : value.trim();
     if (!MONEY.test(str) || Number(str) <= 0) {

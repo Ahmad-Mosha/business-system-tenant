@@ -22,9 +22,12 @@ export async function addProduct(
   formData: FormData,
 ): Promise<CreateProductState> {
   const openingStock = String(formData.get('openingStock') ?? '').trim();
-  const listings = (['noon', 'amazon', 'easyorders'] as const)
-    .map((channel) => ({ channel, externalId: String(formData.get(`sku_${channel}`) ?? '').trim() }))
-    .filter((l) => l.externalId);
+  const listings = (['noon', 'amazon', 'easyorders'] as const).flatMap((channel) =>
+    formData
+      .getAll(`sku_${channel}`)
+      .map((v) => ({ channel, externalId: String(v).trim() }))
+      .filter((l) => l.externalId),
+  );
   const created = await apiRequest<{ id: string }>('/catalog/products', 'POST', {
     name: formData.get('name'),
     category: formData.get('category') || undefined,

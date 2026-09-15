@@ -68,6 +68,16 @@ export class FinanceController {
     return this.ledger.periodSummary(f, t);
   }
 
+  /** Revenue and cost components, bucketed over time — the overview's profit chart. */
+  @Get('profit-series')
+  profitSeries(@Query('from') from?: string, @Query('to') to?: string, @Query('bucket') bucket?: string) {
+    if (!from || !to || !ISO_DATE.test(from) || !ISO_DATE.test(to) || from > to) {
+      throw new BadRequestException('from and to are required as YYYY-MM-DD, with from on or before to');
+    }
+    const b = bucket === 'week' || bucket === 'month' ? bucket : 'day';
+    return this.ledger.profitSeries(from, to, b);
+  }
+
   /** The full ledger, filtered — where every "trace" link lands. */
   @Get('ledger')
   ledger_(

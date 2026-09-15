@@ -10,7 +10,10 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  ComposedChart,
+  Label,
   LabelList,
+  Line,
   ReferenceLine,
   XAxis,
   YAxis,
@@ -234,6 +237,141 @@ export function CashFlowChart({
         <Bar dataKey="in" stackId="flow" fill="var(--color-in)" maxBarSize={36} />
         <Bar dataKey="out" stackId="flow" fill="var(--color-out)" maxBarSize={36} />
       </BarChart>
+    </ChartContainer>
+  );
+}
+
+/**
+ * Revenue, split into what it cost, over time — cost of goods and channel
+ * fees stacked from the bottom, gross profit on top so its own height already
+ * reads as "what's left", with the margin trend as a line against its own
+ * axis. Every bucket present, same as the other time-series charts here.
+ */
+export function ProfitChart({
+  series,
+  bucket,
+}: {
+  series: Array<{
+    period: string;
+    revenue: string;
+    cogs: string;
+    channelFees: string;
+    grossProfit: string;
+  }>;
+  bucket: Bucket;
+}) {
+  const t = useTranslations('charts');
+  const tm = useTranslations('money.overview');
+  const tr = useTranslations();
+  const f = useFormat();
+  const axisWidth = useAxisWidth();
+  const tick = useTick();
+  const rtl = useDirection() === 'rtl';
+
+  const data = series.map((p) => {
+    const revenue = Number(p.revenue);
+    const grossProfit = Number(p.grossProfit);
+    return {
+      period: p.period,
+      cogs: Number(p.cogs),
+      channelFees: Number(p.channelFees),
+      grossProfit: Math.max(grossProfit, 0),
+      margin: revenue > 0.005 ? Math.round((grossProfit / revenue) * 1000) / 10 : null,
+      revenue,
+    };
+  });
+
+  if (data.every((d) => d.revenue === 0)) {
+    return <ChartEmpty className="h-80">{tm('noCosts')}</ChartEmpty>;
+  }
+
+  const config = {
+    cogs: { label: tm('costOfGoods'), color: 'var(--muted-foreground)' },
+    channelFees: { label: tr('enums.cashOut.CHANNEL_FEES'), color: 'var(--muted-foreground)' },
+    grossProfit: { label: tm('grossProfit'), color: 'var(--chart-4)' },
+    margin: { label: t('grossMargin'), color: 'var(--chart-2)' },
+  } satisfies ChartConfig;
+  const weekOf = (date: string) => t('weekOf', { date });
+
+  return (
+    <ChartContainer key={rtl ? 'rtl' : 'ltr'} config={config} className="aspect-auto h-80 w-full">
+      <ComposedChart accessibilityLayer data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+        <CartesianGrid vertical={false} />
+        <XAxis
+          dataKey="period"
+          tickLine={false}
+          axisLine={false}
+          tickMargin={8}
+          minTickGap={24}
+          tickFormatter={(v: string) => tick(bucketLabel(f, weekOf, v, bucket))}
+        />
+        <YAxis
+          yAxisId="amount"
+          orientation={rtl ? 'right' : 'left'}
+          tickLine={false}
+          axisLine={false}
+          width={axisWidth}
+          tickFormatter={(v: number) => tick(f.compact(v))}
+        />
+        <YAxis
+          yAxisId="margin"
+          orientation={rtl ? 'left' : 'right'}
+          tickLine={false}
+          axisLine={false}
+          width={36}
+          domain={[0, (max: number) => Math.max(Math.ceil(max / 10) * 10, 10)]}
+          tickFormatter={(v: number) => `${tick(String(v))}%`}
+        >
+          <Label
+            value={t('grossMargin')}
+            position={rtl ? 'insideLeft' : 'insideRight'}
+            angle={-90}
+            offset={rtl ? -4 : 8}
+            style={{ fontSize: 11, fill: 'var(--muted-foreground)', textAnchor: 'middle' }}
+          />
+        </YAxis>
+        <ChartTooltip
+          cursor={{ fill: 'var(--muted)', fillOpacity: 0.5 }}
+          content={
+            <ChartTooltipContent
+              labelFormatter={(v) => bucketLabel(f, weekOf, String(v), bucket, true)}
+              formatter={(value, _name, item, index) => (
+                <div key={index} className="flex w-full flex-1 items-center gap-2">
+                  <div
+                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: item.color ?? (item.payload as { fill?: string })?.fill }}
+                  />
+                  <span className="flex-1 text-muted-foreground">
+                    {config[item.dataKey as keyof typeof config]?.label}
+                  </span>
+                  <span className="num font-medium text-foreground">
+                    {item.dataKey === 'margin' ? (value === null ? '—' : `${value}%`) : money(Number(value))}
+                  </span>
+                </div>
+              )}
+            />
+          }
+        />
+        <Bar yAxisId="amount" dataKey="cogs" stackId="p" fill="var(--color-cogs)" fillOpacity={0.45} />
+        <Bar yAxisId="amount" dataKey="channelFees" stackId="p" fill="var(--color-channelFees)" fillOpacity={0.25} />
+        <Bar
+          yAxisId="amount"
+          dataKey="grossProfit"
+          stackId="p"
+          fill="var(--color-grossProfit)"
+          radius={rtl ? [0, 0, 0, 0] : [0, 0, 0, 0]}
+          maxBarSize={44}
+        />
+        <Line
+          yAxisId="margin"
+          type="monotone"
+          dataKey="margin"
+          stroke="var(--color-margin)"
+          strokeWidth={2}
+          dot={false}
+          connectNulls
+        />
+      </ComposedChart>
     </ChartContainer>
   );
 }
