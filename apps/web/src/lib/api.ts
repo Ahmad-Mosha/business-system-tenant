@@ -342,12 +342,6 @@ export const getStockHistory = (variantId: string) =>
 export const getBostaShipments = () =>
   get<ShipmentTracking[]>('/bosta/shipments');
 
-export const trackBostaShipment = (trackingNumber: string) =>
-  get<ShipmentTracking>(`/bosta/track/${encodeURIComponent(trackingNumber)}`);
-
-export const getOrderShipment = (orderId: string) =>
-  get<ShipmentTracking | null>(`/bosta/orders/${orderId}`);
-
 export interface FinanceOverview {
   /** Null until an opening balance anchor is set. */
   cash: string | null;

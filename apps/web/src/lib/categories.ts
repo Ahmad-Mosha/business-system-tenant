@@ -7,8 +7,6 @@ import { House, Package, Plug, Sparkles, Tv, type LucideIcon } from 'lucide-reac
  */
 export const CATEGORIES = ['COSMETICS', 'HOME', 'ELECTRONICS', 'TV_SHOP'] as const;
 
-export type Category = (typeof CATEGORIES)[number];
-
 const ICONS: Record<string, LucideIcon> = {
   COSMETICS: Sparkles,
   HOME: House,
