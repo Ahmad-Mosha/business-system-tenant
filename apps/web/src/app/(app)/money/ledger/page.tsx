@@ -1,6 +1,7 @@
 import { ArrowRight, BookText } from 'lucide-react';
 import Link from 'next/link';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { Fragment } from 'react';
 import { Amount } from '@/components/amount';
 import { FilterBar } from '@/components/filter-bar';
@@ -27,9 +28,10 @@ import {
 } from '@/components/ui/table';
 import { getLedger, getMoneyAccounts, type AccountBalance } from '@/lib/api';
 
-import { effectOn } from '@/lib/money';
+import { accountName, effectOn } from '@/lib/money';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
+import { strong } from '@/i18n/rich';
 import { getFormat } from '@/i18n/get-format';
 
 const PAGE_SIZE = 30;
@@ -43,7 +45,12 @@ export default async function LedgerPage({
 }: {
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
-  const f = await getFormat();
+  const [f, t, tr, locale] = await Promise.all([
+    getFormat(),
+    getTranslations('money.ledger'),
+    getTranslations(),
+    getLocale(),
+  ]);
   await requireAdmin();
   const params = await searchParams;
   const code = params.code;
@@ -68,7 +75,9 @@ export default async function LedgerPage({
   // The account every amount is signed against.
   const lens = account ?? accounts.find((a) => a.code === TREASURY);
   const marks = lens?.kind === 'ASSET' ? MONEY : BALANCE;
-  const english = new Map(accounts.map((a) => [a.code, a.nameEn]));
+  const names = new Map(accounts.map((a) => [a.code, accountName(a, locale)]));
+  // The other language's name, for a filter hint — people know accounts by either.
+  const other = (a: AccountBalance) => (a.nameAr === accountName(a, locale) ? a.nameEn : a.nameAr);
 
   const pageHref = (p: number) => {
     const next = new URLSearchParams(keep);
@@ -85,16 +94,11 @@ export default async function LedgerPage({
   return (
     <Page fill>
       <PageHeader
-        title="Ledger"
+        title={tr('nav.items.ledger')}
         description={
-          account ? (
-            <>
-              Every movement in and out of <span className="text-foreground">{account.nameEn}</span>{' '}
-              <bdi>({account.nameAr})</bdi>, newest first.
-            </>
-          ) : (
-            'Every movement of value, newest first — signed by what it did to the treasury.'
-          )
+          account
+            ? t.rich('accountDescription', { account: accountName(account, locale), strong })
+            : t('allDescription')
         }
       />
 
@@ -103,8 +107,8 @@ export default async function LedgerPage({
           {
             kind: 'select',
             param: 'code',
-            all: 'All accounts',
-            options: accounts.map((a) => ({ value: a.code, label: a.nameEn, hint: a.nameAr })),
+            all: t('allAccounts'),
+            options: accounts.map((a) => ({ value: a.code, label: accountName(a, locale), hint: other(a) })),
           },
           { kind: 'dates', from: 'from', to: 'to' },
         ]}
@@ -127,12 +131,12 @@ export default async function LedgerPage({
         {entries.length === 0 ? (
           <TableEmpty
             icon={BookText}
-            title="Nothing recorded for this view"
-            description={keep.size ? 'Try another account or date range.' : 'Entries appear as money moves.'}
+            title={t('empty')}
+            description={keep.size ? t('emptyFiltered') : t('emptyAll')}
             action={
               keep.size ? (
                 <Button variant="outline" asChild>
-                  <Link href="/money/ledger">Reset filters</Link>
+                  <Link href="/money/ledger">{tr('filters.resetFilters')}</Link>
                 </Button>
               ) : undefined
             }
@@ -141,9 +145,9 @@ export default async function LedgerPage({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Entry</TableHead>
-                <TableHead className="hidden w-[340px] md:table-cell">From → to</TableHead>
-                <TableHead className="w-[160px] text-end">Amount</TableHead>
+                <TableHead>{t('columns.entry')}</TableHead>
+                <TableHead className="hidden w-[340px] md:table-cell">{t('columns.fromTo')}</TableHead>
+                <TableHead className="w-[160px] text-end">{tr('money.treasury.columns.amount')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -161,15 +165,15 @@ export default async function LedgerPage({
                         <TableCell className="hidden md:table-cell">
                           <div className="flex min-w-0 items-center gap-1.5">
                             <AccountChip
-                              name={e.creditAr}
-                              title={english.get(e.creditCode)}
+                              name={names.get(e.creditCode) ?? e.creditAr}
+                              title={names.get(e.creditCode)}
                               href={accountHref(e.creditCode)}
                               lens={e.creditCode === lens?.code}
                             />
                             <ArrowRight className="size-3.5 shrink-0 text-muted-foreground rtl:rotate-180" />
                             <AccountChip
-                              name={e.debitAr}
-                              title={english.get(e.debitCode)}
+                              name={names.get(e.debitCode) ?? e.debitAr}
+                              title={names.get(e.debitCode)}
                               href={accountHref(e.debitCode)}
                               lens={e.debitCode === lens?.code}
                             />
@@ -208,14 +212,15 @@ function Lens({
   marks: Record<Direction, Mark>;
   all: boolean;
 }) {
-  const t = useTranslations('ledger');
+  const t = useTranslations();
+  const locale = useLocale();
   // Filtered to one account, every entry touches it.
   const shown: Direction[] = all ? ['up', 'down', 'none'] : ['up', 'down'];
   return (
     <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-2 text-xs text-muted-foreground">
       <span className="flex items-center gap-2">
-        Seen from
-        <AccountChip name={account.nameAr} title={account.nameEn} lens />
+        {t('money.ledger.seenFrom')}
+        <AccountChip name={accountName(account, locale)} lens />
       </span>
       <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
         {shown.map((d) => {
@@ -223,13 +228,13 @@ function Lens({
           return (
             <span key={d} className="inline-flex items-center gap-1">
               <mark.icon className={cn('size-3.5 rtl:-scale-x-100', mark.tone)} />
-              {t(mark.label)}
+              {t(`ledger.${mark.label}`)}
             </span>
           );
         })}
       </span>
       <span className="ms-auto flex items-baseline gap-2">
-        Balance now
+        {t('money.ledger.balanceNow')}
         <Amount
           value={account.balance}
           className={cn(

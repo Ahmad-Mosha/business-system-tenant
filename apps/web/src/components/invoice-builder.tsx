@@ -2,6 +2,7 @@
 
 import { PackageOpen, Send, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { saveInvoice, type InvoicePayload } from '@/app/(app)/money/actions';
@@ -52,6 +53,7 @@ import {
 } from '@/components/ui/table';
 import type { SupplierRow } from '@/lib/api';
 import { money } from '@/lib/format';
+import { b, num, strong } from '@/i18n/rich';
 
 interface Line {
   key: string;
@@ -63,7 +65,7 @@ interface Line {
 }
 
 const cellInput =
-  'h-8 border-transparent bg-transparent px-2 text-right shadow-none hover:border-input focus-visible:border-ring';
+  'h-8 border-transparent bg-transparent px-2 text-end shadow-none hover:border-input focus-visible:border-ring';
 
 export function InvoiceBuilder({
   suppliers,
@@ -72,6 +74,8 @@ export function InvoiceBuilder({
   suppliers: SupplierRow[];
   cashBalance: string;
 }) {
+  const t = useTranslations('money');
+  const tr = useTranslations();
   const router = useRouter();
   const [pending, start] = useTransition();
   const [confirming, setConfirming] = useState(false);
@@ -86,11 +90,11 @@ export function InvoiceBuilder({
   const supplier = suppliers.find((s) => s.id === supplierId);
   const total = lines.reduce((s, l) => s + l.quantity * (Number(l.unitCost) || 0), 0);
   const missing = !supplierId
-    ? 'Choose a supplier.'
+    ? tr('validation.chooseSupplier')
     : !lines.length
-      ? 'Add at least one product.'
+      ? tr('validation.addProduct')
       : lines.some((l) => !(Number(l.unitCost) > 0))
-        ? 'Every line needs a unit cost.'
+        ? tr('validation.lineCost')
         : null;
 
   const patchLine = (key: string, patch: Partial<Line>) =>
@@ -122,47 +126,43 @@ export function InvoiceBuilder({
         setConfirming(false);
         return;
       }
-      toast.success(asDraft ? 'Draft saved.' : 'Invoice posted.');
+      toast.success(t(asDraft ? 'newInvoice.draftSaved' : 'newInvoice.posted'));
       router.push(`/money/purchases/${res.id}`);
     });
   };
 
-  const consequence =
-    payment === 'CASH' ? (
-      <>
-        <span className="num font-medium text-foreground">{money(total)}</span> leaves the till — الخزينة
-        goes <span className="num">{money(cashBalance)}</span> →{' '}
-        <span className="num">{money(Number(cashBalance) - total)}</span>.
-      </>
-    ) : (
-      <>
-        <span className="num font-medium text-foreground">{money(total)}</span> is added to what you owe{' '}
-        {supplier ? <bdi className="text-foreground">{supplier.name}</bdi> : 'the supplier'}. Record the
-        payment from their page when you pay them.
-      </>
-    );
+  const consequence = t.rich('newInvoice.consequence', {
+    payment,
+    total: money(total),
+    from: money(cashBalance),
+    to: money(Number(cashBalance) - total),
+    supplier: supplier?.name ?? t('newInvoice.theSupplier'),
+    b,
+    num,
+    strong,
+  });
 
   return (
     <Page>
       <PageHeader
-        back={{ href: '/money/purchases', label: 'Back to purchases' }}
-        title="New purchase invoice"
-        description="Stock in at cost — from one supplier, on one date."
+        back={{ href: '/money/purchases', label: t('invoice.back') }}
+        title={t('newInvoice.title')}
+        description={t('newInvoice.description')}
       />
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="grid min-w-0 gap-6">
           <Card>
             <CardHeader>
-              <CardTitle>Supplier and terms</CardTitle>
+              <CardTitle>{t('newInvoice.supplierAndTerms')}</CardTitle>
             </CardHeader>
             <CardContent>
               <FieldGroup className="grid gap-4 sm:grid-cols-3">
                 <Field>
-                  <FieldLabel htmlFor="inv-supplier">Supplier</FieldLabel>
+                  <FieldLabel htmlFor="inv-supplier">{t('purchases.columns.supplier')}</FieldLabel>
                   <Select value={supplierId} onValueChange={setSupplierId} disabled={pending}>
                     <SelectTrigger id="inv-supplier" className="w-full">
-                      <SelectValue placeholder="Choose…" />
+                      <SelectValue placeholder={tr('common.choose')} />
                     </SelectTrigger>
                     <SelectContent position="popper">
                       {suppliers.map((s) => (
@@ -175,33 +175,34 @@ export function InvoiceBuilder({
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="inv-ref">
-                    Invoice ref <span className="font-normal text-muted-foreground">(optional)</span>
+                    {t('newInvoice.invoiceRef')}{' '}
+                    <span className="font-normal text-muted-foreground">{tr('common.optional')}</span>
                   </FieldLabel>
                   <Input
                     id="inv-ref"
                     value={invoiceNo}
                     onChange={(e) => setInvoiceNo(e.target.value)}
-                    placeholder="The supplier’s number"
+                    placeholder={t('newInvoice.refPlaceholder')}
                     disabled={pending}
                   />
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="inv-date">Invoice date</FieldLabel>
+                  <FieldLabel htmlFor="inv-date">{t('newInvoice.invoiceDate')}</FieldLabel>
                   <DatePicker id="inv-date" value={invoiceDate} onChange={setInvoiceDate} disabled={pending} />
                 </Field>
                 <RadioGroup
                   value={payment}
                   onValueChange={(v) => setPayment(v as 'CASH' | 'CREDIT')}
                   disabled={pending}
-                  aria-label="Payment"
+                  aria-label={t('purchases.columns.payment')}
                   className="grid gap-2 sm:col-span-3 sm:grid-cols-2"
                 >
                   <FieldLabel htmlFor="pay-credit">
                     <Field orientation="horizontal">
                       <RadioGroupItem value="CREDIT" id="pay-credit" />
                       <FieldContent>
-                        <FieldTitle className="font-medium">On credit</FieldTitle>
-                        <FieldDescription>Pay the supplier later</FieldDescription>
+                        <FieldTitle className="font-medium">{t('newInvoice.onCredit')}</FieldTitle>
+                        <FieldDescription>{t('newInvoice.onCreditHint')}</FieldDescription>
                       </FieldContent>
                     </Field>
                   </FieldLabel>
@@ -209,8 +210,8 @@ export function InvoiceBuilder({
                     <Field orientation="horizontal">
                       <RadioGroupItem value="CASH" id="pay-cash" />
                       <FieldContent>
-                        <FieldTitle className="font-medium">Paid in cash now</FieldTitle>
-                        <FieldDescription>Comes out of the till on posting</FieldDescription>
+                        <FieldTitle className="font-medium">{t('newInvoice.cashNow')}</FieldTitle>
+                        <FieldDescription>{t('newInvoice.cashNowHint')}</FieldDescription>
                       </FieldContent>
                     </Field>
                   </FieldLabel>
@@ -221,15 +222,15 @@ export function InvoiceBuilder({
 
           <Card className="pb-0">
             <CardHeader>
-              <CardTitle>Products received</CardTitle>
-              <CardDescription>Pick from inventory, or add a new product on the spot.</CardDescription>
+              <CardTitle>{t('newInvoice.productsReceived')}</CardTitle>
+              <CardDescription>{t('newInvoice.productsHint')}</CardDescription>
             </CardHeader>
             <CardContent>
               <VariantSearch
                 disabled={pending}
-                placeholder="Add a product — search by Arabic name or SKU"
-                disabledReason={(h) => (lines.some((l) => l.variantId === h.id) ? 'Added' : null)}
-                meta={(h) => `${h.onHand} on hand`}
+                placeholder={t('newInvoice.searchPlaceholder')}
+                disabledReason={(h) => (lines.some((l) => l.variantId === h.id) ? t('newInvoice.added') : null)}
+                meta={(h) => t('newInvoice.onHand', { count: h.onHand })}
                 onPick={(h) => addLine(h.id, h.label, h.onHand, h.unitCost ?? '')}
                 onCreate={setCreating}
               />
@@ -239,10 +240,10 @@ export function InvoiceBuilder({
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Product</TableHead>
-                      <TableHead className="w-[100px] text-end">Qty</TableHead>
-                      <TableHead className="w-[130px] text-end">Unit cost</TableHead>
-                      <TableHead className="w-[130px] text-end">Line total</TableHead>
+                      <TableHead>{t('invoice.columns.product')}</TableHead>
+                      <TableHead className="w-[100px] text-end">{t('invoice.columns.qty')}</TableHead>
+                      <TableHead className="w-[130px] text-end">{t('invoice.columns.unitCost')}</TableHead>
+                      <TableHead className="w-[130px] text-end">{t('invoice.columns.lineTotal')}</TableHead>
                       <TableHead className="w-12" />
                     </TableRow>
                   </TableHeader>
@@ -254,7 +255,9 @@ export function InvoiceBuilder({
                             <bdi>{l.label}</bdi>
                           </p>
                           {l.onHand !== null ? (
-                            <p className="num text-xs text-muted-foreground">{l.onHand} on hand now</p>
+                            <p className="num text-xs text-muted-foreground">
+                              {t('newInvoice.onHandNow', { count: l.onHand })}
+                            </p>
                           ) : null}
                         </TableCell>
                         <TableCell className="py-1.5">
@@ -266,7 +269,7 @@ export function InvoiceBuilder({
                             onChange={(e) =>
                               patchLine(l.key, { quantity: Math.max(1, Number(e.target.value) || 1) })
                             }
-                            aria-label="Quantity"
+                            aria-label={tr('product.stock.quantity')}
                             disabled={pending}
                             className={`num ${cellInput}`}
                           />
@@ -278,7 +281,7 @@ export function InvoiceBuilder({
                             onFocus={(e) => e.currentTarget.select()}
                             onChange={(e) => patchLine(l.key, { unitCost: e.target.value })}
                             placeholder="0.00"
-                            aria-label="Unit cost"
+                            aria-label={t('invoice.columns.unitCost')}
                             aria-invalid={!(Number(l.unitCost) > 0)}
                             disabled={pending}
                             className={`num ${cellInput}`}
@@ -292,7 +295,7 @@ export function InvoiceBuilder({
                             variant="ghost"
                             size="icon"
                             onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))}
-                            aria-label={`Remove ${l.label}`}
+                            aria-label={tr('orders.form.remove', { name: l.label })}
                             disabled={pending}
                             className="text-muted-foreground hover:bg-destructive-subtle hover:text-destructive"
                           >
@@ -309,7 +312,7 @@ export function InvoiceBuilder({
                     <EmptyMedia variant="icon">
                       <PackageOpen />
                     </EmptyMedia>
-                    <EmptyDescription>No products yet — search above to add the first line.</EmptyDescription>
+                    <EmptyDescription>{t('newInvoice.noProducts')}</EmptyDescription>
                   </EmptyHeader>
                 </Empty>
               )}
@@ -320,19 +323,17 @@ export function InvoiceBuilder({
         <aside className="lg:sticky lg:top-0">
           <Card>
             <CardHeader>
-              <CardTitle>Summary</CardTitle>
+              <CardTitle>{tr('orders.detail.summary')}</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4 text-[13px]">
               <div className="flex items-baseline justify-between gap-3">
-                <span className="text-muted-foreground">
-                  <span className="num">{lines.length}</span> {lines.length === 1 ? 'product' : 'products'}
-                </span>
+                <span className="text-muted-foreground">{tr('nouns.products', { count: lines.length })}</span>
                 <Amount value={total} className="text-[28px] font-semibold tracking-tight" />
               </div>
               {lines.length ? (
                 <p className="border-t pt-3 text-xs/relaxed text-muted-foreground">
-                  On posting, {consequence} Either way,{' '}
-                  <span className="num text-foreground">{money(total)}</span> of stock value is added.
+                  {t('newInvoice.onPosting')} {consequence}{' '}
+                  {t.rich('newInvoice.eitherWay', { total: money(total), num })}
                 </p>
               ) : null}
 
@@ -340,18 +341,18 @@ export function InvoiceBuilder({
                 <AlertDialogTrigger asChild>
                   <Button size="lg" disabled={pending || !!missing} className="w-full">
                     <Send />
-                    Post — <span className="num">{money(total)}</span>
+                    {t.rich('newInvoice.postTotal', { total: money(total), num })}
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Post this invoice?</AlertDialogTitle>
+                    <AlertDialogTitle>{t('invoice.confirmTitle')}</AlertDialogTitle>
                     <AlertDialogDescription>
-                      {consequence} Stock comes in at these costs. Posting can’t be undone.
+                      {consequence} {t('newInvoice.cantUndo')}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel disabled={pending}>Not yet</AlertDialogCancel>
+                    <AlertDialogCancel disabled={pending}>{t('invoice.notYet')}</AlertDialogCancel>
                     <AlertDialogAction
                       disabled={pending}
                       onClick={(e) => {
@@ -360,7 +361,7 @@ export function InvoiceBuilder({
                       }}
                     >
                       {pending ? <Spinner /> : null}
-                      Post invoice
+                      {t('invoice.post')}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
@@ -372,7 +373,7 @@ export function InvoiceBuilder({
                 className="w-full"
               >
                 {pending && !confirming ? <Spinner /> : null}
-                Save as draft
+                {t('newInvoice.saveDraft')}
               </Button>
               {missing && !pending ? (
                 <p className="text-center text-xs text-muted-foreground">{missing}</p>

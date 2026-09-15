@@ -132,7 +132,7 @@ function Body({
         </Field>
         <Field>
           <FieldLabel htmlFor="np-sku">
-            {t('new.ourSku')} <span className="font-normal text-muted-foreground">{t('dialog.optional')}</span>
+            {t('new.ourSku')} <span className="font-normal text-muted-foreground">{tr('common.optional')}</span>
           </FieldLabel>
           <Input
             id="np-sku"

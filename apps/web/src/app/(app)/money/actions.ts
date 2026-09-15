@@ -1,9 +1,10 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { authHeaders } from '@/lib/session';
+import { getTranslations } from 'next-intl/server';
+import { apiRequest } from '@/lib/api-request';
+import type messages from '@/messages/en.json';
 
-const API = process.env.API_URL ?? 'http://localhost:3001';
 const MONEY = /^\d+(\.\d{1,2})?$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -17,22 +18,17 @@ function revalidateMoney() {
 }
 
 async function send(path: string, method: 'POST' | 'PATCH', body: unknown): Promise<FormState> {
-  let res: Response;
-  try {
-    res = await fetch(`${API}${path}`, {
-      method,
-      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-      body: JSON.stringify(body),
-    });
-  } catch {
-    return { status: 'error', message: 'Could not reach the API.' };
-  }
-  if (!res.ok) {
-    const detail = await res.json().catch(() => null);
-    return { status: 'error', message: detail?.message ?? 'Could not save.' };
-  }
+  const r = await apiRequest(path, method, body);
+  if (!r.ok) return { status: 'error', message: r.message };
   revalidateMoney();
   return { status: 'saved' };
+}
+
+/** A form's own check failing — said in the reader's language. */
+type Check = keyof (typeof messages)['validation'];
+async function invalid(check: Check, example?: string): Promise<{ status: 'error'; message: string }> {
+  const t = await getTranslations('validation');
+  return { status: 'error', message: check === 'amount' ? t('amount', { example: example ?? '' }) : t(check) };
 }
 
 /** سند قبض / سند صرف / إيداع نقدي — a hand-entered cash movement. */
@@ -43,11 +39,9 @@ export async function recordVoucher(_prev: FormState, form: FormData): Promise<F
   const memo = String(form.get('memo') ?? '').trim();
   const occurredAt = String(form.get('occurredAt') ?? '').trim();
 
-  if (!MONEY.test(amount)) return { status: 'error', message: 'Enter an amount, e.g. 5000.00' };
-  if (!counter) return { status: 'error', message: 'Choose what this is for' };
-  if (occurredAt && !ISO_DATE.test(occurredAt)) {
-    return { status: 'error', message: 'Enter the date as YYYY-MM-DD' };
-  }
+  if (!MONEY.test(amount)) return invalid('amount', '5000.00');
+  if (!counter) return invalid('chooseCounter');
+  if (occurredAt && !ISO_DATE.test(occurredAt)) return invalid('date');
 
   return send('/finance/vouchers', 'POST', {
     direction,
@@ -66,10 +60,10 @@ export async function recordCheque(_prev: FormState, form: FormData): Promise<Fo
   const dueDate = String(form.get('dueDate') ?? '').trim();
   const memo = String(form.get('memo') ?? '').trim();
 
-  if (!MONEY.test(amount)) return { status: 'error', message: 'Enter an amount, e.g. 25000.00' };
-  if (!fromParty) return { status: 'error', message: 'Enter who the cheque is from' };
-  if (!ISO_DATE.test(receivedDate)) return { status: 'error', message: 'Enter the received date' };
-  if (dueDate && !ISO_DATE.test(dueDate)) return { status: 'error', message: 'Enter the due date as YYYY-MM-DD' };
+  if (!MONEY.test(amount)) return invalid('amount', '25000.00');
+  if (!fromParty) return invalid('chequeFrom');
+  if (!ISO_DATE.test(receivedDate)) return invalid('receivedDate');
+  if (dueDate && !ISO_DATE.test(dueDate)) return invalid('dueDate');
 
   return send('/finance/cheques', 'POST', {
     amount,
@@ -85,10 +79,8 @@ export async function settleCheque(_prev: FormState, form: FormData): Promise<Fo
   const id = String(form.get('id') ?? '');
   const status = form.get('status') === 'BOUNCED' ? 'BOUNCED' : 'CLEARED';
   const clearedDate = String(form.get('clearedDate') ?? '').trim();
-  if (!id) return { status: 'error', message: 'Missing cheque' };
-  if (clearedDate && !ISO_DATE.test(clearedDate)) {
-    return { status: 'error', message: 'Enter the date as YYYY-MM-DD' };
-  }
+  if (!id) return invalid('missingRecord');
+  if (clearedDate && !ISO_DATE.test(clearedDate)) return invalid('date');
   return send(`/finance/cheques/${id}`, 'PATCH', {
     status,
     clearedDate: clearedDate || undefined,
@@ -99,8 +91,8 @@ export async function settleCheque(_prev: FormState, form: FormData): Promise<Fo
 export async function setAnchor(_prev: FormState, form: FormData): Promise<FormState> {
   const openingBalance = String(form.get('openingBalance') ?? '').trim();
   const openingAsOf = String(form.get('openingAsOf') ?? '').trim();
-  if (!MONEY.test(openingBalance)) return { status: 'error', message: 'Enter an amount, e.g. 300000.00' };
-  if (!ISO_DATE.test(openingAsOf)) return { status: 'error', message: 'Enter the date as YYYY-MM-DD' };
+  if (!MONEY.test(openingBalance)) return invalid('amount', '300000.00');
+  if (!ISO_DATE.test(openingAsOf)) return invalid('date');
   return send('/finance/anchor', 'PATCH', { openingBalance, openingAsOf });
 }
 
@@ -115,7 +107,7 @@ function revalidatePurchasing() {
 
 export async function createSupplier(_prev: FormState, form: FormData): Promise<FormState> {
   const name = String(form.get('name') ?? '').trim();
-  if (!name) return { status: 'error', message: 'Enter the supplier name' };
+  if (!name) return invalid('supplierName');
   const state = await send('/suppliers', 'POST', {
     name,
     phone: String(form.get('phone') ?? '').trim() || undefined,
@@ -129,8 +121,8 @@ export async function paySupplier(_prev: FormState, form: FormData): Promise<For
   const id = String(form.get('id') ?? '');
   const amount = String(form.get('amount') ?? '').trim();
   const invoiceId = String(form.get('invoiceId') ?? '').trim() || undefined;
-  if (!id) return { status: 'error', message: 'Missing supplier' };
-  if (!MONEY.test(amount)) return { status: 'error', message: 'Enter an amount, e.g. 10000.00' };
+  if (!id) return invalid('missingRecord');
+  if (!MONEY.test(amount)) return invalid('amount', '10000.00');
   const state = await send(`/suppliers/${id}/payments`, 'POST', {
     amount,
     invoiceId,
@@ -172,78 +164,58 @@ export async function createProductForInvoice(input: {
   /** Channel SKUs to link on creation — blank ones are dropped before sending. */
   listings?: Array<{ channel: string; externalId: string }>;
 }): Promise<{ ok: true; variantId: string; label: string } | { ok: false; message: string }> {
-  if (!input.name.trim()) return { ok: false, message: 'Enter a product name' };
+  if (!input.name.trim()) return { ok: false, message: (await invalid('productName')).message };
   const listings = input.listings?.filter((l) => l.externalId.trim());
-  let res: Response;
-  try {
-    res = await fetch(`${API}/catalog/products`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-      body: JSON.stringify({
-        name: input.name.trim(),
-        category: input.category || undefined,
-        sku: input.sku?.trim() || undefined,
-        listings: listings?.length ? listings : undefined,
-      }),
-    });
-  } catch {
-    return { ok: false, message: 'Could not reach the API.' };
-  }
-  const data = await res.json().catch(() => null);
-  if (!res.ok) return { ok: false, message: data?.message ?? 'Could not create the product.' };
+  const r = await apiRequest<{ variantId: string }>('/catalog/products', 'POST', {
+    name: input.name.trim(),
+    category: input.category || undefined,
+    sku: input.sku?.trim() || undefined,
+    listings: listings?.length ? listings : undefined,
+  });
+  if (!r.ok) return r;
   revalidatePath('/inventory');
-  return { ok: true, variantId: data.variantId as string, label: input.name.trim() };
+  return { ok: true, variantId: r.data.variantId, label: input.name.trim() };
 }
 
-async function call(path: string, method: 'POST', body?: unknown): Promise<InvoiceResult> {
-  let res: Response;
-  try {
-    res = await fetch(`${API}${path}`, {
-      method,
-      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-  } catch {
-    return { ok: false, message: 'Could not reach the API.' };
-  }
-  const data = await res.json().catch(() => null);
-  if (!res.ok) return { ok: false, message: data?.message ?? 'Could not save.' };
-  return { ok: true, id: data.id as string };
+async function call(path: string, body?: unknown): Promise<InvoiceResult> {
+  const r = await apiRequest<{ id: string }>(path, 'POST', body);
+  return r.ok ? { ok: true, id: r.data.id } : r;
 }
 
 /** Creates the invoice, and posts it too unless `asDraft`. */
 export async function saveInvoice(input: InvoicePayload, asDraft: boolean): Promise<InvoiceResult> {
-  if (!input.supplierId) return { ok: false, message: 'Choose a supplier' };
-  if (!ISO_DATE.test(input.invoiceDate)) return { ok: false, message: 'Enter the invoice date' };
-  if (!input.lines.length) return { ok: false, message: 'Add at least one product' };
-  for (const l of input.lines) {
-    if (!l.variantId) return { ok: false, message: 'Every line needs a product' };
-    if (!Number.isInteger(l.quantity) || l.quantity < 1) {
-      return { ok: false, message: 'Every line needs a whole quantity' };
-    }
-    if (!MONEY.test(l.unitCost) || Number(l.unitCost) <= 0) {
-      return { ok: false, message: 'Every line needs a unit cost' };
-    }
-  }
-  if (input.extraCosts && !MONEY.test(input.extraCosts)) {
-    return { ok: false, message: 'Extra costs must be an amount like 5000.00' };
-  }
+  const problem: Check | null = !input.supplierId
+    ? 'chooseSupplier'
+    : !ISO_DATE.test(input.invoiceDate)
+      ? 'invoiceDate'
+      : !input.lines.length
+        ? 'addProduct'
+        : input.lines.some((l) => !l.variantId)
+          ? 'lineProduct'
+          : input.lines.some((l) => !Number.isInteger(l.quantity) || l.quantity < 1)
+            ? 'lineQuantity'
+            : input.lines.some((l) => !MONEY.test(l.unitCost) || Number(l.unitCost) <= 0)
+              ? 'lineCost'
+              : input.extraCosts && !MONEY.test(input.extraCosts)
+                ? 'extraCosts'
+                : null;
+  if (problem) return { ok: false, message: (await invalid(problem)).message };
 
-  const created = await call('/purchases', 'POST', input);
+  const created = await call('/purchases', input);
   if (!created.ok) return created;
 
   if (asDraft) {
     revalidatePurchasing();
     return created;
   }
-  const posted = await call(`/purchases/${created.id}/post`, 'POST');
+  const posted = await call(`/purchases/${created.id}/post`);
   revalidatePurchasing();
   return posted.ok ? created : posted;
 }
 
 export async function postInvoice(_prev: FormState, form: FormData): Promise<FormState> {
   const id = String(form.get('id') ?? '');
-  if (!id) return { status: 'error', message: 'Missing invoice' };
+  if (!id) return invalid('missingRecord');
   const state = await send(`/purchases/${id}/post`, 'POST', undefined);
   if (state.status === 'saved') {
     revalidatePurchasing();

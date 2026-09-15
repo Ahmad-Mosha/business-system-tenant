@@ -1,35 +1,36 @@
 import type { Tone } from '@/components/tone-badge';
 import type { AccountBalance, LedgerRow } from '@/lib/api';
-import type messages from '@/messages/en.json';
+import { isOneOf } from '@/lib/utils';
+import { languageOf } from '@/i18n/config';
 
-/** Plain-language label for every ledger entry kind, for the activity feed. */
-export const KIND_LABEL: Record<string, string> = {
-  OPENING_BALANCE: 'Opening balance',
-  CASH_DEPOSIT: 'Cash deposit',
-  CHEQUE_DEPOSIT: 'Cheque received',
-  CHEQUE_CLEAR: 'Cheque cleared',
-  CHEQUE_BOUNCE: 'Cheque bounced',
-  PAYMENT_IN: 'Money in',
-  PAYMENT_OUT: 'Payment',
-  CAPITAL_WITHDRAWAL: 'Owner withdrawal',
-  PURCHASE: 'Purchase',
-  SUPPLIER_PAYMENT: 'Supplier payment',
-  NOON_ACCRUAL: 'noon sale',
-  NOON_FEE: 'noon fee',
-  NOON_PAYOUT: 'noon payout',
-  ORDER_SALE: 'Order paid',
-  COGS: 'Cost of goods',
-  BOSTA_PAYOUT: 'Bosta payout',
-  RETURN: 'Return',
-  STOCK_LOSS: 'Stock loss',
-  ADJUSTMENT: 'Adjustment',
-};
+/** Every ledger entry kind the messages name (`enums.entryKind`) — a newer one shows as its code. */
+const ENTRY_KINDS = [
+  'OPENING_BALANCE',
+  'CASH_DEPOSIT',
+  'CHEQUE_DEPOSIT',
+  'CHEQUE_CLEAR',
+  'CHEQUE_BOUNCE',
+  'PAYMENT_IN',
+  'PAYMENT_OUT',
+  'CAPITAL_WITHDRAWAL',
+  'PURCHASE',
+  'SUPPLIER_PAYMENT',
+  'NOON_ACCRUAL',
+  'NOON_FEE',
+  'NOON_PAYOUT',
+  'ORDER_SALE',
+  'COGS',
+  'BOSTA_PAYOUT',
+  'RETURN',
+  'STOCK_LOSS',
+  'ADJUSTMENT',
+] as const;
 
-export const kindLabel = (kind: string) => KIND_LABEL[kind] ?? kind;
+export const isEntryKind = (kind: string) => isOneOf(ENTRY_KINDS, kind);
 
-/** A kind the messages name (`enums.entryKind.*`) — anything newer shows as its code. */
-export const isEntryKind = (kind: string): kind is keyof (typeof messages)['enums']['entryKind'] =>
-  kind in KIND_LABEL;
+/** An account's name in the reader's language — the API holds both (docs/i18n.md). */
+export const accountName = (account: { nameAr: string; nameEn: string }, locale: string) =>
+  languageOf(locale) === 'ar' ? account.nameAr : account.nameEn;
 
 /**
  * What one entry did to one account: positive when its balance grew, negative
@@ -71,41 +72,39 @@ export function entryMemo(e: Pick<LedgerRow, 'memo' | 'kind' | 'reversesId'>): s
 
 /**
  * Money moving into or out of the treasury, named by the account on the other
- * side — "Supplier payments" rather than "Supplier payable". Anything not
- * listed falls back to the account's own name.
+ * side — "Supplier payments" rather than "Supplier payable" (`enums.cashIn` /
+ * `enums.cashOut`). Anything not listed goes by the account's own name.
  */
-const FLOW_LABEL: Record<string, { in?: string; out?: string }> = {
-  SALES: { in: 'Sales', out: 'Sales reversed' },
-  OWNER_CAPITAL: { in: 'Owner deposits', out: 'Owner withdrawals' },
-  SUPPLIER_PAYABLE: { in: 'Supplier refunds', out: 'Supplier payments' },
-  INVENTORY: { in: 'Cash purchases reversed', out: 'Stock bought for cash' },
-  OTHER_EXPENSE: { out: 'Expenses' },
-  SHIPPING: { out: 'Shipping' },
-  CHANNEL_FEES: { out: 'Fees and ads' },
-  NOON_RECEIVABLE: { in: 'noon payouts' },
-  AMAZON_RECEIVABLE: { in: 'Amazon payouts' },
-  BOSTA_COD: { in: 'Bosta payouts' },
-  CHEQUES_PENDING: { in: 'Cheques cleared' },
-};
-
-export const flowLabel = (direction: 'in' | 'out', code: string, fallback: string) =>
-  FLOW_LABEL[code]?.[direction] ?? fallback;
-
-/** How an invoice's paid state reads, and what it means. */
-export const PAID_STATUS: Record<string, { label: string; tone: Tone }> = {
-  DRAFT: { label: 'Draft', tone: 'neutral' },
-  UNPAID: { label: 'Unpaid', tone: 'warning' },
-  PARTIAL: { label: 'Partly paid', tone: 'warning' },
-  PAID: { label: 'Paid', tone: 'success' },
-};
-
-/** The counter-accounts a hand-entered voucher can move cash against. */
-export const VOUCHER_COUNTERS = [
-  { code: 'OTHER_EXPENSE', label: 'General expense' },
-  { code: 'SHIPPING', label: 'Shipping' },
-  { code: 'CHANNEL_FEES', label: 'Channel fees / ads' },
-  { code: 'OWNER_CAPITAL', label: 'Owner capital' },
+export const CASH_IN = [
+  'SALES',
+  'OWNER_CAPITAL',
+  'SUPPLIER_PAYABLE',
+  'INVENTORY',
+  'NOON_RECEIVABLE',
+  'AMAZON_RECEIVABLE',
+  'BOSTA_COD',
+  'CHEQUES_PENDING',
 ] as const;
+export const CASH_OUT = [
+  'SALES',
+  'OWNER_CAPITAL',
+  'SUPPLIER_PAYABLE',
+  'INVENTORY',
+  'OTHER_EXPENSE',
+  'SHIPPING',
+  'CHANNEL_FEES',
+] as const;
+
+/** How an invoice's paid state looks; its name is `enums.paidStatus`. */
+export const PAID_TONE: Record<string, Tone> = {
+  DRAFT: 'neutral',
+  UNPAID: 'warning',
+  PARTIAL: 'warning',
+  PAID: 'success',
+};
+
+/** The counter-accounts a hand-entered voucher can move cash against (`enums.voucherCounter`). */
+export const VOUCHER_COUNTERS = ['OTHER_EXPENSE', 'SHIPPING', 'CHANNEL_FEES', 'OWNER_CAPITAL'] as const;
 
 /** Groups account balances the way the overview reads them. */
 export function groupAccounts(accounts: AccountBalance[]) {

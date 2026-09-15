@@ -21,10 +21,12 @@ import { getPurchase, getSupplier } from '@/lib/api';
 import { money } from '@/lib/format';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
+import { getTranslations } from 'next-intl/server';
+import { num, strong } from '@/i18n/rich';
 import { getFormat } from '@/i18n/get-format';
 
 export default async function PurchaseDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const f = await getFormat();
+  const [f, t] = await Promise.all([getFormat(), getTranslations('money.invoice')]);
   await requireAdmin();
   const { id } = await params;
   const invoice = await getPurchase(id).catch(() => null);
@@ -43,15 +45,15 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
   return (
     <Page>
       <PageHeader
-        back={{ href: '/money/purchases', label: 'Back to purchases' }}
-        title={invoice.invoiceNo ? `Invoice ${invoice.invoiceNo}` : 'Invoice (no ref)'}
+        back={{ href: '/money/purchases', label: t('back') }}
+        title={invoice.invoiceNo ? t('title', { ref: invoice.invoiceNo }) : t('titleNoRef')}
         meta={<PaidChip status={invoice.paidStatus} />}
-        description={
-          <>
-            <bdi className="text-foreground">{invoice.supplier.name}</bdi> · {f.date(invoice.invoiceDate)} ·{' '}
-            {invoice.payment === 'CASH' ? 'paid in cash' : 'on credit'}
-          </>
-        }
+        description={t.rich('description', {
+          supplier: invoice.supplier.name,
+          date: f.date(invoice.invoiceDate),
+          payment: invoice.payment,
+          strong,
+        })}
         actions={
           draft ? (
             <PostInvoiceButton id={invoice.id} total={invoice.landedTotal} />
@@ -61,8 +63,8 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
               owed={supplier.balance}
               invoiceId={invoice.id}
               defaultAmount={remaining.toFixed(2)}
-              hint={`This invoice has ${money(remaining)} left to pay.`}
-              trigger={<Button>Record payment</Button>}
+              hint={t('remainingHint', { amount: money(remaining) })}
+              trigger={<Button>{t('recordPayment')}</Button>}
             />
           ) : undefined
         }
@@ -71,16 +73,16 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <Card className="min-w-0 pb-0">
           <CardHeader>
-            <CardTitle>Lines</CardTitle>
+            <CardTitle>{t('lines')}</CardTitle>
           </CardHeader>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Product</TableHead>
-                <TableHead className="w-[80px] text-end">Qty</TableHead>
-                <TableHead className="w-[130px] text-end">Unit cost</TableHead>
-                {hasExtras ? <TableHead className="w-[130px] text-end">Landed unit</TableHead> : null}
-                <TableHead className="w-[140px] text-end">Line total</TableHead>
+                <TableHead>{t('columns.product')}</TableHead>
+                <TableHead className="w-[80px] text-end">{t('columns.qty')}</TableHead>
+                <TableHead className="w-[130px] text-end">{t('columns.unitCost')}</TableHead>
+                {hasExtras ? <TableHead className="w-[130px] text-end">{t('columns.landedUnit')}</TableHead> : null}
+                <TableHead className="w-[140px] text-end">{t('columns.lineTotal')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -106,25 +108,22 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
         <aside className="grid gap-6">
           <Card>
             <CardHeader>
-              <CardTitle>Totals</CardTitle>
+              <CardTitle>{t('totals')}</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-2 text-[13px]">
-              <Row label="Goods" value={money(invoice.goodsTotal)} />
+              <Row label={t('goods')} value={money(invoice.goodsTotal)} />
               {hasExtras ? (
-                <Row
-                  label={`Shipping and customs · ${invoice.allocation === 'BY_VALUE' ? 'by value' : 'per unit'}`}
-                  value={money(invoice.extraCosts)}
-                />
+                <Row label={t('extras', { allocation: invoice.allocation })} value={money(invoice.extraCosts)} />
               ) : null}
               <div className="mt-1 flex items-baseline justify-between gap-3 border-t pt-3">
-                <span className="font-medium">Into stock</span>
+                <span className="font-medium">{t('intoStock')}</span>
                 <Amount value={invoice.landedTotal} className="text-2xl font-semibold tracking-tight" />
               </div>
               {!draft && invoice.payment === 'CREDIT' ? (
                 <>
-                  <Row label="Paid so far" value={money(invoice.settledAmount)} />
+                  <Row label={t('paidSoFar')} value={money(invoice.settledAmount)} />
                   <Row
-                    label="Still owed on this invoice"
+                    label={t('stillOwed')}
                     value={money(remaining)}
                     strong
                     className={remaining > 0.005 ? 'text-warning' : 'text-success'}
@@ -137,21 +136,19 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
           <Alert variant={!draft && (invoice.payment === 'CASH' || invoice.paidStatus === 'PAID') ? 'success' : 'default'}>
             {!draft && (invoice.payment === 'CASH' || invoice.paidStatus === 'PAID') ? <CheckCircle2 /> : <Info />}
             <AlertDescription>
-              {draft ? (
-                <>Not posted yet. Posting adds {money(invoice.landedTotal)} of stock and books the money.</>
-              ) : invoice.payment === 'CASH' ? (
-                <>
-                  Posted {f.date(invoice.postedAt)}. {money(invoice.landedTotal)} came out of cash — this
-                  invoice is settled.
-                </>
-              ) : invoice.paidStatus === 'PAID' ? (
-                <>Posted {f.date(invoice.postedAt)} on credit, and fully paid.</>
-              ) : (
-                <>
-                  Posted {f.date(invoice.postedAt)} on credit. {money(remaining)} is still owed to{' '}
-                  <bdi>{invoice.supplier.name}</bdi> — use Record payment when you pay them.
-                </>
-              )}
+              {draft
+                ? t.rich('draftNote', { amount: money(invoice.landedTotal), num })
+                : invoice.payment === 'CASH'
+                  ? t.rich('cashNote', { date: f.date(invoice.postedAt), amount: money(invoice.landedTotal), num })
+                  : invoice.paidStatus === 'PAID'
+                    ? t('paidNote', { date: f.date(invoice.postedAt) })
+                    : t.rich('owedNote', {
+                        date: f.date(invoice.postedAt),
+                        amount: money(remaining),
+                        supplier: invoice.supplier.name,
+                        num,
+                        strong,
+                      })}
             </AlertDescription>
           </Alert>
         </aside>

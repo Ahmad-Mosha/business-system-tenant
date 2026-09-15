@@ -64,6 +64,16 @@ function useGradientId() {
 /** Room for the value axis — Arabic compact figures ("1.1 مليون") run longer. */
 const useAxisWidth = () => (useDirection() === 'rtl' ? 64 : 52);
 
+/**
+ * A tick label inside the chart's left-to-right SVG. An Arabic one ("17 أغسطس",
+ * "850 ألف") is isolated right-to-left — laid out left to right, its number
+ * lands on the wrong side of the word.
+ */
+function useTick() {
+  const rtl = useDirection() === 'rtl';
+  return (label: string) => (rtl ? `\u2067${label}\u2069` : label);
+}
+
 function ChartEmpty({ children, className = 'h-64' }: { children: ReactNode; className?: string }) {
   return (
     <div className={`flex items-center justify-center text-[13px] text-muted-foreground ${className}`}>
@@ -117,6 +127,7 @@ export function CashBalanceChart({
   const f = useFormat();
   const id = useGradientId();
   const axisWidth = useAxisWidth();
+  const tick = useTick();
   if (series.length < 2) {
     return <ChartEmpty className={className}>{t('notEnoughHistory')}</ChartEmpty>;
   }
@@ -138,14 +149,14 @@ export function CashBalanceChart({
           axisLine={false}
           tickMargin={8}
           minTickGap={40}
-          tickFormatter={(v: string) => f.dayShort(v)}
+          tickFormatter={(v: string) => tick(f.dayShort(v))}
         />
         <YAxis
           tickLine={false}
           axisLine={false}
           width={axisWidth}
           domain={['auto', 'auto']}
-          tickFormatter={(v: number) => f.compact(v)}
+          tickFormatter={(v: number) => tick(f.compact(v))}
         />
         <ChartTooltip
           content={
@@ -182,6 +193,7 @@ export function CashFlowChart({
   const t = useTranslations('charts');
   const f = useFormat();
   const axisWidth = useAxisWidth();
+  const tick = useTick();
   const data = series.map((p) => ({ period: p.period, in: Number(p.in), out: -Number(p.out) }));
   if (data.every((d) => d.in === 0 && d.out === 0)) {
     return <ChartEmpty>{t('noMovement')}</ChartEmpty>;
@@ -201,13 +213,13 @@ export function CashFlowChart({
           axisLine={false}
           tickMargin={8}
           minTickGap={24}
-          tickFormatter={(v: string) => bucketLabel(f, weekOf, v, bucket)}
+          tickFormatter={(v: string) => tick(bucketLabel(f, weekOf, v, bucket))}
         />
         <YAxis
           tickLine={false}
           axisLine={false}
           width={axisWidth}
-          tickFormatter={(v: number) => f.compact(Math.abs(v))}
+          tickFormatter={(v: number) => tick(f.compact(Math.abs(v)))}
         />
         <ReferenceLine y={0} stroke="var(--border)" />
         <ChartTooltip
@@ -314,6 +326,7 @@ export function MonthlyProceedsChart({ periods }: { periods: Period[] }) {
   const f = useFormat();
   const router = useRouter();
   const axisWidth = useAxisWidth();
+  const tick = useTick();
   const config = { netProceeds: { label: t('netProceeds'), color: 'var(--chart-3)' } } satisfies ChartConfig;
   const data = [...periods]
     .sort((a, b) => a.month.localeCompare(b.month))
@@ -327,9 +340,9 @@ export function MonthlyProceedsChart({ periods }: { periods: Period[] }) {
           tickLine={false}
           axisLine={false}
           tickMargin={8}
-          tickFormatter={(m: string) => f.monthShort(m)}
+          tickFormatter={(m: string) => tick(f.monthShort(m))}
         />
-        <YAxis tickLine={false} axisLine={false} width={axisWidth} tickFormatter={(v: number) => f.compact(v)} />
+        <YAxis tickLine={false} axisLine={false} width={axisWidth} tickFormatter={(v: number) => tick(f.compact(v))} />
         <ReferenceLine y={0} stroke="var(--border)" />
         <ChartTooltip
           cursor={{ fill: 'var(--muted)', fillOpacity: 0.6 }}

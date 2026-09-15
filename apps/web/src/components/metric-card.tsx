@@ -103,9 +103,8 @@ export function Delta({
   return (
     <Badge variant={flat ? 'outline' : good ? 'success' : 'destructive'} className="num">
       <Icon />
-      {value > 0 ? '+' : ''}
-      {value.toFixed(1)}
-      {suffix}
+      {/* Isolated, or Arabic text around it moves the sign to the far side. */}
+      <bdi>{`${value > 0 ? '+' : ''}${value.toFixed(1)}${suffix}`}</bdi>
     </Badge>
   );
 }

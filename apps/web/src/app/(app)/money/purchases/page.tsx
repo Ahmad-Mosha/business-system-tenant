@@ -17,6 +17,7 @@ import {
 import { getPurchases } from '@/lib/api';
 import { money } from '@/lib/format';
 import { requireAdmin } from '@/lib/session';
+import { getTranslations } from 'next-intl/server';
 import { getFormat } from '@/i18n/get-format';
 
 function monthStart() {
@@ -25,7 +26,7 @@ function monthStart() {
 }
 
 export default async function PurchasesPage() {
-  const f = await getFormat();
+  const [f, t, tr] = await Promise.all([getFormat(), getTranslations('money.purchases'), getTranslations()]);
   await requireAdmin();
   const invoices = await getPurchases();
 
@@ -45,7 +46,7 @@ export default async function PurchasesPage() {
     <Button asChild>
       <Link href="/money/purchases/new">
         <Plus />
-        New invoice
+        {t('newInvoice')}
       </Link>
     </Button>
   );
@@ -53,29 +54,25 @@ export default async function PurchasesPage() {
   return (
     <Page fill>
       <PageHeader
-        title={
-          <>
-            Purchases <bdi className="font-sans text-lg font-normal text-muted-foreground">فاتورة شراء</bdi>
-          </>
-        }
-        description="Supplier invoices — how stock comes in, at cost."
+        title={tr('nav.items.purchases')}
+        description={t('description')}
         actions={newInvoice}
       />
 
       <MetricGrid>
-        <MetricCard label="Bought this month" value={<Amount value={monthTotal} />} hint="Posted invoices, at cost" />
+        <MetricCard label={t('boughtThisMonth')} value={<Amount value={monthTotal} />} hint={t('boughtHint')} />
         <MetricCard
-          label="Owed on invoices"
+          label={t('owed')}
           value={<Amount value={owed} />}
           tone={owed > 0.005 ? 'warning' : 'default'}
-          hint={owed > 0.005 ? 'Credit invoices not fully paid' : 'Every credit invoice is paid'}
-          link={{ href: '/money/suppliers', label: 'Open Suppliers' }}
+          hint={owed > 0.005 ? t('owedSome') : t('owedNone')}
+          link={{ href: '/money/suppliers', label: t('openSuppliers') }}
         />
         <MetricCard
-          label="Drafts"
+          label={t('drafts')}
           value={drafts}
           tone={drafts > 0 ? 'warning' : 'default'}
-          hint={drafts > 0 ? 'Not posted — stock hasn’t moved' : 'Nothing waiting to post'}
+          hint={drafts > 0 ? t('draftsSome') : t('draftsNone')}
         />
       </MetricGrid>
 
@@ -83,28 +80,27 @@ export default async function PurchasesPage() {
         minWidth="52rem"
         footer={
           <TableCount>
-            <span className="num font-medium text-foreground">{invoices.length}</span>{' '}
-            {invoices.length === 1 ? 'invoice' : 'invoices'}
+            {tr('nouns.invoices', { count: invoices.length })}
           </TableCount>
         }
       >
         {invoices.length === 0 ? (
           <TableEmpty
             icon={ClipboardList}
-            title="No purchase invoices yet"
-            description="Create one to bring stock in at cost."
+            title={t('empty')}
+            description={t('emptyHint')}
             action={newInvoice}
           />
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Invoice</TableHead>
-                <TableHead>Supplier</TableHead>
-                <TableHead className="w-[120px]">Date</TableHead>
-                <TableHead className="w-[110px]">Payment</TableHead>
-                <TableHead className="w-[130px]">Status</TableHead>
-                <TableHead className="w-[140px] text-end">Total</TableHead>
+                <TableHead>{t('columns.invoice')}</TableHead>
+                <TableHead>{t('columns.supplier')}</TableHead>
+                <TableHead className="w-[120px]">{t('columns.date')}</TableHead>
+                <TableHead className="w-[110px]">{t('columns.payment')}</TableHead>
+                <TableHead className="w-[130px]">{t('columns.status')}</TableHead>
+                <TableHead className="w-[140px] text-end">{t('columns.total')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -115,10 +111,10 @@ export default async function PurchasesPage() {
                       href={`/money/purchases/${i.id}`}
                       className="font-medium after:absolute after:inset-0 hover:underline focus-visible:underline focus-visible:outline-none"
                     >
-                      {i.invoiceNo ?? <span className="text-muted-foreground">No ref</span>}
+                      {i.invoiceNo ?? <span className="text-muted-foreground">{t('noRef')}</span>}
                     </Link>
-                    <span className="num ms-2 text-xs text-muted-foreground">
-                      {i.lineCount} {i.lineCount === 1 ? 'line' : 'lines'}
+                    <span className="ms-2 text-xs text-muted-foreground">
+                      {tr('nouns.lines', { count: i.lineCount })}
                     </span>
                   </TableCell>
                   <TableCell>
@@ -126,7 +122,7 @@ export default async function PurchasesPage() {
                   </TableCell>
                   <TableCell className="text-muted-foreground">{f.date(i.invoiceDate)}</TableCell>
                   <TableCell className="text-muted-foreground">
-                    {i.payment === 'CASH' ? 'Cash' : 'Credit'}
+                    {tr(`enums.purchasePayment.${i.payment}`)}
                   </TableCell>
                   <TableCell>
                     <PaidChip status={i.paidStatus} />
