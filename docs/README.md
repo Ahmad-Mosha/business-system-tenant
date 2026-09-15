@@ -33,6 +33,8 @@ hours.
 | [architecture.md](architecture.md) | How the system is designed, and why each decision was taken |
 | [roadmap.md](roadmap.md) | The phases, their dependency order, and how each is verified |
 | [ui-ux.md](ui-ux.md) | What is kept, dropped and missing from the UI reference, and the design direction |
+| [frontend.md](frontend.md) | How the web app is put together: where data comes from, where logic lives, the conventions |
+| [i18n.md](i18n.md) | How every screen speaks Arabic and English, and the Arabic glossary |
 | [deployment.md](deployment.md) | Where the API runs and how to put it there |
 
 ## Data
