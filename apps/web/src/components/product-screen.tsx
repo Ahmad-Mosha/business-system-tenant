@@ -1,6 +1,7 @@
 'use client';
 
 import { Check, Pencil, Trash2, X } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { archiveProduct, updateProduct } from '@/app/(app)/inventory/actions';
@@ -29,9 +30,11 @@ import { Spinner } from '@/components/ui/spinner';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { VariantPanel, type Movement } from '@/components/variant-panel';
 import type { ProductDetail } from '@/lib/api';
-import { CATEGORIES, categoryLabel } from '@/lib/categories';
+import { CATEGORIES } from '@/lib/categories';
 import { money } from '@/lib/format';
 import { LOW_STOCK, stockState } from '@/lib/stock';
+import { isOneOf } from '@/lib/utils';
+import { bdi } from '@/i18n/rich';
 import { useFormat } from '@/i18n/use-format';
 
 /** "No category" in a toggle group that can't hold an empty value. */
@@ -52,6 +55,11 @@ export function ProductScreen({
   product: ProductDetail;
   history: Array<{ variantId: string; movements: Movement[] }>;
 }) {
+  const t = useTranslations('product');
+  const tc = useTranslations('common');
+  const te = useTranslations('enums');
+  const tn = useTranslations('nouns');
+  const tr = useTranslations();
   const f = useFormat();
   const [editing, setEditing] = useState(false);
   const [pending, start] = useTransition();
@@ -64,7 +72,7 @@ export function ProductScreen({
     start(async () => {
       const r = await updateProduct(product.id, { name: name.trim(), category: category || null });
       if (r.ok) {
-        toast.success('Product updated.');
+        toast.success(t('updated'));
         setEditing(false);
       } else toast.error(r.message);
     });
@@ -84,15 +92,20 @@ export function ProductScreen({
     0,
   );
   const state = stockState(onHand);
+  const categoryName = !product.category
+    ? te('category.NONE')
+    : isOneOf(CATEGORIES, product.category)
+      ? te(`category.${product.category}`)
+      : product.category;
 
   return (
     <Page>
       <PageHeader
-        back={{ href: '/inventory', label: 'Back to inventory' }}
+        back={{ href: '/inventory', label: t('back') }}
         title={<bdi>{product.name}</bdi>}
         meta={
           <>
-            <Badge variant="outline">{categoryLabel(product.category)}</Badge>
+            <Badge variant="outline">{categoryName}</Badge>
             {only?.sku ? (
               <Badge variant="secondary" className="font-mono">
                 {only.sku}
@@ -102,46 +115,41 @@ export function ProductScreen({
         }
         description={
           product.variants.length > 1
-            ? `${product.variants.length} variants`
-            : 'Stock, cost and the channels that sell it.'
+            ? tn('variants', { count: product.variants.length })
+            : t('description')
         }
         actions={
           editing ? (
             <>
               <Button variant="ghost" onClick={cancel} disabled={pending}>
                 <X />
-                Cancel
+                {tc('cancel')}
               </Button>
               <Button onClick={save} disabled={pending || !nameOk}>
                 {pending ? <Spinner /> : <Check />}
-                Save
+                {tc('save')}
               </Button>
             </>
           ) : (
             <>
               <Button variant="outline" onClick={() => setEditing(true)}>
                 <Pencil />
-                Edit
+                {t('edit')}
               </Button>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="outline" className="text-destructive hover:bg-destructive-subtle hover:text-destructive">
                     <Trash2 />
-                    Delete
+                    {t('delete')}
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>
-                      Delete “<bdi>{product.name}</bdi>”?
-                    </AlertDialogTitle>
-                    <AlertDialogDescription>
-                      It leaves Inventory. Its order and stock history is kept, not erased —
-                      nothing that already references this product changes.
-                    </AlertDialogDescription>
+                    <AlertDialogTitle>{t.rich('deleteTitle', { name: product.name, bdi })}</AlertDialogTitle>
+                    <AlertDialogDescription>{t('deleteDescription')}</AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel disabled={archiving}>Cancel</AlertDialogCancel>
+                    <AlertDialogCancel disabled={archiving}>{tc('cancel')}</AlertDialogCancel>
                     <AlertDialogAction
                       variant="destructive"
                       className="bg-destructive text-white hover:bg-destructive/90"
@@ -155,7 +163,7 @@ export function ProductScreen({
                       }}
                     >
                       {archiving ? <Spinner /> : null}
-                      Delete product
+                      {t('deleteConfirm')}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
@@ -168,12 +176,12 @@ export function ProductScreen({
       {editing ? (
         <Card>
           <CardHeader>
-            <CardTitle>Product details</CardTitle>
+            <CardTitle>{t('details')}</CardTitle>
           </CardHeader>
           <CardContent>
             <FieldGroup className="grid gap-5 md:grid-cols-[minmax(0,1fr)_auto]">
               <Field data-invalid={!nameOk}>
-                <FieldLabel htmlFor="edit-name">Name</FieldLabel>
+                <FieldLabel htmlFor="edit-name">{t('name')}</FieldLabel>
                 <Input
                   id="edit-name"
                   dir="auto"
@@ -182,10 +190,10 @@ export function ProductScreen({
                   aria-invalid={!nameOk}
                   disabled={pending}
                 />
-                {!nameOk ? <FieldError>A product needs a name.</FieldError> : null}
+                {!nameOk ? <FieldError>{t('nameRequired')}</FieldError> : null}
               </Field>
               <Field>
-                <FieldLabel>Category</FieldLabel>
+                <FieldLabel>{t('category')}</FieldLabel>
                 <ToggleGroup
                   type="single"
                   variant="outline"
@@ -193,12 +201,12 @@ export function ProductScreen({
                   value={category || NONE}
                   onValueChange={(v) => v && setCategory(v === NONE ? '' : v)}
                   disabled={pending}
-                  aria-label="Category"
+                  aria-label={t('category')}
                 >
-                  <ToggleGroupItem value={NONE}>None</ToggleGroupItem>
+                  <ToggleGroupItem value={NONE}>{t('noCategory')}</ToggleGroupItem>
                   {CATEGORIES.map((c) => (
-                    <ToggleGroupItem key={c.value} value={c.value}>
-                      {c.label}
+                    <ToggleGroupItem key={c} value={c}>
+                      {te(`category.${c}`)}
                     </ToggleGroupItem>
                   ))}
                 </ToggleGroup>
@@ -210,37 +218,41 @@ export function ProductScreen({
 
       <MetricGrid>
         <MetricCard
-          label="On hand"
+          label={t('onHand')}
           value={f.count(onHand)}
           tone={STATE_MARK[state.tone]}
           hint={
-            state.tone === 'success'
-              ? 'In stock'
-              : state.tone === 'warning'
-                ? `Low — ${LOW_STOCK} or fewer left`
-                : 'Nothing left to sell'
+            state.key === 'in'
+              ? te('stockState.in')
+              : state.key === 'low'
+                ? t('lowHint', { count: LOW_STOCK })
+                : tr('inventory.outHint')
           }
         />
         <MetricCard
-          label="In open orders"
+          label={t('inOpenOrders')}
           value={f.count(inOrders)}
-          hint={inOrders > 0 ? 'Already off on-hand, not delivered yet' : 'Nothing waiting'}
+          hint={inOrders > 0 ? t('inOpenOrdersHint') : t('nothingWaiting')}
         />
         <MetricCard
-          label="Unit cost"
-          value={only ? <Amount value={only.unitCost} /> : 'Varies'}
+          label={t('unitCost')}
+          value={only ? <Amount value={only.unitCost} /> : t('varies')}
           tone={only && !only.unitCost ? 'warning' : 'default'}
           hint={
             !only
-              ? `Differs across ${product.variants.length} variants`
+              ? t('differs', { variants: tn('variants', { count: product.variants.length }) })
               : !only.unitCost
-                ? 'Not set — left out of stock value'
+                ? t('costNotSet')
                 : only.sellingPrice
-                  ? `Sells for ${money(only.sellingPrice)}`
-                  : 'No selling price yet'
+                  ? t('sellsFor', { price: money(only.sellingPrice) })
+                  : t('noPrice')
           }
         />
-        <MetricCard label="Stock value" value={<Amount value={value} />} hint="On hand at unit cost" />
+        <MetricCard
+          label={tr('inventory.stockValue')}
+          value={<Amount value={value} />}
+          hint={t('stockValueHint')}
+        />
       </MetricGrid>
 
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_400px]">
@@ -257,10 +269,8 @@ export function ProductScreen({
 
         <Card className="pb-0">
           <CardHeader>
-            <CardTitle>Channels</CardTitle>
-            <CardDescription>
-              The SKU each channel uses for this product — a sale there moves this stock.
-            </CardDescription>
+            <CardTitle>{t('channels')}</CardTitle>
+            <CardDescription>{t('channelsHint')}</CardDescription>
           </CardHeader>
           <ChannelListings product={product} />
         </Card>

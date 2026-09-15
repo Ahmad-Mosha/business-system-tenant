@@ -1,6 +1,7 @@
 'use client';
 
 import { ArrowDownLeft, ArrowUpRight, History, Minus, Plus } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { recordStock, updateVariant } from '@/app/(app)/inventory/actions';
@@ -29,22 +30,13 @@ import {
 } from '@/components/ui/table';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
-import { cn } from '@/lib/utils';
+import { cn, isOneOf } from '@/lib/utils';
+import { num } from '@/i18n/rich';
 import { useFormat } from '@/i18n/use-format';
 
-const REASONS = [
-  { value: 'PURCHASE', label: 'Purchased' },
-  { value: 'RETURN', label: 'Returned by customer' },
-  { value: 'DAMAGE', label: 'Damaged or lost' },
-  { value: 'COUNT', label: 'Physical count' },
-  { value: 'ADJUSTMENT', label: 'Correction' },
-] as const;
-
-/** Every reason a movement can carry — SALE is recorded by orders, never by hand. */
-const REASON_LABEL: Record<string, string> = {
-  ...Object.fromEntries(REASONS.map((r) => [r.value, r.label])),
-  SALE: 'Sold',
-};
+/** The reasons a person records by hand — SALE is recorded by orders. Names: `enums.stockReason`. */
+const REASONS = ['PURCHASE', 'RETURN', 'DAMAGE', 'COUNT', 'ADJUSTMENT'] as const;
+const ALL_REASONS = [...REASONS, 'SALE'] as const;
 
 interface Variant {
   id: string;
@@ -80,6 +72,8 @@ export function VariantPanel({
   movements: Movement[];
   single?: boolean;
 }) {
+  const t = useTranslations('product.stock');
+  const tr = useTranslations();
   const f = useFormat();
   const [pending, start] = useTransition();
   const [qty, setQty] = useState('1');
@@ -97,7 +91,7 @@ export function VariantPanel({
   const save = () =>
     start(async () => {
       const r = await updateVariant(variant.id, { unitCost: cost || null, sellingPrice: price || null });
-      if (r.ok) toast.success('Saved.');
+      if (r.ok) toast.success(t('saved'));
       else toast.error(r.message);
     });
 
@@ -106,7 +100,7 @@ export function VariantPanel({
       const n = Number(qty) * (direction === 'in' ? 1 : -1);
       const r = await recordStock(variant.id, n, reason);
       if (r.ok) {
-        toast.success(`Stock ${n > 0 ? 'increased' : 'reduced'} by ${Math.abs(n)}.`);
+        toast.success(t(n > 0 ? 'increased' : 'reduced', { count: Math.abs(n) }));
         setQty('1');
       } else toast.error(r.message);
     });
@@ -115,8 +109,8 @@ export function VariantPanel({
     <Card className="pb-0">
       {single ? (
         <CardHeader>
-          <CardTitle>Stock and pricing</CardTitle>
-          <CardDescription>What it costs and sells for, and every unit in or out.</CardDescription>
+          <CardTitle>{t('title')}</CardTitle>
+          <CardDescription>{t('description')}</CardDescription>
         </CardHeader>
       ) : (
         <CardHeader>
@@ -129,14 +123,9 @@ export function VariantPanel({
             ) : null}
           </CardTitle>
           <CardDescription>
-            {variant.inOpenOrders > 0 ? (
-              <>
-                <span className="num">{variant.inOpenOrders}</span> in open orders — already off the
-                shelf count
-              </>
-            ) : (
-              'Nothing waiting in open orders'
-            )}
+            {variant.inOpenOrders > 0
+              ? t.rich('inOpenOrders', { count: variant.inOpenOrders, num })
+              : t('noneWaiting')}
           </CardDescription>
           <CardAction className="text-end">
             <p
@@ -147,32 +136,32 @@ export function VariantPanel({
             >
               {variant.onHand}
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">on hand</p>
+            <p className="mt-1 text-xs text-muted-foreground">{t('onHand')}</p>
           </CardAction>
         </CardHeader>
       )}
 
       <CardContent className="grid gap-5 md:grid-cols-2">
         <FieldGroup className="gap-3">
-          <p className="text-xs font-medium">Pricing</p>
+          <p className="text-xs font-medium">{t('pricing')}</p>
           <div className="grid grid-cols-2 gap-3">
             <Field>
-              <FieldLabel htmlFor={`cost-${variant.id}`}>Unit cost</FieldLabel>
+              <FieldLabel htmlFor={`cost-${variant.id}`}>{tr('product.unitCost')}</FieldLabel>
               <MoneyField id={`cost-${variant.id}`} value={cost} onChange={setCost} disabled={pending} />
             </Field>
             <Field>
-              <FieldLabel htmlFor={`price-${variant.id}`}>Selling price</FieldLabel>
+              <FieldLabel htmlFor={`price-${variant.id}`}>{t('sellingPrice')}</FieldLabel>
               <MoneyField id={`price-${variant.id}`} value={price} onChange={setPrice} disabled={pending} />
             </Field>
           </div>
           <Button variant="outline" onClick={save} disabled={pending || !pricesDirty} className="w-fit">
             {pending ? <Spinner /> : null}
-            Save prices
+            {t('savePrices')}
           </Button>
         </FieldGroup>
 
         <FieldGroup className="gap-3">
-          <p className="text-xs font-medium">Record a movement</p>
+          <p className="text-xs font-medium">{t('record')}</p>
           <div className="grid grid-cols-[auto_80px_minmax(0,1fr)] items-end gap-2">
             <ToggleGroup
               type="single"
@@ -180,17 +169,17 @@ export function VariantPanel({
               spacing={0}
               value={direction}
               onValueChange={(v) => v && setDirection(v as 'in' | 'out')}
-              aria-label="Direction"
+              aria-label={t('direction')}
             >
-              <ToggleGroupItem value="in" aria-label="Stock in">
+              <ToggleGroupItem value="in" aria-label={t('in')}>
                 <Plus />
               </ToggleGroupItem>
-              <ToggleGroupItem value="out" aria-label="Stock out">
+              <ToggleGroupItem value="out" aria-label={t('out')}>
                 <Minus />
               </ToggleGroupItem>
             </ToggleGroup>
             <Field>
-              <FieldLabel htmlFor={`qty-${variant.id}`}>Quantity</FieldLabel>
+              <FieldLabel htmlFor={`qty-${variant.id}`}>{t('quantity')}</FieldLabel>
               <Input
                 id={`qty-${variant.id}`}
                 value={qty}
@@ -202,15 +191,15 @@ export function VariantPanel({
               />
             </Field>
             <Field>
-              <FieldLabel htmlFor={`reason-${variant.id}`}>Reason</FieldLabel>
+              <FieldLabel htmlFor={`reason-${variant.id}`}>{t('reason')}</FieldLabel>
               <Select value={reason} onValueChange={setReason} disabled={pending}>
                 <SelectTrigger id={`reason-${variant.id}`} className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent position="popper">
                   {REASONS.map((r) => (
-                    <SelectItem key={r.value} value={r.value}>
-                      {r.label}
+                    <SelectItem key={r} value={r}>
+                      {tr(`enums.stockReason.${r}`)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -220,18 +209,11 @@ export function VariantPanel({
           <div className="flex flex-wrap items-center gap-3">
             <Button onClick={move} disabled={pending || !count || tooMany} className="w-fit">
               {pending ? <Spinner /> : direction === 'in' ? <Plus /> : <Minus />}
-              {direction === 'in' ? 'Add' : 'Remove'} <span className="num">{count}</span>{' '}
-              {count === 1 ? 'unit' : 'units'}
+              {t(direction === 'in' ? 'add' : 'remove', { units: tr('nouns.units', { count }) })}
             </Button>
             {tooMany ? (
               <p role="status" className="text-xs text-destructive">
-                {available > 0 ? (
-                  <>
-                    Only <span className="num">{available}</span> on hand
-                  </>
-                ) : (
-                  'Nothing on hand to remove'
-                )}
+                {available > 0 ? t.rich('onlyOnHand', { count: available, num }) : t('nothingToRemove')}
               </p>
             ) : null}
           </div>
@@ -245,9 +227,9 @@ export function VariantPanel({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Movement</TableHead>
-                  <TableHead className="w-[90px] text-end">Change</TableHead>
-                  <TableHead className="w-[90px] text-end">Balance</TableHead>
+                  <TableHead>{t('movement')}</TableHead>
+                  <TableHead className="w-[90px] text-end">{t('change')}</TableHead>
+                  <TableHead className="w-[90px] text-end">{t('balance')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -259,7 +241,7 @@ export function VariantPanel({
                       <TableCell className="h-12 max-w-0">
                         <div className="flex min-w-0 items-center gap-3">
                           <span
-                            title={inbound ? 'In' : 'Out'}
+                            title={tr(inbound ? 'ledger.in' : 'ledger.out')}
                             className={cn(
                               'flex size-7 shrink-0 items-center justify-center',
                               inbound ? 'bg-success-subtle text-success' : 'bg-destructive-subtle text-destructive',
@@ -268,7 +250,9 @@ export function VariantPanel({
                             <Icon className="size-3.5 rtl:-scale-x-100" />
                           </span>
                           <div className="min-w-0">
-                            <p className="truncate font-medium">{REASON_LABEL[m.reason] ?? m.reason}</p>
+                            <p className="truncate font-medium">
+                              {isOneOf(ALL_REASONS, m.reason) ? tr(`enums.stockReason.${m.reason}`) : m.reason}
+                            </p>
                             <p className="truncate text-xs text-muted-foreground">
                               {f.dateTime(m.occurredAt)}
                               {m.note ? (
@@ -284,8 +268,7 @@ export function VariantPanel({
                       <TableCell
                         className={cn('num text-end font-semibold', inbound ? 'text-success' : 'text-destructive')}
                       >
-                        {inbound ? '+' : '−'}
-                        {Math.abs(m.quantity)}
+                        <bdi>{`${inbound ? '+' : '−'}${Math.abs(m.quantity)}`}</bdi>
                       </TableCell>
                       <TableCell className="num text-end text-muted-foreground">{m.runningTotal}</TableCell>
                     </TableRow>
@@ -300,7 +283,7 @@ export function VariantPanel({
               <EmptyMedia variant="icon">
                 <History />
               </EmptyMedia>
-              <EmptyDescription>No stock movements yet.</EmptyDescription>
+              <EmptyDescription>{t('noMovements')}</EmptyDescription>
             </EmptyHeader>
           </Empty>
         )}
@@ -320,6 +303,7 @@ function MoneyField({
   onChange: (v: string) => void;
   disabled?: boolean;
 }) {
+  const t = useTranslations('common');
   return (
     <InputGroup>
       <InputGroupInput
@@ -328,12 +312,12 @@ function MoneyField({
         onChange={(e) => onChange(e.target.value)}
         onFocus={(e) => e.currentTarget.select()}
         inputMode="decimal"
-        placeholder="Not set"
+        placeholder={t('notSet')}
         disabled={disabled}
         className="num"
       />
       <InputGroupAddon align="inline-end">
-        <InputGroupText>EGP</InputGroupText>
+        <InputGroupText>{t('egp')}</InputGroupText>
       </InputGroupAddon>
     </InputGroup>
   );

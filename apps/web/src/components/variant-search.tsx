@@ -1,6 +1,7 @@
 'use client';
 
 import { Plus, Search } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 import { searchVariants } from '@/app/(app)/orders/actions';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,7 @@ import {
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Spinner } from '@/components/ui/spinner';
+import { bdi } from '@/i18n/rich';
 
 export type VariantHit = Awaited<ReturnType<typeof searchVariants>>[number];
 
@@ -28,7 +30,7 @@ export function VariantSearch({
   disabledReason,
   meta,
   onCreate,
-  placeholder = 'Add a product — search by name or SKU',
+  placeholder,
   disabled,
 }: {
   onPick: (hit: VariantHit) => void;
@@ -41,6 +43,7 @@ export function VariantSearch({
   placeholder?: string;
   disabled?: boolean;
 }) {
+  const t = useTranslations('productSearch');
   const [open, setOpen] = useState(false);
   const [term, setTerm] = useState('');
   const [hits, setHits] = useState<VariantHit[]>([]);
@@ -51,14 +54,14 @@ export function VariantSearch({
   useEffect(() => {
     if (!q) return;
     const id = ++seq.current;
-    const t = setTimeout(async () => {
+    const timer = setTimeout(async () => {
       setLoading(true);
       const result = await searchVariants(q);
       if (id !== seq.current) return;
       setHits(result);
       setLoading(false);
     }, 250);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, [q]);
 
   const shown = q ? hits : [];
@@ -77,26 +80,26 @@ export function VariantSearch({
           className="w-full justify-start px-2.5 font-normal text-muted-foreground"
         >
           <Search />
-          {placeholder}
+          {placeholder ?? t('placeholder')}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-(--radix-popover-trigger-width) min-w-80 p-0" align="start">
         <Command shouldFilter={false}>
-          <CommandInput value={term} onValueChange={setTerm} placeholder="Name or SKU…" />
+          <CommandInput value={term} onValueChange={setTerm} placeholder={t('input')} />
           <CommandList>
             {!q ? (
               <p className="px-3 py-6 text-center text-xs text-muted-foreground">
-                Start typing a product name or SKU.
+                {t('startTyping')}
               </p>
             ) : loading && !shown.length ? (
               <div className="flex justify-center py-6">
                 <Spinner className="text-muted-foreground" />
               </div>
             ) : (
-              <CommandEmpty>No product matches “{q}”.</CommandEmpty>
+              <CommandEmpty>{t.rich('noMatch', { term: q, bdi })}</CommandEmpty>
             )}
             {shown.length ? (
-              <CommandGroup heading="Products">
+              <CommandGroup heading={t('products')}>
                 {shown.map((h) => {
                   const reason = disabledReason?.(h) ?? null;
                   return (
@@ -130,7 +133,7 @@ export function VariantSearch({
                   }}
                 >
                   <Plus />
-                  Add “<bdi>{q}</bdi>” as a new product
+                  <span>{t.rich('create', { term: q, bdi })}</span>
                 </CommandItem>
               </CommandGroup>
             ) : null}

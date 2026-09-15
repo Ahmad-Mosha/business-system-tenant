@@ -1,9 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { authHeaders } from '@/lib/session';
-
-const API = process.env.API_URL ?? 'http://localhost:3001';
+import { getTranslations } from 'next-intl/server';
+import { apiRequest } from '@/lib/api-request';
 
 export type ModeratorFormState =
   | { status: 'idle' }
@@ -14,22 +13,14 @@ export async function addModerator(
   _prev: ModeratorFormState,
   formData: FormData,
 ): Promise<ModeratorFormState> {
-  const res = await fetch(`${API}/auth/moderators`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-    body: JSON.stringify({
-      name: formData.get('name'),
-      email: formData.get('email'),
-      password: formData.get('password'),
-    }),
+  const r = await apiRequest<{ name: string; email: string }>('/auth/moderators', 'POST', {
+    name: formData.get('name'),
+    email: formData.get('email'),
+    password: formData.get('password'),
   });
+  if (!r.ok) return { status: 'error', message: r.message };
 
-  if (!res.ok) {
-    const detail = await res.json().catch(() => null);
-    return { status: 'error', message: detail?.message ?? 'Could not add the moderator' };
-  }
-
-  const m = (await res.json()) as { name: string; email: string };
   revalidatePath('/team');
-  return { status: 'saved', message: `${m.name} can sign in with ${m.email}.` };
+  const t = await getTranslations('team');
+  return { status: 'saved', message: t('canSignIn', { name: r.data.name, email: r.data.email }) };
 }

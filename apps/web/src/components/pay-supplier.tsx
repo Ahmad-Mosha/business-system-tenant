@@ -1,6 +1,7 @@
 'use client';
 
 import { Banknote } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
 import { paySupplier } from '@/app/(app)/money/actions';
 import { FormDialog } from '@/components/form-dialog';
@@ -9,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { money } from '@/lib/format';
+import { num } from '@/i18n/rich';
 
 export function PaySupplier({
   supplierId,
@@ -27,37 +29,36 @@ export function PaySupplier({
   trigger?: ReactNode;
   hint?: string;
 }) {
+  const t = useTranslations('money');
+  const tc = useTranslations('common');
   return (
     <FormDialog
       trigger={
         trigger ?? (
           <Button disabled={Number(owed) <= 0}>
             <Banknote />
-            Record payment
+            {t('invoice.recordPayment')}
           </Button>
         )
       }
-      title="Pay supplier"
-      description={hint ?? 'Moves cash out of the till and clears what we owe them.'}
+      title={t('pay.title')}
+      description={hint ?? t('pay.hint')}
       action={paySupplier}
-      submitLabel="Record payment"
-      success="Payment recorded."
+      submitLabel={t('invoice.recordPayment')}
+      success={t('pay.recorded')}
     >
       <input type="hidden" name="id" value={supplierId} />
       {invoiceId ? <input type="hidden" name="invoiceId" value={invoiceId} /> : null}
       <Field>
-        <FieldLabel htmlFor="pay-amount">Amount</FieldLabel>
+        <FieldLabel htmlFor="pay-amount">{t('vouchers.amount')}</FieldLabel>
         <MoneyInput id="pay-amount" name="amount" defaultValue={defaultAmount ?? owed} autoFocus />
-        <FieldDescription>
-          Owed in total: <span className="num text-foreground">{money(owed)}</span> — a payment can’t
-          exceed it.
-        </FieldDescription>
+        <FieldDescription>{t.rich('pay.owedTotal', { amount: money(owed), num })}</FieldDescription>
       </Field>
       <Field>
         <FieldLabel htmlFor="pay-memo">
-          Note <span className="font-normal text-muted-foreground">(optional)</span>
+          {t('vouchers.note')} <span className="font-normal text-muted-foreground">{tc('optional')}</span>
         </FieldLabel>
-        <Input id="pay-memo" name="memo" placeholder="e.g. against invoice INV-42" />
+        <Input id="pay-memo" name="memo" placeholder={t('pay.memoPlaceholder')} />
       </Field>
     </FormDialog>
   );

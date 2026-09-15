@@ -1,6 +1,7 @@
 'use client';
 
 import { UserPlus } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { addModerator } from '@/app/(app)/team/actions';
 import { FormDialog } from '@/components/form-dialog';
 import { Button } from '@/components/ui/button';
@@ -8,32 +9,40 @@ import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 
 export function ModeratorForm() {
+  const t = useTranslations('team');
   return (
     <FormDialog
       trigger={
         <Button>
           <UserPlus />
-          Add moderator
+          {t('add')}
         </Button>
       }
-      title="Add moderator"
-      description="They’ll see Orders and Shipments, and only the orders assigned to them."
+      title={t('add')}
+      description={t('addHint')}
       action={addModerator}
-      submitLabel="Add moderator"
-      success={(state) => (state.status === 'saved' && state.message) || 'Moderator added.'}
+      submitLabel={t('add')}
+      success={(state) => (state.status === 'saved' && state.message) || t('added')}
     >
       <Field>
-        <FieldLabel htmlFor="mod-name">Name</FieldLabel>
-        <Input id="mod-name" name="name" dir="auto" placeholder="e.g. Aya" autoFocus required />
+        <FieldLabel htmlFor="mod-name">{t('name')}</FieldLabel>
+        <Input id="mod-name" name="name" dir="auto" placeholder={t('namePlaceholder')} autoFocus required />
       </Field>
       <Field>
-        <FieldLabel htmlFor="mod-email">Email</FieldLabel>
+        <FieldLabel htmlFor="mod-email">{t('email')}</FieldLabel>
         <Input id="mod-email" name="email" type="email" placeholder="aya@prime.com" required />
       </Field>
       <Field>
-        <FieldLabel htmlFor="mod-password">Password</FieldLabel>
-        <Input id="mod-password" name="password" type="text" placeholder="At least 6 characters" required minLength={6} />
-        <FieldDescription>Share it with them — they sign in with it directly.</FieldDescription>
+        <FieldLabel htmlFor="mod-password">{t('password')}</FieldLabel>
+        <Input
+          id="mod-password"
+          name="password"
+          type="text"
+          placeholder={t('passwordPlaceholder')}
+          required
+          minLength={6}
+        />
+        <FieldDescription>{t('passwordHint')}</FieldDescription>
       </Field>
     </FormDialog>
   );

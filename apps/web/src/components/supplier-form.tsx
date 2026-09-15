@@ -1,40 +1,46 @@
 'use client';
 
 import { Plus } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { createSupplier } from '@/app/(app)/money/actions';
 import { FormDialog } from '@/components/form-dialog';
 import { Button } from '@/components/ui/button';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 
-const optional = <span className="font-normal text-muted-foreground">(optional)</span>;
-
 export function SupplierForm() {
+  const t = useTranslations('money.suppliers');
+  const tr = useTranslations();
+  const optional = <span className="font-normal text-muted-foreground">{tr('common.optional')}</span>;
   return (
     <FormDialog
       trigger={
         <Button>
           <Plus />
-          Add supplier
+          {t('add')}
         </Button>
       }
-      title="Add supplier"
-      description="Someone we buy stock from. Their balance builds from the invoices you post."
+      title={t('add')}
+      description={t('addHint')}
       action={createSupplier}
-      submitLabel="Add supplier"
-      success="Supplier added."
+      submitLabel={t('add')}
+      success={t('addedToast')}
     >
       <Field>
-        <FieldLabel htmlFor="supplier-name">Name</FieldLabel>
-        <Input id="supplier-name" name="name" dir="auto" placeholder="e.g. مورد الإسكندرية" autoFocus required />
+        <FieldLabel htmlFor="supplier-name">{t('name')}</FieldLabel>
+        <Input id="supplier-name" name="name" dir="auto" placeholder={t('namePlaceholder')} autoFocus required />
       </Field>
       <Field>
-        <FieldLabel htmlFor="supplier-phone">Phone {optional}</FieldLabel>
+        <FieldLabel htmlFor="supplier-phone">
+          {t('columns.phone')} {optional}
+        </FieldLabel>
         <Input id="supplier-phone" name="phone" inputMode="tel" placeholder="01…" className="num" />
       </Field>
       <Field>
-        <FieldLabel htmlFor="supplier-note">Note {optional}</FieldLabel>
-        <Input id="supplier-note" name="note" dir="auto" placeholder="What they supply, terms…" />
+        <FieldLabel htmlFor="supplier-note">
+          {tr('money.vouchers.note')} {optional}
+        </FieldLabel>
+        <Input id="supplier-note" name="note" dir="auto" placeholder={t('notePlaceholder')} />
       </Field>
     </FormDialog>
   );

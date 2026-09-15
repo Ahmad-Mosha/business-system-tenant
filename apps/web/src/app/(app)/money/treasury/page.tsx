@@ -17,15 +17,21 @@ import {
 } from '@/components/ui/table';
 import { getAccountLedger, getCashFlow, getCheques, getMoneyAccounts } from '@/lib/api';
 import { isoDate } from '@/lib/format';
-import { accountByCode } from '@/lib/money';
+import { accountByCode, accountName } from '@/lib/money';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { getFormat } from '@/i18n/get-format';
 
 const LIMIT = 150;
 
 export default async function TreasuryPage() {
-  const f = await getFormat();
+  const [f, t, tr, locale] = await Promise.all([
+    getFormat(),
+    getTranslations('money.treasury'),
+    getTranslations(),
+    getLocale(),
+  ]);
   await requireAdmin();
   const today = new Date();
   const since = isoDate(new Date(today.getFullYear(), today.getMonth(), 1));
@@ -41,46 +47,42 @@ export default async function TreasuryPage() {
   const monthIn = month.series.reduce((n, p) => n + Number(p.in), 0);
   const monthOut = -month.series.reduce((n, p) => n + Number(p.out), 0);
   const chequesTotal = cheques.reduce((n, c) => n + Number(c.amount), 0);
-  const sinceLabel = `Since ${f.date(since)}`;
+  const sinceLabel = t('since', { date: f.date(since) });
+  const nameOf = (code: string, fallback: string) => {
+    const a = accountByCode(accounts, code);
+    return a ? accountName(a, locale) : fallback;
+  };
 
   return (
     <Page fill>
       <PageHeader
-        title={
-          <>
-            Treasury <bdi className="font-sans text-lg font-normal text-muted-foreground">الخزينة</bdi>
-          </>
-        }
-        description="Cash on hand, every movement in and out of it, and cheques waiting to clear."
+        title={tr('nav.items.treasury')}
+        description={t('description')}
         actions={<TreasuryActions />}
       />
 
       <MetricGrid>
         <MetricCard
-          label="Cash on hand"
+          label={tr('charts.cashOnHand')}
           value={<Amount value={cash} className={cn(Number(cash) < 0 && 'text-destructive')} />}
-          hint="EGP, in the till"
-          link={{ href: '/money/ledger?code=CASH', label: 'Open in the ledger' }}
+          hint={t('cashHint')}
+          link={{ href: '/money/ledger?code=CASH', label: t('openInLedger') }}
         />
         <MetricCard
-          label="In this month"
+          label={t('inThisMonth')}
           value={<Amount value={monthIn} signed className={monthIn > 0 ? 'text-success' : undefined} />}
           hint={sinceLabel}
         />
         <MetricCard
-          label="Out this month"
+          label={t('outThisMonth')}
           value={<Amount value={monthOut} className={monthOut < 0 ? 'text-destructive' : undefined} />}
           hint={sinceLabel}
         />
         <MetricCard
-          label="Cheques pending"
+          label={t('chequesPending')}
           value={<Amount value={chequesTotal} />}
           tone={cheques.length ? 'warning' : 'default'}
-          hint={
-            cheques.length
-              ? `${cheques.length} ${cheques.length === 1 ? 'cheque' : 'cheques'} not cleared yet`
-              : 'Nothing waiting to clear'
-          }
+          hint={cheques.length ? t('chequesNotCleared', { count: cheques.length }) : t('nothingPending')}
         />
       </MetricGrid>
 
@@ -91,25 +93,25 @@ export default async function TreasuryPage() {
         footer={
           <TableCount>
             {movements.length >= LIMIT
-              ? `The ${LIMIT} most recent movements — older ones are in the Ledger.`
-              : `${movements.length} ${movements.length === 1 ? 'movement' : 'movements'}`}
+              ? t('recent', { limit: LIMIT })
+              : tr('nouns.movements', { count: movements.length })}
           </TableCount>
         }
       >
         {movements.length === 0 ? (
           <TableEmpty
             icon={Receipt}
-            title="No cash movements yet"
-            description="Record a deposit to start — every sale, payout and expense lands here after."
+            title={t('empty')}
+            description={t('emptyHint')}
           />
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Movement</TableHead>
-                <TableHead className="hidden w-[240px] md:table-cell">From or to</TableHead>
-                <TableHead className="w-[150px] text-end">Amount</TableHead>
-                <TableHead className="hidden w-[150px] text-end sm:table-cell">Balance</TableHead>
+                <TableHead>{t('columns.movement')}</TableHead>
+                <TableHead className="hidden w-[240px] md:table-cell">{t('columns.fromOrTo')}</TableHead>
+                <TableHead className="w-[150px] text-end">{t('columns.amount')}</TableHead>
+                <TableHead className="hidden w-[150px] text-end sm:table-cell">{t('columns.balance')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -128,10 +130,10 @@ export default async function TreasuryPage() {
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
                           <span className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-                            {effect > 0 ? 'from' : 'to'}
+                            {effect > 0 ? t('from') : t('to')}
                             <AccountChip
-                              name={effect > 0 ? m.creditAr : m.debitAr}
-                              title={accountByCode(accounts, other)?.nameEn}
+                              name={nameOf(other, effect > 0 ? m.creditAr : m.debitAr)}
+                              title={nameOf(other, '')}
                               href={`/money/ledger?code=${other}`}
                             />
                           </span>

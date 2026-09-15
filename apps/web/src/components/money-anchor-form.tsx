@@ -1,6 +1,7 @@
 'use client';
 
 import { AlertTriangle } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { useActionState } from 'react';
 import { toast } from 'sonner';
 import { setAnchor, type FormState } from '@/app/(app)/money/actions';
@@ -19,9 +20,10 @@ export function MoneyAnchorForm({
   openingBalance: string;
   openingAsOf: string | null;
 }) {
+  const t = useTranslations();
   const [state, submit, pending] = useActionState<FormState, FormData>(async (prev, form) => {
     const next = await setAnchor(prev, form);
-    if (next.status === 'saved') toast.success('Opening balance saved.');
+    if (next.status === 'saved') toast.success(t('money.start.saved'));
     return next;
   }, { status: 'idle' });
 
@@ -29,7 +31,7 @@ export function MoneyAnchorForm({
     <form action={submit} className="grid w-full gap-4 text-start">
       <div className="grid gap-3 sm:grid-cols-2">
         <Field>
-          <FieldLabel htmlFor="openingBalance">Cash on hand</FieldLabel>
+          <FieldLabel htmlFor="openingBalance">{t('charts.cashOnHand')}</FieldLabel>
           <MoneyInput
             id="openingBalance"
             name="openingBalance"
@@ -38,7 +40,7 @@ export function MoneyAnchorForm({
           />
         </Field>
         <Field>
-          <FieldLabel htmlFor="openingAsOf">As of</FieldLabel>
+          <FieldLabel htmlFor="openingAsOf">{t('money.start.asOf')}</FieldLabel>
           <DatePicker
             id="openingAsOf"
             name="openingAsOf"
@@ -55,7 +57,7 @@ export function MoneyAnchorForm({
       ) : null}
       <Button type="submit" disabled={pending} className="justify-self-start">
         {pending ? <Spinner /> : null}
-        Start the ledger
+        {t('money.start.submit')}
       </Button>
     </form>
   );

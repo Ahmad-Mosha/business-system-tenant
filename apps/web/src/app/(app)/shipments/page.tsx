@@ -6,9 +6,11 @@ import { ShipmentsView } from '@/components/shipments-view';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getBostaShipments } from '@/lib/api';
 import { requireSession } from '@/lib/session';
+import { getTranslations } from 'next-intl/server';
 
 export default async function ShipmentsPage() {
   await requireSession();
+  const t = await getTranslations('shipments');
 
   // A failed fetch must not read as "zero shipments" — the two look identical
   // to a user with nothing to say anything went wrong.
@@ -17,7 +19,7 @@ export default async function ShipmentsPage() {
   try {
     shipments = await getBostaShipments();
   } catch (e) {
-    loadError = e instanceof Error ? e.message : 'Could not reach Bosta.';
+    loadError = e instanceof Error ? e.message : t('unreachable');
   }
 
   const delivered = shipments.filter((s) => s.status === 'DELIVERED').length;
@@ -34,41 +36,41 @@ export default async function ShipmentsPage() {
 
   return (
     <Page fill>
-      <PageHeader title="Shipments" description="Every live Bosta delivery, in one place." />
+      <PageHeader title={t('title')} description={t('description')} />
 
       {loadError ? (
         <Alert variant="destructive">
           <AlertTriangle />
-          <AlertTitle>Could not load shipments from Bosta</AlertTitle>
+          <AlertTitle>{t('loadFailed')}</AlertTitle>
           <AlertDescription>{loadError}</AlertDescription>
         </Alert>
       ) : null}
 
       <MetricGrid>
-        <MetricCard label="Live shipments" value={shipments.length} hint="Active Bosta deliveries" />
+        <MetricCard label={t('live')} value={shipments.length} hint={t('liveHint')} />
         <MetricCard
-          label="Delivered"
+          label={t('delivered')}
           value={delivered}
           hint={
             shipments.length
-              ? `${Math.round((delivered / shipments.length) * 100)}% of live shipments`
-              : 'Nothing delivered yet'
+              ? t('deliveredShare', { share: delivered / shipments.length })
+              : t('deliveredNone')
           }
         />
         <MetricCard
-          label="In transit"
+          label={t('inTransit')}
           value={inTransit}
           tone={delayed > 0 ? 'warning' : 'default'}
-          hint={delayed > 0 ? `${delayed} delayed` : 'With the courier or out for delivery'}
+          hint={delayed > 0 ? t('delayed', { count: delayed }) : t('inTransitHint')}
         />
         <MetricCard
-          label="COD to collect"
+          label={t('codToCollect')}
           value={<Amount value={uncollectedValue} />}
           tone={uncollected.length > 0 ? 'warning' : 'default'}
           hint={
             uncollected.length > 0
-              ? `${uncollected.length} delivered, cash not remitted`
-              : 'Bosta holds nothing of ours'
+              ? t('codUncollected', { count: uncollected.length })
+              : t('codNone')
           }
         />
       </MetricGrid>

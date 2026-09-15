@@ -1,6 +1,7 @@
 'use client';
 
 import { Send } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { postInvoice } from '@/app/(app)/money/actions';
@@ -18,12 +19,14 @@ import {
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { money } from '@/lib/format';
+import { num } from '@/i18n/rich';
 
 /**
  * Posts a draft invoice — the one irreversible step in purchasing (stock moves
  * in, the ledger books it), so it asks first and says exactly what happens.
  */
 export function PostInvoiceButton({ id, total }: { id: string; total: string }) {
+  const t = useTranslations('money.invoice');
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
 
@@ -34,7 +37,7 @@ export function PostInvoiceButton({ id, total }: { id: string; total: string }) 
       const result = await postInvoice({ status: 'idle' }, form);
       if (result.status === 'error') toast.error(result.message);
       if (result.status === 'saved') {
-        toast.success('Invoice posted — stock and the ledger updated.');
+        toast.success(t('posted'));
         setOpen(false);
       }
     });
@@ -44,19 +47,16 @@ export function PostInvoiceButton({ id, total }: { id: string; total: string }) 
       <AlertDialogTrigger asChild>
         <Button>
           <Send />
-          Post invoice
+          {t('post')}
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Post this invoice?</AlertDialogTitle>
-          <AlertDialogDescription>
-            <span className="num text-foreground">{money(total)}</span> of stock comes in at cost and
-            the money is booked. Posting can’t be undone.
-          </AlertDialogDescription>
+          <AlertDialogTitle>{t('confirmTitle')}</AlertDialogTitle>
+          <AlertDialogDescription>{t.rich('confirm', { total: money(total), num })}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={pending}>Not yet</AlertDialogCancel>
+          <AlertDialogCancel disabled={pending}>{t('notYet')}</AlertDialogCancel>
           <AlertDialogAction
             disabled={pending}
             onClick={(e) => {
@@ -65,7 +65,7 @@ export function PostInvoiceButton({ id, total }: { id: string; total: string }) 
             }}
           >
             {pending ? <Spinner /> : null}
-            Post invoice
+            {t('post')}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

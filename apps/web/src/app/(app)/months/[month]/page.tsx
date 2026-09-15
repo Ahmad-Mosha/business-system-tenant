@@ -4,11 +4,12 @@ import { StatementView } from '@/components/statement-view';
 import { getPeriods } from '@/lib/api';
 
 import { requireAdmin } from '@/lib/session';
+import { getTranslations } from 'next-intl/server';
 import { getFormat } from '@/i18n/get-format';
 
 /** Next 16 hands params in as a promise. */
 export default async function MonthPage({ params }: { params: Promise<{ month: string }> }) {
-  const f = await getFormat();
+  const [f, t, tr] = await Promise.all([getFormat(), getTranslations('noon.months'), getTranslations()]);
   await requireAdmin();
   const { month } = await params;
   const periods = await getPeriods();
@@ -18,9 +19,11 @@ export default async function MonthPage({ params }: { params: Promise<{ month: s
   return (
     <Page>
       <PageHeader
-        back={{ href: '/months', label: 'Back to months' }}
+        back={{ href: '/months', label: t('back') }}
         title={f.month(period.month)}
-        description={`noon settlement · ${f.date(period.from)} – ${f.date(period.to)}`}
+        description={t('settlement', {
+          range: tr('common.dateRange', { from: f.date(period.from), to: f.date(period.to) }),
+        })}
       />
       <StatementView from={period.from} to={period.to} />
     </Page>

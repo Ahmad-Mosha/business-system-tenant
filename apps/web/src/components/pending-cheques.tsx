@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useActionState } from 'react';
 import { toast } from 'sonner';
 import { settleCheque, type FormState } from '@/app/(app)/money/actions';
@@ -13,14 +14,15 @@ import { useFormat } from '@/i18n/use-format';
 
 /** Cheques received but not cleared — clear or bounce each one. */
 export function PendingCheques({ cheques }: { cheques: ChequeRow[] }) {
+  const t = useTranslations('money');
   const f = useFormat();
   if (cheques.length === 0) return null;
   const total = cheques.reduce((n, c) => n + Number(c.amount), 0);
   return (
     <Card className="shrink-0 pb-0">
       <CardHeader>
-        <CardTitle>Cheques pending</CardTitle>
-        <CardDescription>Not counted as cash until they clear.</CardDescription>
+        <CardTitle>{t('treasury.chequesPending')}</CardTitle>
+        <CardDescription>{t('cheques.hint')}</CardDescription>
         <CardAction className="num text-sm font-semibold">{money(total)}</CardAction>
       </CardHeader>
       <div className="border-t">
@@ -31,10 +33,17 @@ export function PendingCheques({ cheques }: { cheques: ChequeRow[] }) {
                 <TableCell className="num w-[140px] text-end font-medium">{money(c.amount)}</TableCell>
                 <TableCell className="max-w-0 truncate">
                   <bdi>{c.fromParty}</bdi>
-                  {c.memo ? <span className="text-muted-foreground"> · {c.memo}</span> : null}
+                  {c.memo ? (
+                    <span className="text-muted-foreground">
+                      {' · '}
+                      <bdi>{c.memo}</bdi>
+                    </span>
+                  ) : null}
                 </TableCell>
                 <TableCell className="w-[160px] text-muted-foreground">
-                  {c.dueDate ? `Due ${f.date(c.dueDate)}` : `Received ${f.date(c.receivedDate)}`}
+                  {c.dueDate
+                    ? t('cheques.due', { date: f.date(c.dueDate) })
+                    : t('cheques.received', { date: f.date(c.receivedDate) })}
                 </TableCell>
                 <TableCell className="w-[190px] text-end">
                   <ChequeActions id={c.id} />
@@ -49,10 +58,11 @@ export function PendingCheques({ cheques }: { cheques: ChequeRow[] }) {
 }
 
 function ChequeActions({ id }: { id: string }) {
+  const t = useTranslations('money.cheques');
   const [, submit, pending] = useActionState<FormState, FormData>(async (prev, form) => {
     const next = await settleCheque(prev, form);
     if (next.status === 'error') toast.error(next.message);
-    if (next.status === 'saved') toast.success('Cheque updated.');
+    if (next.status === 'saved') toast.success(t('updated'));
     return next;
   }, { status: 'idle' });
 
@@ -60,11 +70,11 @@ function ChequeActions({ id }: { id: string }) {
     <form action={submit} className="inline-flex items-center gap-1.5">
       <input type="hidden" name="id" value={id} />
       <Button type="submit" name="status" value="BOUNCED" size="sm" variant="ghost" disabled={pending} className="text-muted-foreground">
-        Bounced
+        {t('bounced')}
       </Button>
       <Button type="submit" name="status" value="CLEARED" size="sm" variant="outline" disabled={pending}>
         {pending ? <Spinner /> : null}
-        Cleared
+        {t('cleared')}
       </Button>
     </form>
   );
