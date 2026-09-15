@@ -22,17 +22,16 @@ const eslintConfig = defineConfig([
   ...nextTs,
   // Words on screen come from src/messages, never from the code (docs/i18n.md):
   // not JSX text, not a text prop, not a toast or an action's message.
-  // Warnings while screens move over module by module; errors after.
   {
     files: ["src/app/**/*.{ts,tsx}", "src/components/**/*.{ts,tsx}"],
     ignores: ["src/app/dev-preview/**", "src/app/api/**", "src/components/ui/**"],
     rules: {
       "react/jsx-no-literals": [
-        "warn",
-        { noStrings: false, ignoreProps: true, allowedStrings: ["·", "—", "–", "/", "(", ")", "%", "+", "−", ":", "×"] },
+        "error",
+        { noStrings: false, ignoreProps: true, allowedStrings: ["·", "—", "–", "/", "(", ")", "%", "+", "−", ":", "×", "#"] },
       ],
       "no-restricted-syntax": [
-        "warn",
+        "error",
         ...TEXT_SELECTORS.map((selector) => ({
           selector,
           message: "Text a reader sees comes from src/messages (docs/i18n.md).",
