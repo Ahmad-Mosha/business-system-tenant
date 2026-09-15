@@ -1,0 +1,128 @@
+import { MigrationInterface, QueryRunner } from "typeorm";
+
+export class Initial1789469345697 implements MigrationInterface {
+    name = 'Initial1789469345697'
+
+    public async up(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`CREATE TABLE "app_user" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "email" text NOT NULL, "name" text NOT NULL, "password_hash" text NOT NULL, "role" text NOT NULL DEFAULT 'MODERATOR', "active" boolean NOT NULL DEFAULT true, "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "uq_user_email" UNIQUE ("email"), CONSTRAINT "PK_22a5c4a3d9b2fb8e4e73fc4ada1" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TABLE "product" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "name" text NOT NULL, "category" text, "mega_id" text, "discovered" boolean NOT NULL DEFAULT false, "active" boolean NOT NULL DEFAULT true, "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "uq_product_mega_id" UNIQUE ("mega_id"), CONSTRAINT "PK_bebc9158e480b949565b4dc7a82" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TABLE "product_variant" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "product_id" uuid NOT NULL, "name" text NOT NULL DEFAULT 'Default', "sku" text, "attributes" jsonb NOT NULL DEFAULT '{}'::jsonb, "unit_cost" numeric(14,2), "selling_price" numeric(14,2), "active" boolean NOT NULL DEFAULT true, "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "uq_variant_sku" UNIQUE ("sku"), CONSTRAINT "PK_1ab69c9935c61f7c70791ae0a9f" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "ix_variant_product" ON "product_variant" ("product_id") `);
+        await queryRunner.query(`CREATE TABLE "channel_listing" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "channel" text NOT NULL, "external_id" text NOT NULL, "external_variant_id" text NOT NULL DEFAULT '', "price" numeric(14,2), "partner_sku" text, "title" text, "variant_id" uuid NOT NULL, "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "uq_listing_channel_external" UNIQUE ("channel", "external_id", "external_variant_id"), CONSTRAINT "PK_78aa80eb7c60478a7f2eb3cf618" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "ix_listing_partner_sku" ON "channel_listing" ("partner_sku") `);
+        await queryRunner.query(`CREATE INDEX "ix_listing_variant" ON "channel_listing" ("variant_id") `);
+        await queryRunner.query(`CREATE TABLE "cheque" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "amount" numeric(14,2) NOT NULL, "from_party" text NOT NULL, "received_date" date NOT NULL, "due_date" date, "status" text NOT NULL DEFAULT 'PENDING', "cleared_date" date, "memo" text, "deposit_entry_id" uuid, "created_by_id" uuid, "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_bf81eabc52f4f3320378a80f77e" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "ix_cheque_status" ON "cheque" ("status") `);
+        await queryRunner.query(`CREATE TABLE "ledger_account" ("code" text NOT NULL, "name_ar" text NOT NULL, "name_en" text NOT NULL, "kind" text NOT NULL, "sort" integer NOT NULL DEFAULT '0', CONSTRAINT "PK_cb2ceafed631e8bfa859548d22b" PRIMARY KEY ("code"))`);
+        await queryRunner.query(`CREATE TABLE "ledger_entry" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "occurred_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "amount" numeric(14,2) NOT NULL, "debit_code" text NOT NULL, "credit_code" text NOT NULL, "kind" text NOT NULL, "memo" text, "supplier_id" uuid, "source_type" text, "source_id" text, "reverses_id" uuid, "actor_id" uuid, "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_04e9d274911f909a5848a15cd74" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "ix_ledger_entry_supplier" ON "ledger_entry" ("supplier_id") `);
+        await queryRunner.query(`CREATE INDEX "ix_ledger_entry_source" ON "ledger_entry" ("source_type", "source_id") `);
+        await queryRunner.query(`CREATE INDEX "ix_ledger_entry_credit" ON "ledger_entry" ("credit_code") `);
+        await queryRunner.query(`CREATE INDEX "ix_ledger_entry_debit" ON "ledger_entry" ("debit_code") `);
+        await queryRunner.query(`CREATE INDEX "ix_ledger_entry_occurred" ON "ledger_entry" ("occurred_at") `);
+        await queryRunner.query(`CREATE TABLE "easyorders_event" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "fingerprint" text NOT NULL, "event_type" text NOT NULL, "external_order_id" text, "payload" jsonb NOT NULL, "processed_at" TIMESTAMP WITH TIME ZONE, "error" text, "received_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "uq_easyorders_event_fingerprint" UNIQUE ("fingerprint"), CONSTRAINT "PK_27bee4a679cb768b9bdf9a68576" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "ix_easyorders_event_order" ON "easyorders_event" ("external_order_id") `);
+        await queryRunner.query(`CREATE TABLE "stock_movement" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "variant_id" uuid NOT NULL, "quantity" integer NOT NULL, "reason" text NOT NULL, "unit_cost" numeric(14,2), "avg_cost_after" numeric(14,4), "source_type" text, "source_id" text, "note" text, "created_by_id" uuid, "occurred_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_9fe1232f916686ae8cf00294749" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "ix_stock_variant_date" ON "stock_movement" ("variant_id", "occurred_at") `);
+        await queryRunner.query(`CREATE TABLE "channel_account" ("channel" text NOT NULL, "opening_balance" numeric(14,2) NOT NULL DEFAULT '0', "opening_as_of" date, "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_7dec197ce4cb73234dc53ada874" PRIMARY KEY ("channel"))`);
+        await queryRunner.query(`CREATE TABLE "noon_import" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "filename" text NOT NULL, "file_hash" text NOT NULL, "rows_in_file" integer NOT NULL, "rows_inserted" integer NOT NULL, "rows_skipped" integer NOT NULL, "unmapped_listings" integer NOT NULL DEFAULT '0', "period_start" date, "period_end" date, "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "uq_noon_import_file_hash" UNIQUE ("file_hash"), CONSTRAINT "PK_98fd4dd4ea4fc8b49f8d19375cb" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TABLE "noon_transaction" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "fingerprint" text NOT NULL, "import_id" uuid NOT NULL, "reference_nr" text NOT NULL, "order_nr" text, "item_nr" text, "order_date" date, "transaction_date" date, "title" text NOT NULL, "noon_sku" text, "partner_sku" text, "transaction_type" text NOT NULL, "currency" text NOT NULL DEFAULT 'EGP', "net_proceeds" numeric(14,2) NOT NULL, "referral_fee" numeric(14,2) NOT NULL, "fulfilment_fee" numeric(14,2) NOT NULL, "shipping_credits" numeric(14,2) NOT NULL, "other_order_fees" numeric(14,2) NOT NULL, "order_subsidies" numeric(14,2) NOT NULL, "non_order_fees" numeric(14,2) NOT NULL, "non_order_subsidies" numeric(14,2) NOT NULL, "others" numeric(14,2) NOT NULL, "total" numeric(14,2) NOT NULL, "listing_id" uuid, CONSTRAINT "uq_noon_transaction_fingerprint" UNIQUE ("fingerprint"), CONSTRAINT "PK_97958861b2b82c7500815335ee8" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "ix_noon_tx_reference" ON "noon_transaction" ("reference_nr") `);
+        await queryRunner.query(`CREATE INDEX "ix_noon_tx_date" ON "noon_transaction" ("transaction_date") `);
+        await queryRunner.query(`CREATE INDEX "ix_noon_tx_listing" ON "noon_transaction" ("listing_id") `);
+        await queryRunner.query(`CREATE INDEX "ix_noon_tx_type_date" ON "noon_transaction" ("transaction_type", "transaction_date") `);
+        await queryRunner.query(`CREATE TABLE "order_item" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "order_id" uuid NOT NULL, "variant_id" uuid, "external_product_id" text, "external_variant_id" text, "title" text NOT NULL, "quantity" integer NOT NULL, "unit_price" numeric(14,2) NOT NULL, "line_total" numeric(14,2) NOT NULL, CONSTRAINT "PK_d01158fe15b1ead5c26fd7f4e90" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "ix_order_item_order" ON "order_item" ("order_id") `);
+        await queryRunner.query(`CREATE INDEX "ix_order_item_variant" ON "order_item" ("variant_id") `);
+        await queryRunner.query(`CREATE TABLE "customer_order" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "order_number" text NOT NULL, "source" text NOT NULL, "external_id" text, "status" text NOT NULL DEFAULT 'NEW', "payment_status" text NOT NULL DEFAULT 'UNPAID', "payment_method" text NOT NULL DEFAULT 'COD', "external_status" text, "customer_name" text NOT NULL, "customer_phone" text NOT NULL, "governorate" text, "address" text, "subtotal" numeric(14,2) NOT NULL DEFAULT '0', "shipping_cost" numeric(14,2) NOT NULL DEFAULT '0', "total" numeric(14,2) NOT NULL DEFAULT '0', "assigned_to_id" uuid, "created_by_id" uuid, "notes" text, "tracking_number" text, "placed_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "uq_order_source_external" UNIQUE ("source", "external_id"), CONSTRAINT "PK_c70aef746523b2c4a0af0945209" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "ix_order_number" ON "customer_order" ("order_number") `);
+        await queryRunner.query(`CREATE INDEX "ix_order_status" ON "customer_order" ("status") `);
+        await queryRunner.query(`CREATE INDEX "ix_order_assigned" ON "customer_order" ("assigned_to_id") `);
+        await queryRunner.query(`CREATE INDEX "ix_order_tracking_number" ON "customer_order" ("tracking_number") `);
+        await queryRunner.query(`CREATE INDEX "ix_order_placed_at" ON "customer_order" ("placed_at") `);
+        await queryRunner.query(`CREATE TABLE "order_event" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "order_id" uuid NOT NULL, "type" text NOT NULL, "from_value" text, "to_value" text, "note" text, "actor_id" uuid, "actor_name" text, "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_394b0d7613180ebee9028e9aaa1" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "ix_order_event_order" ON "order_event" ("order_id") `);
+        await queryRunner.query(`CREATE TABLE "supplier" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "name" text NOT NULL, "phone" text, "note" text, "active" boolean NOT NULL DEFAULT true, "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_2bc0d2cab6276144d2ff98a2828" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TABLE "purchase_invoice" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "supplier_id" uuid NOT NULL, "invoice_no" text, "invoice_date" date NOT NULL, "status" text NOT NULL DEFAULT 'DRAFT', "payment" text NOT NULL DEFAULT 'CREDIT', "goods_total" numeric(14,2) NOT NULL DEFAULT '0', "extra_costs" numeric(14,2) NOT NULL DEFAULT '0', "allocation" text NOT NULL DEFAULT 'BY_VALUE', "landed_total" numeric(14,2) NOT NULL DEFAULT '0', "settled_amount" numeric(14,2) NOT NULL DEFAULT '0', "posted_at" TIMESTAMP WITH TIME ZONE, "created_by_id" uuid, "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_ce2d4f73261c835e3252a9a9bab" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "ix_purchase_supplier" ON "purchase_invoice" ("supplier_id") `);
+        await queryRunner.query(`CREATE INDEX "ix_purchase_status" ON "purchase_invoice" ("status") `);
+        await queryRunner.query(`CREATE TABLE "purchase_invoice_line" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "invoice_id" uuid NOT NULL, "variant_id" uuid NOT NULL, "quantity" integer NOT NULL, "unit_cost" numeric(14,2) NOT NULL, "landed_unit_cost" numeric(14,4), "line_total" numeric(14,2) NOT NULL, CONSTRAINT "PK_1e95cf54a54824fbe4b0efb6a3f" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "ix_purchase_line_invoice" ON "purchase_invoice_line" ("invoice_id") `);
+        await queryRunner.query(`ALTER TABLE "product_variant" ADD CONSTRAINT "FK_ca67dd080aac5ecf99609960cd2" FOREIGN KEY ("product_id") REFERENCES "product"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "channel_listing" ADD CONSTRAINT "FK_497a074ee365023a07040c2fc0c" FOREIGN KEY ("variant_id") REFERENCES "product_variant"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "ledger_entry" ADD CONSTRAINT "FK_c94800496bcd8aa391154942963" FOREIGN KEY ("debit_code") REFERENCES "ledger_account"("code") ON DELETE RESTRICT ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "ledger_entry" ADD CONSTRAINT "FK_542c7bb0da6e0532e137a8a1bbc" FOREIGN KEY ("credit_code") REFERENCES "ledger_account"("code") ON DELETE RESTRICT ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "stock_movement" ADD CONSTRAINT "FK_2ab0d3b1aa21963228e7443c964" FOREIGN KEY ("variant_id") REFERENCES "product_variant"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "noon_transaction" ADD CONSTRAINT "FK_5ff5a089897b9b99d063f3dc17e" FOREIGN KEY ("import_id") REFERENCES "noon_import"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "noon_transaction" ADD CONSTRAINT "FK_8b4719c92b66ade9f18bc6ba7a1" FOREIGN KEY ("listing_id") REFERENCES "channel_listing"("id") ON DELETE SET NULL ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "order_item" ADD CONSTRAINT "FK_e9674a6053adbaa1057848cddfa" FOREIGN KEY ("order_id") REFERENCES "customer_order"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "order_item" ADD CONSTRAINT "FK_6312e502a3cc8068671253bdbaf" FOREIGN KEY ("variant_id") REFERENCES "product_variant"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "customer_order" ADD CONSTRAINT "FK_e460578219f438f79fe900818b4" FOREIGN KEY ("assigned_to_id") REFERENCES "app_user"("id") ON DELETE SET NULL ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "order_event" ADD CONSTRAINT "FK_b5ad8b36013879595c72c063178" FOREIGN KEY ("order_id") REFERENCES "customer_order"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "purchase_invoice" ADD CONSTRAINT "FK_ca0ba97738e319cca423da2b0c4" FOREIGN KEY ("supplier_id") REFERENCES "supplier"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "purchase_invoice_line" ADD CONSTRAINT "FK_8cab914e9d6e0e0e3d235fa1815" FOREIGN KEY ("invoice_id") REFERENCES "purchase_invoice"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "purchase_invoice_line" ADD CONSTRAINT "FK_0a0d16aa2faeb6fa37c6b008972" FOREIGN KEY ("variant_id") REFERENCES "product_variant"("id") ON DELETE RESTRICT ON UPDATE NO ACTION`);
+    }
+
+    public async down(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`ALTER TABLE "purchase_invoice_line" DROP CONSTRAINT "FK_0a0d16aa2faeb6fa37c6b008972"`);
+        await queryRunner.query(`ALTER TABLE "purchase_invoice_line" DROP CONSTRAINT "FK_8cab914e9d6e0e0e3d235fa1815"`);
+        await queryRunner.query(`ALTER TABLE "purchase_invoice" DROP CONSTRAINT "FK_ca0ba97738e319cca423da2b0c4"`);
+        await queryRunner.query(`ALTER TABLE "order_event" DROP CONSTRAINT "FK_b5ad8b36013879595c72c063178"`);
+        await queryRunner.query(`ALTER TABLE "customer_order" DROP CONSTRAINT "FK_e460578219f438f79fe900818b4"`);
+        await queryRunner.query(`ALTER TABLE "order_item" DROP CONSTRAINT "FK_6312e502a3cc8068671253bdbaf"`);
+        await queryRunner.query(`ALTER TABLE "order_item" DROP CONSTRAINT "FK_e9674a6053adbaa1057848cddfa"`);
+        await queryRunner.query(`ALTER TABLE "noon_transaction" DROP CONSTRAINT "FK_8b4719c92b66ade9f18bc6ba7a1"`);
+        await queryRunner.query(`ALTER TABLE "noon_transaction" DROP CONSTRAINT "FK_5ff5a089897b9b99d063f3dc17e"`);
+        await queryRunner.query(`ALTER TABLE "stock_movement" DROP CONSTRAINT "FK_2ab0d3b1aa21963228e7443c964"`);
+        await queryRunner.query(`ALTER TABLE "ledger_entry" DROP CONSTRAINT "FK_542c7bb0da6e0532e137a8a1bbc"`);
+        await queryRunner.query(`ALTER TABLE "ledger_entry" DROP CONSTRAINT "FK_c94800496bcd8aa391154942963"`);
+        await queryRunner.query(`ALTER TABLE "channel_listing" DROP CONSTRAINT "FK_497a074ee365023a07040c2fc0c"`);
+        await queryRunner.query(`ALTER TABLE "product_variant" DROP CONSTRAINT "FK_ca67dd080aac5ecf99609960cd2"`);
+        await queryRunner.query(`DROP INDEX "public"."ix_purchase_line_invoice"`);
+        await queryRunner.query(`DROP TABLE "purchase_invoice_line"`);
+        await queryRunner.query(`DROP INDEX "public"."ix_purchase_status"`);
+        await queryRunner.query(`DROP INDEX "public"."ix_purchase_supplier"`);
+        await queryRunner.query(`DROP TABLE "purchase_invoice"`);
+        await queryRunner.query(`DROP TABLE "supplier"`);
+        await queryRunner.query(`DROP INDEX "public"."ix_order_event_order"`);
+        await queryRunner.query(`DROP TABLE "order_event"`);
+        await queryRunner.query(`DROP INDEX "public"."ix_order_placed_at"`);
+        await queryRunner.query(`DROP INDEX "public"."ix_order_tracking_number"`);
+        await queryRunner.query(`DROP INDEX "public"."ix_order_assigned"`);
+        await queryRunner.query(`DROP INDEX "public"."ix_order_status"`);
+        await queryRunner.query(`DROP INDEX "public"."ix_order_number"`);
+        await queryRunner.query(`DROP TABLE "customer_order"`);
+        await queryRunner.query(`DROP INDEX "public"."ix_order_item_variant"`);
+        await queryRunner.query(`DROP INDEX "public"."ix_order_item_order"`);
+        await queryRunner.query(`DROP TABLE "order_item"`);
+        await queryRunner.query(`DROP INDEX "public"."ix_noon_tx_type_date"`);
+        await queryRunner.query(`DROP INDEX "public"."ix_noon_tx_listing"`);
+        await queryRunner.query(`DROP INDEX "public"."ix_noon_tx_date"`);
+        await queryRunner.query(`DROP INDEX "public"."ix_noon_tx_reference"`);
+        await queryRunner.query(`DROP TABLE "noon_transaction"`);
+        await queryRunner.query(`DROP TABLE "noon_import"`);
+        await queryRunner.query(`DROP TABLE "channel_account"`);
+        await queryRunner.query(`DROP INDEX "public"."ix_stock_variant_date"`);
+        await queryRunner.query(`DROP TABLE "stock_movement"`);
+        await queryRunner.query(`DROP INDEX "public"."ix_easyorders_event_order"`);
+        await queryRunner.query(`DROP TABLE "easyorders_event"`);
+        await queryRunner.query(`DROP INDEX "public"."ix_ledger_entry_occurred"`);
+        await queryRunner.query(`DROP INDEX "public"."ix_ledger_entry_debit"`);
+        await queryRunner.query(`DROP INDEX "public"."ix_ledger_entry_credit"`);
+        await queryRunner.query(`DROP INDEX "public"."ix_ledger_entry_source"`);
+        await queryRunner.query(`DROP INDEX "public"."ix_ledger_entry_supplier"`);
+        await queryRunner.query(`DROP TABLE "ledger_entry"`);
+        await queryRunner.query(`DROP TABLE "ledger_account"`);
+        await queryRunner.query(`DROP INDEX "public"."ix_cheque_status"`);
+        await queryRunner.query(`DROP TABLE "cheque"`);
+        await queryRunner.query(`DROP INDEX "public"."ix_listing_variant"`);
+        await queryRunner.query(`DROP INDEX "public"."ix_listing_partner_sku"`);
+        await queryRunner.query(`DROP TABLE "channel_listing"`);
+        await queryRunner.query(`DROP INDEX "public"."ix_variant_product"`);
+        await queryRunner.query(`DROP TABLE "product_variant"`);
+        await queryRunner.query(`DROP TABLE "product"`);
+        await queryRunner.query(`DROP TABLE "app_user"`);
+    }
+
+}

@@ -6,62 +6,25 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthController } from './auth/auth.controller';
 import { AuthGuard } from './auth/auth.guard';
 import { AuthService } from './auth/auth.service';
-import { User } from './auth/user.entity';
 import { CatalogController } from './catalog/catalog.controller';
 import { CatalogService } from './catalog/catalog.service';
-import { ChannelListing } from './catalog/channel-listing.entity';
-import { ProductVariant } from './catalog/product-variant.entity';
-import { Product } from './catalog/product.entity';
-import { SnakeNamingStrategy } from './database/snake-naming.strategy';
-import { Cheque } from './finance/cheque.entity';
+import { ENTITIES } from './database/entities';
+import { ormOptions } from './database/orm-options';
 import { FinanceController } from './finance/finance.controller';
 import { FinanceService } from './finance/finance.service';
-import { LedgerAccount } from './finance/ledger-account.entity';
-import { LedgerEntry } from './finance/ledger-entry.entity';
 import { LedgerService } from './finance/ledger.service';
 import { EasyOrdersController } from './integrations/easyorders/easyorders.controller';
-import { EasyOrdersEvent } from './integrations/easyorders/easyorders-event.entity';
 import { EasyOrdersService } from './integrations/easyorders/easyorders.service';
 import { BostaClient } from './integrations/bosta/bosta.client';
 import { BostaController } from './integrations/bosta/bosta.controller';
 import { BostaService } from './integrations/bosta/bosta.service';
-import { StockMovement } from './inventory/stock-movement.entity';
-import { ChannelAccount } from './noon/channel-account.entity';
-import { NoonImport } from './noon/noon-import.entity';
 import { NoonImportService } from './noon/noon-import.service';
-import { NoonTransaction } from './noon/noon-transaction.entity';
 import { NoonController } from './noon/noon.controller';
-import { OrderEvent } from './orders/order-event.entity';
-import { OrderItem } from './orders/order-item.entity';
-import { Order } from './orders/order.entity';
 import { OrdersController } from './orders/orders.controller';
 import { OrdersService } from './orders/orders.service';
-import { PurchaseInvoice, PurchaseInvoiceLine } from './purchasing/purchase-invoice.entity';
 import { PurchasesController, SuppliersController } from './purchasing/purchasing.controller';
 import { PurchasingService } from './purchasing/purchasing.service';
-import { Supplier } from './purchasing/supplier.entity';
 import { NoonReportingService } from './reporting/noon-reporting.service';
-
-const ENTITIES = [
-  User,
-  Product,
-  ProductVariant,
-  ChannelListing,
-  StockMovement,
-  Order,
-  OrderItem,
-  OrderEvent,
-  NoonImport,
-  NoonTransaction,
-  ChannelAccount,
-  EasyOrdersEvent,
-  LedgerAccount,
-  LedgerEntry,
-  Cheque,
-  Supplier,
-  PurchaseInvoice,
-  PurchaseInvoiceLine,
-];
 
 @Module({
   imports: [
@@ -76,11 +39,11 @@ const ENTITIES = [
     TypeOrmModule.forRoot({
       type: 'postgres',
       url: process.env.DATABASE_URL,
-      entities: ENTITIES,
-      namingStrategy: new SnakeNamingStrategy(),
-      // ponytail: schema sync while the model is still moving. Swap for
-      // generated migrations before real inventory data lands.
-      synchronize: true,
+      ...ormOptions,
+      // Schema now comes from src/database/migrations, run automatically on
+      // boot — see src/database/data-source.ts for the CLI that generates them.
+      migrationsRun: true,
+      synchronize: false,
     }),
     TypeOrmModule.forFeature(ENTITIES),
   ],
