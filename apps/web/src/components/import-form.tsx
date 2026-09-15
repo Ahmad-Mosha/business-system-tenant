@@ -1,6 +1,7 @@
 'use client';
 
 import { CheckCircle2, FileText, Info, Upload, X } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { useActionState, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { uploadReport, type UploadState } from '@/app/(app)/imports/actions';
@@ -9,6 +10,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 
 export function ImportForm() {
+  const t = useTranslations('noon.imports');
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -19,9 +21,9 @@ export function ImportForm() {
     if (next.status === 'error') toast.error(next.message);
     if (next.status === 'done') {
       const { rowsInserted, alreadyImported } = next.result;
-      if (alreadyImported) toast.info('This exact file was already imported.');
-      else if (rowsInserted === 0) toast.info('Every row was already on record.');
-      else toast.success(`Imported ${rowsInserted} new rows.`);
+      if (alreadyImported) toast.info(t('alreadyImported'));
+      else if (rowsInserted === 0) toast.info(t('allKnown'));
+      else toast.success(t('importedRows', { count: rowsInserted }));
       // Clear the picker so the next upload starts from a clean slate.
       setFile(null);
       formRef.current?.reset();
@@ -33,7 +35,7 @@ export function ImportForm() {
     const next = files?.[0];
     if (!next) return;
     if (!next.name.toLowerCase().endsWith('.csv')) {
-      toast.error('That is not a CSV file.');
+      toast.error(t('notCsv'));
       return;
     }
     setFile(next);
@@ -68,19 +70,19 @@ export function ImportForm() {
           disabled={pending}
           onChange={(e) => choose(e.target.files)}
           className="absolute inset-0 cursor-pointer opacity-0 disabled:cursor-not-allowed"
-          aria-label="Choose a noon settlement export"
+          aria-label={t('choose')}
         />
         {file ? (
           <div className="pointer-events-none flex items-center justify-center gap-2.5">
             <FileText className="size-4 shrink-0 text-muted-foreground" />
-            <span className="truncate text-[13px] font-medium">{file.name}</span>
-            <span className="num shrink-0 text-xs text-muted-foreground">{(file.size / 1024).toFixed(0)} KB</span>
+            <bdi className="truncate text-[13px] font-medium">{file.name}</bdi>
+            <span className="num shrink-0 text-xs text-muted-foreground">{t('fileSize', { size: (file.size / 1024).toFixed(0) })}</span>
             {!pending ? (
               <Button
                 type="button"
                 variant="ghost"
                 size="icon-xs"
-                aria-label="Remove file"
+                aria-label={t('remove')}
                 onClick={() => {
                   setFile(null);
                   formRef.current?.reset();
@@ -96,8 +98,8 @@ export function ImportForm() {
             <span className="mb-2 flex size-9 items-center justify-center bg-muted">
               <Upload className="size-4 text-muted-foreground" />
             </span>
-            <p className="text-[13px] font-medium">Drop a settlement export here</p>
-            <p className="text-xs text-muted-foreground">or click to browse · CSV from the noon portal</p>
+            <p className="text-[13px] font-medium">{t('drop')}</p>
+            <p className="text-xs text-muted-foreground">{t('browse')}</p>
           </div>
         )}
       </div>
@@ -105,13 +107,9 @@ export function ImportForm() {
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" disabled={!file || pending}>
           {pending ? <Spinner /> : <Upload />}
-          {pending ? 'Reading…' : 'Import report'}
+          {pending ? t('reading') : t('import')}
         </Button>
-        <p className="text-xs text-muted-foreground">
-          {pending
-            ? 'Parsing, matching products and storing rows.'
-            : 'The same report twice is safe — files are recognised by content, and rows already held are skipped.'}
-        </p>
+        <p className="text-xs text-muted-foreground">{pending ? t('parsing') : t('safe')}</p>
       </div>
 
       {state.status === 'done' ? <Outcome state={state} /> : null}
@@ -120,6 +118,7 @@ export function ImportForm() {
 }
 
 function Outcome({ state }: { state: Extract<UploadState, { status: 'done' }> }) {
+  const t = useTranslations('noon.imports');
   const r = state.result;
   const nothingNew = r.alreadyImported || r.rowsInserted === 0;
 
@@ -131,14 +130,16 @@ function Outcome({ state }: { state: Extract<UploadState, { status: 'done' }> })
         ) : (
           <CheckCircle2 className="size-4 shrink-0 text-success" />
         )}
-        <p className="min-w-0 flex-1 truncate text-[13px] font-medium">{state.filename}</p>
+        <p className="min-w-0 flex-1 truncate text-[13px] font-medium">
+          <bdi>{state.filename}</bdi>
+        </p>
       </div>
       <dl className="grid grid-cols-2 sm:grid-cols-4">
         {[
-          { label: 'Rows read', value: r.rowsInFile },
-          { label: 'New', value: r.rowsInserted },
-          { label: 'Already held', value: r.rowsSkipped },
-          { label: 'Unmapped SKUs', value: r.unmappedListings },
+          { label: t('rowsRead'), value: r.rowsInFile },
+          { label: t('columns.new'), value: r.rowsInserted },
+          { label: t('alreadyHeld'), value: r.rowsSkipped },
+          { label: t('unmappedSkus'), value: r.unmappedListings },
         ].map((cell, i) => (
           <div key={cell.label} className={cn('px-4 py-3', i > 0 && 'border-s')}>
             <dt className="text-xs text-muted-foreground">{cell.label}</dt>
@@ -148,9 +149,7 @@ function Outcome({ state }: { state: Extract<UploadState, { status: 'done' }> })
       </dl>
       {nothingNew ? (
         <p className="border-t px-4 py-3 text-xs text-muted-foreground">
-          {r.alreadyImported
-            ? 'This exact file had already been imported, so nothing changed.'
-            : 'Every row was already on record from an earlier export.'}
+          {r.alreadyImported ? t('alreadyImportedNote') : t('allKnownNote')}
         </p>
       ) : null}
     </div>
