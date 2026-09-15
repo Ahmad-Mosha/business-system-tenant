@@ -3,12 +3,15 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 import { Progress as ProgressPrimitive } from "radix-ui"
+import { useDirection } from "@/components/ui/direction"
 
 function Progress({
   className,
   value,
   ...props
 }: React.ComponentProps<typeof ProgressPrimitive.Root>) {
+  // The bar grows from the reading start — the right edge in Arabic.
+  const sign = useDirection() === "rtl" ? "" : "-"
   return (
     <ProgressPrimitive.Root
       data-slot="progress"
@@ -21,7 +24,7 @@ function Progress({
       <ProgressPrimitive.Indicator
         data-slot="progress-indicator"
         className="size-full flex-1 bg-primary transition-all"
-        style={{ transform: `translateX(-${100 - (value || 0)}%)` }}
+        style={{ transform: `translateX(${sign}${100 - (value || 0)}%)` }}
       />
     </ProgressPrimitive.Root>
   )

@@ -10,6 +10,7 @@ import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
 import type { UserRole } from './user.entity';
+import { problem } from '../problem';
 
 export const SESSION_COOKIE = 'pm_session';
 
@@ -50,17 +51,17 @@ export class AuthGuard implements CanActivate {
 
     const req = context.switchToHttp().getRequest<Request>();
     const token = req.cookies?.[SESSION_COOKIE];
-    if (!token) throw new UnauthorizedException('not signed in');
+    if (!token) throw new UnauthorizedException(problem('auth.required', 'not signed in'));
 
     try {
       req.user = await this.jwt.verifyAsync<SessionUser>(token);
     } catch {
-      throw new UnauthorizedException('session expired');
+      throw new UnauthorizedException(problem('auth.required', 'session expired'));
     }
 
     const roles = this.reflector.getAllAndOverride<UserRole[]>('roles', targets);
     if (roles?.length && !roles.includes(req.user.role)) {
-      throw new ForbiddenException('not permitted for your role');
+      throw new ForbiddenException(problem('auth.forbidden', 'not permitted for your role'));
     }
     return true;
   }

@@ -53,10 +53,14 @@ export async function StatementView({ from, to }: { from: string; to: string }) 
         <MetricCard
           label={tr('charts.netProceeds')}
           value={<Amount value={statement.netProceeds} />}
-          hint={t('netHint', {
-            units: tr('nouns.units', { count: unitsSold }),
-            products: tr('nouns.products', { count: products.length }),
-          })}
+          hint={
+            products.length
+              ? t('netHint', {
+                  units: tr('nouns.units', { count: unitsSold }),
+                  products: tr('nouns.products', { count: products.length }),
+                })
+              : t('netHintNone')
+          }
         />
         <MetricCard
           label={t('fees')}
