@@ -16,7 +16,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { getAccountLedger, getCashFlow, getCheques, getMoneyAccounts } from '@/lib/api';
-import { isoDate } from '@/lib/format';
+import { monthStart, today } from '@/lib/format';
 import { accountByCode, accountName } from '@/lib/money';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
@@ -33,14 +33,13 @@ export default async function TreasuryPage() {
     getLocale(),
   ]);
   await requireAdmin();
-  const today = new Date();
-  const since = isoDate(new Date(today.getFullYear(), today.getMonth(), 1));
+  const since = monthStart();
   const [accounts, movements, cheques, month] = await Promise.all([
     getMoneyAccounts(),
     getAccountLedger('CASH', LIMIT),
     getCheques('PENDING'),
     // Totals from the API, not from the rows below — those stop at LIMIT.
-    getCashFlow(since, isoDate(today), 'month'),
+    getCashFlow(since, today(), 'month'),
   ]);
 
   const cash = accountByCode(accounts, 'CASH')?.balance ?? '0';
