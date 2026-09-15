@@ -17,10 +17,11 @@ import {
 import { getSupplier } from '@/lib/api';
 import { money } from '@/lib/format';
 import { requireAdmin } from '@/lib/session';
+import { getTranslations } from 'next-intl/server';
 import { getFormat } from '@/i18n/get-format';
 
 export default async function SupplierDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const f = await getFormat();
+  const [f, t, tr] = await Promise.all([getFormat(), getTranslations('money.supplier'), getTranslations()]);
   await requireAdmin();
   const { id } = await params;
   const supplier = await getSupplier(id).catch(() => null);
@@ -34,48 +35,52 @@ export default async function SupplierDetailPage({ params }: { params: Promise<{
   return (
     <Page>
       <PageHeader
-        back={{ href: '/money/suppliers', label: 'Back to suppliers' }}
+        back={{ href: '/money/suppliers', label: t('back') }}
         title={<bdi>{supplier.name}</bdi>}
         description={
-          [supplier.phone, supplier.note].filter(Boolean).join(' · ') || 'Supplier'
+          supplier.phone || supplier.note ? (
+            <bdi>{[supplier.phone, supplier.note].filter(Boolean).join(' · ')}</bdi>
+          ) : (
+            t('fallback')
+          )
         }
         actions={<PaySupplier supplierId={supplier.id} owed={supplier.balance} />}
       />
 
       <MetricGrid>
         <MetricCard
-          label="Owed"
+          label={t('owed')}
           value={<Amount value={supplier.balance} />}
           tone={owed > 0 ? 'warning' : 'default'}
-          hint={owed > 0 ? 'On posted credit invoices' : 'Fully settled'}
+          hint={owed > 0 ? t('owedSome') : t('settled')}
         />
         <MetricCard
-          label="Bought"
+          label={t('bought')}
           value={<Amount value={purchased} />}
-          hint={`${posted.length} posted ${posted.length === 1 ? 'invoice' : 'invoices'}`}
+          hint={t('postedInvoices', { count: posted.length })}
         />
         <MetricCard
-          label="Paid"
+          label={t('paid')}
           value={<Amount value={paid} />}
-          hint={`${supplier.payments.length} ${supplier.payments.length === 1 ? 'payment' : 'payments'}`}
+          hint={tr('nouns.payments', { count: supplier.payments.length })}
         />
       </MetricGrid>
 
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_400px]">
         <Card className="min-w-0 pb-0">
           <CardHeader>
-            <CardTitle>Invoices</CardTitle>
+            <CardTitle>{t('invoices')}</CardTitle>
           </CardHeader>
           {supplier.invoices.length === 0 ? (
-            <p className="border-t p-10 text-center text-[13px] text-muted-foreground">No invoices yet.</p>
+            <p className="border-t p-10 text-center text-[13px] text-muted-foreground">{t('noInvoices')}</p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Invoice</TableHead>
-                  <TableHead className="w-[120px]">Date</TableHead>
-                  <TableHead className="w-[130px]">Status</TableHead>
-                  <TableHead className="w-[140px] text-end">Total</TableHead>
+                  <TableHead>{tr('money.purchases.columns.invoice')}</TableHead>
+                  <TableHead className="w-[120px]">{tr('money.purchases.columns.date')}</TableHead>
+                  <TableHead className="w-[130px]">{tr('money.purchases.columns.status')}</TableHead>
+                  <TableHead className="w-[140px] text-end">{tr('money.purchases.columns.total')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -86,10 +91,10 @@ export default async function SupplierDetailPage({ params }: { params: Promise<{
                         href={`/money/purchases/${i.id}`}
                         className="font-medium after:absolute after:inset-0 hover:underline focus-visible:underline focus-visible:outline-none"
                       >
-                        {i.invoiceNo ?? 'No ref'}
+                        {i.invoiceNo ?? tr('money.purchases.noRef')}
                       </Link>
                       <span className="ms-2 text-xs text-muted-foreground">
-                        {i.payment === 'CASH' ? 'Cash' : 'Credit'}
+                        {tr(`enums.purchasePayment.${i.payment}`)}
                       </span>
                     </TableCell>
                     <TableCell className="text-muted-foreground">{f.date(i.invoiceDate)}</TableCell>
@@ -106,11 +111,11 @@ export default async function SupplierDetailPage({ params }: { params: Promise<{
 
         <Card className="pb-0">
           <CardHeader>
-            <CardTitle>Payments</CardTitle>
-            <CardDescription>Cash paid to them, newest first.</CardDescription>
+            <CardTitle>{t('payments')}</CardTitle>
+            <CardDescription>{t('paymentsHint')}</CardDescription>
           </CardHeader>
           {supplier.payments.length === 0 ? (
-            <p className="border-t p-10 text-center text-[13px] text-muted-foreground">No payments yet.</p>
+            <p className="border-t p-10 text-center text-[13px] text-muted-foreground">{t('noPayments')}</p>
           ) : (
             <Table>
               <TableBody>
@@ -118,12 +123,12 @@ export default async function SupplierDetailPage({ params }: { params: Promise<{
                   <TableRow key={p.id}>
                     <TableCell className="h-auto max-w-0 py-2.5">
                       <p className="truncate">
-                        <bdi>{p.memo ?? 'Payment'}</bdi>
+                        <bdi>{p.memo ?? t('payment')}</bdi>
                       </p>
                       <p className="text-xs text-muted-foreground">{f.dateTime(p.occurredAt)}</p>
                     </TableCell>
-                    <TableCell className="num w-[130px] text-end font-medium text-destructive">
-                      −{money(p.amount)}
+                    <TableCell className="w-[130px] text-end">
+                      <Amount value={-Number(p.amount)} className="font-medium text-destructive" />
                     </TableCell>
                   </TableRow>
                 ))}

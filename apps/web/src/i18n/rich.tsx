@@ -13,3 +13,5 @@ export const num = (chunks: ReactNode) => <bdi className="num">{chunks}</bdi>;
 export const b = (chunks: ReactNode) => (
   <span className="num font-medium text-foreground">{chunks}</span>
 );
+/** `<strong>`: a name the sentence is about — a supplier, an account — isolated and in full colour. */
+export const strong = (chunks: ReactNode) => <bdi className="text-foreground">{chunks}</bdi>;
