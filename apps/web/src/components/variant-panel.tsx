@@ -209,7 +209,7 @@ export function VariantPanel({
           <div className="flex flex-wrap items-center gap-3">
             <Button onClick={move} disabled={pending || !count || tooMany} className="w-fit">
               {pending ? <Spinner /> : direction === 'in' ? <Plus /> : <Minus />}
-              {t(direction === 'in' ? 'add' : 'remove', { units: tr('nouns.units', { count }) })}
+              {t(direction === 'in' ? 'add' : 'remove', { count })}
             </Button>
             {tooMany ? (
               <p role="status" className="text-xs text-destructive">

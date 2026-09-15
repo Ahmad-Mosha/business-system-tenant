@@ -451,8 +451,8 @@
       "out": "Stock out",
       "quantity": "Quantity",
       "reason": "Reason",
-      "add": "Add {units}",
-      "remove": "Remove {units}",
+      "add": "Add {count, plural, one {# unit} other {# units}}",
+      "remove": "Remove {count, plural, one {# unit} other {# units}}",
       "increased": "Stock increased by {count}.",
       "reduced": "Stock reduced by {count}.",
       "onlyOnHand": "Only <num>{count}</num> on hand",
@@ -815,7 +815,8 @@
       "bestHint": "By net, after noon’s fees.",
       "noProducts": "No product-level sales yet — they appear once noon SKUs are linked to products in Inventory.",
       "units": "Units",
-      "net": "Net"
+      "net": "Net",
+      "netHintNone": "No product-level sales yet"
     },
     "months": {
       "noDataDescription": "noon settlements, month by month.",

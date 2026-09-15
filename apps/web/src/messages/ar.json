@@ -451,8 +451,8 @@
       "out": "خصم من المخزون",
       "quantity": "الكمية",
       "reason": "السبب",
-      "add": "إضافة {units}",
-      "remove": "خصم {units}",
+      "add": "إضافة {count, plural, zero {# وحدة} one {وحدة واحدة} two {وحدتين} few {# وحدات} many {# وحدة} other {# وحدة}}",
+      "remove": "خصم {count, plural, zero {# وحدة} one {وحدة واحدة} two {وحدتين} few {# وحدات} many {# وحدة} other {# وحدة}}",
       "increased": "زاد المخزون بمقدار {count}.",
       "reduced": "نقص المخزون بمقدار {count}.",
       "onlyOnHand": "المتوفر <num>{count}</num> فقط",
@@ -815,7 +815,8 @@
       "bestHint": "حسب الصافي، بعد رسوم نون.",
       "noProducts": "لا توجد مبيعات على مستوى المنتج بعد — تظهر بمجرد ربط رموز SKU الخاصة بنون بالمنتجات في المخزون.",
       "units": "الوحدات",
-      "net": "الصافي"
+      "net": "الصافي",
+      "netHintNone": "لا توجد مبيعات على مستوى المنتج بعد"
     },
     "months": {
       "noDataDescription": "تسويات نون، شهرًا بشهر.",
