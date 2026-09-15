@@ -13,6 +13,7 @@ import { Delta, MetricCard, MetricGrid } from '@/components/metric-card';
 import { MoneyAnchorForm } from '@/components/money-anchor-form';
 import { Page, PageHeader } from '@/components/page';
 import { PeriodTabs } from '@/components/period-tabs';
+import { ProfitSection } from '@/components/profit-breakdown';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -29,6 +30,7 @@ import {
   getFinanceOverview,
   getMoneyAccounts,
   getPeriodSummary,
+  getProfitSeries,
   type CashFlow,
 } from '@/lib/api';
 import { daysAgo, money, today } from '@/lib/format';
@@ -96,12 +98,13 @@ export default async function MoneyOverviewPage({
   // The same length of time just before, for "vs the previous 30 days".
   const before = { from: daysAgo(range.days * 2 - 1), to: daysAgo(range.days) };
 
-  const [accounts, days, flow, previous, summary] = await Promise.all([
+  const [accounts, days, flow, previous, summary, profitSeries] = await Promise.all([
     getMoneyAccounts(),
     getCashSeries(range.days),
     getCashFlow(from, to, range.bucket),
     getCashFlow(before.from, before.to, 'month'),
     getPeriodSummary(from, to),
+    getProfitSeries(from, to, range.bucket),
   ]);
 
   // Before the opening balance there were no books, not a zero balance — so
@@ -221,9 +224,8 @@ export default async function MoneyOverviewPage({
         />
       </MetricGrid>
 
-      <div className="grid gap-6 xl:grid-cols-3">
-        {/* Stretches to The books beside it, and the chart takes the height. */}
-        <Card className="flex flex-col xl:col-span-2">
+      <div className="grid items-start gap-6 xl:grid-cols-3">
+        <Card className="xl:col-span-2">
           <CardHeader>
             <CardTitle>{tr('charts.cashOnHand')}</CardTitle>
             <CardDescription>{t('overview.balanceHint', { span: balanceSpan })}</CardDescription>
@@ -236,8 +238,13 @@ export default async function MoneyOverviewPage({
               </Button>
             </CardAction>
           </CardHeader>
-          <CardContent className="flex-1">
-            <CashBalanceChart series={series} className="h-full min-h-72" />
+          <CardContent className="space-y-5">
+            <CashBalanceChart series={series} className="h-64" />
+            <div className="border-t pt-4">
+              <h3 className="mb-1 text-sm font-medium">{t('overview.profitTitle')}</h3>
+              <p className="mb-3 text-xs text-muted-foreground">{t('overview.profitHint', { span: last })}</p>
+              <ProfitSection summary={summary} series={profitSeries} bucket={range.bucket} />
+            </div>
           </CardContent>
         </Card>
 
