@@ -13,7 +13,7 @@ function revalidateOrder(orderId: string) {
   revalidatePath(`/orders/${orderId}`);
 }
 
-/** A status, payment, assignment or tracking change — the API decides, the lists refresh. */
+/** A status, payment or assignment change — the API decides, the lists refresh. */
 async function change(orderId: string, path: string, body: unknown): Promise<ActionResult> {
   const r = await apiRequest(path, 'PATCH', body);
   if (!r.ok) return r;
@@ -31,10 +31,6 @@ export async function setPaymentStatus(orderId: string, paymentStatus: string) {
 
 export async function assignOrder(orderId: string, assignedToId: string | null) {
   return change(orderId, `/orders/${orderId}/assignment`, { assignedToId });
-}
-
-export async function setOrderTracking(orderId: string, trackingNumber: string | null) {
-  return change(orderId, `/bosta/orders/${orderId}/tracking`, { trackingNumber });
 }
 
 export type CreateOrderState = { status: 'idle' } | { status: 'error'; message: string };

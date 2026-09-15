@@ -1,3 +1,5 @@
+import { dayKey } from '@/i18n/format';
+
 const EGP = new Intl.NumberFormat('en-EG', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
@@ -23,19 +25,22 @@ export function moneyWhole(v: string | number | null | undefined): string {
   return keepSign(EGP_WHOLE.format(Number(v)));
 }
 
-/** A calendar date as `YYYY-MM-DD`, in local time — not UTC's, which is a day behind after midnight. */
-export const isoDate = (d: Date) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+/**
+ * Today as `YYYY-MM-DD` in Cairo — the business's day, whatever zone the
+ * server runs in. On a UTC server, the first hours of a Cairo day would
+ * otherwise still count as yesterday.
+ */
+export const today = (now = new Date()) => dayKey(now);
 
-/** The local calendar date `n` days before today — for API date ranges, not display. */
-export function daysAgo(n: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return isoDate(d);
+/** The Cairo date `n` days before today — for API date ranges, not display. */
+export function daysAgo(n: number, now = new Date()): string {
+  const d = new Date(`${today(now)}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - n);
+  return d.toISOString().slice(0, 10);
 }
 
-export const isNegative = (v: string | number | null | undefined) =>
-  v !== null && v !== undefined && v !== '' && Number(v) < 0;
+/** The first day of this month in Cairo. */
+export const monthStart = (now = new Date()) => `${today(now).slice(0, 7)}-01`;
 
 /**
  * Money split into a bold whole part and a de-emphasised `.dd` — so a big

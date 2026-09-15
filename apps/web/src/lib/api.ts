@@ -1,3 +1,9 @@
+/**
+ * Every read the screens make: typed API calls for server components. A
+ * failed read throws, and the screen's error boundary takes over. Writes go
+ * through server actions and `api-request.ts`, which answer with a result
+ * instead of throwing, so a form can say what went wrong.
+ */
 import { authHeaders } from './session';
 
 const API = process.env.API_URL ?? 'http://localhost:3001';
@@ -342,12 +348,6 @@ export const getStockHistory = (variantId: string) =>
 export const getBostaShipments = () =>
   get<ShipmentTracking[]>('/bosta/shipments');
 
-export const trackBostaShipment = (trackingNumber: string) =>
-  get<ShipmentTracking>(`/bosta/track/${encodeURIComponent(trackingNumber)}`);
-
-export const getOrderShipment = (orderId: string) =>
-  get<ShipmentTracking | null>(`/bosta/orders/${orderId}`);
-
 export interface FinanceOverview {
   /** Null until an opening balance anchor is set. */
   cash: string | null;
@@ -502,6 +502,3 @@ export const getSuppliers = () => get<SupplierRow[]>('/suppliers');
 export const getSupplier = (id: string) => get<SupplierDetail>(`/suppliers/${id}`);
 export const getPurchases = () => get<PurchaseInvoiceRow[]>('/purchases');
 export const getPurchase = (id: string) => get<PurchaseInvoiceDetail>(`/purchases/${id}`);
-
-
-
