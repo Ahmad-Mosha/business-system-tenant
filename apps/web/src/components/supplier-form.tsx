@@ -1,5 +1,3 @@
-'use client';
-
 import { Plus } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { createSupplier } from '@/app/(app)/money/actions';

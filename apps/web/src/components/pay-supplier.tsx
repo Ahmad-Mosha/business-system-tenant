@@ -1,5 +1,3 @@
-'use client';
-
 import { Banknote } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
