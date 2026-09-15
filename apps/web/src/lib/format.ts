@@ -5,16 +5,22 @@ const EGP = new Intl.NumberFormat('en-EG', {
 
 const EGP_WHOLE = new Intl.NumberFormat('en-EG', { maximumFractionDigits: 0 });
 
+/**
+ * A left-to-right mark before a minus — what Intl itself does for Arabic. In
+ * Arabic text a bare `-1,234.50` loses its minus to the far side of the number.
+ */
+const keepSign = (s: string) => (s.startsWith('-') ? `\u200E${s}` : s);
+
 /** `-1,234.50`. Values arrive as strings from Postgres `numeric`. */
 export function money(v: string | number | null | undefined): string {
   if (v === null || v === undefined || v === '') return '—';
-  return EGP.format(Number(v));
+  return keepSign(EGP.format(Number(v)));
 }
 
 /** Compact form for dense table cells, where the piastres are noise. */
 export function moneyWhole(v: string | number | null | undefined): string {
   if (v === null || v === undefined || v === '') return '—';
-  return EGP_WHOLE.format(Number(v));
+  return keepSign(EGP_WHOLE.format(Number(v)));
 }
 
 /** A calendar date as `YYYY-MM-DD`, in local time — not UTC's, which is a day behind after midnight. */
