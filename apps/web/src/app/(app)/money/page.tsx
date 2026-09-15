@@ -31,7 +31,7 @@ import {
   getPeriodSummary,
   type CashFlow,
 } from '@/lib/api';
-import { daysAgo, isoDate, money } from '@/lib/format';
+import { daysAgo, money, today } from '@/lib/format';
 import { accountByCode, accountName, CASH_IN, CASH_OUT, groupAccounts } from '@/lib/money';
 import { requireAdmin } from '@/lib/session';
 import { cn, isOneOf } from '@/lib/utils';
@@ -91,7 +91,7 @@ export default async function MoneyOverviewPage({
 
   const params = await searchParams;
   const range = RANGES.find((r) => r.value === params.range) ?? RANGES.find((r) => r.value === DEFAULT_RANGE)!;
-  const to = isoDate(new Date());
+  const to = today();
   const from = daysAgo(range.days - 1);
   // The same length of time just before, for "vs the previous 30 days".
   const before = { from: daysAgo(range.days * 2 - 1), to: daysAgo(range.days) };
