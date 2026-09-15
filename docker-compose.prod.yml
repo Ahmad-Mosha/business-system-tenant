@@ -29,7 +29,10 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      # A full connection string (Neon or any external Postgres), not built
+      # from the POSTGRES_* vars below — those only configure the local `db`
+      # service, kept running as a rollback path but no longer what api reads.
+      DATABASE_URL: ${DATABASE_URL}
       API_PORT: 3001
       JWT_SECRET: ${JWT_SECRET}
       # Real credentials for the two named accounts — never left at the dev
