@@ -1,4 +1,5 @@
 import { UserCog } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { Amount } from '@/components/amount';
 import { MetricCard, MetricGrid } from '@/components/metric-card';
 import { ModeratorForm } from '@/components/moderator-form';
@@ -19,6 +20,8 @@ import type { TeamMember } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 export function TeamScreen({ team }: { team: TeamMember[] }) {
+  const t = useTranslations('team');
+  const tr = useTranslations();
   const assigned = team.reduce((n, m) => n + m.assigned, 0);
   const delivered = team.reduce((n, m) => n + m.delivered, 0);
   const value = team.reduce((n, m) => n + Number(m.deliveredValue), 0);
@@ -26,8 +29,8 @@ export function TeamScreen({ team }: { team: TeamMember[] }) {
   return (
     <Page>
       <PageHeader
-        title="Team"
-        description="Moderators, and how the orders assigned to them are going."
+        title={tr('nav.items.team')}
+        description={t('description')}
         actions={<ModeratorForm />}
       />
 
@@ -37,8 +40,8 @@ export function TeamScreen({ team }: { team: TeamMember[] }) {
             <EmptyMedia variant="icon">
               <UserCog />
             </EmptyMedia>
-            <EmptyTitle>No moderators yet</EmptyTitle>
-            <EmptyDescription>Add one so orders can be assigned to them.</EmptyDescription>
+            <EmptyTitle>{t('empty')}</EmptyTitle>
+            <EmptyDescription>{t('emptyHint')}</EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
             <ModeratorForm />
@@ -47,14 +50,18 @@ export function TeamScreen({ team }: { team: TeamMember[] }) {
       ) : (
         <>
           <MetricGrid>
-            <MetricCard label="Moderators" value={team.length} hint={`${team.filter((m) => m.active).length} active`} />
-            <MetricCard label="Orders assigned" value={assigned} hint="Across the whole team" />
             <MetricCard
-              label="Delivery rate"
-              value={assigned ? `${Math.round((delivered / assigned) * 100)}%` : '—'}
-              hint={`${delivered} of ${assigned} delivered`}
+              label={t('moderators')}
+              value={team.length}
+              hint={t('active', { count: team.filter((m) => m.active).length })}
             />
-            <MetricCard label="Delivered sales" value={<Amount value={value} />} hint="EGP, delivered orders" />
+            <MetricCard label={t('assigned')} value={assigned} hint={t('assignedHint')} />
+            <MetricCard
+              label={t('rate')}
+              value={assigned ? `${Math.round((delivered / assigned) * 100)}%` : '—'}
+              hint={t('rateHint', { delivered, assigned })}
+            />
+            <MetricCard label={t('sales')} value={<Amount value={value} />} hint={t('salesHint')} />
           </MetricGrid>
 
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -69,6 +76,7 @@ export function TeamScreen({ team }: { team: TeamMember[] }) {
 }
 
 function ModeratorCard({ m }: { m: TeamMember }) {
+  const t = useTranslations('team');
   return (
     <Card>
       <CardHeader className="grid-cols-[auto_1fr] items-center gap-x-3">
@@ -77,29 +85,31 @@ function ModeratorCard({ m }: { m: TeamMember }) {
             {m.name.slice(0, 1).toUpperCase()}
           </AvatarFallback>
         </Avatar>
-        <CardTitle className="truncate">{m.name}</CardTitle>
+        <CardTitle className="truncate">
+          <bdi>{m.name}</bdi>
+        </CardTitle>
         <CardDescription className="truncate">{m.email}</CardDescription>
         {!m.active ? (
           <CardAction>
-            <Badge variant="outline">Inactive</Badge>
+            <Badge variant="outline">{t('inactive')}</Badge>
           </CardAction>
         ) : null}
       </CardHeader>
       <CardContent className="grid gap-4">
         <div className="grid gap-2">
           <div className="flex items-baseline justify-between text-xs">
-            <span className="text-muted-foreground">Delivery rate</span>
+            <span className="text-muted-foreground">{t('rate')}</span>
             <span className="num text-sm font-semibold">{m.deliveryRate === null ? '—' : `${m.deliveryRate}%`}</span>
           </div>
-          <Progress value={m.deliveryRate ?? 0} aria-label={`${m.name} delivery rate`} />
+          <Progress value={m.deliveryRate ?? 0} aria-label={t('rateOf', { name: m.name })} />
         </div>
         <dl className="grid grid-cols-3 border-t pt-3">
-          <Kpi label="Assigned" value={m.assigned} />
-          <Kpi label="Delivered" value={m.delivered} className={m.delivered > 0 ? 'text-success' : undefined} />
-          <Kpi label="Cancelled" value={m.cancelled} className={m.cancelled > 0 ? 'text-destructive' : undefined} />
+          <Kpi label={t('assignedKpi')} value={m.assigned} />
+          <Kpi label={t('deliveredKpi')} value={m.delivered} className={m.delivered > 0 ? 'text-success' : undefined} />
+          <Kpi label={t('cancelledKpi')} value={m.cancelled} className={m.cancelled > 0 ? 'text-destructive' : undefined} />
         </dl>
         <div className="flex items-baseline justify-between border-t pt-3">
-          <span className="text-xs text-muted-foreground">Delivered sales value</span>
+          <span className="text-xs text-muted-foreground">{t('salesValue')}</span>
           <Amount value={m.deliveredValue} className="text-sm font-semibold" />
         </div>
       </CardContent>

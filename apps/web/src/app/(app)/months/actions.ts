@@ -1,9 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { authHeaders } from '@/lib/session';
-
-const API = process.env.API_URL ?? 'http://localhost:3001';
+import { getTranslations } from 'next-intl/server';
+import { apiRequest } from '@/lib/api-request';
 
 export type AnchorState = { status: 'idle' } | { status: 'saved' } | { status: 'error'; message: string };
 
@@ -15,27 +14,14 @@ export async function setOpeningBalance(
   const openingBalance = String(formData.get('openingBalance') ?? '').trim();
   const openingAsOf = String(formData.get('openingAsOf') ?? '').trim();
 
+  const t = await getTranslations('validation');
   if (!/^-?\d+(\.\d{1,2})?$/.test(openingBalance)) {
-    return { status: 'error', message: 'Enter an amount, for example 89006.06' };
+    return { status: 'error', message: t('amount', { example: '89006.06' }) };
   }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(openingAsOf)) {
-    return { status: 'error', message: 'Enter the date as YYYY-MM-DD' };
-  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(openingAsOf)) return { status: 'error', message: t('date') };
 
-  let res: Response;
-  try {
-    res = await fetch(`${API}/noon/account`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-      body: JSON.stringify({ openingBalance, openingAsOf }),
-    });
-  } catch {
-    return { status: 'error', message: 'Could not reach the API.' };
-  }
-  if (!res.ok) {
-    const detail = await res.json().catch(() => null);
-    return { status: 'error', message: detail?.message ?? 'Could not save.' };
-  }
+  const r = await apiRequest('/noon/account', 'PATCH', { openingBalance, openingAsOf });
+  if (!r.ok) return { status: 'error', message: r.message };
 
   revalidatePath('/');
   revalidatePath('/months');

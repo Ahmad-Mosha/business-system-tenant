@@ -18,27 +18,40 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { getProductsCatalog, getProductsSummary } from '@/lib/api';
-import { CATEGORIES, categoryIcon, categoryLabel } from '@/lib/categories';
+import { CATEGORIES, categoryIcon } from '@/lib/categories';
 import { requireAdmin } from '@/lib/session';
 import { LOW_STOCK, stockState } from '@/lib/stock';
-import { cn } from '@/lib/utils';
+import { cn, isOneOf } from '@/lib/utils';
+import { getTranslations } from 'next-intl/server';
 import { getFormat } from '@/i18n/get-format';
 
 const PAGE_SIZE = 20;
 
+/** The API's stock filter, and the `enums.stockState` each one is. */
 const STOCK_LEVELS = [
-  { value: 'in_stock', label: 'In stock' },
-  { value: 'low_stock', label: 'Low stock' },
-  { value: 'out_of_stock', label: 'Out of stock' },
+  { value: 'in_stock', state: 'in' },
+  { value: 'low_stock', state: 'low' },
+  { value: 'out_of_stock', state: 'out' },
 ] as const;
+
+const CHANNELS = ['noon', 'easyorders', 'amazon', 'social', 'unlisted'] as const;
 
 export default async function InventoryPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
-  const f = await getFormat();
+  const [f, t, te, tc, tf, tn] = await Promise.all([
+    getFormat(),
+    getTranslations('inventory'),
+    getTranslations('enums'),
+    getTranslations('common'),
+    getTranslations('filters'),
+    getTranslations('nouns'),
+  ]);
   await requireAdmin();
+  const categoryName = (c: string | null) =>
+    !c ? te('category.NONE') : isOneOf(CATEGORIES, c) ? te(`category.${c}`) : c;
   const params = await searchParams;
 
   // Everything but the stock level: the figures and the stock-level counts
@@ -78,15 +91,15 @@ export default async function InventoryPage({
   return (
     <Page fill>
       <PageHeader
-        title="Inventory"
-        description="What you have, what it's worth, and what needs restocking."
+        title={t('title')}
+        description={t('description')}
         actions={
           <>
             <SyncWebsiteButton />
             <Button asChild>
               <Link href="/inventory/new">
                 <Plus />
-                Add product
+                {t('add')}
               </Link>
             </Button>
           </>
@@ -95,60 +108,59 @@ export default async function InventoryPage({
 
       <MetricGrid>
         <MetricCard
-          label="Stock value"
+          label={t('stockValue')}
           value={<Amount value={summary.stockValue} />}
           tone={summary.missingCost > 0 ? 'warning' : 'default'}
-          hint={
-            summary.missingCost > 0
-              ? `${summary.missingCost} ${summary.missingCost === 1 ? 'product has' : 'products have'} no cost yet`
-              : 'EGP, at unit cost'
-          }
+          hint={summary.missingCost > 0 ? t('missingCost', { count: summary.missingCost }) : t('atCost')}
         />
         <MetricCard
-          label="Units on hand"
+          label={t('unitsOnHand')}
           value={f.count(summary.unitsOnHand)}
           hint={
             summary.unitsInOrders > 0
-              ? `Plus ${f.count(summary.unitsInOrders)} in open orders`
-              : 'None waiting in open orders'
+              ? t('inOpenOrders', { count: f.count(summary.unitsInOrders) })
+              : t('noneInOrders')
           }
         />
         <MetricCard
-          label="Low stock"
+          label={te('stockState.low')}
           value={f.count(count.low_stock)}
           tone={count.low_stock > 0 ? 'warning' : 'default'}
-          hint={`${LOW_STOCK} or fewer left`}
+          hint={t('lowHint', { count: LOW_STOCK })}
         />
         <MetricCard
-          label="Out of stock"
+          label={te('stockState.out')}
           value={f.count(count.out_of_stock)}
           tone={count.out_of_stock > 0 ? 'destructive' : 'default'}
-          hint="Nothing left to sell"
+          hint={t('outHint')}
         />
       </MetricGrid>
 
       <FilterBar
-        search={{ param: 'search', placeholder: 'Search products…' }}
+        search={{ param: 'search', placeholder: t('search') }}
         filters={[
           {
             kind: 'segments',
             param: 'stock',
-            label: 'Stock level',
-            all: { value: '', label: 'All', count: summary.products },
-            options: STOCK_LEVELS.map((s) => ({ ...s, count: count[s.value] })),
+            label: t('stockLevel'),
+            all: { value: '', label: tc('all'), count: summary.products },
+            options: STOCK_LEVELS.map((s) => ({
+              value: s.value,
+              label: te(`stockState.${s.state}`),
+              count: count[s.value],
+            })),
           },
-          { kind: 'select', param: 'category', all: 'All categories', options: [...CATEGORIES] },
+          {
+            kind: 'select',
+            param: 'category',
+            all: t('allCategories'),
+            options: CATEGORIES.map((c) => ({ value: c, label: te(`category.${c}`) })),
+          },
           {
             kind: 'select',
             param: 'channel',
-            all: 'Any channel',
-            options: [
-              { value: 'noon', label: 'noon' },
-              { value: 'easyorders', label: 'Website' },
-              { value: 'amazon', label: 'Amazon' },
-              { value: 'social', label: 'Social' },
-              { value: 'unlisted', label: 'Not on any channel' },
-            ],
+            all: t('anyChannel'),
+            options: CHANNELS.map((c) => ({ value: c, label: te(`channel.${c}`) })),
           },
         ]}
       />
@@ -169,22 +181,18 @@ export default async function InventoryPage({
         {products.length === 0 ? (
           <TableEmpty
             icon={Package}
-            title={filterQuery.size ? 'No products match' : 'No products yet'}
-            description={
-              filterQuery.size
-                ? 'Try another filter, or clear the search.'
-                : 'Add the first product, with its cost and opening stock.'
-            }
+            title={filterQuery.size ? t('noMatch') : t('none')}
+            description={filterQuery.size ? t('noMatchHint') : t('noneHint')}
             action={
               filterQuery.size ? (
                 <Button variant="outline" asChild>
-                  <Link href="/inventory">Reset filters</Link>
+                  <Link href="/inventory">{tf('resetFilters')}</Link>
                 </Button>
               ) : (
                 <Button asChild>
                   <Link href="/inventory/new">
                     <Plus />
-                    Add product
+                    {t('add')}
                   </Link>
                 </Button>
               )
@@ -194,13 +202,13 @@ export default async function InventoryPage({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Product</TableHead>
-                <TableHead className="w-[120px]">Stock</TableHead>
-                <TableHead className="w-[84px] text-end">On hand</TableHead>
-                <TableHead className="w-[84px] text-end">In orders</TableHead>
-                <TableHead className="w-[110px] text-end">Unit cost</TableHead>
-                <TableHead className="w-[130px] text-end">Stock value</TableHead>
-                <TableHead className="w-[210px] ps-6">Channels</TableHead>
+                <TableHead>{t('columns.product')}</TableHead>
+                <TableHead className="w-[120px]">{t('columns.stock')}</TableHead>
+                <TableHead className="w-[84px] text-end">{t('columns.onHand')}</TableHead>
+                <TableHead className="w-[84px] text-end">{t('columns.inOrders')}</TableHead>
+                <TableHead className="w-[110px] text-end">{t('columns.unitCost')}</TableHead>
+                <TableHead className="w-[130px] text-end">{t('columns.stockValue')}</TableHead>
+                <TableHead className="w-[210px] ps-6">{t('columns.channels')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -226,11 +234,11 @@ export default async function InventoryPage({
                             <bdi>{p.name}</bdi>
                           </Link>
                           <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                            {categoryLabel(p.category)}
+                            {categoryName(p.category)}
                             {p.variantCount > 1 ? (
                               <>
                                 {' · '}
-                                <span className="num">{p.variantCount}</span> variants
+                                {tn('variants', { count: p.variantCount })}
                               </>
                             ) : null}
                           </p>
@@ -238,7 +246,7 @@ export default async function InventoryPage({
                       </div>
                     </TableCell>
                     <TableCell>
-                      <ToneBadge tone={state.tone}>{state.label}</ToneBadge>
+                      <ToneBadge tone={state.tone}>{te(`stockState.${state.key}`)}</ToneBadge>
                     </TableCell>
                     <TableCell
                       className={cn('num text-end font-medium', p.onHand < 0 && 'text-destructive')}
@@ -252,7 +260,7 @@ export default async function InventoryPage({
                       {p.unitCost ? (
                         <Amount value={p.unitCost} />
                       ) : (
-                        <span className="text-xs text-warning">Not set</span>
+                        <span className="text-xs text-warning">{tc('notSet')}</span>
                       )}
                     </TableCell>
                     <TableCell className="text-end">

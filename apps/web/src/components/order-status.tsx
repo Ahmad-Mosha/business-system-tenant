@@ -2,6 +2,7 @@ import { useTranslations } from 'next-intl';
 import { ToneBadge, type Tone } from '@/components/tone-badge';
 import { Badge } from '@/components/ui/badge';
 import type { OrderStatus, PaymentStatus } from '@/lib/api';
+import { isOneOf } from '@/lib/utils';
 
 /** One definition of what each status means, used everywhere a status appears. */
 const STATUS_TONE: Record<OrderStatus, Tone> = {
@@ -12,17 +13,6 @@ const STATUS_TONE: Record<OrderStatus, Tone> = {
   DELIVERED: 'success',
   CANCELLED: 'danger',
   RETURNED: 'warning',
-};
-
-/** English names for screens not yet on translations — new code reads `enums.orderStatus`. */
-export const STATUS_LABELS: Record<OrderStatus, string> = {
-  NEW: 'New',
-  ASSIGNED: 'Assigned',
-  CONFIRMED: 'Confirmed',
-  SHIPPED: 'Shipped',
-  DELIVERED: 'Delivered',
-  CANCELLED: 'Cancelled',
-  RETURNED: 'Returned',
 };
 
 export const ALL_ORDER_STATUSES: OrderStatus[] = [
@@ -58,12 +48,6 @@ const PAYMENT_TONE: Record<PaymentStatus, Tone> = {
   REFUNDED: 'warning',
 };
 
-export const PAYMENT_LABELS: Record<PaymentStatus, string> = {
-  UNPAID: 'Unpaid',
-  PAID: 'Paid',
-  REFUNDED: 'Refunded',
-};
-
 /** Payment direction was never a guided flow — any status can move to any other. */
 export const ALL_PAYMENT_STATUSES: PaymentStatus[] = ['UNPAID', 'PAID', 'REFUNDED'];
 
@@ -85,36 +69,19 @@ export function PaymentBadge({ status, className }: { status: PaymentStatus; cla
   );
 }
 
-export const sourceLabel = (source: 'EASYORDERS' | 'SOCIAL') =>
-  source === 'EASYORDERS' ? 'Website' : 'Social';
-
-/**
- * Channel labels. One definition, used by the inventory table and the filters
- * so a channel looks identical everywhere.
- */
-export const CHANNEL_LABELS: Record<string, string> = {
-  noon: 'noon',
-  amazon: 'Amazon',
-  easyorders: 'Website',
-  website: 'Website',
-  social: 'Social',
-};
-
 /**
  * Deliberately monochrome. A channel is an identity, not a state — colouring
  * it would compete with the badges that do mean something (noon's yellow
  * collided with `warning` when it was tried). Its name is unambiguous.
  */
 const KNOWN_CHANNELS = ['noon', 'amazon', 'easyorders', 'website', 'social'] as const;
-const isKnownChannel = (key: string): key is (typeof KNOWN_CHANNELS)[number] =>
-  (KNOWN_CHANNELS as readonly string[]).includes(key);
 
 export function ChannelBadge({ channel, className }: { channel: string; className?: string }) {
   const t = useTranslations('enums.channel');
   const key = (channel ?? '').toLowerCase();
   return (
     <Badge variant="outline" className={className}>
-      {isKnownChannel(key) ? t(key) : channel}
+      {isOneOf(KNOWN_CHANNELS, key) ? t(key) : channel}
     </Badge>
   );
 }

@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { AssignMenu } from '@/components/assign-menu';
 import { FilterBar } from '@/components/filter-bar';
 import { MetricCard, MetricGrid } from '@/components/metric-card';
-import { ALL_ORDER_STATUSES, sourceLabel, STATUS_LABELS } from '@/components/order-status';
+import { ALL_ORDER_STATUSES } from '@/components/order-status';
 import { OrderStatusMenu } from '@/components/order-status-menu';
 import { Page, PageHeader } from '@/components/page';
 import { PaymentStatusMenu } from '@/components/payment-status-menu';
@@ -18,6 +18,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { getTranslations } from 'next-intl/server';
 import { getAssignees, getOrderSummary, getOrders } from '@/lib/api';
 import { money } from '@/lib/format';
 import { requireSession } from '@/lib/session';
@@ -31,7 +32,12 @@ export default async function OrdersPage({
 }: {
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
-  const f = await getFormat();
+  const [f, t, te, tf] = await Promise.all([
+    getFormat(),
+    getTranslations('orders'),
+    getTranslations('enums'),
+    getTranslations('filters'),
+  ]);
   const user = await requireSession();
   const params = await searchParams;
   const isAdmin = user.role === 'ADMIN';
@@ -58,23 +64,17 @@ export default async function OrdersPage({
     const qs = next.toString();
     return qs ? `/orders?${qs}` : '/orders';
   };
-  const share = (n: number) =>
-    summary.total > 0 ? ` · ${Math.round((n / summary.total) * 100)}% of orders` : '';
 
   return (
     <Page fill>
       <PageHeader
-        title="Orders"
-        description={
-          isAdmin
-            ? 'Every order from social and the website, in one list.'
-            : 'The orders assigned to you.'
-        }
+        title={t('title')}
+        description={isAdmin ? t('descriptionAdmin') : t('descriptionMine')}
         actions={
           <Button asChild>
             <Link href="/orders/new">
               <Plus />
-              New order
+              {t('new')}
             </Link>
           </Button>
         }
@@ -82,52 +82,56 @@ export default async function OrdersPage({
 
       <MetricGrid>
         <MetricCard
-          label="All orders"
+          label={t('all')}
           value={summary.total}
-          hint={isAdmin ? 'Social and website' : 'Assigned to you'}
+          hint={isAdmin ? t('allHintAdmin') : t('allHintMine')}
         />
         <MetricCard
-          label="Needs work"
+          label={t('needsWork')}
           value={summary.needsWork}
           tone={summary.needsWork > 0 ? 'warning' : 'default'}
-          hint={`New or assigned${share(summary.needsWork)}`}
+          hint={
+            summary.total > 0
+              ? t('needsWorkShare', { share: summary.needsWork / summary.total })
+              : t('needsWorkHint')
+          }
         />
         {isAdmin ? (
           <MetricCard
-            label="Unassigned"
+            label={t('unassigned')}
             value={summary.unassigned}
             tone={summary.unassigned > 0 ? 'warning' : 'default'}
-            hint={summary.unassigned > 0 ? 'Nobody owns these yet' : 'Every order has an owner'}
+            hint={summary.unassigned > 0 ? t('unassignedSome') : t('unassignedNone')}
           />
         ) : null}
         <MetricCard
-          label="Delivered, unpaid"
+          label={t('deliveredUnpaid')}
           value={summary.deliveredUnpaid}
           tone={summary.deliveredUnpaid > 0 ? 'warning' : 'default'}
-          hint={summary.deliveredUnpaid > 0 ? 'Cash not yet collected' : 'All delivered orders paid'}
+          hint={summary.deliveredUnpaid > 0 ? t('deliveredUnpaidSome') : t('deliveredUnpaidNone')}
         />
       </MetricGrid>
 
       <FilterBar
-        search={{ param: 'search', placeholder: 'Search orders, customers, phones…' }}
+        search={{ param: 'search', placeholder: t('search') }}
         filters={[
           {
             kind: 'select',
             param: 'source',
-            all: 'All channels',
+            all: t('allChannels'),
             options: [
-              { value: 'SOCIAL', label: 'Social' },
-              { value: 'EASYORDERS', label: 'Website' },
+              { value: 'SOCIAL', label: te('orderSource.SOCIAL') },
+              { value: 'EASYORDERS', label: te('orderSource.EASYORDERS') },
             ],
           },
           {
             kind: 'select',
             param: 'status',
-            all: 'Any status',
-            options: ALL_ORDER_STATUSES.map((s) => ({ value: s, label: STATUS_LABELS[s] })),
+            all: t('anyStatus'),
+            options: ALL_ORDER_STATUSES.map((s) => ({ value: s, label: te(`orderStatus.${s}`) })),
           },
           ...(isAdmin
-            ? [{ kind: 'toggle' as const, param: 'unassigned', value: 'true', label: 'Unassigned' }]
+            ? [{ kind: 'toggle' as const, param: 'unassigned', value: 'true', label: t('unassigned') }]
             : []),
         ]}
       />
@@ -149,24 +153,24 @@ export default async function OrdersPage({
           filters.size > 0 ? (
             <TableEmpty
               icon={ShoppingBag}
-              title="No orders match this view"
-              description="Try another status or channel, or clear the search."
+              title={t('noMatch')}
+              description={t('noMatchHint')}
               action={
                 <Button variant="outline" asChild>
-                  <Link href="/orders">Reset filters</Link>
+                  <Link href="/orders">{tf('resetFilters')}</Link>
                 </Button>
               }
             />
           ) : (
             <TableEmpty
               icon={ShoppingBag}
-              title="No orders yet"
-              description="Website orders arrive here on their own. Social orders are entered by hand."
+              title={t('none')}
+              description={t('noneHint')}
               action={
                 <Button asChild>
                   <Link href="/orders/new">
                     <Plus />
-                    New order
+                    {t('new')}
                   </Link>
                 </Button>
               }
@@ -176,14 +180,14 @@ export default async function OrdersPage({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[120px]">Order</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead className="w-[96px]">Channel</TableHead>
-                <TableHead className="w-[140px]">Status</TableHead>
-                <TableHead className="w-[120px]">Payment</TableHead>
-                {isAdmin ? <TableHead className="w-[150px]">Assigned</TableHead> : null}
-                <TableHead className="w-[120px] text-end">Total</TableHead>
-                <TableHead className="w-[110px] text-end">Placed</TableHead>
+                <TableHead className="w-[120px]">{t('columns.order')}</TableHead>
+                <TableHead>{t('columns.customer')}</TableHead>
+                <TableHead className="w-[96px]">{t('columns.channel')}</TableHead>
+                <TableHead className="w-[140px]">{t('columns.status')}</TableHead>
+                <TableHead className="w-[120px]">{t('columns.payment')}</TableHead>
+                {isAdmin ? <TableHead className="w-[150px]">{t('columns.assigned')}</TableHead> : null}
+                <TableHead className="w-[120px] text-end">{t('columns.total')}</TableHead>
+                <TableHead className="w-[110px] text-end">{t('columns.placed')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -201,14 +205,11 @@ export default async function OrdersPage({
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <AlertTriangle
-                              aria-label={`${o.unmappedCount} not in inventory`}
+                              aria-label={t('unmapped', { count: o.unmappedCount })}
                               className="relative z-10 size-3.5 text-warning"
                             />
                           </TooltipTrigger>
-                          <TooltipContent>
-                            {o.unmappedCount} {o.unmappedCount === 1 ? 'item isn’t' : 'items aren’t'}{' '}
-                            linked to inventory, so stock won’t move
-                          </TooltipContent>
+                          <TooltipContent>{t('unmapped', { count: o.unmappedCount })}</TooltipContent>
                         </Tooltip>
                       ) : null}
                     </div>
@@ -217,9 +218,11 @@ export default async function OrdersPage({
                     <p className="truncate font-medium">
                       <bdi>{o.customerName}</bdi>
                     </p>
-                    <p className="num truncate text-xs text-muted-foreground">{o.customerPhone}</p>
+                    <p className="num truncate text-xs text-muted-foreground">
+                      <bdi>{o.customerPhone}</bdi>
+                    </p>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{sourceLabel(o.source)}</TableCell>
+                  <TableCell className="text-muted-foreground">{te(`orderSource.${o.source}`)}</TableCell>
                   <TableCell>
                     <OrderStatusMenu orderId={o.id} status={o.status} canRevert={isAdmin} />
                   </TableCell>

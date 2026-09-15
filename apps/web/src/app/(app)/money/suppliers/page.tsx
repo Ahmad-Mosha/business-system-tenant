@@ -16,10 +16,11 @@ import {
 import { getSuppliers } from '@/lib/api';
 import { money } from '@/lib/format';
 import { requireAdmin } from '@/lib/session';
+import { getTranslations } from 'next-intl/server';
 import { getFormat } from '@/i18n/get-format';
 
 export default async function SuppliersPage() {
-  const f = await getFormat();
+  const [f, t, tr] = await Promise.all([getFormat(), getTranslations('money.suppliers'), getTranslations()]);
   await requireAdmin();
   const suppliers = await getSuppliers();
   const owed = suppliers.reduce((n, s) => n + Number(s.balance), 0);
@@ -28,44 +29,45 @@ export default async function SuppliersPage() {
   return (
     <Page fill>
       <PageHeader
-        title="Suppliers"
-        description="Everyone we buy stock from, and what we owe each of them."
+        title={tr('nav.items.suppliers')}
+        description={t('description')}
         actions={<SupplierForm />}
       />
 
       <MetricGrid>
-        <MetricCard label="Suppliers" value={suppliers.length} hint="Active" />
+        <MetricCard label={tr('nav.items.suppliers')} value={suppliers.length} hint={t('active')} />
         <MetricCard
-          label="Owed in total"
+          label={t('owedTotal')}
           value={<Amount value={owed} />}
           tone={owed > 0 ? 'warning' : 'default'}
-          hint={owed > 0 ? `Across ${owing} ${owing === 1 ? 'supplier' : 'suppliers'}` : 'Nobody is owed anything'}
+          hint={
+            owed > 0 ? t('across', { suppliers: tr('nouns.suppliers', { count: owing }) }) : t('nobodyOwed')
+          }
         />
       </MetricGrid>
 
       <TablePanel
         footer={
           <TableCount>
-            <span className="num font-medium text-foreground">{suppliers.length}</span>{' '}
-            {suppliers.length === 1 ? 'supplier' : 'suppliers'}
+            {tr('nouns.suppliers', { count: suppliers.length })}
           </TableCount>
         }
       >
         {suppliers.length === 0 ? (
           <TableEmpty
             icon={Users}
-            title="No suppliers yet"
-            description="Add one to record a purchase from them."
+            title={t('empty')}
+            description={t('emptyHint')}
             action={<SupplierForm />}
           />
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Supplier</TableHead>
-                <TableHead className="w-[160px]">Phone</TableHead>
-                <TableHead className="w-[160px] text-end">Balance owed</TableHead>
-                <TableHead className="w-[130px] text-end">Added</TableHead>
+                <TableHead>{t('columns.supplier')}</TableHead>
+                <TableHead className="w-[160px]">{t('columns.phone')}</TableHead>
+                <TableHead className="w-[160px] text-end">{t('columns.balance')}</TableHead>
+                <TableHead className="w-[130px] text-end">{t('columns.added')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -84,12 +86,14 @@ export default async function SuppliersPage() {
                       </p>
                     ) : null}
                   </TableCell>
-                  <TableCell className="num text-muted-foreground">{s.phone ?? '—'}</TableCell>
+                  <TableCell className="num text-muted-foreground">
+                    <bdi>{s.phone ?? '—'}</bdi>
+                  </TableCell>
                   <TableCell className="num text-end font-medium">
                     {Number(s.balance) > 0 ? (
                       <span className="text-warning">{money(s.balance)}</span>
                     ) : (
-                      <span className="text-muted-foreground">Settled</span>
+                      <span className="text-muted-foreground">{t('settled')}</span>
                     )}
                   </TableCell>
                   <TableCell className="text-end text-muted-foreground">{f.date(s.createdAt)}</TableCell>

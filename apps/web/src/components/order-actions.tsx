@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
 import { AssignMenu } from '@/components/assign-menu';
 import { OrderStatusMenu } from '@/components/order-status-menu';
@@ -29,15 +30,16 @@ export function OrderActions({
   assignees: Array<{ id: string; name: string }>;
   canAssign: boolean;
 }) {
+  const t = useTranslations('orders.workflow');
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Workflow</CardTitle>
-        <CardDescription>Change any of these in place.</CardDescription>
+        <CardTitle>{t('title')}</CardTitle>
+        <CardDescription>{t('description')}</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-1">
         {canAssign ? (
-          <Row label="Assigned to">
+          <Row label={t('assignedTo')}>
             <AssignMenu
               orderId={orderId}
               assignedToId={assignedToId}
@@ -48,10 +50,10 @@ export function OrderActions({
         ) : null}
         {/* Admins can move an order to any status, including undoing a
             mistake — moderators stay on the guided forward-only path. */}
-        <Row label="Status">
+        <Row label={t('status')}>
           <OrderStatusMenu orderId={orderId} status={status} canRevert={canAssign} />
         </Row>
-        <Row label="Payment">
+        <Row label={t('payment')}>
           <PaymentStatusMenu orderId={orderId} status={paymentStatus} />
         </Row>
       </CardContent>

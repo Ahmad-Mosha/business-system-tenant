@@ -14,21 +14,22 @@ import {
 import { getImports } from '@/lib/api';
 
 import { requireAdmin } from '@/lib/session';
+import { getTranslations } from 'next-intl/server';
 import { getFormat } from '@/i18n/get-format';
 
 export default async function ImportsPage() {
-  const f = await getFormat();
+  const [f, t, tr] = await Promise.all([getFormat(), getTranslations('noon.imports'), getTranslations()]);
   await requireAdmin();
   const imports = await getImports();
 
   return (
     <Page>
-      <PageHeader title="Imports" description="noon settlement exports — how noon’s figures get in." />
+      <PageHeader title={tr('nav.items.imports')} description={t('description')} />
 
       <Card className="max-w-3xl">
         <CardHeader>
-          <CardTitle>Upload a report</CardTitle>
-          <CardDescription>Export the settlement report from the noon portal as CSV and drop it here.</CardDescription>
+          <CardTitle>{t('upload')}</CardTitle>
+          <CardDescription>{t('uploadHint')}</CardDescription>
         </CardHeader>
         <CardContent>
           <ImportForm />
@@ -39,24 +40,23 @@ export default async function ImportsPage() {
         minWidth="56rem"
         footer={
           <TableCount>
-            <span className="num font-medium text-foreground">{imports.length}</span>{' '}
-            {imports.length === 1 ? 'import' : 'imports'}
+            {tr('nouns.imports', { count: imports.length })}
           </TableCount>
         }
       >
         {imports.length === 0 ? (
-          <TableEmpty icon={Upload} title="No reports imported yet" description="Your first upload shows up here." />
+          <TableEmpty icon={Upload} title={t('empty')} description={t('emptyHint')} />
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="min-w-[200px]">File</TableHead>
-                <TableHead>Period</TableHead>
-                <TableHead className="text-end">Rows</TableHead>
-                <TableHead className="text-end">New</TableHead>
-                <TableHead className="text-end">Skipped</TableHead>
-                <TableHead className="text-end">Unmapped</TableHead>
-                <TableHead className="text-end">Imported</TableHead>
+                <TableHead className="min-w-[200px]">{t('columns.file')}</TableHead>
+                <TableHead>{t('columns.period')}</TableHead>
+                <TableHead className="text-end">{t('columns.rows')}</TableHead>
+                <TableHead className="text-end">{t('columns.new')}</TableHead>
+                <TableHead className="text-end">{t('columns.skipped')}</TableHead>
+                <TableHead className="text-end">{t('columns.unmapped')}</TableHead>
+                <TableHead className="text-end">{t('columns.imported')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -64,11 +64,11 @@ export default async function ImportsPage() {
                 <TableRow key={i.id}>
                   <TableCell className="max-w-0">
                     <span className="block truncate font-medium" title={i.filename}>
-                      {i.filename}
+                      <bdi>{i.filename}</bdi>
                     </span>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {f.date(i.periodStart)} – {f.date(i.periodEnd)}
+                    {tr('common.dateRange', { from: f.date(i.periodStart), to: f.date(i.periodEnd) })}
                   </TableCell>
                   <TableCell className="num text-end">{i.rowsInFile}</TableCell>
                   <TableCell className="num text-end font-medium">{i.rowsInserted}</TableCell>

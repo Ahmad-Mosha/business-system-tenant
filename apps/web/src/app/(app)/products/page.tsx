@@ -19,6 +19,7 @@ import { getDataRange, getPeriods, getProducts, type ProductPerformance } from '
 import { money, moneyWhole } from '@/lib/format';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
+import { getTranslations } from 'next-intl/server';
 import { getFormat } from '@/i18n/get-format';
 
 const fees = (p: ProductPerformance) =>
@@ -39,7 +40,7 @@ export default async function ProductsPage({
 }: {
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
-  const f = await getFormat();
+  const [f, t, tr] = await Promise.all([getFormat(), getTranslations('noon'), getTranslations()]);
   await requireAdmin();
   const params = await searchParams;
   const { period, q, returns, cost } = params;
@@ -50,7 +51,7 @@ export default async function ProductsPage({
   if (!dataRange) {
     return (
       <Page>
-        <PageHeader title="Products" description="How each product did on noon." />
+        <PageHeader title={tr('nav.items.products')} description={t('products.noDataDescription')} />
         <NoDataYet />
       </Page>
     );
@@ -113,25 +114,25 @@ export default async function ProductsPage({
   return (
     <Page fill>
       <PageHeader
-        title="Products"
+        title={tr('nav.items.products')}
         description={
           selected
-            ? `How each product did on noon in ${f.month(selected.month)}.`
-            : 'How each product did on noon — units, proceeds, fees, and profit where cost is known.'
+            ? t('products.descriptionMonth', { month: f.month(selected.month) })
+            : t('products.description')
         }
       />
 
       <FilterBar
-        search={{ param: 'q', placeholder: 'Search products…' }}
+        search={{ param: 'q', placeholder: tr('inventory.search') }}
         filters={[
           {
             kind: 'select',
             param: 'period',
-            all: 'All time',
+            all: t('products.allTime'),
             options: periods.map((p) => ({ value: p.month, label: f.month(p.month) })),
           },
-          { kind: 'toggle', param: 'returns', value: '1', label: 'Has returns' },
-          { kind: 'toggle', param: 'cost', value: 'missing', label: 'Missing cost' },
+          { kind: 'toggle', param: 'returns', value: '1', label: t('products.hasReturns') },
+          { kind: 'toggle', param: 'cost', value: 'missing', label: t('products.missingCost') },
         ]}
       />
 
@@ -139,24 +140,19 @@ export default async function ProductsPage({
         minWidth="56rem"
         footer={
           <TableCount>
-            <span className="num font-medium text-foreground">{products.length}</span>{' '}
-            {products.length === 1 ? 'product' : 'products'}
+            {tr('nouns.products', { count: products.length })}
           </TableCount>
         }
       >
         {products.length === 0 ? (
           <TableEmpty
             icon={BarChart3}
-            title={filtered ? 'No products match these filters' : 'No products yet'}
-            description={
-              filtered
-                ? undefined
-                : 'A noon sale lands on a product once its SKU is linked — open the product in Inventory and add its noon Partner SKU.'
-            }
+            title={filtered ? t('products.noMatch') : tr('inventory.none')}
+            description={filtered ? undefined : t('products.noneHint')}
             action={
               filtered ? (
                 <Button variant="outline" asChild>
-                  <Link href="/products">Reset filters</Link>
+                  <Link href="/products">{tr('filters.resetFilters')}</Link>
                 </Button>
               ) : undefined
             }
@@ -165,13 +161,13 @@ export default async function ProductsPage({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[38%] min-w-[240px]">Product</TableHead>
-                {sortHead('units', 'Units')}
-                {sortHead('returned', 'Returned')}
-                {sortHead('proceeds', 'Proceeds')}
-                {sortHead('fees', 'Fees')}
-                {sortHead('net', 'Net')}
-                {sortHead('profit', 'Profit')}
+                <TableHead className="w-[38%] min-w-[240px]">{tr('inventory.columns.product')}</TableHead>
+                {sortHead('units', t('statement.units'))}
+                {sortHead('returned', t('products.returned'))}
+                {sortHead('proceeds', t('months.proceeds'))}
+                {sortHead('fees', t('statement.fees'))}
+                {sortHead('net', t('statement.net'))}
+                {sortHead('profit', t('products.profit'))}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -186,12 +182,10 @@ export default async function ProductsPage({
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Badge variant="outline" className="shrink-0">
-                              Stub
+                              {t('products.stub')}
                             </Badge>
                           </TooltipTrigger>
-                          <TooltipContent>
-                            Created automatically from an import. Add a cost and category to complete it.
-                          </TooltipContent>
+                          <TooltipContent>{t('products.stubHint')}</TooltipContent>
                         </Tooltip>
                       ) : null}
                     </div>
@@ -213,7 +207,7 @@ export default async function ProductsPage({
                         <TooltipTrigger asChild>
                           <span className="cursor-default text-muted-foreground/50">—</span>
                         </TooltipTrigger>
-                        <TooltipContent>No cost recorded, so profit can’t be calculated.</TooltipContent>
+                        <TooltipContent>{t('products.noCost')}</TooltipContent>
                       </Tooltip>
                     ) : (
                       <span className={cn(Number(p.grossProfit) < 0 && 'text-destructive')}>

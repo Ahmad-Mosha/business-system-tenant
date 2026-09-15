@@ -10,10 +10,11 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { getDataRange, getPeriods } from '@/lib/api';
 
 import { requireSession } from '@/lib/session';
+import { getTranslations } from 'next-intl/server';
 import { getFormat } from '@/i18n/get-format';
 
 export default async function OverviewPage() {
-  const f = await getFormat();
+  const [f, t, tr] = await Promise.all([getFormat(), getTranslations('noon.overview'), getTranslations()]);
   const user = await requireSession();
   if (user.role === 'MODERATOR') redirect('/orders');
 
@@ -21,7 +22,7 @@ export default async function OverviewPage() {
   if (!range) {
     return (
       <Page>
-        <PageHeader title="noon" description="What noon owes us, and why." />
+        <PageHeader title={tr('nav.groups.noon')} description={t('noDataDescription')} />
         <NoDataYet />
       </Page>
     );
@@ -32,12 +33,14 @@ export default async function OverviewPage() {
   return (
     <Page>
       <PageHeader
-        title="noon"
-        description={`Everything imported, ${f.date(range.from)} – ${f.date(range.to)}. Every figure matches noon’s own statement.`}
+        title={tr('nav.groups.noon')}
+        description={t('description', {
+          range: tr('common.dateRange', { from: f.date(range.from), to: f.date(range.to) }),
+        })}
         actions={
           <Button variant="outline" asChild>
             <Link href="/months">
-              View by month
+              {t('viewByMonth')}
               <ArrowUpRight className="rtl:-scale-x-100" />
             </Link>
           </Button>
@@ -49,12 +52,12 @@ export default async function OverviewPage() {
       {periods.length > 1 ? (
         <Card>
           <CardHeader>
-            <CardTitle>By month</CardTitle>
-            <CardDescription>Net proceeds per settlement month. Open a bar for its statement.</CardDescription>
+            <CardTitle>{t('byMonth')}</CardTitle>
+            <CardDescription>{t('byMonthHint')}</CardDescription>
             <CardAction>
               <Button variant="ghost" size="sm" asChild>
                 <Link href="/months">
-                  All months
+                  {t('allMonths')}
                   <ArrowUpRight className="rtl:-scale-x-100" />
                 </Link>
               </Button>
