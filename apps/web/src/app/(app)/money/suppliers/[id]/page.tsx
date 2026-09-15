@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/table';
 import { getSupplier } from '@/lib/api';
 import { money } from '@/lib/format';
+import { isSystemMemo } from '@/lib/money';
 import { requireAdmin } from '@/lib/session';
 import { getTranslations } from 'next-intl/server';
 import { getFormat } from '@/i18n/get-format';
@@ -123,7 +124,7 @@ export default async function SupplierDetailPage({ params }: { params: Promise<{
                   <TableRow key={p.id}>
                     <TableCell className="h-auto max-w-0 py-2.5">
                       <p className="truncate">
-                        <bdi>{p.memo ?? t('payment')}</bdi>
+                        <bdi>{p.memo && !isSystemMemo(p.memo) ? p.memo : t('payment')}</bdi>
                       </p>
                       <p className="text-xs text-muted-foreground">{f.dateTime(p.occurredAt)}</p>
                     </TableCell>
