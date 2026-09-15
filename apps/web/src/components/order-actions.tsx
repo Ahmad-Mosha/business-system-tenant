@@ -1,5 +1,3 @@
-'use client';
-
 import { useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
 import { AssignMenu } from '@/components/assign-menu';

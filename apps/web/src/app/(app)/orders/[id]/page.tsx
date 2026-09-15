@@ -7,6 +7,7 @@ import { OrderActions } from '@/components/order-actions';
 import {
   ALL_ORDER_STATUSES,
   ALL_PAYMENT_STATUSES,
+  EDITABLE_STATUSES,
   PaymentBadge,
   StatusBadge,
 } from '@/components/order-status';
@@ -31,9 +32,6 @@ import { useTranslations } from 'next-intl';
 import { getTranslations } from 'next-intl/server';
 import { getFormat } from '@/i18n/get-format';
 
-/** Mirrors OrdersService.EDITABLE — once it ships, the goods have left. */
-const EDITABLE = ['NEW', 'ASSIGNED', 'CONFIRMED'];
-
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
   const [f, t, te, tn] = await Promise.all([
     getFormat(),
@@ -44,13 +42,15 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const user = await requireSession();
   const { id } = await params;
 
-  const order = await getOrder(id).catch(() => null);
+  const isAdmin = user.role === 'ADMIN';
+  const [order, assignees] = await Promise.all([
+    getOrder(id).catch(() => null),
+    isAdmin ? getAssignees() : [],
+  ]);
   if (!order) notFound();
 
-  const isAdmin = user.role === 'ADMIN';
-  const assignees = isAdmin ? await getAssignees() : [];
   const unmapped = order.items.filter((i) => !i.variantId).length;
-  const editable = EDITABLE.includes(order.status);
+  const editable = EDITABLE_STATUSES.includes(order.status);
   const units = order.items.reduce((n, i) => n + i.quantity, 0);
 
   return (

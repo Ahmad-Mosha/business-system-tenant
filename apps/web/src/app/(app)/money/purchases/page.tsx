@@ -15,15 +15,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { getPurchases } from '@/lib/api';
-import { money } from '@/lib/format';
+import { money, monthStart } from '@/lib/format';
 import { requireAdmin } from '@/lib/session';
 import { getTranslations } from 'next-intl/server';
 import { getFormat } from '@/i18n/get-format';
-
-function monthStart() {
-  const d = new Date();
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)).toISOString().slice(0, 10);
-}
 
 export default async function PurchasesPage() {
   const [f, t, tr] = await Promise.all([getFormat(), getTranslations('money.purchases'), getTranslations()]);
