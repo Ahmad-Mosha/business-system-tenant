@@ -515,7 +515,13 @@
       "movement": "Movement",
       "change": "Change",
       "balance": "Balance",
-      "noMovements": "No stock movements yet."
+      "noMovements": "No stock movements yet.",
+      "notes": {
+        "orderReturned": "Order returned",
+        "orderCancelled": "Order cancelled",
+        "orderEdited": "Order edited — its earlier lines reversed",
+        "orderReactivated": "Order reactivated — stock leaves again"
+      }
     },
     "listings": {
       "variantsNotBuilt": "This product has variants. Per-variant channel mapping isn’t built yet — say the word when you need it.",
