@@ -1,9 +1,9 @@
 'use client';
 
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Plus, X } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { useActionState, useState } from 'react';
+import { useActionState, useRef, useState } from 'react';
 import { addProduct, type CreateProductState } from '@/app/(app)/inventory/actions';
 import { Page, PageHeader } from '@/components/page';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -165,20 +165,9 @@ export function NewProductForm() {
               <FieldSet>
                 <FieldLegend>{t('new.alsoSoldOn')}</FieldLegend>
                 <FieldDescription>{t('new.alsoSoldOnHint')}</FieldDescription>
-                <div className="grid gap-3">
+                <div className="grid gap-4">
                   {LISTING_CHANNELS.map((c) => (
-                    <Field key={c} orientation="horizontal">
-                      <FieldLabel htmlFor={`sku_${c}`} className="w-20 shrink-0 font-normal text-muted-foreground">
-                        {tr(`enums.channel.${c}`)}
-                      </FieldLabel>
-                      <Input
-                        id={`sku_${c}`}
-                        name={`sku_${c}`}
-                        placeholder={t(`channelSku.${c}.placeholder`)}
-                        disabled={pending}
-                        className="font-mono"
-                      />
-                    </Field>
+                    <ChannelSkuField key={c} channel={c} pending={pending} />
                   ))}
                 </div>
               </FieldSet>
@@ -203,5 +192,64 @@ export function NewProductForm() {
         </Card>
       </form>
     </Page>
+  );
+}
+
+/**
+ * A channel's SKU inputs — one to start, more via "+". Uncontrolled and
+ * native: every row shares the same `name`, so `formData.getAll(name)` on
+ * submit collects them all (see `addProduct`) without any client-side
+ * assembly.
+ */
+function ChannelSkuField({ channel, pending }: { channel: (typeof LISTING_CHANNELS)[number]; pending: boolean }) {
+  const t = useTranslations('product');
+  const tr = useTranslations();
+  const nextId = useRef(1);
+  const [rows, setRows] = useState<number[]>([0]);
+
+  return (
+    <Field orientation="horizontal">
+      <FieldLabel className="w-20 shrink-0 pt-2 font-normal text-muted-foreground">
+        {tr(`enums.channel.${channel}`)}
+      </FieldLabel>
+      <div className="grid flex-1 gap-2">
+        {rows.map((id, i) => (
+          <div key={id} className="flex gap-2">
+            <Input
+              name={`sku_${channel}`}
+              placeholder={t(`channelSku.${channel}.placeholder`)}
+              disabled={pending}
+              className="font-mono"
+            />
+            {rows.length > 1 ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                disabled={pending}
+                aria-label={tr('common.cancel')}
+                onClick={() => setRows((r) => r.filter((x) => x !== id))}
+                className="shrink-0 text-muted-foreground"
+              >
+                <X />
+              </Button>
+            ) : null}
+            {i === rows.length - 1 ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                disabled={pending}
+                aria-label={t('listings.addAnother')}
+                onClick={() => setRows((r) => [...r, nextId.current++])}
+                className="shrink-0 text-muted-foreground"
+              >
+                <Plus />
+              </Button>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </Field>
   );
 }
