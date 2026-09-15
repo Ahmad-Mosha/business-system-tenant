@@ -39,6 +39,12 @@ export const NEXT_STATUSES: Record<OrderStatus, OrderStatus[]> = {
   RETURNED: [],
 };
 
+/**
+ * The statuses an order can still be edited in — mirrors OrdersService.EDITABLE.
+ * Once it ships, the goods have left; the API refuses the rest regardless.
+ */
+export const EDITABLE_STATUSES: OrderStatus[] = ['NEW', 'ASSIGNED', 'CONFIRMED'];
+
 /** A move that undoes rather than advances — styled as destructive. */
 export const isReverse = (s: OrderStatus) => s === 'CANCELLED' || s === 'RETURNED';
 

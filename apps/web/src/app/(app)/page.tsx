@@ -18,7 +18,7 @@ export default async function OverviewPage() {
   const user = await requireSession();
   if (user.role === 'MODERATOR') redirect('/orders');
 
-  const range = await getDataRange();
+  const [range, periods] = await Promise.all([getDataRange(), getPeriods()]);
   if (!range) {
     return (
       <Page>
@@ -27,8 +27,6 @@ export default async function OverviewPage() {
       </Page>
     );
   }
-
-  const periods = await getPeriods();
 
   return (
     <Page>
