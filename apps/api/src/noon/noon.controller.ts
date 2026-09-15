@@ -18,6 +18,7 @@ import { ChannelAccount } from './channel-account.entity';
 import { NoonImport } from './noon-import.entity';
 import { NoonImportService } from './noon-import.service';
 import { NoonReportFormatError } from './noon-report.parser';
+import { problem } from '../problem';
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -43,7 +44,7 @@ export class NoonController {
     } catch (e) {
       // A bad file is the caller's problem, not a 500.
       if (e instanceof NoonReportFormatError) {
-        throw new BadRequestException(`not a noon settlement export: ${e.message}`);
+        throw new BadRequestException(problem('import.notNoon', `not a noon settlement export: ${e.message}`));
       }
       throw e;
     }

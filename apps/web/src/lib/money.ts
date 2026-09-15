@@ -60,14 +60,25 @@ export const sourceHref = (e: Pick<LedgerRow, 'sourceType' | 'sourceId'>) =>
   e.sourceType && e.sourceId && SOURCE_PATH[e.sourceType] ? SOURCE_PATH[e.sourceType] + e.sourceId : null;
 
 /**
+ * The memos the API writes itself (purchasing and finance services), in its
+ * own English. The row already names the kind, so only the data inside is
+ * worth showing: a supplier, an invoice number, who a cheque is from.
+ */
+const SYSTEM_MEMO = /^(?:Opening cash balance|Payment to (.+)|Purchase invoice ?(.*)|Cheque from (.+?)(?: cleared)?)$/;
+
+export const isSystemMemo = (memo: string) => SYSTEM_MEMO.test(memo);
+
+/**
  * An entry's memo minus what its row already says. A reversal is written as
  * "Reversal — <original memo or kind>"; the row shows a Reversal badge and the
- * kind, so only an original memo is worth repeating.
+ * kind. A memo a person typed is shown as they typed it.
  */
 export function entryMemo(e: Pick<LedgerRow, 'memo' | 'kind' | 'reversesId'>): string | null {
-  if (!e.memo || !e.reversesId) return e.memo;
-  const original = e.memo.replace(/^Reversal — /, '');
-  return original === e.kind ? null : original;
+  if (!e.memo) return null;
+  const memo = e.reversesId ? e.memo.replace(/^Reversal — /, '') : e.memo;
+  if (memo === e.kind) return null;
+  const system = memo.match(SYSTEM_MEMO);
+  return system ? system.slice(1).find(Boolean) || null : memo;
 }
 
 /**

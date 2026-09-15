@@ -174,7 +174,62 @@
   "errors": {
     "unreachable": "تعذّر الاتصال بالخادم. تحقق من الاتصال ثم حاول مرة أخرى.",
     "requestFailed": "فشل الطلب ({status}).",
-    "trackingRequired": "أدخل رقم التتبع."
+    "trackingRequired": "أدخل رقم التتبع.",
+    "api": {
+      "notFound": "هذا السجل لم يعد موجودًا — أعد تحميل الصفحة.",
+      "auth": {
+        "required": "انتهت جلستك — سجّل الدخول مرة أخرى.",
+        "forbidden": "صلاحياتك لا تسمح بهذا الإجراء.",
+        "name": "أدخل الاسم.",
+        "email": "أدخل بريدًا إلكترونيًا صحيحًا.",
+        "password": "كلمة المرور يجب ألا تقل عن 6 أحرف.",
+        "emailTaken": "البريد {email} مستخدم بالفعل."
+      },
+      "order": {
+        "customerName": "أدخل اسم العميل.",
+        "phone": "أدخل رقم موبايل مصري صحيحًا، مثل 01012345678.",
+        "governorate": "اختر المحافظة.",
+        "noItems": "الطلب يحتاج إلى صنف واحد على الأقل.",
+        "itemQuantity": "كل صنف يحتاج إلى كمية بعدد صحيح لا تقل عن 1.",
+        "itemPrice": "كل صنف يحتاج إلى سعر أكبر من صفر.",
+        "stockShort": "{name}: المتوفر {onHand} فقط، والمطلوب {requested}.",
+        "locked": "لم يعد ممكنًا تعديل هذا الطلب — فقد غادر المخزن.",
+        "transition": "لا يمكن نقل الطلب إلى هذه الحالة من حالته الحالية."
+      },
+      "cheque": {
+        "settled": "{status, select, CLEARED {تم تحصيل هذا الشيك بالفعل.} BOUNCED {هذا الشيك مرتد بالفعل.} other {هذا الشيك لم يعد تحت التحصيل.}}"
+      },
+      "payment": {
+        "invoiceClosed": "لا يمكن تسجيل دفعة على هذه الفاتورة.",
+        "nothingOwed": "{scope, select, invoice {لا يوجد مبلغ متبقٍ على هذه الفاتورة.} other {لا توجد مستحقات لـ{supplier}.}}",
+        "overpay": "{scope, select, invoice {المتبقي على هذه الفاتورة {owed} فقط} other {المستحق لـ{supplier} هو {owed} فقط}} — وحاولت دفع {paid}."
+      },
+      "invoice": {
+        "productsGone": "منتج واحد أو أكثر لم يعد موجودًا.",
+        "postedDelete": "لا يمكن حذف فاتورة مرحّلة — اعكسها بدلًا من ذلك.",
+        "posted": "هذه الفاتورة مرحّلة بالفعل.",
+        "noLines": "أضف بندًا واحدًا على الأقل قبل الترحيل."
+      },
+      "sku": {
+        "taken": "رمز SKU «{sku}» مستخدم بالفعل."
+      },
+      "listing": {
+        "taken": "رمز SKU «{externalId}» على {channel, select, noon {نون} amazon {أمازون} easyorders {الموقع} other {{channel}}} مربوط بالفعل بمنتج آخر."
+      },
+      "stock": {
+        "remove": "{available, plural, =0 {لا يوجد رصيد للخصم.} other {المتوفر # فقط — يمكنك خصم # كحد أقصى.}}"
+      },
+      "sync": {
+        "notConfigured": "ربط Easy Orders غير مُعدّ.",
+        "failed": "لم يستجب Easy Orders (خطأ {status})."
+      },
+      "import": {
+        "notNoon": "هذا الملف ليس ملف تسوية من نون."
+      },
+      "shipment": {
+        "notFound": "لا توجد شحنة على بوسطة برقم التتبع {trackingNumber}."
+      }
+    }
   },
   "orders": {
     "title": "الطلبات",
@@ -451,8 +506,8 @@
       "out": "خصم من المخزون",
       "quantity": "الكمية",
       "reason": "السبب",
-      "add": "إضافة {units}",
-      "remove": "خصم {units}",
+      "add": "إضافة {count, plural, zero {# وحدة} one {وحدة واحدة} two {وحدتين} few {# وحدات} many {# وحدة} other {# وحدة}}",
+      "remove": "خصم {count, plural, zero {# وحدة} one {وحدة واحدة} two {وحدتين} few {# وحدات} many {# وحدة} other {# وحدة}}",
       "increased": "زاد المخزون بمقدار {count}.",
       "reduced": "نقص المخزون بمقدار {count}.",
       "onlyOnHand": "المتوفر <num>{count}</num> فقط",
@@ -460,7 +515,13 @@
       "movement": "الحركة",
       "change": "التغيير",
       "balance": "الرصيد",
-      "noMovements": "لا توجد حركات مخزون بعد."
+      "noMovements": "لا توجد حركات مخزون بعد.",
+      "notes": {
+        "orderReturned": "إرجاع طلب",
+        "orderCancelled": "إلغاء طلب",
+        "orderEdited": "تعديل طلب — عُكست أصنافه السابقة",
+        "orderReactivated": "إعادة تفعيل طلب — خرج المخزون مرة أخرى"
+      }
     },
     "listings": {
       "variantsNotBuilt": "لهذا المنتج أنواع متعددة، وربط القنوات لكل نوع على حدة غير متاح بعد — أخبرنا عندما تحتاج إليه.",
@@ -815,7 +876,8 @@
       "bestHint": "حسب الصافي، بعد رسوم نون.",
       "noProducts": "لا توجد مبيعات على مستوى المنتج بعد — تظهر بمجرد ربط رموز SKU الخاصة بنون بالمنتجات في المخزون.",
       "units": "الوحدات",
-      "net": "الصافي"
+      "net": "الصافي",
+      "netHintNone": "لا توجد مبيعات على مستوى المنتج بعد"
     },
     "months": {
       "noDataDescription": "تسويات نون، شهرًا بشهر.",

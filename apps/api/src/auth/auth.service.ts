@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import { hashPassword, verifyPassword } from './password';
 import { User, type UserRole } from './user.entity';
 import type { SessionUser } from './auth.guard';
+import { problem } from '../problem';
 
 /**
  * The two named accounts, created on boot only when the table is empty.
@@ -103,12 +104,16 @@ export class AuthService {
     const email = (input.email ?? '').trim().toLowerCase();
     const password = input.password ?? '';
 
-    if (!name) throw new BadRequestException('name is required');
-    if (!AuthService.EMAIL.test(email)) throw new BadRequestException('enter a valid email address');
-    if (password.length < 6) throw new BadRequestException('password must be at least 6 characters');
+    if (!name) throw new BadRequestException(problem('auth.name', 'name is required'));
+    if (!AuthService.EMAIL.test(email)) {
+      throw new BadRequestException(problem('auth.email', 'enter a valid email address'));
+    }
+    if (password.length < 6) {
+      throw new BadRequestException(problem('auth.password', 'password must be at least 6 characters'));
+    }
 
     if (await this.users.findOne({ where: { email } })) {
-      throw new BadRequestException(`${email} is already in use`);
+      throw new BadRequestException(problem('auth.emailTaken', `${email} is already in use`, { email }));
     }
 
     const user = await this.users.save(

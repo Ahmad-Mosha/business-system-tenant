@@ -38,6 +38,15 @@ import { useFormat } from '@/i18n/use-format';
 const REASONS = ['PURCHASE', 'RETURN', 'DAMAGE', 'COUNT', 'ADJUSTMENT'] as const;
 const ALL_REASONS = [...REASONS, 'SALE'] as const;
 
+/** The notes the API writes on stock it moves for an order (orders.service.ts); any other note is a person's. */
+const ORDER_NOTES = {
+  'order returned': 'orderReturned',
+  'order cancelled': 'orderCancelled',
+  'order edited — previous lines reversed': 'orderEdited',
+  'order reactivated — stock leaves again': 'orderReactivated',
+} as const;
+const isOrderNote = (note: string): note is keyof typeof ORDER_NOTES => note in ORDER_NOTES;
+
 interface Variant {
   id: string;
   name: string;
@@ -209,7 +218,7 @@ export function VariantPanel({
           <div className="flex flex-wrap items-center gap-3">
             <Button onClick={move} disabled={pending || !count || tooMany} className="w-fit">
               {pending ? <Spinner /> : direction === 'in' ? <Plus /> : <Minus />}
-              {t(direction === 'in' ? 'add' : 'remove', { units: tr('nouns.units', { count }) })}
+              {t(direction === 'in' ? 'add' : 'remove', { count })}
             </Button>
             {tooMany ? (
               <p role="status" className="text-xs text-destructive">
@@ -258,7 +267,7 @@ export function VariantPanel({
                               {m.note ? (
                                 <>
                                   {' · '}
-                                  <bdi>{m.note}</bdi>
+                                  <bdi>{isOrderNote(m.note) ? t(`notes.${ORDER_NOTES[m.note]}`) : m.note}</bdi>
                                 </>
                               ) : null}
                             </p>

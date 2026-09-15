@@ -33,9 +33,15 @@ export async function apiRequest<T = unknown>(
   const data = res.status === 204 ? null : await res.json().catch(() => null);
   if (res.ok) return { ok: true, data: data as T };
 
-  // Nest sends one reason, or a list of them from validation.
+  const t = await getTranslations('errors');
+  // A problem the API names (apps/api/src/problem.ts) reads in the reader's language.
+  if (typeof data?.code === 'string') {
+    const key = `api.${data.code}` as Parameters<typeof t>[0];
+    if (t.has(key)) return { ok: false, message: t(key, data.params ?? {}) };
+  }
+  // Otherwise the API's own reason — one, or a list of them from validation.
   const reason: unknown = data?.message;
   if (typeof reason === 'string' && reason) return { ok: false, message: reason };
   if (Array.isArray(reason) && reason.length) return { ok: false, message: reason.join(' · ') };
-  return { ok: false, message: (await getTranslations('errors'))('requestFailed', { status: res.status }) };
+  return { ok: false, message: t('requestFailed', { status: res.status }) };
 }
