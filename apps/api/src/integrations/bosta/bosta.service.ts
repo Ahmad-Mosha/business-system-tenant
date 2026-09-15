@@ -11,6 +11,7 @@ import type { SessionUser } from '../../auth/auth.guard';
 import { Order } from '../../orders/order.entity';
 import { OrderEvent } from '../../orders/order-event.entity';
 import { BostaClient, type BostaDeliveryRaw } from './bosta.client';
+import { problem } from '../../problem';
 
 export interface DeliveryTimelineStep {
   code: number;
@@ -182,7 +183,11 @@ export class BostaService {
       // Validate that the tracking number exists in Bosta
       trackingData = await this.track(cleanTn);
       if (!trackingData) {
-        throw new BadRequestException(`Shipment not found on Bosta with tracking number: ${cleanTn}`);
+        throw new BadRequestException(
+          problem('shipment.notFound', `Shipment not found on Bosta with tracking number: ${cleanTn}`, {
+            trackingNumber: cleanTn,
+          }),
+        );
       }
     }
 
@@ -212,10 +217,10 @@ export class BostaService {
     const order = await this.db.getRepository(Order).findOne({
       where: { id: orderId },
     });
-    if (!order) throw new NotFoundException('Order not found');
+    if (!order) throw new NotFoundException(problem('notFound', 'Order not found'));
 
     if (user.role === 'MODERATOR' && order.assignedToId !== user.id) {
-      throw new ForbiddenException('You do not have access to this order');
+      throw new ForbiddenException(problem('auth.forbidden', 'You do not have access to this order'));
     }
 
     return order;
