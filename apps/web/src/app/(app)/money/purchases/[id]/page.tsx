@@ -114,6 +114,7 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
               {hasExtras ? (
                 <Row label={t('extras', { allocation: invoice.allocation })} value={money(invoice.extraCosts)} />
               ) : null}
+              {hasExtras && invoice.extraCostsPaidSeparately ? <p className="text-xs text-muted-foreground">{t('separateCosts')}</p> : null}
               <div className="mt-1 flex items-baseline justify-between gap-3 border-t pt-3">
                 <span className="font-medium">{t('intoStock')}</span>
                 <Amount value={invoice.landedTotal} className="text-2xl font-semibold tracking-tight" />
