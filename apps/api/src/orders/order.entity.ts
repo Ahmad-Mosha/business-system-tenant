@@ -64,7 +64,7 @@ export type OrderStatus =
   | 'RETURNED';
 
 /** Whether we have the money. Independent of fulfilment — see below. */
-export type PaymentStatus = 'UNPAID' | 'PAID' | 'REFUNDED';
+export type PaymentStatus = 'UNPAID' | 'PAID' | 'REFUND_DUE' | 'REFUNDED';
 
 export type PaymentMethod = 'COD' | 'INSTAPAY' | 'WALLET';
 
@@ -127,6 +127,12 @@ export class Order {
 
   @Column({ type: 'text', default: 'COD' })
   paymentMethod: PaymentMethod;
+
+  @Column({ type: 'text', nullable: true })
+  returnReason: string | null;
+
+  @Column({ type: 'boolean', nullable: true })
+  returnRestock: boolean | null;
 
   /** The channel's own status string, preserved verbatim rather than guessed. */
   @Column({ type: 'text', nullable: true })

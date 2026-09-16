@@ -227,7 +227,7 @@ export default async function OrdersPage({
                     <OrderStatusMenu orderId={o.id} status={o.status} canRevert={isAdmin} />
                   </TableCell>
                   <TableCell>
-                    <PaymentStatusMenu orderId={o.id} status={o.paymentStatus} />
+                    <PaymentStatusMenu orderId={o.id} status={o.paymentStatus} orderStatus={o.status} />
                   </TableCell>
                   {isAdmin ? (
                     <TableCell className="max-w-0">
