@@ -86,6 +86,8 @@ export class PurchasesController {
       payment?: PurchasePayment;
       allocation?: CostAllocation;
       extraCosts?: string;
+      extraCostsPaidSeparately?: boolean;
+      postImmediately?: boolean;
       lines?: InvoiceLineInput[];
     },
   ) {
@@ -98,9 +100,11 @@ export class PurchasesController {
         payment: body.payment ?? 'CREDIT',
         allocation: body.allocation,
         extraCosts: body.extraCosts,
+        extraCostsPaidSeparately: body.extraCostsPaidSeparately,
         lines: body.lines,
       },
       req.user!.id,
+      body.postImmediately === true,
     );
   }
 

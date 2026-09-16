@@ -74,6 +74,10 @@ export class PurchaseInvoice {
   @Column({ type: 'numeric', precision: 14, scale: 2, default: 0 })
   extraCosts: string;
 
+  /** Costs paid to carriers/customs now, instead of owed to the goods supplier. */
+  @Column({ type: 'boolean', default: false })
+  extraCostsPaidSeparately: boolean;
+
   @Column({ type: 'text', default: 'BY_VALUE' })
   allocation: CostAllocation;
 

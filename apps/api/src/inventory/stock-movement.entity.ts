@@ -55,7 +55,7 @@ export class StockMovement {
 
   /** Cost per unit this movement applied — landed cost on a receipt, the
    *  average cost at the time on a sale (which is COGS). Null when unknown. */
-  @Column({ type: 'numeric', precision: 14, scale: 2, nullable: true })
+  @Column({ type: 'numeric', precision: 16, scale: 4, nullable: true })
   unitCost: string | null;
 
   /** The variant's moving-average cost right after this movement. Receipts only. */
