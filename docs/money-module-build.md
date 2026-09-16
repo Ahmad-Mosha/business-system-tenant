@@ -289,3 +289,16 @@ Notable decisions that landed differently from the spec above:
 
 All money-module test data was **wiped 2026-09-01** for a fresh test (see
 handoff). The 14 `ledger_account` rows stay — re-seeded on boot regardless.
+
+### Gaps found in the 2026-09-15 audit
+
+- **COGS is never posted.** Nothing writes `debit COGS / credit INVENTORY` on a
+  sale, and SALE stock movements from orders carry no `unit_cost`. So
+  `periodSummary` / `profitSeries` always report COGS = 0 and any profit figure
+  would be overstated; the UI hides profit while that's true.
+- The gross/net formula in `ledger.service.ts` is a placeholder until the owners
+  answer [owner-questions-money-system.md](owner-questions-money-system.md).
+- Returning a paid order doesn't reverse its revenue unless the payment status
+  is also changed.
+- `GET /finance/profit-series` (bucketed revenue / COGS / fees / gross / net)
+  drives the profit section on `/money`.

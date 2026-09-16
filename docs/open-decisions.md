@@ -6,6 +6,13 @@ the data model or the numbers the business will act on.
 Ordered by what blocks what. Anything in Tier 1 should be settled with the
 owner before the corresponding code is written.
 
+> **Status (2026-09-16):** #13 is answered by what's built — suppliers and
+> purchase invoices exist. #1 and #2 are built as weighted average and
+> by-value allocation, but still need the owners' explicit yes. The live,
+> meeting-ready question list for everything blocking the money system is
+> [owner-questions-money-system.md](owner-questions-money-system.md) — record
+> answers there, then fold them into [business-rules.md](business-rules.md).
+
 ---
 
 ## Tier 1 — blocks the foundation
