@@ -51,6 +51,7 @@ export function effectOn(
 
 /** Where an entry came from, when that record has a screen of its own. */
 const SOURCE_PATH: Record<string, string> = {
+  expense: '/money/expenses#',
   order: '/orders/',
   purchase_invoice: '/money/purchases/',
   supplier: '/money/suppliers/',
