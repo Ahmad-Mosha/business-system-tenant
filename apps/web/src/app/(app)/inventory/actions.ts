@@ -12,6 +12,8 @@ type Result = { ok: true } | { ok: false; message: string };
 async function write(path: string, method: 'POST' | 'PATCH' | 'DELETE', body: unknown, ...paths: string[]): Promise<Result> {
   const r = await apiRequest(path, method, body);
   if (!r.ok) return r;
+  revalidatePath('/inventory', 'layout');
+  revalidatePath('/money', 'layout');
   for (const p of paths) revalidatePath(p);
   return { ok: true };
 }
@@ -53,8 +55,8 @@ export async function archiveProduct(productId: string) {
   redirect('/inventory');
 }
 
-export async function recordStock(variantId: string, quantity: number, reason: string, note?: string) {
-  return write(`/catalog/variants/${variantId}/stock`, 'POST', { quantity, reason, note }, '/inventory');
+export async function recordStock(variantId: string, quantity: number, reason: string, note?: string, location: 'WAREHOUSE' | 'NOON' = 'WAREHOUSE') {
+  return write(`/catalog/variants/${variantId}/stock`, 'POST', { quantity, reason, note, location }, '/inventory');
 }
 
 export async function updateVariant(
@@ -87,4 +89,10 @@ export async function syncEasyOrders() {
   const r = await apiRequest<{ updated: number; unmatched: unknown[] }>('/catalog/sync/easyorders', 'POST', {});
   if (r.ok) revalidatePath('/inventory');
   return r;
+}
+
+export async function transferStock(variantId: string, quantity: number, from: 'WAREHOUSE' | 'NOON', note: string) {
+  return write(`/catalog/variants/${variantId}/transfer`, 'POST', {
+    quantity, from, to: from === 'WAREHOUSE' ? 'NOON' : 'WAREHOUSE', note,
+  }, '/inventory');
 }

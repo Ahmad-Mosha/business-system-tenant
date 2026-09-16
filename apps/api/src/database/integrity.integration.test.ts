@@ -7,6 +7,7 @@ import { LedgerService } from '../finance/ledger.service';
 import { FinanceService } from '../finance/finance.service';
 import { OrdersService } from '../orders/orders.service';
 import { PurchasingService } from '../purchasing/purchasing.service';
+import { CatalogService } from '../catalog/catalog.service';
 import { Product } from '../catalog/product.entity';
 import { ProductVariant } from '../catalog/product-variant.entity';
 import { StockMovement } from '../inventory/stock-movement.entity';
@@ -90,6 +91,25 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     await orders.updateStatus(actor, order.id, 'SHIPPED');
     await assert.rejects(orders.updateStatus(actor, order.id, 'CANCELLED'));
     assert.equal(await balance(id), 1);
+  });
+  await t.test('warehouse transfers conserve stock and Noon stock cannot fill manual orders', async () => {
+    const catalog = new CatalogService(db, finance);
+    const id = await stock(5);
+    const beforeValue = (await finance.overview()).stockValue;
+    await catalog.transferStock(id, 4, 'WAREHOUSE', 'NOON', user.id, 'Test transfer');
+    assert.equal(await balance(id), 5);
+    assert.equal((await finance.overview()).stockValue, beforeValue);
+    await assert.rejects(orders.create(actor, input(id, 2)));
+    await assert.rejects(catalog.transferStock(id, 2, 'WAREHOUSE', 'NOON', user.id));
+    const competing = await Promise.allSettled([
+      catalog.transferStock(id, 1, 'WAREHOUSE', 'NOON', user.id),
+      orders.create(actor, input(id)),
+    ]);
+    assert.equal(competing.filter((r) => r.status === 'fulfilled').length, 1);
+    const grouped = await db.query("SELECT source_id, SUM(quantity)::int AS total FROM stock_movement WHERE variant_id = $1 AND reason = 'TRANSFER' GROUP BY source_id", [id]);
+    assert.ok(grouped.every((r: { total: number }) => r.total === 0));
+    await assert.rejects(catalog.recordStock(id, -1, 'PURCHASE', user.id));
+    await assert.rejects(catalog.recordStock(id, 1, 'DAMAGE', user.id));
   });
   await t.test('a ledger entry can only be reversed once', async () => {
     const entry = await ledger.post({ amount: '10', debit: 'CASH', credit: 'OWNER_CAPITAL', kind: 'CASH_DEPOSIT' });
