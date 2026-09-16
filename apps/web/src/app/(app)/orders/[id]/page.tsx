@@ -257,7 +257,7 @@ function Detail({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /** One line of the order's history. Enum values read as words, not CONFIRMED. */
-function EventLine({ e }: { e: { type: string; fromValue: string | null; toValue: string | null } }) {
+function EventLine({ e }: { e: { type: string; fromValue: string | null; toValue: string | null; note?: string | null } }) {
   const t = useTranslations('orders.history');
   const te = useTranslations('enums');
   const status = (v: string | null) =>
@@ -275,6 +275,8 @@ function EventLine({ e }: { e: { type: string; fromValue: string | null; toValue
       return t('status', { from: status(e.fromValue), to: status(e.toValue) });
     case 'PAYMENT_CHANGED':
       return t('payment', { from: payment(e.fromValue), to: payment(e.toValue) });
+    case 'NOTE':
+      return <><bdi>{e.note}</bdi>{e.toValue === 'RESTOCK' || e.toValue === 'WRITE_OFF' ? <span className="ms-2 text-muted-foreground">{t(e.toValue === 'RESTOCK' ? 'restocked' : 'writtenOff')}</span> : null}</>;
     default:
       return e.toValue ? t('updatedTo', { value: e.toValue }) : t('updated');
   }

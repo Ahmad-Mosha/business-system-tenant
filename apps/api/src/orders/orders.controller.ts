@@ -93,10 +93,10 @@ export class OrdersController {
   updateStatus(
     @Req() req: Request,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: { status: OrderStatus },
+    @Body() body: { status: OrderStatus; reason?: string; restock?: boolean },
   ) {
     if (!STATUSES.includes(body?.status)) throw new BadRequestException('unknown status');
-    return this.orders.updateStatus(this.user(req), id, body.status);
+    return this.orders.updateStatus(this.user(req), id, body.status, body);
   }
 
   @Patch(':id/payment')

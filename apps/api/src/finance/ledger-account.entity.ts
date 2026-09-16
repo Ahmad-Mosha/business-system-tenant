@@ -52,6 +52,7 @@ export const LEDGER_ACCOUNTS = [
   { code: 'AMAZON_RECEIVABLE', nameAr: 'رصيد أمازون', nameEn: 'Amazon balance', kind: 'ASSET' },
   { code: 'BOSTA_COD', nameAr: 'تحصيلات بوسطة', nameEn: 'Bosta holding', kind: 'ASSET' },
   { code: 'SUPPLIER_PAYABLE', nameAr: 'مستحقات الموردين', nameEn: 'Supplier payable', kind: 'LIABILITY' },
+  { code: 'CUSTOMER_REFUNDS', nameAr: 'مبالغ مستحقة للعملاء', nameEn: 'Customer refunds due', kind: 'LIABILITY' },
   { code: 'OWNER_CAPITAL', nameAr: 'رأس المال', nameEn: 'Owner capital', kind: 'EQUITY' },
   { code: 'OPENING_EQUITY', nameAr: 'رصيد افتتاحي', nameEn: 'Opening balance', kind: 'EQUITY' },
   { code: 'SALES', nameAr: 'المبيعات', nameEn: 'Sales revenue', kind: 'INCOME' },

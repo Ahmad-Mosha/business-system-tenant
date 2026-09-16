@@ -215,7 +215,8 @@ export class EasyOrdersService {
       const previous = order.externalStatus;
       const wasPaid = order.paymentStatus === 'PAID';
       order.externalStatus = payload.new_status ?? null;
-      if (payload.new_status?.toLowerCase() === 'paid') order.paymentStatus = 'PAID';
+      if (payload.new_status?.toLowerCase() === 'paid' && order.paymentStatus === 'UNPAID' &&
+          !['CANCELLED', 'RETURNED'].includes(order.status)) order.paymentStatus = 'PAID';
       await tx.save(order);
 
       // Same rule as our own payment-status change: the money only lands the

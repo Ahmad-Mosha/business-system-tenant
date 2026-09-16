@@ -59,6 +59,38 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     await Promise.all([orders.updateStatus(actor, order.id, 'CANCELLED'), orders.updateStatus(actor, order.id, 'CANCELLED')]);
     assert.equal(await balance(id), 1);
   });
+  for (const restock of [true, false]) {
+    await t.test(`paid return preserves cash until refund; restock=${restock}`, async () => {
+      const id = await stock(2);
+      const order = await orders.create(actor, input(id));
+      const cashBefore = Number(await ledger.balanceOf('CASH'));
+      const revenueBefore = Number(await ledger.balanceOf('SALES'));
+      await orders.updatePayment(actor, order.id, 'PAID');
+      await assert.rejects(orders.updateStatus(actor, order.id, 'RETURNED'));
+      const returned = await orders.updateStatus(actor, order.id, 'RETURNED', { reason: 'Customer return', restock });
+      assert.equal(returned.paymentStatus, 'REFUND_DUE');
+      assert.equal(await balance(id), restock ? 2 : 1);
+      assert.equal(Number(await ledger.balanceOf('CASH')), cashBefore + 20);
+      assert.equal(Number(await ledger.balanceOf('SALES')), revenueBefore);
+      await orders.updateStatus(actor, order.id, 'RETURNED', { reason: 'retry', restock });
+      assert.equal(await balance(id), restock ? 2 : 1);
+      await assert.rejects(orders.updateStatus(actor, order.id, 'NEW'));
+      await assert.rejects(orders.updatePayment(actor, order.id, 'PAID'));
+      await Promise.all([orders.updatePayment(actor, order.id, 'REFUNDED'), orders.updatePayment(actor, order.id, 'REFUNDED')]);
+      assert.equal(Number(await ledger.balanceOf('CASH')), cashBefore);
+      assert.equal(Number((await db.query("SELECT COALESCE(SUM(CASE WHEN credit_code = 'CUSTOMER_REFUNDS' THEN amount WHEN debit_code = 'CUSTOMER_REFUNDS' THEN -amount ELSE 0 END), 0) AS n FROM ledger_entry WHERE source_id = $1", [order.id]))[0].n), 0);
+      assert.equal(await balance(id), restock ? 2 : 1);
+    });
+  }
+  await t.test('moderators cannot cancel, and shipped goods require a received return', async () => {
+    const id = await stock(2);
+    const moderator = { ...actor, role: 'MODERATOR' as const };
+    const order = await orders.create(moderator, input(id));
+    await assert.rejects(orders.updateStatus(moderator, order.id, 'CANCELLED'));
+    await orders.updateStatus(actor, order.id, 'SHIPPED');
+    await assert.rejects(orders.updateStatus(actor, order.id, 'CANCELLED'));
+    assert.equal(await balance(id), 1);
+  });
   await t.test('a ledger entry can only be reversed once', async () => {
     const entry = await ledger.post({ amount: '10', debit: 'CASH', credit: 'OWNER_CAPITAL', kind: 'CASH_DEPOSIT' });
     const [a, b] = await Promise.all([ledger.reverse(entry.id), ledger.reverse(entry.id)]);

@@ -124,7 +124,7 @@ export async function getDataRange(): Promise<{ from: string; to: string } | nul
 
 export type OrderStatus =
   | 'NEW' | 'ASSIGNED' | 'CONFIRMED' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED' | 'RETURNED';
-export type PaymentStatus = 'UNPAID' | 'PAID' | 'REFUNDED';
+export type PaymentStatus = 'UNPAID' | 'PAID' | 'REFUND_DUE' | 'REFUNDED';
 
 export interface OrderRow {
   id: string;

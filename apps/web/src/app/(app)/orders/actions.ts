@@ -11,6 +11,8 @@ export type ActionResult = { ok: true } | { ok: false; message: string };
 function revalidateOrder(orderId: string) {
   revalidatePath('/orders');
   revalidatePath(`/orders/${orderId}`);
+  revalidatePath('/inventory', 'layout');
+  revalidatePath('/money', 'layout');
 }
 
 /** A status, payment or assignment change — the API decides, the lists refresh. */
@@ -21,8 +23,8 @@ async function change(orderId: string, path: string, body: unknown): Promise<Act
   return { ok: true };
 }
 
-export async function setOrderStatus(orderId: string, status: string) {
-  return change(orderId, `/orders/${orderId}/status`, { status });
+export async function setOrderStatus(orderId: string, status: string, returned?: { reason: string; restock: boolean }) {
+  return change(orderId, `/orders/${orderId}/status`, { status, ...returned });
 }
 
 export async function setPaymentStatus(orderId: string, paymentStatus: string) {
