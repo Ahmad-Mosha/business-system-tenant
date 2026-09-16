@@ -52,7 +52,7 @@ export function OrderActions({
           <OrderStatusMenu orderId={orderId} status={status} canRevert={canAssign} />
         </Row>
         <Row label={t('payment')}>
-          <PaymentStatusMenu orderId={orderId} status={paymentStatus} />
+          <PaymentStatusMenu orderId={orderId} status={paymentStatus} orderStatus={status} />
         </Row>
       </CardContent>
     </Card>

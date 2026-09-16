@@ -51,11 +51,12 @@ export const isReverse = (s: OrderStatus) => s === 'CANCELLED' || s === 'RETURNE
 const PAYMENT_TONE: Record<PaymentStatus, Tone> = {
   UNPAID: 'neutral',
   PAID: 'success',
+  REFUND_DUE: 'warning',
   REFUNDED: 'warning',
 };
 
 /** Payment direction was never a guided flow — any status can move to any other. */
-export const ALL_PAYMENT_STATUSES: PaymentStatus[] = ['UNPAID', 'PAID', 'REFUNDED'];
+export const ALL_PAYMENT_STATUSES: PaymentStatus[] = ['UNPAID', 'PAID', 'REFUND_DUE', 'REFUNDED'];
 
 export function StatusBadge({ status, className }: { status: OrderStatus; className?: string }) {
   const t = useTranslations('enums.orderStatus');
