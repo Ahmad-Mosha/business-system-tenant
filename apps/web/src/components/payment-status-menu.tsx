@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { setPaymentStatus } from '@/app/(app)/orders/actions';
 import { InlineMenu } from '@/components/inline-menu';
 import { ALL_PAYMENT_STATUSES, PaymentBadge } from '@/components/order-status';
-import type { PaymentStatus } from '@/lib/api';
+import type { OrderStatus, PaymentStatus } from '@/lib/api';
 
 /**
  * Changes an order's payment status straight from the list — always free-form
@@ -15,13 +15,20 @@ import type { PaymentStatus } from '@/lib/api';
 export function PaymentStatusMenu({
   orderId,
   status,
+  orderStatus,
 }: {
   orderId: string;
   status: PaymentStatus;
+  orderStatus: OrderStatus;
 }) {
   const t = useTranslations();
   const [pending, start] = useTransition();
   const name = (s: PaymentStatus) => t(`enums.paymentStatus.${s}`);
+
+  const allowed = status === 'REFUND_DUE' ? ['REFUNDED'] : status === 'REFUNDED' ? [] :
+    status === 'PAID' ? ['UNPAID', 'REFUNDED'] :
+    ['CANCELLED', 'RETURNED'].includes(orderStatus) ? [] : ['PAID'];
+  if (!allowed.length) return <PaymentBadge status={status} />;
 
   return (
     <InlineMenu
@@ -31,7 +38,7 @@ export function PaymentStatusMenu({
       sections={[
         {
           heading: t('status.markAs'),
-          items: ALL_PAYMENT_STATUSES.map((s) => ({
+          items: ALL_PAYMENT_STATUSES.filter((s) => allowed.includes(s)).map((s) => ({
             value: s,
             label: name(s),
             current: s === status,

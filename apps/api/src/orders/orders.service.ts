@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   OnModuleInit,
@@ -383,7 +384,7 @@ export class OrdersService implements OnModuleInit {
    * *leaving* debits it again, so an admin un-cancelling an order doesn't
    * silently leave the stock double-counted as both "returned" and "in stock".
    */
-  async updateStatus(user: SessionUser, orderId: string, next: OrderStatus) {
+  async updateStatus(user: SessionUser, orderId: string, next: OrderStatus, returned?: { reason?: string; restock?: boolean }) {
     return this.db.transaction(async (tx) => {
       const order = await tx.findOne(Order, {
         where: user.role === 'ADMIN' ? { id: orderId } : { id: orderId, assignedToId: user.id },
@@ -393,6 +394,22 @@ export class OrdersService implements OnModuleInit {
 
       const from = order.status;
       if (from === next) return order;
+
+      if (next === 'CANCELLED' && user.role !== 'ADMIN') throw new ForbiddenException();
+      if (from === 'RETURNED') throw new BadRequestException(problem('order.returnFinal', 'a received return cannot be reopened'));
+      if (next === 'CANCELLED' && ['SHIPPED', 'DELIVERED'].includes(from)) {
+        throw new BadRequestException(problem('order.useReturn', 'record a received return for an order that has shipped'));
+      }
+      if (next === 'RETURNED') {
+        if (from === 'CANCELLED' || !returned?.reason?.trim() || typeof returned.restock !== 'boolean') {
+          throw new BadRequestException(problem('order.returnDetails', 'enter a return reason and choose whether received goods are sellable'));
+        }
+        order.returnReason = returned.reason.trim();
+        order.returnRestock = returned.restock;
+      }
+      if (from === 'CANCELLED' && order.paymentStatus !== 'UNPAID') {
+        throw new BadRequestException(problem('order.returnFinal', 'a refunded or refund-due order cannot be reopened'));
+      }
 
       if (user.role !== 'ADMIN') {
         const allowed = ALLOWED_TRANSITIONS[from] ?? [];
@@ -412,10 +429,28 @@ export class OrdersService implements OnModuleInit {
       await tx.save(order);
       await this.record(tx, orderId, 'STATUS_CHANGED', from, next, user);
 
-      const wasOut = from === 'CANCELLED' || from === 'RETURNED';
+      const wasOut = from === 'CANCELLED';
       const isOut = next === 'CANCELLED' || next === 'RETURNED';
       if (!wasOut && isOut) {
-        await OrdersService.creditStockForOrder(tx, orderId, next);
+        await OrdersService.creditStockForOrder(tx, orderId, next, user.id, returned?.reason);
+        if (next === 'RETURNED' && !returned?.restock) {
+          const items = await tx.find(OrderItem, { where: { orderId } });
+          const damaged = items.filter((i) => i.variantId).map((i) => ({
+            variantId: i.variantId!, quantity: -i.quantity, reason: 'DAMAGE' as const,
+            sourceType: 'order', sourceId: orderId, createdById: user.id, note: returned?.reason?.trim(),
+          }));
+          if (damaged.length) await tx.insert(StockMovement, damaged);
+        }
+        if (order.paymentStatus === 'PAID') {
+          await this.finance.recordOrderReturn(tx, orderId, user.id);
+          order.paymentStatus = 'REFUND_DUE';
+          await tx.save(order);
+          await this.record(tx, orderId, 'PAYMENT_CHANGED', 'PAID', 'REFUND_DUE', user);
+        }
+        if (next === 'RETURNED') {
+          await tx.insert(OrderEvent, { orderId, type: 'NOTE', actorId: user.id, actorName: user.name,
+            note: order.returnReason, toValue: returned?.restock ? 'RESTOCK' : 'WRITE_OFF' });
+        }
       } else if (wasOut && !isOut) {
         const items = await tx.find(OrderItem, { where: { orderId } });
         await this.assertStockAvailable(tx, items.map((i) => ({ ...i, variantId: i.variantId ?? undefined })));
@@ -442,6 +477,13 @@ export class OrdersService implements OnModuleInit {
       const from = order.paymentStatus;
       if (from === next) return order;
 
+      const inactive = order.status === 'CANCELLED' || order.status === 'RETURNED';
+      if (next === 'REFUND_DUE' || (from === 'REFUND_DUE' && next !== 'REFUNDED') ||
+          (inactive && next === 'PAID') || (next === 'REFUNDED' && !['PAID', 'REFUND_DUE'].includes(from)) ||
+          from === 'REFUNDED') {
+        throw new BadRequestException(problem('order.paymentTransition', 'this payment change is not available'));
+      }
+      if (from === 'REFUND_DUE') await this.finance.refundReturnedOrder(tx, orderId, user.id);
       order.paymentStatus = next;
       await tx.save(order);
       await this.record(tx, orderId, 'PAYMENT_CHANGED', from, next, user);
@@ -554,6 +596,8 @@ export class OrdersService implements OnModuleInit {
     tx: EntityManager,
     orderId: string,
     reason: 'CANCELLED' | 'RETURNED' | 'EDITED',
+    actorId?: string,
+    note?: string,
   ): Promise<void> {
     const items = await tx.find(OrderItem, { where: { orderId } });
     const movements = items
@@ -564,12 +608,13 @@ export class OrdersService implements OnModuleInit {
         reason: reason === 'RETURNED' ? ('RETURN' as const) : ('ADJUSTMENT' as const),
         sourceType: 'order',
         sourceId: orderId,
-        note:
+        createdById: actorId ?? null,
+        note: note?.trim() || (
           reason === 'RETURNED'
             ? 'order returned'
             : reason === 'EDITED'
               ? 'order edited — previous lines reversed'
-              : 'order cancelled',
+              : 'order cancelled'),
       }));
     if (movements.length) {
       await lockStock(tx, movements.map((m) => m.variantId));

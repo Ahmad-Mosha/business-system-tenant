@@ -292,6 +292,31 @@ export class FinanceService {
     );
   }
 
+  /** Remove revenue now; keep collected cash until the actual refund. */
+  async recordOrderReturn(tx: EntityManager, orderId: string, actorId: string) {
+    const [sale] = await tx.query(
+      `SELECT e.amount FROM ledger_entry e
+       WHERE e.source_type = 'order' AND e.source_id = $1 AND e.kind = 'ORDER_SALE'
+         AND e.reverses_id IS NULL
+         AND NOT EXISTS (SELECT 1 FROM ledger_entry r WHERE r.reverses_id = e.id)
+       ORDER BY e.created_at DESC LIMIT 1`, [orderId],
+    );
+    if (!sale) throw new BadRequestException(problem('order.missingPayment', 'reconcile the original payment before returning this paid order'));
+    await this.ledger.post({ amount: sale.amount, debit: 'SALES', credit: 'CUSTOMER_REFUNDS',
+      kind: 'RETURN', sourceType: 'order', sourceId: orderId, actorId }, tx);
+  }
+
+  async refundReturnedOrder(tx: EntityManager, orderId: string, actorId: string) {
+    const [due] = await tx.query(
+      `SELECT COALESCE(SUM(CASE WHEN credit_code = 'CUSTOMER_REFUNDS' THEN amount
+        WHEN debit_code = 'CUSTOMER_REFUNDS' THEN -amount ELSE 0 END), 0) AS amount
+       FROM ledger_entry WHERE source_type = 'order' AND source_id = $1`, [orderId],
+    );
+    if (Number(due.amount) <= 0) throw new BadRequestException(problem('order.noRefundDue', 'no refund is due'));
+    await this.ledger.post({ amount: due.amount, debit: 'CUSTOMER_REFUNDS', credit: 'CASH',
+      kind: 'PAYMENT_OUT', sourceType: 'order', sourceId: orderId, actorId }, tx);
+  }
+
   /**
    * Undoes the entry above when an order is un-marked PAID (moved to UNPAID or
    * REFUNDED) — otherwise the cash it booked stays in the ledger as if the

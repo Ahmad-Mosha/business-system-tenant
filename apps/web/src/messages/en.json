@@ -194,7 +194,13 @@
         "stockShort": "{name}: only {onHand} in stock, {requested} requested.",
         "locked": "This order can no longer be edited — it has left the warehouse.",
         "transition": "That status change isn’t allowed from the order’s current status.",
-        "paidEdit": "Reverse the payment before editing a paid or refunded order."
+        "paidEdit": "Reverse the payment before editing a paid or refunded order.",
+        "returnFinal": "This received return or refunded order cannot be reopened.",
+        "useReturn": "This order has shipped. Receive a return instead of cancelling it.",
+        "returnDetails": "Enter a reason and choose the condition of the received goods.",
+        "paymentTransition": "This payment change is not available for this order.",
+        "missingPayment": "Reconcile the original payment before returning this paid order.",
+        "noRefundDue": "No customer refund is due."
       },
       "cheque": {
         "settled": "{status, select, CLEARED {This cheque has already cleared.} BOUNCED {This cheque has already bounced.} other {This cheque is no longer pending.}}"
@@ -299,7 +305,9 @@
       "status": "Status {from} → {to}",
       "payment": "Payment {from} → {to}",
       "updatedTo": "Updated to {value}",
-      "updated": "Updated"
+      "updated": "Updated",
+      "restocked": "Returned to sellable stock",
+      "writtenOff": "Written off; no sellable stock added"
     },
     "workflow": {
       "title": "Workflow",
@@ -345,6 +353,17 @@
       "needsGovernorate": "Pick a governorate.",
       "overStock": "Only <num>{count}</num> of <bdi>{name}</bdi> in stock.",
       "belowCost": "<bdi>{name}</bdi> is priced below its <num>{cost}</num> cost."
+    },
+    "return": {
+      "title": "Receive returned order",
+      "description": "Record a full return only after all goods have been received. For mixed conditions, use the unsellable option and reconcile sellable units separately.",
+      "reason": "Return reason",
+      "condition": "Condition of received goods",
+      "sellable": "All goods are sellable — return to available stock",
+      "damaged": "Do not restock — damaged or unsellable",
+      "refundHint": "A paid order becomes refund due. Record the cash refund separately when it is actually paid.",
+      "submit": "Receive return",
+      "saved": "Return received; stock and finances updated"
     }
   },
   "productSearch": {
@@ -992,7 +1011,8 @@
     "paymentStatus": {
       "UNPAID": "Unpaid",
       "PAID": "Paid",
-      "REFUNDED": "Refunded"
+      "REFUNDED": "Refunded",
+      "REFUND_DUE": "Refund due"
     },
     "orderSource": {
       "EASYORDERS": "Website",
