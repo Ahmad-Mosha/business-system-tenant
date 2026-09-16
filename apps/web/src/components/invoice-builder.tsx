@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { saveInvoice, type InvoicePayload } from '@/app/(app)/money/actions';
+import { SupplierForm } from '@/components/supplier-form';
 import { AddProductDialog } from '@/components/add-product-dialog';
 import { Amount } from '@/components/amount';
 import { DatePicker, todayISO } from '@/components/date-picker';
@@ -80,6 +81,11 @@ export function InvoiceBuilder({
   const [pending, start] = useTransition();
   const [confirming, setConfirming] = useState(false);
 
+  const [newSuppliers, setNewSuppliers] = useState<SupplierRow[]>([]);
+  const supplierOptions = [...suppliers, ...newSuppliers.filter((s) => !suppliers.some((existing) => existing.id === s.id))];
+  const [extraCosts, setExtraCosts] = useState('0');
+  const [allocation, setAllocation] = useState<'BY_VALUE' | 'PER_UNIT'>('BY_VALUE');
+  const [separateCosts, setSeparateCosts] = useState(true);
   const [supplierId, setSupplierId] = useState('');
   const [invoiceNo, setInvoiceNo] = useState('');
   const [invoiceDate, setInvoiceDate] = useState(todayISO());
@@ -87,9 +93,16 @@ export function InvoiceBuilder({
   const [lines, setLines] = useState<Line[]>([]);
   const [creating, setCreating] = useState<string | null>(null);
 
-  const supplier = suppliers.find((s) => s.id === supplierId);
-  const total = lines.reduce((s, l) => s + l.quantity * (Number(l.unitCost) || 0), 0);
-  const missing = !supplierId
+  const supplier = supplierOptions.find((s) => s.id === supplierId);
+  const goodsTotal = lines.reduce((s, l) => s + l.quantity * (Number(l.unitCost) || 0), 0);
+  const extraValue = Number(extraCosts) || 0;
+  const total = goodsTotal + extraValue;
+  const totalUnits = lines.reduce((sum, l) => sum + l.quantity, 0);
+  const missing = !/^\d+(\.\d{1,2})?$/.test(extraCosts)
+    ? tr('validation.extraCosts')
+    : lines.some((l) => !Number.isInteger(l.quantity) || l.quantity < 1)
+      ? tr('validation.lineQuantity')
+      : !supplierId
     ? tr('validation.chooseSupplier')
     : !lines.length
       ? tr('validation.addProduct')
@@ -112,11 +125,9 @@ export function InvoiceBuilder({
       invoiceNo: invoiceNo.trim() || undefined,
       invoiceDate,
       payment,
-      // Shipping/customs allocation is off for now — every invoice is goods
-      // only. The backend and its costing math still take these two fields;
-      // turning it back on is re-adding the two inputs, nothing more.
-      allocation: 'BY_VALUE',
-      extraCosts: '0',
+      allocation,
+      extraCosts,
+      extraCostsPaidSeparately: separateCosts,
       lines: lines.map((l) => ({ variantId: l.variantId, quantity: l.quantity, unitCost: l.unitCost })),
     };
     start(async () => {
@@ -131,7 +142,7 @@ export function InvoiceBuilder({
     });
   };
 
-  const consequence = t.rich('newInvoice.consequence', {
+  const consequence = extraValue > 0 ? t('landed.paymentHint', { cash: money(payment === 'CASH' ? total : separateCosts ? extraValue : 0), supplier: money(payment === 'CREDIT' ? total - (separateCosts ? extraValue : 0) : 0) }) : t.rich('newInvoice.consequence', {
     payment,
     total: money(total),
     from: money(cashBalance),
@@ -165,13 +176,14 @@ export function InvoiceBuilder({
                       <SelectValue placeholder={tr('common.choose')} />
                     </SelectTrigger>
                     <SelectContent position="popper">
-                      {suppliers.map((s) => (
+                      {supplierOptions.map((s) => (
                         <SelectItem key={s.id} value={s.id}>
                           <bdi>{s.name}</bdi>
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  <SupplierForm onCreated={(s) => { setNewSuppliers((prev) => [...prev, { ...s, balance: '0.00' }]); setSupplierId(s.id); }} />
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="inv-ref">
@@ -231,7 +243,7 @@ export function InvoiceBuilder({
                 placeholder={t('newInvoice.searchPlaceholder')}
                 disabledReason={(h) => (lines.some((l) => l.variantId === h.id) ? t('newInvoice.added') : null)}
                 meta={(h) => t('newInvoice.onHand', { count: h.onHand })}
-                onPick={(h) => addLine(h.id, h.label, h.onHand, h.unitCost ?? '')}
+                onPick={(h) => addLine(h.id, h.label, h.onHand, h.unitCost ? Number(h.unitCost).toFixed(2) : '')}
                 onCreate={setCreating}
               />
             </CardContent>
@@ -244,6 +256,7 @@ export function InvoiceBuilder({
                       <TableHead className="w-[100px] text-end">{t('invoice.columns.qty')}</TableHead>
                       <TableHead className="w-[130px] text-end">{t('invoice.columns.unitCost')}</TableHead>
                       <TableHead className="w-[130px] text-end">{t('invoice.columns.lineTotal')}</TableHead>
+                      {extraValue > 0 ? <TableHead className="w-[130px] text-end">{t('landed.estimatedUnit')}</TableHead> : null}
                       <TableHead className="w-12" />
                     </TableRow>
                   </TableHeader>
@@ -290,6 +303,7 @@ export function InvoiceBuilder({
                         <TableCell className="num text-end font-medium">
                           {money(l.quantity * (Number(l.unitCost) || 0))}
                         </TableCell>
+                        {extraValue > 0 ? <TableCell className="num text-end text-muted-foreground">{money(Number(l.unitCost || 0) + (allocation === 'BY_VALUE' ? (goodsTotal > 0 ? extraValue * Number(l.unitCost || 0) / goodsTotal : 0) : extraValue / totalUnits))}</TableCell> : null}
                         <TableCell className="pe-2">
                           <Button
                             variant="ghost"
@@ -318,6 +332,14 @@ export function InvoiceBuilder({
               )}
             </div>
           </Card>
+          <Card><CardHeader><CardTitle>{t('landed.title')}</CardTitle><CardDescription>{t('landed.description')}</CardDescription></CardHeader>
+            <CardContent className="grid gap-4 sm:grid-cols-2">
+              <Field><FieldLabel htmlFor="extra-costs">{t('landed.amount')}</FieldLabel><Input id="extra-costs" inputMode="decimal" value={extraCosts} onChange={(e) => setExtraCosts(e.target.value)} disabled={pending} className="num" /></Field>
+              <Field><FieldLabel htmlFor="allocation">{t('landed.allocation')}</FieldLabel><Select value={allocation} onValueChange={(v) => setAllocation(v as typeof allocation)} disabled={pending}><SelectTrigger id="allocation"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="BY_VALUE">{t('landed.byValue')}</SelectItem><SelectItem value="PER_UNIT">{t('landed.perUnit')}</SelectItem></SelectContent></Select></Field>
+              <label className="flex items-start gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={separateCosts} onChange={(e) => setSeparateCosts(e.target.checked)} disabled={pending} className="mt-1" />{t('landed.paidSeparately')}</label>
+              {extraValue > 0 ? <p className="text-xs text-muted-foreground sm:col-span-2">{t('landed.paymentHint', { cash: money(payment === 'CASH' ? total : separateCosts ? extraValue : 0), supplier: money(payment === 'CREDIT' ? total - (separateCosts ? extraValue : 0) : 0) })}</p> : null}
+            </CardContent>
+          </Card>
         </div>
 
         <aside className="lg:sticky lg:top-0">
@@ -327,9 +349,10 @@ export function InvoiceBuilder({
             </CardHeader>
             <CardContent className="grid gap-4 text-[13px]">
               <div className="flex items-baseline justify-between gap-3">
-                <span className="text-muted-foreground">{tr('nouns.products', { count: lines.length })}</span>
+                <span className="text-muted-foreground">{t('invoice.intoStock')}</span>
                 <Amount value={total} className="text-[28px] font-semibold tracking-tight" />
               </div>
+              {extraValue > 0 ? <p className="text-xs text-muted-foreground">{t('landed.breakdown', { goods: money(goodsTotal), extra: money(extraValue) })}</p> : null}
               {lines.length ? (
                 <p className="border-t pt-3 text-xs/relaxed text-muted-foreground">
                   {t('newInvoice.onPosting')} {consequence}{' '}
@@ -368,7 +391,7 @@ export function InvoiceBuilder({
               </AlertDialog>
               <Button
                 variant="outline"
-                disabled={pending || !lines.length || !supplierId}
+                disabled={pending || !!missing}
                 onClick={() => submit(true)}
                 className="w-full"
               >

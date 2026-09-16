@@ -57,7 +57,7 @@ export class ProductVariant {
    * ponytail: a single current figure, not FIFO/average layers. Costing method
    * is deliberately undecided — see docs/decisions/001.
    */
-  @Column({ type: 'numeric', precision: 14, scale: 2, nullable: true })
+  @Column({ type: 'numeric', precision: 16, scale: 4, nullable: true })
   unitCost: string | null;
 
   /** Default selling price. Channels may override; a listing keeps its own. */

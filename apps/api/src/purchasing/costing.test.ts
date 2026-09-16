@@ -59,3 +59,14 @@ test('a lopsided split still reconciles to the last cent', () => {
   const shares = allocateExtraCosts(lines, 10, 'BY_VALUE');
   assert.equal(round2(shares.reduce((a, b) => a + b, 0)), 10);
 });
+
+
+test('many tiny landed shares never make the last line negative', () => {
+  const lines = Array.from({ length: 100 }, () => ({ lineTotal: 1, quantity: 1 }));
+  for (const method of ['BY_VALUE', 'PER_UNIT'] as const) {
+    const shares = allocateExtraCosts(lines, 0.51, method);
+    assert.ok(shares.every((share) => share >= 0));
+    assert.equal(Math.round(shares.reduce((sum, share) => sum + share, 0) * 100), 51);
+    assert.equal(shares.filter((share) => share === 0.01).length, 51);
+  }
+});

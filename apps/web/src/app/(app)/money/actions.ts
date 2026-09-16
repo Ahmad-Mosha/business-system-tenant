@@ -147,6 +147,7 @@ export interface InvoicePayload {
   payment: 'CASH' | 'CREDIT';
   allocation: 'BY_VALUE' | 'PER_UNIT';
   extraCosts: string;
+  extraCostsPaidSeparately?: boolean;
   lines: InvoiceLinePayload[];
 }
 
@@ -201,16 +202,9 @@ export async function saveInvoice(input: InvoicePayload, asDraft: boolean): Prom
                 : null;
   if (problem) return { ok: false, message: (await invalid(problem)).message };
 
-  const created = await call('/purchases', input);
-  if (!created.ok) return created;
-
-  if (asDraft) {
-    revalidatePurchasing();
-    return created;
-  }
-  const posted = await call(`/purchases/${created.id}/post`);
-  revalidatePurchasing();
-  return posted.ok ? created : posted;
+  const result = await call('/purchases', { ...input, postImmediately: !asDraft });
+  if (result.ok) revalidatePurchasing();
+  return result;
 }
 
 export async function postInvoice(_prev: FormState, form: FormData): Promise<FormState> {
@@ -222,4 +216,12 @@ export async function postInvoice(_prev: FormState, form: FormData): Promise<For
     revalidatePath(`/money/purchases/${id}`);
   }
   return state;
+}
+
+export async function createSupplierInline(form: FormData) {
+  const r = await apiRequest<{ id: string; name: string; phone: string | null; note: string | null; active: boolean; createdAt: string }>('/suppliers', 'POST', {
+    name: String(form.get('name') ?? '').trim(), phone: String(form.get('phone') ?? '').trim(), note: String(form.get('note') ?? '').trim(),
+  });
+  if (r.ok) revalidatePath('/money/suppliers');
+  return r;
 }
