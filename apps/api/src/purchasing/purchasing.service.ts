@@ -14,6 +14,7 @@ import {
 } from './purchase-invoice.entity';
 import { Supplier } from './supplier.entity';
 import { problem } from '../problem';
+import { lockStock } from '../inventory/stock-lock';
 
 const MONEY = /^\d+(\.\d{1,2})?$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -135,7 +136,7 @@ export class PurchasingService {
     if (value <= 0) throw new BadRequestException('amount must be greater than zero');
 
     return this.db.transaction(async (tx) => {
-      const supplier = await tx.findOneBy(Supplier, { id: supplierId });
+      const supplier = await tx.findOne(Supplier, { where: { id: supplierId }, lock: { mode: 'pessimistic_write' } });
       if (!supplier) throw new NotFoundException(problem('notFound', 'supplier not found'));
 
       const targets = invoiceId
@@ -278,14 +279,14 @@ export class PurchasingService {
   }
 
   async deleteDraft(id: string) {
-    const invoice = await this.db.getRepository(PurchaseInvoice).findOneBy({ id });
-    if (!invoice) throw new NotFoundException(problem('notFound', 'invoice not found'));
-    if (invoice.status !== 'DRAFT') {
-      throw new BadRequestException(
-        problem('invoice.postedDelete', 'a posted invoice cannot be deleted — reverse it instead'),
-      );
-    }
-    await this.db.getRepository(PurchaseInvoice).delete({ id });
+    await this.db.transaction(async (tx) => {
+      const invoice = await tx.findOne(PurchaseInvoice, { where: { id }, lock: { mode: 'pessimistic_write' } });
+      if (!invoice) throw new NotFoundException(problem('notFound', 'invoice not found'));
+      if (invoice.status !== 'DRAFT') {
+        throw new BadRequestException(problem('invoice.postedDelete', 'a posted invoice cannot be deleted'));
+      }
+      await tx.delete(PurchaseInvoice, { id });
+    });
   }
 
   /**
@@ -295,9 +296,11 @@ export class PurchasingService {
    */
   async postInvoice(id: string, userId: string) {
     await this.db.transaction(async (tx) => {
-      const invoice = await tx.findOne(PurchaseInvoice, { where: { id }, relations: { lines: true } });
+      const invoice = await tx.findOne(PurchaseInvoice, { where: { id }, lock: { mode: 'pessimistic_write' } });
       if (!invoice) throw new NotFoundException(problem('notFound', 'invoice not found'));
       if (invoice.status === 'POSTED') throw new BadRequestException(problem('invoice.posted', 'this invoice is already posted'));
+      invoice.lines = await tx.find(PurchaseInvoiceLine, { where: { invoiceId: id }, order: { id: 'ASC' } });
+      await lockStock(tx, invoice.lines.map((l) => l.variantId));
       if (!invoice.lines.length) throw new BadRequestException(problem('invoice.noLines', 'add at least one line before posting'));
 
       const shares = allocateExtraCosts(
