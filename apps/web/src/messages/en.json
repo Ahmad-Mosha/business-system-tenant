@@ -810,7 +810,8 @@
       "confirm": "<num>{total}</num> of stock comes in at cost and the money is booked. Posting can’t be undone.",
       "notYet": "Not yet",
       "post": "Post invoice",
-      "posted": "Invoice posted — stock and the ledger updated."
+      "posted": "Invoice posted — stock and the ledger updated.",
+      "separateCosts": "Extra costs are paid separately from cash and are included in the settled amount."
     },
     "newInvoice": {
       "title": "New purchase invoice",

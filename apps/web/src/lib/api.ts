@@ -470,6 +470,7 @@ export interface PurchaseInvoiceDetail {
   status: 'DRAFT' | 'POSTED';
   payment: 'CASH' | 'CREDIT';
   allocation: 'BY_VALUE' | 'PER_UNIT';
+  extraCostsPaidSeparately: boolean;
   goodsTotal: string;
   extraCosts: string;
   landedTotal: string;
