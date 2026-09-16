@@ -1,8 +1,9 @@
+import { randomUUID } from 'node:crypto';
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
 import { FinanceService } from '../finance/finance.service';
-import { StockMovement, type StockReason } from '../inventory/stock-movement.entity';
+import { STOCK_LOCATIONS, StockMovement, type StockLocation, type StockReason } from '../inventory/stock-movement.entity';
 import { ChannelListing } from './channel-listing.entity';
 import { PRODUCT_CATEGORIES, type ProductCategory } from './product.entity';
 import { ProductVariant } from './product-variant.entity';
@@ -115,7 +116,9 @@ export class CatalogService {
       `SELECT p.id, p.name, p.category, p.discovered, p.active,
               stock.variant_count                               AS "variantCount",
               stock.on_hand                                     AS "onHand",
+              stock.warehouse AS "warehouseOnHand", stock.noon AS "noonOnHand",
               stock.unit_cost                                   AS "unitCost",
+              stock.stock_value AS "stockValue",
               stock.selling_price                               AS "sellingPrice",
               COALESCE(held.open, 0)::int                       AS "inOrders",
               COALESCE(ch.channels, '{}')                       AS channels,
@@ -127,7 +130,10 @@ export class CatalogService {
        LEFT JOIN LATERAL (
          SELECT count(DISTINCT v.id)::int          AS variant_count,
                 COALESCE(SUM(m.quantity), 0)::int  AS on_hand,
+                COALESCE(SUM(m.quantity) FILTER (WHERE m.location = 'WAREHOUSE'), 0)::int AS warehouse,
+                COALESCE(SUM(m.quantity) FILTER (WHERE m.location = 'NOON'), 0)::int AS noon,
                 MIN(v.unit_cost)                   AS unit_cost,
+                COALESCE(SUM(m.quantity * COALESCE(v.unit_cost, 0)), 0) AS stock_value,
                 MIN(v.selling_price)               AS selling_price
          FROM product_variant v
          LEFT JOIN stock_movement m ON m.variant_id = v.id
@@ -167,12 +173,13 @@ export class CatalogService {
     const [row] = await this.db.query(
       `SELECT count(*)::int                                              AS products,
               COALESCE(SUM(stock.on_hand), 0)::int                       AS "unitsOnHand",
-              COALESCE(SUM(stock.on_hand * COALESCE(stock.unit_cost, 0)), 0) AS "stockValue",
+              COALESCE(SUM(stock.stock_value), 0) AS "stockValue",
               count(*) FILTER (WHERE stock.unit_cost IS NULL)::int       AS "missingCost",
               COALESCE(SUM(held.open), 0)::int                           AS "unitsInOrders"
        FROM product p
        LEFT JOIN LATERAL (
-         SELECT COALESCE(SUM(m.quantity), 0)::int AS on_hand, MIN(v.unit_cost) AS unit_cost
+         SELECT COALESCE(SUM(m.quantity), 0)::int AS on_hand, MIN(v.unit_cost) AS unit_cost,
+                COALESCE(SUM(m.quantity * COALESCE(v.unit_cost, 0)), 0) AS stock_value
          FROM product_variant v
          LEFT JOIN stock_movement m ON m.variant_id = v.id
          WHERE v.product_id = p.id
@@ -201,10 +208,15 @@ export class CatalogService {
       `SELECT v.id, v.name, v.sku, v.attributes, v.unit_cost AS "unitCost",
               v.selling_price AS "sellingPrice", v.active,
               COALESCE(stock.on_hand, 0)::int AS "onHand",
+              COALESCE(stock.warehouse, 0)::int AS "warehouseOnHand",
+              COALESCE(stock.noon, 0)::int AS "noonOnHand",
               COALESCE(held.open, 0)::int AS "inOpenOrders"
        FROM product_variant v
        LEFT JOIN LATERAL (
-         SELECT SUM(quantity) AS on_hand FROM stock_movement m WHERE m.variant_id = v.id
+         SELECT SUM(quantity) AS on_hand,
+           SUM(quantity) FILTER (WHERE location = 'WAREHOUSE') AS warehouse,
+           SUM(quantity) FILTER (WHERE location = 'NOON') AS noon
+         FROM stock_movement m WHERE m.variant_id = v.id
        ) stock ON TRUE
        LEFT JOIN LATERAL (
          SELECT SUM(i.quantity) AS open
@@ -501,7 +513,12 @@ export class CatalogService {
     reason: StockReason,
     userId: string,
     note?: string,
+    location: StockLocation = 'WAREHOUSE',
   ) {
+    if (!STOCK_LOCATIONS.includes(location)) throw new BadRequestException('unknown stock location');
+    if ((['PURCHASE', 'RETURN'].includes(reason) && quantity < 0) || (reason === 'DAMAGE' && quantity > 0) || ['SALE', 'TRANSFER'].includes(reason)) {
+      throw new BadRequestException(problem('stock.direction', 'this reason does not match the stock direction'));
+    }
     if (!Number.isInteger(quantity) || quantity === 0) {
       throw new BadRequestException('quantity must be a non-zero whole number');
     }
@@ -509,15 +526,15 @@ export class CatalogService {
       const variant = await tx.findOne(ProductVariant, { where: { id: variantId }, lock: { mode: 'pessimistic_write' } });
       if (!variant) throw new NotFoundException(problem('notFound', 'variant not found'));
       const [{ onHand }] = await tx.query(
-        'SELECT COALESCE(SUM(quantity), 0)::int AS "onHand" FROM stock_movement WHERE variant_id = $1',
-        [variantId],
+        'SELECT COALESCE(SUM(quantity), 0)::int AS "onHand" FROM stock_movement WHERE variant_id = $1 AND location = $2',
+        [variantId, location],
       );
       const refused = removalError(onHand, quantity);
       if (refused) {
         throw new BadRequestException(problem('stock.remove', refused, { available: Math.max(onHand, 0) }));
       }
 
-      const result = await this.addMovement(tx, variantId, quantity, reason, userId, note, variant.unitCost);
+      const result = await this.addMovement(tx, variantId, quantity, reason, userId, note, variant.unitCost, location);
       // A purchase converts cash into stock — record the cash side too, same
       // transaction, so the two ledgers can never drift apart. No cost on
       // file means no known cash amount, so it's skipped rather than guessed.
@@ -530,11 +547,32 @@ export class CatalogService {
     });
   }
 
+  /** A transfer is a conserved pair, in one transaction and one audit group. */
+  async transferStock(variantId: string, quantity: number, from: StockLocation, to: StockLocation, userId: string, note?: string) {
+    if (!Number.isInteger(quantity) || quantity <= 0 || !STOCK_LOCATIONS.includes(from) || !STOCK_LOCATIONS.includes(to) || from === to) {
+      throw new BadRequestException(problem('stock.transfer', 'choose different locations and a positive whole quantity'));
+    }
+    return this.db.transaction(async (tx) => {
+      const variant = await tx.findOne(ProductVariant, { where: { id: variantId }, lock: { mode: 'pessimistic_write' } });
+      if (!variant) throw new NotFoundException(problem('notFound', 'variant not found'));
+      const [{ onHand }] = await tx.query('SELECT COALESCE(SUM(quantity), 0)::int AS "onHand" FROM stock_movement WHERE variant_id = $1 AND location = $2', [variantId, from]);
+      if (quantity > onHand) throw new BadRequestException(problem('stock.remove', 'insufficient stock at source location', { available: Math.max(onHand, 0) }));
+      const transferId = randomUUID();
+      const common = { variantId, reason: 'TRANSFER' as const, unitCost: variant.unitCost,
+        sourceType: 'transfer', sourceId: transferId, note: note?.trim() || null, createdById: userId };
+      await tx.insert(StockMovement, [
+        { ...common, location: from, quantity: -quantity },
+        { ...common, location: to, quantity },
+      ]);
+      return { transferId };
+    });
+  }
+
   async stockHistory(variantId: string) {
     return this.db.query(
-      `SELECT id, quantity, reason, note, unit_cost AS "unitCost",
+      `SELECT id, quantity, reason, note, location, source_id AS "sourceId", unit_cost AS "unitCost",
               occurred_at AS "occurredAt",
-              SUM(quantity) OVER (ORDER BY occurred_at, id)::int AS "runningTotal"
+              SUM(quantity) OVER (PARTITION BY location ORDER BY occurred_at, created_at, id)::int AS "runningTotal"
        FROM stock_movement
        WHERE variant_id = $1
        ORDER BY occurred_at DESC, id DESC
@@ -551,9 +589,11 @@ export class CatalogService {
     userId: string | null,
     note?: string | null,
     unitCost?: string | null,
+    location: StockLocation = 'WAREHOUSE',
   ) {
     return tx.insert(StockMovement, {
       variantId,
+      location,
       quantity,
       reason,
       note: note ?? null,
@@ -614,7 +654,7 @@ export class CatalogService {
     return this.db.query(
       `SELECT v.id, v.sku, v.selling_price AS "sellingPrice", v.unit_cost AS "unitCost",
               CASE WHEN v.name = 'Default' THEN p.name ELSE p.name || ' — ' || v.name END AS label,
-              COALESCE((SELECT SUM(quantity) FROM stock_movement m WHERE m.variant_id = v.id), 0)::int AS "onHand"
+              COALESCE((SELECT SUM(quantity) FROM stock_movement m WHERE m.variant_id = v.id AND m.location = 'WAREHOUSE'), 0)::int AS "onHand"
        FROM product_variant v
        JOIN product p ON p.id = v.product_id
        WHERE v.active AND (p.name ILIKE $1 OR v.sku ILIKE $1)

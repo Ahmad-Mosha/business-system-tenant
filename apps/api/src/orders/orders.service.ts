@@ -239,7 +239,7 @@ export class OrdersService implements OnModuleInit {
 
     const rows: Array<{ id: string; name: string; onHand: number }> = await tx.query(
       `SELECT v.id, COALESCE(v.name || ' — ' || p.name, p.name) AS name,
-              COALESCE((SELECT SUM(quantity) FROM stock_movement m WHERE m.variant_id = v.id), 0)::int AS "onHand"
+              COALESCE((SELECT SUM(quantity) FROM stock_movement m WHERE m.variant_id = v.id AND m.location = 'WAREHOUSE'), 0)::int AS "onHand"
        FROM product_variant v JOIN product p ON p.id = v.product_id
        WHERE v.id = ANY($1)`,
       [linked.map((i) => i.variantId)],

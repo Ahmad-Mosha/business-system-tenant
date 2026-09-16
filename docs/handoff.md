@@ -17,7 +17,9 @@ purchasing writes now serialize concurrent changes; paid order edits require
 reversing payment first. No production data has been rewritten. Full received returns now require a reason
 and condition; paid returns/cancellations reverse revenue into customer refunds
 due, with cash paid separately. A received return is final. Existing historical
-returns require reconciliation, not automatic backfill.
+returns require reconciliation, not automatic backfill. Inventory now separates
+WAREHOUSE/NOON with atomic transfers; the legacy pooled balance stays WAREHOUSE
+until an owner reconciles actual noon holdings. No quantities are guessed.
 
 ## Toolchain (what's real)
 

@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { Roles } from '../auth/auth.guard';
-import type { StockReason } from '../inventory/stock-movement.entity';
+import type { StockLocation, StockReason } from '../inventory/stock-movement.entity';
 import { PRODUCT_CATEGORIES, type ProductCategory } from './product.entity';
 import { CatalogService, type CreateProductInput } from './catalog.service';
 import { problem } from '../problem';
@@ -144,12 +144,19 @@ export class CatalogController {
   recordStock(
     @Req() req: Request,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: { quantity: number; reason: StockReason; note?: string },
+    @Body() body: { quantity: number; reason: StockReason; note?: string; location?: StockLocation },
   ) {
     if (!REASONS.includes(body?.reason)) {
       throw new BadRequestException(`reason must be one of: ${REASONS.join(', ')}`);
     }
-    return this.catalog.recordStock(id, Number(body.quantity), body.reason, req.user!.id, body.note);
+    return this.catalog.recordStock(id, Number(body.quantity), body.reason, req.user!.id, body.note, body.location);
+  }
+
+  @Roles('ADMIN')
+  @Post('variants/:id/transfer')
+  transferStock(@Req() req: Request, @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { quantity: number; from: StockLocation; to: StockLocation; note?: string }) {
+    return this.catalog.transferStock(id, body.quantity, body.from, body.to, req.user!.id, body.note);
   }
 
   @Roles('ADMIN')

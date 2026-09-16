@@ -223,7 +223,9 @@
         "taken": "رمز SKU «{externalId}» على {channel, select, noon {نون} amazon {أمازون} easyorders {الموقع} other {{channel}}} مربوط بالفعل بمنتج آخر."
       },
       "stock": {
-        "remove": "{available, plural, =0 {لا يوجد رصيد للخصم.} other {المتوفر # فقط — يمكنك خصم # كحد أقصى.}}"
+        "remove": "{available, plural, =0 {لا يوجد رصيد للخصم.} other {المتوفر # فقط — يمكنك خصم # كحد أقصى.}}",
+        "direction": "اختار سبباً مناسباً لإضافة أو سحب المخزون.",
+        "transfer": "اختار مخزنين مختلفين وكمية صحيحة أكبر من صفر."
       },
       "sync": {
         "notConfigured": "ربط Easy Orders غير مُعدّ.",
@@ -479,7 +481,18 @@
       "channels": "القنوات"
     },
     "sync": "مزامنة الموقع",
-    "synced": "تمت مزامنة منتجات الموقع: تحديث {updated}، وتعذّرت مطابقة {unmatched}."
+    "synced": "تمت مزامنة منتجات الموقع: تحديث {updated}، وتعذّرت مطابقة {unmatched}.",
+    "location": "المخزن",
+    "transfer": {
+      "title": "تحويل مخزون",
+      "description": "انقل البضاعة بين مخزننا ومخزن نون. إجمالي الكمية والقيمة لا يتغير.",
+      "submit": "تحويل",
+      "saved": "تم تحويل المخزون",
+      "from": "من",
+      "destination": "إلى: {location} · المتاح: {available}",
+      "quantity": "الكمية",
+      "note": "ملاحظة / مرجع (اختياري)"
+    }
   },
   "product": {
     "back": "العودة إلى المخزون",
@@ -533,14 +546,15 @@
       "nothingToRemove": "لا يوجد رصيد للخصم",
       "movement": "الحركة",
       "change": "التغيير",
-      "balance": "الرصيد",
+      "balance": "رصيد المخزن",
       "noMovements": "لا توجد حركات مخزون بعد.",
       "notes": {
         "orderReturned": "إرجاع طلب",
         "orderCancelled": "إلغاء طلب",
         "orderEdited": "تعديل طلب — عُكست أصنافه السابقة",
         "orderReactivated": "إعادة تفعيل طلب — خرج المخزون مرة أخرى"
-      }
+      },
+      "note": "السبب / المرجع (اختياري)"
     },
     "listings": {
       "variantsNotBuilt": "لهذا المنتج أنواع متعددة، وربط القنوات لكل نوع على حدة غير متاح بعد — أخبرنا عندما تحتاج إليه.",
@@ -1064,7 +1078,8 @@
       "RETURN": "مرتجع من عميل",
       "DAMAGE": "تالف أو مفقود",
       "COUNT": "جرد فعلي",
-      "ADJUSTMENT": "تصحيح"
+      "ADJUSTMENT": "تصحيح",
+      "TRANSFER": "تحويل بين المخازن"
     },
     "entryKind": {
       "OPENING_BALANCE": "رصيد افتتاحي",
@@ -1140,6 +1155,10 @@
       "order_update": "تسويات ما بعد البيع",
       "statement_fee": "رسوم الإعلانات والكشف",
       "balance_transfer": "تحويلات الرصيد"
+    },
+    "stockLocation": {
+      "WAREHOUSE": "مخزننا",
+      "NOON": "مخزن نون"
     }
   }
 }

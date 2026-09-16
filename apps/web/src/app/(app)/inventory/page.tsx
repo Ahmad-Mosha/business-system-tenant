@@ -204,6 +204,8 @@ export default async function InventoryPage({
               <TableRow>
                 <TableHead>{t('columns.product')}</TableHead>
                 <TableHead className="w-[120px]">{t('columns.stock')}</TableHead>
+                <TableHead className="w-[84px] text-end">{te('stockLocation.WAREHOUSE')}</TableHead>
+                <TableHead className="w-[84px] text-end">{te('stockLocation.NOON')}</TableHead>
                 <TableHead className="w-[84px] text-end">{t('columns.onHand')}</TableHead>
                 <TableHead className="w-[84px] text-end">{t('columns.inOrders')}</TableHead>
                 <TableHead className="w-[110px] text-end">{t('columns.unitCost')}</TableHead>
@@ -248,6 +250,8 @@ export default async function InventoryPage({
                     <TableCell>
                       <ToneBadge tone={state.tone}>{te(`stockState.${state.key}`)}</ToneBadge>
                     </TableCell>
+                    <TableCell className="num text-end">{f.count(p.warehouseOnHand)}</TableCell>
+                    <TableCell className="num text-end">{f.count(p.noonOnHand)}</TableCell>
                     <TableCell
                       className={cn('num text-end font-medium', p.onHand < 0 && 'text-destructive')}
                     >
@@ -265,7 +269,7 @@ export default async function InventoryPage({
                     </TableCell>
                     <TableCell className="text-end">
                       {p.unitCost && p.onHand > 0 ? (
-                        <Amount value={p.onHand * Number(p.unitCost)} className="font-medium" />
+                        <Amount value={p.stockValue} className="font-medium" />
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
