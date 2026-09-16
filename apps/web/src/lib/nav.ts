@@ -60,6 +60,7 @@ export const NAVIGATION: NavGroup[] = [
     icon: Wallet,
     items: [
       { href: '/money', key: 'moneyOverview', icon: Wallet, roles: ['ADMIN'], exact: true },
+      { href: '/money/expenses', key: 'expenses', icon: Receipt, roles: ['ADMIN'] },
       { href: '/money/treasury', key: 'treasury', icon: Receipt, roles: ['ADMIN'] },
       { href: '/money/purchases', key: 'purchases', icon: ClipboardList, roles: ['ADMIN'] },
       { href: '/money/suppliers', key: 'suppliers', icon: Users, roles: ['ADMIN'] },

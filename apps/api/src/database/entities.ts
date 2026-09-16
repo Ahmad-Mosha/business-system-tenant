@@ -1,3 +1,4 @@
+import { Expense, ExpenseCategory } from '../finance/expense.entity';
 import { User } from '../auth/user.entity';
 import { ChannelListing } from '../catalog/channel-listing.entity';
 import { ProductVariant } from '../catalog/product-variant.entity';
@@ -18,6 +19,7 @@ import { Supplier } from '../purchasing/supplier.entity';
 
 /** Shared with app.module.ts (runtime) and database/data-source.ts (CLI) so they can never drift apart. */
 export const ENTITIES = [
+  Expense, ExpenseCategory,
   User,
   Product,
   ProductVariant,

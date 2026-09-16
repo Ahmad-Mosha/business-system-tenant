@@ -1,4 +1,6 @@
 import 'reflect-metadata';
+import { randomUUID } from 'node:crypto';
+import { ExpensesService } from '../finance/expenses.service';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { DataSource } from 'typeorm';
@@ -110,6 +112,23 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     assert.ok(grouped.every((r: { total: number }) => r.total === 0));
     await assert.rejects(catalog.recordStock(id, -1, 'PURCHASE', user.id));
     await assert.rejects(catalog.recordStock(id, 1, 'DAMAGE', user.id));
+  });
+  await t.test('custom expenses deduplicate requests and reverse without deleting history', async () => {
+    const expenses = new ExpensesService(db, ledger);
+    const cash = Number(await ledger.balanceOf('CASH'));
+    const body = { requestId: randomUUID(), amount: '25.50', category: '  Custom ads  ', spentOn: '2026-09-16', note: 'Test' };
+    const [a, b] = await Promise.all([expenses.create(body, user.id), expenses.create(body, user.id)]);
+    assert.equal(a.id, b.id);
+    assert.equal(Number(await ledger.balanceOf('CASH')), cash - 25.5);
+    await assert.rejects(expenses.create({ ...body, amount: '30' }, user.id));
+    await expenses.create({ ...body, requestId: randomUUID(), category: 'custom ads' }, user.id);
+    assert.equal((await expenses.categories()).filter((c) => c.key === 'custom ads').length, 1);
+    await Promise.all([expenses.void(a.id, 'Entered by mistake', user.id), expenses.void(a.id, 'retry', user.id)]);
+    assert.equal(Number(await ledger.balanceOf('CASH')), cash - 25.5);
+    const history = await ledger.entries({ sourceType: 'expense', sourceId: a.id });
+    assert.equal(history.total, 2);
+    assert.ok(history.entries.some((e: { reversesId: string | null }) => e.reversesId));
+    await assert.rejects(expenses.create({ ...body, requestId: randomUUID(), spentOn: '2026-02-30' }, user.id));
   });
   await t.test('a ledger entry can only be reversed once', async () => {
     const entry = await ledger.post({ amount: '10', debit: 'CASH', credit: 'OWNER_CAPITAL', kind: 'CASH_DEPOSIT' });

@@ -26,6 +26,8 @@ export interface PostEntry {
 }
 
 export interface EntryFilter {
+  sourceType?: string;
+  sourceId?: string;
   code?: LedgerAccountCode;
   kind?: LedgerEntryKind;
   supplierId?: string;
@@ -219,6 +221,8 @@ export class LedgerService {
       return `$${params.length}`;
     };
     if (filter.code) where.push(`(e.debit_code = ${bind(filter.code)} OR e.credit_code = ${bind(filter.code)})`);
+    if (filter.sourceType) where.push(`e.source_type = ${bind(filter.sourceType)}`);
+    if (filter.sourceId) where.push(`e.source_id = ${bind(filter.sourceId)}`);
     if (filter.kind) where.push(`e.kind = ${bind(filter.kind)}`);
     if (filter.supplierId) where.push(`e.supplier_id = ${bind(filter.supplierId)}`);
     if (filter.from) where.push(`e.occurred_at::date >= ${bind(filter.from)}`);
