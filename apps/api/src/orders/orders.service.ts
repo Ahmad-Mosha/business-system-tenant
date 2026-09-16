@@ -374,15 +374,9 @@ export class OrdersService implements OnModuleInit {
   }
 
   /**
-   * Admins can move an order to any status — including undoing a mistake
-   * (Ahmad's own example: confirmed by accident, needs to go back). Moderators
-   * stay on the guided forward-only path in `ALLOWED_TRANSITIONS`, so someone
-   * without full context can't skip steps by accident.
-   *
-   * Stock only ever moves at the CANCELLED/RETURNED boundary, in either
-   * direction: entering credits it back (unchanged from before), and — new —
-   * *leaving* debits it again, so an admin un-cancelling an order doesn't
-   * silently leave the stock double-counted as both "returned" and "in stock".
+   * Administrators may correct active states. Received returns are final;
+   * cancellations after dispatch must use the received-return flow. Stock,
+   * revenue reversal and any refund liability commit with the status event.
    */
   async updateStatus(user: SessionUser, orderId: string, next: OrderStatus, returned?: { reason?: string; restock?: boolean }) {
     return this.db.transaction(async (tx) => {
@@ -401,7 +395,7 @@ export class OrdersService implements OnModuleInit {
         throw new BadRequestException(problem('order.useReturn', 'record a received return for an order that has shipped'));
       }
       if (next === 'RETURNED') {
-        if (from === 'CANCELLED' || !returned?.reason?.trim() || typeof returned.restock !== 'boolean') {
+        if (from === 'CANCELLED' || !returned?.reason?.trim() || returned.reason.trim().length > 1000 || typeof returned.restock !== 'boolean') {
           throw new BadRequestException(problem('order.returnDetails', 'enter a return reason and choose whether received goods are sellable'));
         }
         order.returnReason = returned.reason.trim();
@@ -460,12 +454,7 @@ export class OrdersService implements OnModuleInit {
     });
   }
 
-  /**
-   * Free on both roles, as it always was — payment direction was never a
-   * guided flow. New: leaving PAID reverses the cash-in entry posted when it
-   * was marked paid, so un-marking a mistaken PAID doesn't leave phantom cash
-   * in the ledger.
-   */
+  /** Cash collection/refund is independent of whether goods were returned. */
   async updatePayment(user: SessionUser, orderId: string, next: PaymentStatus) {
     return this.db.transaction(async (tx) => {
       const order = await tx.findOne(Order, {

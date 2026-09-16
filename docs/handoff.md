@@ -14,7 +14,10 @@ The owner's 2026-09-16 instructions supersede the old money-system blockers
 below. Current decisions, audit findings and implementation progress are in
 [production-readiness.md](production-readiness.md). Order/payment/stock and
 purchasing writes now serialize concurrent changes; paid order edits require
-reversing payment first. No production data has been rewritten.
+reversing payment first. No production data has been rewritten. Full received returns now require a reason
+and condition; paid returns/cancellations reverse revenue into customer refunds
+due, with cash paid separately. A received return is final. Existing historical
+returns require reconciliation, not automatic backfill.
 
 ## Toolchain (what's real)
 

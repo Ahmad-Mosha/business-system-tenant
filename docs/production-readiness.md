@@ -23,10 +23,13 @@ baseline; older architecture proposals are not the implementation.
    locks shared with purchases and stock adjustments. Aggregate repeated order
    lines before checking availability; reactivation must check availability too.
    Paid/refunded order totals cannot change until payment is reversed.
-2. **Returns and refunds.** Current return restores all goods without condition or
-   reason, keeps revenue on paid orders, and permits unsafe reactivation. Add an
-   explicit return decision, retain a refund liability until cash is paid, and
-   preserve the stock and financial audit trail.
+2. **Returns and refunds — implemented.** Full received returns require a reason
+   and explicit sellability decision. Returns add a RETURN movement; unsellable
+   receipts add an equal DAMAGE movement, preserving available stock. Paid
+   cancellation/return reverses sales into CUSTOMER_REFUNDS, keeping cash until
+   REFUND_DUE → REFUNDED. Received returns cannot reopen; dispatched orders cannot
+   be cancelled and only admins cancel. Partial returns/refunds remain future work.
+   Existing historical returns are not silently recosted or refunded.
 3. **Inventory locations and purchasing.** Current balances pool own/noon stock;
    purchase allocations round the last line, which can produce a negative share.
    Keep receipt precision and validate supported methods. Inline supplier creation.
