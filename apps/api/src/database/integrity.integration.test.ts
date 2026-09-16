@@ -116,6 +116,21 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     const [a, b] = await Promise.all([ledger.reverse(entry.id), ledger.reverse(entry.id)]);
     assert.equal(a.id, b.id);
   });
+  await t.test('landed costs preserve precision and separately paid costs are not owed to supplier', async () => {
+    const id = await stock(3);
+    const supplier = await purchasing.createSupplier({ name: 'Landed-cost supplier' });
+    const cash = Number(await ledger.balanceOf('CASH'));
+    const inv = await purchasing.createInvoice({ supplierId: supplier.id, invoiceDate: '2026-09-16', payment: 'CREDIT',
+      extraCosts: '1.00', extraCostsPaidSeparately: true, allocation: 'PER_UNIT', lines: [{ variantId: id, quantity: 3, unitCost: '10.00' }] }, user.id, true);
+    assert.equal(inv.status, 'POSTED');
+    assert.equal(inv.lines[0].landedUnitCost, '10.3333');
+    assert.equal((await db.getRepository(ProductVariant).findOneByOrFail({ id })).unitCost, '10.1667');
+    assert.equal((await purchasing.supplierDetail(supplier.id)).balance, '30.00');
+    assert.equal(await ledger.balanceOf('SUPPLIER_PAYABLE', { supplierId: supplier.id }), '30.00');
+    assert.equal(Number(await ledger.balanceOf('CASH')), cash - 1);
+    assert.equal(inv.settledAmount, '1.00');
+    await assert.rejects(purchasing.createInvoice({ supplierId: supplier.id, invoiceDate: '2026-09-16', payment: 'CREDIT', allocation: 'INVALID' as never, lines: [{ variantId: id, quantity: 1, unitCost: '1.00' }] }, user.id));
+  });
   await t.test('an invoice is received once and cannot be overpaid concurrently', async () => {
     const id = await stock(1);
     const supplier = await purchasing.createSupplier({ name: 'Test supplier' });

@@ -133,10 +133,11 @@ export class CatalogController {
   @Roles('ADMIN')
   @Patch('variants/:id')
   updateVariant(
+    @Req() req: Request,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: { sku?: string | null; unitCost?: string | null; sellingPrice?: string | null; name?: string },
   ) {
-    return this.catalog.updateVariant(id, body);
+    return this.catalog.updateVariant(id, body, req.user!.id);
   }
 
   @Roles('ADMIN')

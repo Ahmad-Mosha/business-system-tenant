@@ -354,25 +354,31 @@ export class CatalogService {
   async updateVariant(
     variantId: string,
     patch: { sku?: string | null; unitCost?: string | null; sellingPrice?: string | null; name?: string },
+    userId?: string,
   ) {
-    const repo = this.db.getRepository(ProductVariant);
-    const variant = await repo.findOneBy({ id: variantId });
+    return this.db.transaction(async (tx) => {
+    const variant = await tx.findOne(ProductVariant, { where: { id: variantId }, lock: { mode: 'pessimistic_write' } });
     if (!variant) throw new NotFoundException(problem('notFound', 'variant not found'));
 
     for (const [field, value] of [
       ['unitCost', patch.unitCost],
       ['sellingPrice', patch.sellingPrice],
     ] as const) {
-      if (value !== undefined && value !== null && value !== '' && !MONEY.test(value)) {
+      if (value !== undefined && value !== null && value !== '' && !(field === 'unitCost' ? /^\d+(\.\d{1,4})?$/ : MONEY).test(value)) {
         throw new BadRequestException(`${field} must be an amount like 120.50`);
       }
     }
 
     if (patch.sku !== undefined) variant.sku = patch.sku?.trim() || null;
     if (patch.name !== undefined) variant.name = patch.name.trim() || 'Default';
-    if (patch.unitCost !== undefined) variant.unitCost = patch.unitCost || null;
+    if (patch.unitCost !== undefined && Number(patch.unitCost) !== Number(variant.unitCost)) {
+      await tx.insert(StockMovement, { variantId, quantity: 0, reason: 'ADJUSTMENT', unitCost: patch.unitCost || null,
+        createdById: userId ?? null, note: `Unit cost corrected from ${variant.unitCost ?? 'unknown'} to ${patch.unitCost || 'unknown'}` });
+      variant.unitCost = patch.unitCost || null;
+    }
     if (patch.sellingPrice !== undefined) variant.sellingPrice = patch.sellingPrice || null;
-    return repo.save(variant);
+    return tx.save(variant);
+    });
   }
 
   /**

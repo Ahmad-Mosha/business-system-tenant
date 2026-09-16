@@ -39,8 +39,7 @@ export interface AllocatableLine {
 
 /**
  * Splits `extra` (shipping, customs) across lines and returns each line's share.
- * The shares sum to exactly `extra` at 2dp — the last line absorbs any rounding
- * remainder — so landed cost always reconciles to what was actually paid.
+ * The shares sum to exactly `extra` at 2dp using largest remainders, so landed cost always reconciles to what was actually paid.
  */
 export function allocateExtraCosts(
   lines: AllocatableLine[],
@@ -48,22 +47,16 @@ export function allocateExtraCosts(
   method: 'BY_VALUE' | 'PER_UNIT',
 ): number[] {
   if (lines.length === 0) return [];
-  const totalValue = lines.reduce((s, l) => s + l.lineTotal, 0);
-  const totalUnits = lines.reduce((s, l) => s + l.quantity, 0);
-
-  let allocated = 0;
-  return lines.map((l, i) => {
-    if (i === lines.length - 1) return round2(extra - allocated);
-    const basis =
-      method === 'BY_VALUE'
-        ? totalValue > 0
-          ? l.lineTotal / totalValue
-          : 1 / lines.length
-        : totalUnits > 0
-          ? l.quantity / totalUnits
-          : 1 / lines.length;
-    const share = round2(extra * basis);
-    allocated += share;
-    return share;
-  });
+  // Integer minor units + largest remainders: every share is nonnegative,
+  // and many small lines can never force a negative share onto the last line.
+  const cents = BigInt(Math.round(extra * 100));
+  const weights = lines.map((l) => BigInt(Math.round(method === 'BY_VALUE' ? l.lineTotal * 100 : l.quantity)));
+  let denominator = weights.reduce((sum, weight) => sum + weight, 0n);
+  if (denominator === 0n) { weights.fill(1n); denominator = BigInt(lines.length); }
+  const shares = weights.map((weight) => cents * weight / denominator);
+  const ranked = weights.map((weight, index) => ({ index, remainder: cents * weight % denominator }))
+    .sort((a, b) => a.remainder === b.remainder ? a.index - b.index : a.remainder > b.remainder ? -1 : 1);
+  const remaining = Number(cents - shares.reduce((sum, share) => sum + share, 0n));
+  for (let i = 0; i < remaining; i++) shares[ranked[i].index] += 1n;
+  return shares.map((share) => Number(share) / 100);
 }

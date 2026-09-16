@@ -4,7 +4,7 @@ import { DataSource, EntityManager, In } from 'typeorm';
 import { ProductVariant } from '../catalog/product-variant.entity';
 import { LedgerService } from '../finance/ledger.service';
 import { StockMovement } from '../inventory/stock-movement.entity';
-import { allocateExtraCosts, allocateOldestFirst, movingAverage, round2, round4 } from './costing';
+import { allocateExtraCosts, allocateOldestFirst, movingAverage, round2 } from './costing';
 import {
   type CostAllocation,
   paidStatusOf,
@@ -33,6 +33,7 @@ export interface CreateInvoiceInput {
   payment: PurchasePayment;
   allocation?: CostAllocation;
   extraCosts?: string;
+  extraCostsPaidSeparately?: boolean;
   lines: InvoiceLineInput[];
 }
 
@@ -237,7 +238,7 @@ export class PurchasingService {
   }
 
   /** Creates a DRAFT invoice — no stock or money moves until it is posted. */
-  async createInvoice(input: CreateInvoiceInput, userId: string) {
+  async createInvoice(input: CreateInvoiceInput, userId: string, postImmediately = false) {
     this.validateInvoiceInput(input);
 
     const wantedVariantIds = [...new Set(input.lines.map((l) => l.variantId))];
@@ -257,6 +258,8 @@ export class PurchasingService {
     const extraCosts = round2(Number(input.extraCosts ?? 0));
 
     const invoiceId = await this.db.transaction(async (tx) => {
+      const supplier = await tx.findOneBy(Supplier, { id: input.supplierId, active: true });
+      if (!supplier) throw new BadRequestException(problem('invoice.supplierGone', 'choose an active supplier'));
       const invoice = await tx.save(PurchaseInvoice, {
         supplierId: input.supplierId,
         invoiceNo: input.invoiceNo?.trim() || null,
@@ -266,6 +269,7 @@ export class PurchasingService {
         allocation: input.allocation ?? 'BY_VALUE',
         goodsTotal: goodsTotal.toFixed(2),
         extraCosts: extraCosts.toFixed(2),
+        extraCostsPaidSeparately: input.extraCostsPaidSeparately ?? false,
         landedTotal: round2(goodsTotal + extraCosts).toFixed(2),
         createdById: userId,
       });
@@ -273,6 +277,7 @@ export class PurchasingService {
         PurchaseInvoiceLine,
         lines.map((l) => ({ ...l, invoiceId: invoice.id })),
       );
+      if (postImmediately) await this.postInvoiceInTransaction(tx, invoice.id, userId);
       return invoice.id;
     });
     return this.getInvoice(invoiceId);
@@ -295,7 +300,11 @@ export class PurchasingService {
    * forward, and books one `INVENTORY ← CASH / SUPPLIER_PAYABLE` entry.
    */
   async postInvoice(id: string, userId: string) {
-    await this.db.transaction(async (tx) => {
+    await this.db.transaction((tx) => this.postInvoiceInTransaction(tx, id, userId));
+    return this.getInvoice(id);
+  }
+
+  private async postInvoiceInTransaction(tx: EntityManager, id: string, userId: string) {
       const invoice = await tx.findOne(PurchaseInvoice, { where: { id }, lock: { mode: 'pessimistic_write' } });
       if (!invoice) throw new NotFoundException(problem('notFound', 'invoice not found'));
       if (invoice.status === 'POSTED') throw new BadRequestException(problem('invoice.posted', 'this invoice is already posted'));
@@ -311,7 +320,7 @@ export class PurchasingService {
 
       for (const [i, line] of invoice.lines.entries()) {
         const landedLineTotal = round2(Number(line.lineTotal) + shares[i]);
-        const landedUnitCost = round4(landedLineTotal / line.quantity);
+        const landedUnitCost = landedLineTotal / line.quantity;
 
         const [{ onHand, avg }] = await tx.query(
           `SELECT COALESCE(SUM(m.quantity), 0)::int AS "onHand", v.unit_cost AS avg
@@ -331,19 +340,20 @@ export class PurchasingService {
           variantId: line.variantId,
           quantity: line.quantity,
           reason: 'PURCHASE',
-          unitCost: round2(landedUnitCost).toFixed(2),
+          unitCost: landedUnitCost.toFixed(4),
           avgCostAfter: newAvg.toFixed(4),
           sourceType: 'purchase_invoice',
           sourceId: invoice.id,
+          createdById: userId,
           occurredAt: new Date(`${invoice.invoiceDate}T00:00:00Z`),
         });
-        await tx.update(ProductVariant, { id: line.variantId }, { unitCost: round2(newAvg).toFixed(2) });
+        await tx.update(ProductVariant, { id: line.variantId }, { unitCost: newAvg.toFixed(4) });
         await tx.update(PurchaseInvoiceLine, { id: line.id }, { landedUnitCost: landedUnitCost.toFixed(4) });
       }
 
       await this.ledger.post(
         {
-          amount: invoice.landedTotal,
+          amount: invoice.extraCostsPaidSeparately ? invoice.goodsTotal : invoice.landedTotal,
           debit: 'INVENTORY',
           credit: invoice.payment === 'CASH' ? 'CASH' : 'SUPPLIER_PAYABLE',
           kind: 'PURCHASE',
@@ -357,6 +367,11 @@ export class PurchasingService {
         tx,
       );
 
+      if (invoice.extraCostsPaidSeparately && Number(invoice.extraCosts) > 0) {
+        await this.ledger.post({ amount: invoice.extraCosts, debit: 'INVENTORY', credit: 'CASH', kind: 'PURCHASE',
+          sourceType: 'purchase_invoice', sourceId: invoice.id, actorId: userId,
+          occurredAt: new Date(`${invoice.invoiceDate}T00:00:00Z`), memo: 'Landed costs paid separately' }, tx);
+      }
       await tx.update(
         PurchaseInvoice,
         { id },
@@ -364,15 +379,15 @@ export class PurchasingService {
           status: 'POSTED',
           postedAt: new Date(),
           // A cash invoice is paid the moment it posts.
-          settledAmount: invoice.payment === 'CASH' ? invoice.landedTotal : '0',
+          settledAmount: invoice.payment === 'CASH' ? invoice.landedTotal : invoice.extraCostsPaidSeparately ? invoice.extraCosts : '0',
         },
       );
       this.log.log(`purchase invoice ${id} posted: ${invoice.lines.length} lines, ${invoice.landedTotal}`);
-    });
-    return this.getInvoice(id);
   }
 
   private validateInvoiceInput(input: CreateInvoiceInput) {
+    if (input.allocation !== undefined && !['BY_VALUE', 'PER_UNIT'].includes(input.allocation)) throw new BadRequestException(problem('invoice.allocation', 'choose a supported allocation method'));
+    if (input.extraCostsPaidSeparately !== undefined && typeof input.extraCostsPaidSeparately !== 'boolean') throw new BadRequestException('invalid cost payment');
     if (!input.supplierId) throw new BadRequestException('choose a supplier');
     if (!ISO_DATE.test(input.invoiceDate ?? '')) throw new BadRequestException('invoiceDate must be YYYY-MM-DD');
     if (input.payment !== 'CASH' && input.payment !== 'CREDIT') {

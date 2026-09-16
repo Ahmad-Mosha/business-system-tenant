@@ -36,8 +36,13 @@ baseline; older architecture proposals are not the implementation.
    location balances. Old pooled movements remain WAREHOUSE: reconcile actual
    noon stock explicitly, because old data cannot establish its location.
    Multi-variant inventory valuation now sums each variant's actual cost.
-4. **Purchasing.** Allocation rounding can produce a negative final share.
-   Keep receipt precision, validate methods, expose landed costs and inline suppliers.
+4. **Purchasing — implemented.** By-value/per-unit landed costs are exposed with
+   a live estimate. Largest-remainder allocation conserves every cent without
+   negative shares; AVCO and movement costs retain 4 decimals. Costs paid separately
+   credit CASH and count as settled, so supplier debt includes only what is owed.
+   Supplier creation works inline even with no existing suppliers. Create-and-post
+   is one database transaction; failed posting cannot leave duplicate hidden drafts.
+   Manual cost corrections are locked and create an audit movement.
 5. **Expenses and business profit.** Fixed voucher accounts are not custom expense
    categories. Replace the obsolete COGS gate with the confirmed business measure,
    with clear channel scope and no double-counted shipping.

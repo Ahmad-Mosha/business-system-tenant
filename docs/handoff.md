@@ -20,6 +20,9 @@ due, with cash paid separately. A received return is final. Existing historical
 returns require reconciliation, not automatic backfill. Inventory now separates
 WAREHOUSE/NOON with atomic transfers; the legacy pooled balance stays WAREHOUSE
 until an owner reconciles actual noon holdings. No quantities are guessed.
+Purchase entry supports by-value/per-unit landed costs and inline supplier creation.
+Separately paid extras affect cash rather than supplier debt. Create-and-post is
+atomic. Receipt/average costs retain four decimal places.
 
 ## Toolchain (what's real)
 

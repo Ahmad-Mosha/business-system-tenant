@@ -38,8 +38,7 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
   const draft = invoice.status === 'DRAFT';
   const remaining = Number(invoice.landedTotal) - Number(invoice.settledAmount);
   const canPay = isCredit && invoice.paidStatus !== 'PAID' && remaining > 0.005;
-  // Shipping/customs allocation is off in the builder; older invoices may
-  // still carry extra costs, so those rows show only when there are any.
+  // Landed cost is part of inventory value, distinct from the supplier balance.
   const hasExtras = Number(invoice.extraCosts) > 0;
 
   return (
@@ -115,6 +114,7 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
               {hasExtras ? (
                 <Row label={t('extras', { allocation: invoice.allocation })} value={money(invoice.extraCosts)} />
               ) : null}
+              {hasExtras && invoice.extraCostsPaidSeparately ? <p className="text-xs text-muted-foreground">{t('separateCosts')}</p> : null}
               <div className="mt-1 flex items-baseline justify-between gap-3 border-t pt-3">
                 <span className="font-medium">{t('intoStock')}</span>
                 <Amount value={invoice.landedTotal} className="text-2xl font-semibold tracking-tight" />
