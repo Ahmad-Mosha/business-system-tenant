@@ -22,23 +22,35 @@ of the three.
 
 ## What actually exists to deploy
 
-Three services, one Postgres:
-
 | Service | Built from | Talks to |
 |---|---|---|
-| `api` | `apps/api/Dockerfile` — NestJS, `npm run build` | `db` over the compose network |
+| `api` | `apps/api/Dockerfile` — NestJS, `npm run build` | the database in `DATABASE_URL` (Neon) |
 | `web` | `apps/web/Dockerfile` — Next.js standalone output | `api` over the compose network, never from the browser |
-| `db` | `postgres:17-alpine` | — |
 | `caddy` | reverse proxy, automatic HTTPS | `api` and `web` |
+| `db` | `postgres:17-alpine` | — **not used by `api` any more**; kept running as a rollback copy of the pre-Neon data |
 
 Nothing is exposed to the host except Caddy on 80/443 — `api` and `web` are
 only reachable from inside the compose network, by service name.
 
-**Schema:** the API runs with TypeORM's `synchronize: true` — the schema
-applies itself on boot, there is no separate migration step to run. (A
-deliberate simplification while the schema is still moving; see the comment
-next to it in `app.module.ts` if this needs revisiting once real data has
-accumulated.)
+**Database:** managed Postgres on **Neon** (separate Prod and Dev projects),
+set as a full connection string in `DATABASE_URL`. `docker-compose.prod.yml`
+passes it through unchanged. Use Neon's **direct** endpoint (hostname without
+`-pooler`) with `sslmode=require` — the pooled endpoint has no default
+`search_path` and rejects the startup option that would set one, which breaks
+this app's raw SQL.
+
+**Schema:** TypeORM migrations in `apps/api/src/database/migrations/`, applied
+automatically on API boot (`migrationsRun: true`) — still no separate migrate
+command at deploy time. To add one, change the entity, then generate against a
+database that has the current schema:
+```bash
+DATABASE_URL=... npm run migration:generate -w @prime/api -- src/database/migrations/DescribeTheChange
+```
+Review the generated SQL before committing — this is a money schema.
+
+**Not in any migration:** `order_number_seq` is created by
+`OrdersService.onModuleInit`. When copying real data into a new database,
+`setval` it to the last used order number.
 
 **Auth:** the two named accounts (`admin@admin.com`, `moderator@moderator.com`)
 seed themselves on first boot into an empty user table. Their passwords come
@@ -55,7 +67,20 @@ docker compose -f docker-compose.prod.yml up -d --build
 ```
 
 That's the whole deploy. No separate migrate command, no manual seed step —
-both happen automatically on the API's first boot.
+both happen automatically on the API's boot.
+
+**Updating the live box** (no CI/CD — nothing deploys on merge):
+```bash
+ssh -i ~/Downloads/prime-key.pem ec2-user@prime-market.duckdns.org
+cd ~/dashboard && git pull && docker compose -f docker-compose.prod.yml up -d --build api web
+```
+Rebuild `api` and `web` together — they're developed as a pair on `main`, and
+an old web against a new API (or the reverse) is an untested combination. A
+t3.micro takes several minutes to build.
+
+SSH is restricted to one IP in the security group. If it times out, the IP has
+changed: EC2 → the instance → Security → the security group → Edit inbound
+rules → port 22 source → **My IP** → Save.
 
 Point the domain's A record at the instance **before** bringing the stack up —
 Caddy requests the certificate on first boot and fails the ACME challenge
