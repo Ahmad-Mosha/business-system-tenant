@@ -30,13 +30,18 @@ baseline; older architecture proposals are not the implementation.
    REFUND_DUE → REFUNDED. Received returns cannot reopen; dispatched orders cannot
    be cancelled and only admins cancel. Partial returns/refunds remain future work.
    Existing historical returns are not silently recosted or refunded.
-3. **Inventory locations and purchasing.** Current balances pool own/noon stock;
-   purchase allocations round the last line, which can produce a negative share.
-   Keep receipt precision and validate supported methods. Inline supplier creation.
-4. **Expenses and business profit.** Fixed voucher accounts are not custom expense
+3. **Inventory locations — implemented.** Movements carry WAREHOUSE or NOON;
+   transfers are atomic, conserved pairs. Manual sales/availability use WAREHOUSE.
+   Inventory shows both balances; adjustments select a location; history shows
+   location balances. Old pooled movements remain WAREHOUSE: reconcile actual
+   noon stock explicitly, because old data cannot establish its location.
+   Multi-variant inventory valuation now sums each variant's actual cost.
+4. **Purchasing.** Allocation rounding can produce a negative final share.
+   Keep receipt precision, validate methods, expose landed costs and inline suppliers.
+5. **Expenses and business profit.** Fixed voucher accounts are not custom expense
    categories. Replace the obsolete COGS gate with the confirmed business measure,
    with clear channel scope and no double-counted shipping.
-5. **Daily operations UX.** Bulk assignment with visible-page selection, clear
+6. **Daily operations UX.** Bulk assignment with visible-page selection, clear
    selection scope, authorization and atomic server writes. Check English/Arabic,
    normal laptop and wide desktop layouts, states and feedback.
 
