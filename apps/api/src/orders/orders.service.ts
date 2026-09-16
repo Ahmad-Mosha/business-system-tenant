@@ -20,6 +20,7 @@ import {
   type PaymentStatus,
 } from './order.entity';
 import { problem } from '../problem';
+import { lockStock } from '../inventory/stock-lock';
 
 /** Egyptian mobile: 01[0125] + 8 digits, with or without a +20/0020/20 prefix. */
 const EGYPT_PHONE = /^(?:\+?20|0)?1[0125]\d{8}$/;
@@ -219,8 +220,8 @@ export class OrdersService implements OnModuleInit {
    * A manual order is ours to refuse, unlike a channel order that already
    * happened out in the world — so this is the one creation path that blocks
    * on stock instead of letting on-hand run negative.
-   * ponytail: read-then-check, no row lock — two mods racing the same item
-   * in the same second is rare enough here to not be worth it yet.
+   * Locks serialize stock checks against every other writer. Repeated lines
+   * for the same variant count as one combined request.
    */
   private async assertStockAvailable(
     tx: EntityManager,
@@ -228,6 +229,12 @@ export class OrdersService implements OnModuleInit {
   ): Promise<void> {
     const linked = items.filter((i) => i.variantId);
     if (!linked.length) return;
+    await lockStock(tx, linked.map((i) => i.variantId as string));
+    const requested = new Map<string, number>();
+    for (const item of linked) {
+      const id = item.variantId as string;
+      requested.set(id, (requested.get(id) ?? 0) + item.quantity);
+    }
 
     const rows: Array<{ id: string; name: string; onHand: number }> = await tx.query(
       `SELECT v.id, COALESCE(v.name || ' — ' || p.name, p.name) AS name,
@@ -238,14 +245,15 @@ export class OrdersService implements OnModuleInit {
     );
     const onHand = new Map(rows.map((r) => [r.id, r]));
 
-    for (const item of linked) {
-      const stock = onHand.get(item.variantId as string);
-      if (stock && item.quantity > stock.onHand) {
+    for (const [id, quantity] of requested) {
+      const stock = onHand.get(id);
+      if (!stock) throw new BadRequestException(problem('notFound', 'variant not found'));
+      if (quantity > stock.onHand) {
         throw new BadRequestException(
-          problem('order.stockShort', `${stock.name}: only ${stock.onHand} in stock, ${item.quantity} requested`, {
+          problem('order.stockShort', `${stock.name}: only ${stock.onHand} in stock, ${quantity} requested`, {
             name: stock.name,
             onHand: stock.onHand,
-            requested: item.quantity,
+            requested: quantity,
           }),
         );
       }
@@ -253,18 +261,18 @@ export class OrdersService implements OnModuleInit {
   }
 
   async assign(orderId: string, assigneeId: string | null, actor: SessionUser) {
-    const repo = this.db.getRepository(Order);
-    const order = await repo.findOneBy({ id: orderId });
-    if (!order) throw new NotFoundException(problem('notFound', 'order not found'));
-
-    order.assignedToId = assigneeId;
-    // Assigning an untouched order moves it along; a later state is left alone.
-    if (assigneeId && order.status === 'NEW') order.status = 'ASSIGNED';
-    if (!assigneeId && order.status === 'ASSIGNED') order.status = 'NEW';
-    await repo.save(order);
-
-    await this.record(this.db.manager, orderId, 'ASSIGNED', null, assigneeId ?? 'unassigned', actor);
-    return order;
+    return this.db.transaction(async (tx) => {
+      const order = await tx.findOne(Order, { where: { id: orderId }, lock: { mode: 'pessimistic_write' } });
+      if (!order) throw new NotFoundException(problem('notFound', 'order not found'));
+      const previous = order.assignedToId;
+      if (previous === assigneeId) return order;
+      order.assignedToId = assigneeId;
+      if (assigneeId && order.status === 'NEW') order.status = 'ASSIGNED';
+      if (!assigneeId && order.status === 'ASSIGNED') order.status = 'NEW';
+      await tx.save(order);
+      await this.record(tx, orderId, 'ASSIGNED', previous, assigneeId ?? 'unassigned', actor);
+      return order;
+    });
   }
 
   /**
@@ -303,6 +311,7 @@ export class OrdersService implements OnModuleInit {
     return this.db.transaction(async (tx) => {
       const order = await tx.findOne(Order, {
         where: user.role === 'ADMIN' ? { id: orderId } : { id: orderId, assignedToId: user.id },
+        lock: { mode: 'pessimistic_write' },
       });
       if (!order) throw new NotFoundException(problem('notFound', 'order not found'));
 
@@ -315,6 +324,12 @@ export class OrdersService implements OnModuleInit {
           ),
         );
       }
+
+      if (order.paymentStatus !== 'UNPAID') {
+        throw new BadRequestException(problem('order.paidEdit', 'reverse the payment before editing a paid or refunded order'));
+      }
+      const oldItems = await tx.find(OrderItem, { where: { orderId } });
+      await lockStock(tx, [...oldItems, ...input.items].flatMap((i) => i.variantId ? [i.variantId] : []));
 
       // Put the old lines' stock back before asking whether the new ones fit,
       // so re-saving an unchanged order never trips its own availability check.
@@ -372,6 +387,7 @@ export class OrdersService implements OnModuleInit {
     return this.db.transaction(async (tx) => {
       const order = await tx.findOne(Order, {
         where: user.role === 'ADMIN' ? { id: orderId } : { id: orderId, assignedToId: user.id },
+        lock: { mode: 'pessimistic_write' },
       });
       if (!order) throw new NotFoundException(problem('notFound', 'order not found'));
 
@@ -401,6 +417,8 @@ export class OrdersService implements OnModuleInit {
       if (!wasOut && isOut) {
         await OrdersService.creditStockForOrder(tx, orderId, next);
       } else if (wasOut && !isOut) {
+        const items = await tx.find(OrderItem, { where: { orderId } });
+        await this.assertStockAvailable(tx, items.map((i) => ({ ...i, variantId: i.variantId ?? undefined })));
         await OrdersService.debitStockForOrderId(tx, orderId, 'order reactivated — stock leaves again');
       }
       return order;
@@ -417,6 +435,7 @@ export class OrdersService implements OnModuleInit {
     return this.db.transaction(async (tx) => {
       const order = await tx.findOne(Order, {
         where: user.role === 'ADMIN' ? { id: orderId } : { id: orderId, assignedToId: user.id },
+        lock: { mode: 'pessimistic_write' },
       });
       if (!order) throw new NotFoundException(problem('notFound', 'order not found'));
 
@@ -520,7 +539,10 @@ export class OrdersService implements OnModuleInit {
         sourceType: 'order',
         sourceId: orderId,
       }));
-    if (movements.length) await tx.insert(StockMovement, movements);
+    if (movements.length) {
+      await lockStock(tx, movements.map((m) => m.variantId));
+      await tx.insert(StockMovement, movements);
+    }
   }
 
   /**
@@ -549,7 +571,10 @@ export class OrdersService implements OnModuleInit {
               ? 'order edited — previous lines reversed'
               : 'order cancelled',
       }));
-    if (movements.length) await tx.insert(StockMovement, movements);
+    if (movements.length) {
+      await lockStock(tx, movements.map((m) => m.variantId));
+      await tx.insert(StockMovement, movements);
+    }
   }
 
   /**
@@ -574,6 +599,9 @@ export class OrdersService implements OnModuleInit {
         sourceId: orderId,
         note,
       }));
-    if (movements.length) await tx.insert(StockMovement, movements);
+    if (movements.length) {
+      await lockStock(tx, movements.map((m) => m.variantId));
+      await tx.insert(StockMovement, movements);
+    }
   }
 }

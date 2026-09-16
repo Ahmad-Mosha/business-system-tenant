@@ -206,7 +206,10 @@ export class EasyOrdersService {
    */
   private async applyStatusChange(payload: StatusChange): Promise<IngestResult> {
     return this.db.transaction(async (tx) => {
-      const order = await tx.findOneBy(Order, { source: 'EASYORDERS', externalId: payload.order_id });
+      const order = await tx.findOne(Order, {
+        where: { source: 'EASYORDERS', externalId: payload.order_id },
+        lock: { mode: 'pessimistic_write' },
+      });
       if (!order) return { status: 'ignored' };
 
       const previous = order.externalStatus;

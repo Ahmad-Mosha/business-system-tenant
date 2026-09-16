@@ -193,7 +193,8 @@
         "itemPrice": "Every item needs a price greater than 0.",
         "stockShort": "{name}: only {onHand} in stock, {requested} requested.",
         "locked": "This order can no longer be edited — it has left the warehouse.",
-        "transition": "That status change isn’t allowed from the order’s current status."
+        "transition": "That status change isn’t allowed from the order’s current status.",
+        "paidEdit": "Reverse the payment before editing a paid or refunded order."
       },
       "cheque": {
         "settled": "{status, select, CLEARED {This cheque has already cleared.} BOUNCED {This cheque has already bounced.} other {This cheque is no longer pending.}}"

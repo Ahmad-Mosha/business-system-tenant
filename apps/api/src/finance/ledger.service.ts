@@ -105,11 +105,17 @@ export class LedgerService {
     actorId?: string | null,
     tx: EntityManager = this.db.manager,
   ): Promise<LedgerEntry> {
-    const original = await tx.findOneBy(LedgerEntry, { id: entryId });
+    if (!tx.queryRunner?.isTransactionActive) {
+      return this.db.transaction((manager) => this.reverse(entryId, actorId, manager));
+    }
+    const original = await tx.findOne(LedgerEntry, { where: { id: entryId }, lock: { mode: 'pessimistic_write' } });
     if (!original) throw new NotFoundException(problem('notFound', 'ledger entry not found'));
     if (original.reversesId) {
       throw new BadRequestException('that entry is itself a reversal');
     }
+
+    const existing = await tx.findOneBy(LedgerEntry, { reversesId: original.id });
+    if (existing) return existing;
 
     return this.post(
       {
