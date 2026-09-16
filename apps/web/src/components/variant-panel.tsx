@@ -4,6 +4,7 @@ import { ArrowDownLeft, ArrowUpRight, History, Minus, Plus } from 'lucide-react'
 import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
+import { StockTransferDialog } from '@/components/stock-transfer-dialog';
 import { recordStock, updateVariant } from '@/app/(app)/inventory/actions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -36,7 +37,7 @@ import { useFormat } from '@/i18n/use-format';
 
 /** The reasons a person records by hand — SALE is recorded by orders. Names: `enums.stockReason`. */
 const REASONS = ['PURCHASE', 'RETURN', 'DAMAGE', 'COUNT', 'ADJUSTMENT'] as const;
-const ALL_REASONS = [...REASONS, 'SALE'] as const;
+const ALL_REASONS = [...REASONS, 'SALE', 'TRANSFER'] as const;
 
 /** The notes the API writes on stock it moves for an order (orders.service.ts); any other note is a person's. */
 const ORDER_NOTES = {
@@ -54,6 +55,8 @@ interface Variant {
   unitCost: string | null;
   sellingPrice: string | null;
   onHand: number;
+  warehouseOnHand: number;
+  noonOnHand: number;
   inOpenOrders: number;
 }
 
@@ -61,6 +64,7 @@ export interface Movement {
   id: string;
   quantity: number;
   reason: string;
+  location: 'WAREHOUSE' | 'NOON';
   note: string | null;
   occurredAt: string;
   runningTotal: number;
@@ -87,6 +91,8 @@ export function VariantPanel({
   const [pending, start] = useTransition();
   const [qty, setQty] = useState('1');
   const [reason, setReason] = useState<string>('PURCHASE');
+  const [location, setLocation] = useState<'WAREHOUSE' | 'NOON'>('WAREHOUSE');
+  const [note, setNote] = useState('');
   const [direction, setDirection] = useState<'in' | 'out'>('in');
   const [cost, setCost] = useState(variant.unitCost ?? '');
   const [price, setPrice] = useState(variant.sellingPrice ?? '');
@@ -94,7 +100,7 @@ export function VariantPanel({
   const pricesDirty = cost !== (variant.unitCost ?? '') || price !== (variant.sellingPrice ?? '');
   // The API refuses a removal below zero too; this just says so before asking.
   const count = Number(qty) || 0;
-  const available = Math.max(variant.onHand, 0);
+  const available = Math.max(location === 'WAREHOUSE' ? variant.warehouseOnHand : variant.noonOnHand, 0);
   const tooMany = direction === 'out' && count > available;
 
   const save = () =>
@@ -107,7 +113,7 @@ export function VariantPanel({
   const move = () =>
     start(async () => {
       const n = Number(qty) * (direction === 'in' ? 1 : -1);
-      const r = await recordStock(variant.id, n, reason);
+      const r = await recordStock(variant.id, n, reason, note, location);
       if (r.ok) {
         toast.success(t(n > 0 ? 'increased' : 'reduced', { count: Math.abs(n) }));
         setQty('1');
@@ -150,6 +156,10 @@ export function VariantPanel({
         </CardHeader>
       )}
 
+      <CardContent className="flex flex-wrap items-center gap-6 border-b pb-4">
+        {(['WAREHOUSE', 'NOON'] as const).map((l) => <div key={l}><p className="text-xs text-muted-foreground">{tr(`enums.stockLocation.${l}`)}</p><p className="num text-lg font-semibold">{f.count(l === 'WAREHOUSE' ? variant.warehouseOnHand : variant.noonOnHand)}</p></div>)}
+        <StockTransferDialog variant={variant} />
+      </CardContent>
       <CardContent className="grid gap-5 md:grid-cols-2">
         <FieldGroup className="gap-3">
           <p className="text-xs font-medium">{t('pricing')}</p>
@@ -171,13 +181,16 @@ export function VariantPanel({
 
         <FieldGroup className="gap-3">
           <p className="text-xs font-medium">{t('record')}</p>
+          <Field><FieldLabel htmlFor={`location-${variant.id}`}>{tr('inventory.location')}</FieldLabel>
+            <Select value={location} onValueChange={(v) => setLocation(v as 'WAREHOUSE' | 'NOON')} disabled={pending}><SelectTrigger id={`location-${variant.id}`}><SelectValue /></SelectTrigger><SelectContent>{(['WAREHOUSE', 'NOON'] as const).map((l) => <SelectItem key={l} value={l}>{tr(`enums.stockLocation.${l}`)}</SelectItem>)}</SelectContent></Select>
+          </Field>
           <div className="grid grid-cols-[auto_80px_minmax(0,1fr)] items-end gap-2">
             <ToggleGroup
               type="single"
               variant="outline"
               spacing={0}
               value={direction}
-              onValueChange={(v) => v && setDirection(v as 'in' | 'out')}
+              onValueChange={(v) => { if (v) { setDirection(v as 'in' | 'out'); setReason('ADJUSTMENT'); } }}
               aria-label={t('direction')}
             >
               <ToggleGroupItem value="in" aria-label={t('in')}>
@@ -206,7 +219,7 @@ export function VariantPanel({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent position="popper">
-                  {REASONS.map((r) => (
+                  {REASONS.filter((r) => direction === 'in' ? r !== 'DAMAGE' : !['PURCHASE', 'RETURN'].includes(r)).map((r) => (
                     <SelectItem key={r} value={r}>
                       {tr(`enums.stockReason.${r}`)}
                     </SelectItem>
@@ -215,8 +228,9 @@ export function VariantPanel({
               </Select>
             </Field>
           </div>
+          <Field><FieldLabel htmlFor={`note-${variant.id}`}>{t('note')}</FieldLabel><Input id={`note-${variant.id}`} value={note} onChange={(e) => setNote(e.target.value)} dir="auto" disabled={pending} /></Field>
           <div className="flex flex-wrap items-center gap-3">
-            <Button onClick={move} disabled={pending || !count || tooMany} className="w-fit">
+            <Button onClick={move} disabled={pending || !Number.isInteger(count) || count <= 0 || tooMany} className="w-fit">
               {pending ? <Spinner /> : direction === 'in' ? <Plus /> : <Minus />}
               {t(direction === 'in' ? 'add' : 'remove', { count })}
             </Button>
@@ -263,7 +277,7 @@ export function VariantPanel({
                               {isOneOf(ALL_REASONS, m.reason) ? tr(`enums.stockReason.${m.reason}`) : m.reason}
                             </p>
                             <p className="truncate text-xs text-muted-foreground">
-                              {f.dateTime(m.occurredAt)}
+                              {tr(`enums.stockLocation.${m.location}`)} · {f.dateTime(m.occurredAt)}
                               {m.note ? (
                                 <>
                                   {' · '}

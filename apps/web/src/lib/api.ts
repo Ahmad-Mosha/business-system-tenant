@@ -278,6 +278,9 @@ export interface ProductRow {
   active: boolean;
   variantCount: number;
   onHand: number;
+  stockValue: string;
+  warehouseOnHand: number;
+  noonOnHand: number;
   /** Units already off on-hand but sitting in an order that hasn't shipped,
    *  delivered or reversed — context, not a second pool of stock. */
   inOrders: number;
@@ -311,6 +314,8 @@ export interface ProductDetail {
     sellingPrice: string | null;
     active: boolean;
     onHand: number;
+    warehouseOnHand: number;
+    noonOnHand: number;
     /** In orders that are neither cancelled nor returned — already off on-hand, shown for context. */
     inOpenOrders: number;
   }>;
@@ -341,7 +346,7 @@ export const getProductsSummary = (query?: string) =>
   get<ProductsSummary>(`/catalog/products/summary${query ? (query.startsWith('?') ? query : `?${query}`) : ''}`);
 export const getProductDetail = (id: string) => get<ProductDetail>(`/catalog/products/${id}`);
 export const getStockHistory = (variantId: string) =>
-  get<Array<{ id: string; quantity: number; reason: string; note: string | null; occurredAt: string; runningTotal: number }>>(
+  get<Array<{ id: string; quantity: number; reason: string; location: 'WAREHOUSE' | 'NOON'; note: string | null; occurredAt: string; runningTotal: number }>>(
     `/catalog/variants/${variantId}/stock`,
   );
 
