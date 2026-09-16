@@ -214,7 +214,9 @@
         "productsGone": "One or more products no longer exist.",
         "postedDelete": "A posted invoice can’t be deleted — reverse it instead.",
         "posted": "This invoice is already posted.",
-        "noLines": "Add at least one line before posting."
+        "noLines": "Add at least one line before posting.",
+        "allocation": "Choose allocation by goods value or units.",
+        "supplierGone": "Choose an active supplier."
       },
       "sku": {
         "taken": "SKU “{sku}” is already in use."
@@ -885,6 +887,18 @@
       "paymentsHint": "Cash paid to them, newest first.",
       "noPayments": "No payments yet.",
       "payment": "Payment"
+    },
+    "landed": {
+      "title": "Landed costs",
+      "description": "Add shipping, customs and other receipt costs to inventory. Do not enter these again as operating expenses.",
+      "amount": "Extra costs (EGP)",
+      "allocation": "Allocate by",
+      "byValue": "Goods value",
+      "perUnit": "Number of units",
+      "estimatedUnit": "Est. landed / unit",
+      "paidSeparately": "Extra costs are paid separately now (cash), not owed to this supplier",
+      "paymentHint": "Cash paid now: {cash} · Owed to supplier: {supplier}",
+      "breakdown": "Goods: {goods} + extra costs: {extra}"
     }
   },
   "noon": {
