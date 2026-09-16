@@ -9,7 +9,11 @@ import {
 } from 'typeorm';
 import { ProductVariant } from '../catalog/product-variant.entity';
 
+export const STOCK_LOCATIONS = ['WAREHOUSE', 'NOON'] as const;
+export type StockLocation = (typeof STOCK_LOCATIONS)[number];
+
 export type StockReason =
+  | 'TRANSFER'
   | 'PURCHASE' // stock bought in
   | 'SALE' // sold and dispatched
   | 'RETURN' // came back from a customer
@@ -38,6 +42,9 @@ export class StockMovement {
 
   @Column({ name: 'variant_id', type: 'uuid' })
   variantId: string;
+
+  @Column({ type: 'text', default: 'WAREHOUSE' })
+  location: StockLocation;
 
   /** Signed: positive adds stock, negative removes it. */
   @Column({ type: 'int' })

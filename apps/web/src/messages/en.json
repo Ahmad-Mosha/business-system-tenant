@@ -223,7 +223,9 @@
         "taken": "{channel, select, noon {noon} amazon {Amazon} easyorders {Website} other {{channel}}} SKU “{externalId}” is already linked to another product."
       },
       "stock": {
-        "remove": "{available, plural, =0 {Nothing on hand to remove.} other {Only # on hand — you can remove up to #.}}"
+        "remove": "{available, plural, =0 {Nothing on hand to remove.} other {Only # on hand — you can remove up to #.}}",
+        "direction": "Choose a reason that matches adding or removing stock.",
+        "transfer": "Choose different warehouses and a positive whole quantity."
       },
       "sync": {
         "notConfigured": "The Easy Orders connection isn’t set up.",
@@ -479,7 +481,18 @@
       "channels": "Channels"
     },
     "sync": "Sync website",
-    "synced": "Website catalogue synced: {updated} updated, {unmatched} unmatched."
+    "synced": "Website catalogue synced: {updated} updated, {unmatched} unmatched.",
+    "location": "Location",
+    "transfer": {
+      "title": "Transfer stock",
+      "description": "Move received stock between our warehouse and Noon. Total stock and value stay the same.",
+      "submit": "Transfer",
+      "saved": "Stock transferred",
+      "from": "From",
+      "destination": "To: {location} · Available: {available}",
+      "quantity": "Quantity",
+      "note": "Note / reference (optional)"
+    }
   },
   "product": {
     "back": "Back to inventory",
@@ -533,14 +546,15 @@
       "nothingToRemove": "Nothing on hand to remove",
       "movement": "Movement",
       "change": "Change",
-      "balance": "Balance",
+      "balance": "Location balance",
       "noMovements": "No stock movements yet.",
       "notes": {
         "orderReturned": "Order returned",
         "orderCancelled": "Order cancelled",
         "orderEdited": "Order edited — its earlier lines reversed",
         "orderReactivated": "Order reactivated — stock leaves again"
-      }
+      },
+      "note": "Reason / reference (optional)"
     },
     "listings": {
       "variantsNotBuilt": "This product has variants. Per-variant channel mapping isn’t built yet — say the word when you need it.",
@@ -1064,7 +1078,8 @@
       "RETURN": "Returned by customer",
       "DAMAGE": "Damaged or lost",
       "COUNT": "Physical count",
-      "ADJUSTMENT": "Correction"
+      "ADJUSTMENT": "Correction",
+      "TRANSFER": "Warehouse transfer"
     },
     "entryKind": {
       "OPENING_BALANCE": "Opening balance",
@@ -1140,6 +1155,10 @@
       "order_update": "Post-sale adjustments",
       "statement_fee": "Advertising & statement fees",
       "balance_transfer": "Balance transfers"
+    },
+    "stockLocation": {
+      "WAREHOUSE": "Our warehouse",
+      "NOON": "Noon warehouse"
     }
   }
 }
