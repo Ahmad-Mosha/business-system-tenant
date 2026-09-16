@@ -241,7 +241,7 @@ export class FinanceService {
       throw new BadRequestException('clearedDate must be YYYY-MM-DD');
     }
     return this.db.transaction(async (tx) => {
-      const cheque = await tx.findOneBy(Cheque, { id });
+      const cheque = await tx.findOne(Cheque, { where: { id }, lock: { mode: 'pessimistic_write' } });
       if (!cheque) throw new BadRequestException(problem('notFound', 'cheque not found'));
       if (cheque.status !== 'PENDING') {
         throw new BadRequestException(

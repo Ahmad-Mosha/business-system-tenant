@@ -505,12 +505,9 @@ export class CatalogService {
     if (!Number.isInteger(quantity) || quantity === 0) {
       throw new BadRequestException('quantity must be a non-zero whole number');
     }
-    const variant = await this.db.getRepository(ProductVariant).findOneBy({ id: variantId });
-    if (!variant) throw new NotFoundException(problem('notFound', 'variant not found'));
-
     return this.db.transaction(async (tx) => {
-      // Lock the variant so two removals at once can't both pass the check.
-      await tx.query('SELECT id FROM product_variant WHERE id = $1 FOR UPDATE', [variantId]);
+      const variant = await tx.findOne(ProductVariant, { where: { id: variantId }, lock: { mode: 'pessimistic_write' } });
+      if (!variant) throw new NotFoundException(problem('notFound', 'variant not found'));
       const [{ onHand }] = await tx.query(
         'SELECT COALESCE(SUM(quantity), 0)::int AS "onHand" FROM stock_movement WHERE variant_id = $1',
         [variantId],

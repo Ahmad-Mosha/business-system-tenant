@@ -8,6 +8,14 @@ Last updated: 2026-09-16.
 
 ---
 
+## Active production-readiness work
+
+The owner's 2026-09-16 instructions supersede the old money-system blockers
+below. Current decisions, audit findings and implementation progress are in
+[production-readiness.md](production-readiness.md). Order/payment/stock and
+purchasing writes now serialize concurrent changes; paid order edits require
+reversing payment first. No production data has been rewritten.
+
 ## Toolchain (what's real)
 
 - **npm workspaces** monorepo — `apps/api` (NestJS 11 + **TypeORM** + Postgres)
