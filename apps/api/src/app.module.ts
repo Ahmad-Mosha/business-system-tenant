@@ -1,3 +1,5 @@
+import { ExpensesController } from './finance/expenses.controller';
+import { ExpensesService } from './finance/expenses.service';
 import { Module, type OnModuleInit } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
@@ -48,6 +50,7 @@ import { NoonReportingService } from './reporting/noon-reporting.service';
     TypeOrmModule.forFeature(ENTITIES),
   ],
   controllers: [
+    ExpensesController,
     AuthController,
     NoonController,
     OrdersController,
@@ -59,6 +62,7 @@ import { NoonReportingService } from './reporting/noon-reporting.service';
     PurchasesController,
   ],
   providers: [
+    ExpensesService,
     // Every endpoint requires a session unless it opts out with @Public(),
     // so a new controller is protected by default rather than by remembering.
     { provide: APP_GUARD, useClass: AuthGuard },

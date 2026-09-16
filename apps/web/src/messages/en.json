@@ -69,7 +69,8 @@
       "months": "Months",
       "products": "Products",
       "imports": "Imports",
-      "team": "Team"
+      "team": "Team",
+      "expenses": "Expenses"
     },
     "crumbs": {
       "new": "New",
@@ -105,7 +106,8 @@
     "suppliers": "{count, plural, =0 {No suppliers} one {# supplier} other {# suppliers}}",
     "payments": "{count, plural, =0 {No payments} one {# payment} other {# payments}}",
     "imports": "{count, plural, =0 {No imports} one {# import} other {# imports}}",
-    "settlementLines": "{count, plural, =0 {no settlement lines} one {# settlement line} other {# settlement lines}}"
+    "settlementLines": "{count, plural, =0 {no settlement lines} one {# settlement line} other {# settlement lines}}",
+    "expenses": "{count, plural, one {# expense} other {# expenses}}"
   },
   "filters": {
     "reset": "Reset",
@@ -238,6 +240,13 @@
       },
       "shipment": {
         "notFound": "No Bosta shipment has the tracking number {trackingNumber}."
+      },
+      "expense": {
+        "date": "Enter a valid date.",
+        "category": "Enter a category up to 100 characters.",
+        "amount": "Enter a positive amount with at most two decimals.",
+        "reason": "Enter a correction reason.",
+        "retryChanged": "This submission was already recorded with different details."
       }
     }
   },
@@ -755,7 +764,8 @@
         "fromTo": "From → to"
       },
       "seenFrom": "Seen from",
-      "balanceNow": "Balance now"
+      "balanceNow": "Balance now",
+      "sourceDescription": "Entries for the linked record, including any reversals."
     },
     "purchases": {
       "description": "Supplier invoices — how stock comes in, at cost.",
@@ -1175,5 +1185,32 @@
       "WAREHOUSE": "Our warehouse",
       "NOON": "Noon warehouse"
     }
+  },
+  "expenses": {
+    "title": "Expenses",
+    "description": "Paid operating expenses, with categories you control.",
+    "add": "Record expense",
+    "hint": "Record cash already spent. Purchase shipping and customs belong on the purchase invoice.",
+    "save": "Record expense",
+    "saved": "Expense recorded",
+    "category": "Category",
+    "categoryHint": "Shipping, ads, or a new category…",
+    "categoryHelp": "Choose an existing category or type a new one; it is saved with this expense.",
+    "amount": "Amount (EGP)",
+    "date": "Date paid",
+    "note": "Note / reference (optional)",
+    "void": "Void mistake",
+    "voidHint": "Correct an incorrectly entered expense. This reverses its cash entry and keeps the original record.",
+    "voided": "Voided",
+    "reason": "Correction reason",
+    "total": "Expenses in this view",
+    "totalHint": "Excludes voided entries. Purchases are recorded separately.",
+    "search": "Search category or note…",
+    "allCategories": "All categories",
+    "empty": "No expenses in this view",
+    "emptyHint": "Record an expense or change the filters.",
+    "status": "Status",
+    "recorded": "Recorded",
+    "trace": "Ledger"
   }
 }

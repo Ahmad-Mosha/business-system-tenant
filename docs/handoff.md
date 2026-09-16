@@ -23,6 +23,8 @@ until an owner reconciles actual noon holdings. No quantities are guessed.
 Purchase entry supports by-value/per-unit landed costs and inline supplier creation.
 Separately paid extras affect cash rather than supplier debt. Create-and-post is
 atomic. Receipt/average costs retain four decimal places.
+`/money/expenses` records paid expenses with inline custom categories. Corrections
+void and reverse, never delete. Categories do not change the chart of accounts.
 
 ## Toolchain (what's real)
 

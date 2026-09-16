@@ -59,6 +59,8 @@ export default async function LedgerPage({
   const page = Math.max(Number(params.page) || 1, 1);
 
   const keep = new URLSearchParams();
+  if (params.sourceType) keep.set('sourceType', params.sourceType);
+  if (params.sourceId) keep.set('sourceId', params.sourceId);
   if (code) keep.set('code', code);
   if (from) keep.set('from', from);
   if (to) keep.set('to', to);
@@ -96,7 +98,7 @@ export default async function LedgerPage({
       <PageHeader
         title={tr('nav.items.ledger')}
         description={
-          account
+          params.sourceId ? t('sourceDescription') : account
             ? t.rich('accountDescription', { account: accountName(account, locale), strong })
             : t('allDescription')
         }

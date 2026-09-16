@@ -43,10 +43,13 @@ baseline; older architecture proposals are not the implementation.
    Supplier creation works inline even with no existing suppliers. Create-and-post
    is one database transaction; failed posting cannot leave duplicate hidden drafts.
    Manual cost corrections are locked and create an audit movement.
-5. **Expenses and business profit.** Fixed voucher accounts are not custom expense
-   categories. Replace the obsolete COGS gate with the confirmed business measure,
-   with clear channel scope and no double-counted shipping.
-6. **Daily operations UX.** Bulk assignment with visible-page selection, clear
+5. **Expenses — implemented.** Dedicated paid-expense records with inline custom
+   categories, date/category/search filters, a ledger link and reasoned voids.
+   Requests are idempotent and voids retain/reverse the original. Categories are
+   independent of accounting accounts; purchases stay in landed cost, not expenses.
+6. **Business profit.** Replace the obsolete COGS gate with the confirmed business
+   measure, with clear channel scope and no double-counted shipping.
+7. **Daily operations UX.** Bulk assignment with visible-page selection, clear
    selection scope, authorization and atomic server writes. Check English/Arabic,
    normal laptop and wide desktop layouts, states and feedback.
 

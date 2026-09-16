@@ -520,3 +520,10 @@ export const getSuppliers = () => get<SupplierRow[]>('/suppliers');
 export const getSupplier = (id: string) => get<SupplierDetail>(`/suppliers/${id}`);
 export const getPurchases = () => get<PurchaseInvoiceRow[]>('/purchases');
 export const getPurchase = (id: string) => get<PurchaseInvoiceDetail>(`/purchases/${id}`);
+
+
+export const getExpenseCategories = () => get<Array<{ id: string; name: string }>>('/expenses/categories');
+export const getExpenses = (query: string) => get<{
+  expenses: Array<{ id: string; amount: string; spentOn: string; note: string | null; category: string; voidedAt: string | null; voidReason: string | null }>;
+  total: number; totalAmount: string; page: number;
+}>(`/expenses?${query}`);

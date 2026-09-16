@@ -81,6 +81,8 @@ export class FinanceController {
   /** The full ledger, filtered — where every "trace" link lands. */
   @Get('ledger')
   ledger_(
+    @Query('sourceType') sourceType?: string,
+    @Query('sourceId') sourceId?: string,
     @Query('code') code?: string,
     @Query('kind') kind?: string,
     @Query('from') from?: string,
@@ -92,6 +94,7 @@ export class FinanceController {
       if (value && !ISO_DATE.test(value)) throw new BadRequestException(`${name} must be YYYY-MM-DD`);
     }
     return this.ledger.entries({
+      sourceType, sourceId,
       code: code as LedgerAccountCode | undefined,
       kind: kind as LedgerEntryKind | undefined,
       from,
