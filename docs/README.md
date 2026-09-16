@@ -14,7 +14,8 @@ hours.
 
 | File | What it gives you |
 |---|---|
-| [handoff.md](handoff.md) | **Start here.** What is actually built and running now (money module, Bosta), the real toolchain, DB state, and what's still open. Updated per session. |
+| [handoff.md](handoff.md) | **Start here.** What is actually built and running now, environments (Neon, EC2), the numbers audit, and what's still open. Updated per session. |
+| [owner-questions-money-system.md](owner-questions-money-system.md) | Open business questions blocking the money system, in Egyptian Arabic, with space for the owners' answers. |
 
 ## Read in this order
 
