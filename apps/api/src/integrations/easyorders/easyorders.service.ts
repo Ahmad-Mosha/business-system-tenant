@@ -222,7 +222,7 @@ export class EasyOrdersService {
       // Same rule as our own payment-status change: the money only lands the
       // moment it first turns PAID.
       if (order.paymentStatus === 'PAID' && !wasPaid) {
-        await this.finance.recordOrderPayment(tx, order.id, order.total);
+        await this.finance.recordOrderPayment(tx, order.id, order.total, order.shippingCost);
       }
 
       await tx.insert(OrderEvent, {
