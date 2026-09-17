@@ -28,8 +28,8 @@ export class EasyOrdersController {
    * `secret` header it sends — the value configured when the webhook is created
    * in the seller dashboard.
    *
-   * Always answers 200 for an accepted delivery: the payload is stored before
-   * processing, so retrying on our internal failure would only duplicate work.
+   * Answers 200 only after processing succeeds. A failed payload is already
+   * stored, and a later redelivery retries it safely instead of duplicating it.
    */
   @Public()
   @Post('webhook')

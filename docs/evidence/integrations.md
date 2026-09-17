@@ -94,7 +94,7 @@ daily.
 
 ---
 
-## Easy Orders (own website) — live, with one broken piece
+## Easy Orders (own website) — live
 
 ### Product catalogue API
 
@@ -176,7 +176,17 @@ handler keys on `event_type` being present in the body (order-created has none).
 
 `GET /api/integrations/easyorders/failures` (admin session) lists deliveries
 that were stored but not turned into an order — `error` carries the reason. The
-raw payload is always kept, so a failed delivery can be replayed after a fix.
+raw payload is always kept. Redelivering the same failed payload retries it;
+successful deliveries return as duplicates without repeating stock or money.
+Deliveries for the same Easy Orders order are serialized even when their raw
+payloads differ, so concurrent webhooks cannot create two orders. A status that
+arrives before its order remains failed and asks for a retry rather than being
+silently marked processed.
+
+Order-created payloads reject empty carts, non-positive/non-integer quantities,
+invalid dates and invalid or negative money before any order, stock movement or
+financial entry is written. Late `paid` notifications record the external status
+but cannot move a cancelled, returned, refund-due or refunded order back to paid.
 
 A wrong or unset `EASYORDERS_STORE_ID` on the box fails **every** order into
 that list (`payload belongs to store … , not ours`); the id is the `store_id`

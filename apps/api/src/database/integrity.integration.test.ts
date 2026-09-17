@@ -15,6 +15,7 @@ import { Product } from '../catalog/product.entity';
 import { ProductVariant } from '../catalog/product-variant.entity';
 import { StockMovement } from '../inventory/stock-movement.entity';
 import { User } from '../auth/user.entity';
+import { EasyOrdersService } from '../integrations/easyorders/easyorders.service';
 
 // Explicit, disposable local database only. Never uses the application's DATABASE_URL.
 const url = process.env.TEST_DATABASE_URL;
@@ -28,6 +29,7 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
   await ledger.seedAccounts();
   const finance = new FinanceService(db, ledger);
   const orders = new OrdersService(db, finance);
+  const easyOrders = new EasyOrdersService(db, finance);
   const purchasing = new PurchasingService(db, ledger);
   const user = await db.getRepository(User).save({ email: `test-${Date.now()}@example.invalid`, name: 'Test', passwordHash: 'unused', role: 'ADMIN' });
   const actor = { id: user.id, name: user.name, role: 'ADMIN' as const, email: user.email };
@@ -65,6 +67,102 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     await assert.rejects(
       db.query('UPDATE customer_order SET order_number = $1 WHERE id = $2', [first.orderNumber, second.id]),
     );
+  });
+  await t.test('concurrent Easy Orders deliveries create and process one order', async () => {
+    const externalId = randomUUID();
+    const payload = {
+      id: externalId,
+      full_name: 'Webhook customer',
+      phone: '01012345678',
+      cost: 50,
+      shipping_cost: 10,
+      total_cost: 60,
+      cart_items: [{ id: randomUUID(), quantity: 1, price: 50, product: { name: 'Webhook item' } }],
+    };
+    const results = await Promise.all([
+      easyOrders.ingest(payload),
+      easyOrders.ingest(payload),
+      easyOrders.ingest({ ...payload, full_name: 'Webhook customer updated' }),
+    ]);
+    assert.deepEqual(results.map((result) => result.status).sort(), ['created', 'duplicate', 'duplicate']);
+    assert.equal(Number((await db.query(
+      "SELECT count(*) AS n FROM customer_order WHERE source = 'EASYORDERS' AND external_id = $1",
+      [externalId],
+    ))[0].n), 1);
+    const eventRows = await db.query(
+      'SELECT processed_at AS "processedAt", error FROM easyorders_event WHERE external_order_id = $1',
+      [externalId],
+    );
+    assert.equal(eventRows.length, 2);
+    assert.ok(eventRows.every((event: { processedAt: Date | null; error: string | null }) =>
+      event.processedAt && event.error === null));
+  });
+  await t.test('an early Easy Orders status retries and late paid cannot undo a refund', async () => {
+    const externalId = randomUUID();
+    const paid = { event_type: 'order-status', order_id: externalId, new_status: 'paid' };
+    await assert.rejects(easyOrders.ingest(paid));
+    const [failed] = await db.query(
+      'SELECT processed_at AS "processedAt", error FROM easyorders_event WHERE external_order_id = $1',
+      [externalId],
+    );
+    assert.equal(failed.processedAt, null);
+    assert.match(failed.error, /before its order/);
+
+    const created = await easyOrders.ingest({
+      id: externalId,
+      full_name: 'Retry customer',
+      phone: '01012345678',
+      total_cost: 40,
+      cart_items: [{ id: randomUUID(), quantity: 1, price: 40, product: { name: 'Retry item' } }],
+    });
+    assert.equal((await easyOrders.ingest(paid)).status, 'updated');
+    const [retried] = await db.query(
+      "SELECT processed_at AS \"processedAt\", error FROM easyorders_event WHERE external_order_id = $1 AND event_type = 'order-status'",
+      [externalId],
+    );
+    assert.ok(retried.processedAt);
+    assert.equal(retried.error, null);
+
+    await orders.updateStatus(actor, created.orderId!, 'CONFIRMED');
+    await orders.updateStatus(actor, created.orderId!, 'SHIPPED');
+    const returned = await orders.updateStatus(actor, created.orderId!, 'RETURNED', {
+      reason: 'Customer returned the parcel', restock: false,
+    });
+    assert.equal(returned.paymentStatus, 'REFUND_DUE');
+    await easyOrders.ingest({ ...paid, old_status: 'late-after-return' });
+    assert.equal((await db.getRepository(Order).findOneByOrFail({ id: created.orderId })).paymentStatus, 'REFUND_DUE');
+    assert.equal(Number((await db.query(
+      "SELECT count(*) AS n FROM ledger_entry WHERE source_id = $1 AND kind = 'ORDER_SALE'",
+      [created.orderId],
+    ))[0].n), 1);
+  });
+  await t.test('invalid Easy Orders quantities preserve a visible failed delivery', async () => {
+    const externalId = randomUUID();
+    await assert.rejects(easyOrders.ingest({
+      id: externalId,
+      cart_items: [{ id: randomUUID(), quantity: 0, price: 10, product: { name: 'Invalid item' } }],
+    }));
+    const [event] = await db.query(
+      'SELECT processed_at AS "processedAt", error FROM easyorders_event WHERE external_order_id = $1',
+      [externalId],
+    );
+    assert.equal(event.processedAt, null);
+    assert.match(event.error, /positive integer/);
+    assert.equal(Number((await db.query(
+      "SELECT count(*) AS n FROM customer_order WHERE source = 'EASYORDERS' AND external_id = $1",
+      [externalId],
+    ))[0].n), 0);
+
+    const invalidAmountId = randomUUID();
+    await assert.rejects(easyOrders.ingest({
+      id: invalidAmountId,
+      total_cost: -1,
+      cart_items: [{ id: randomUUID(), quantity: 1, price: 10, product: { name: 'Invalid total' } }],
+    }));
+    assert.equal(Number((await db.query(
+      "SELECT count(*) AS n FROM customer_order WHERE source = 'EASYORDERS' AND external_id = $1",
+      [invalidAmountId],
+    ))[0].n), 0);
   });
   await t.test('concurrent payment and cancellation requests post exactly once', async () => {
     const id = await stock(1);
