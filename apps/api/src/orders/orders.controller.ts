@@ -18,6 +18,7 @@ import { OrdersService, type CreateOrderInput } from './orders.service';
 
 const STATUSES = Object.keys(ALLOWED_TRANSITIONS) as OrderStatus[];
 const PAYMENT_STATUSES: PaymentStatus[] = ['UNPAID', 'PAID', 'REFUNDED'];
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 @Controller('orders')
 export class OrdersController {
@@ -40,6 +41,7 @@ export class OrdersController {
     @Query('offset') offset?: string,
   ) {
     if (status && !STATUSES.includes(status)) throw new BadRequestException('unknown status');
+    if (assignedToId && !UUID.test(assignedToId)) throw new BadRequestException('unknown assignee');
     return this.orders.list(this.user(req), {
       status,
       source,
@@ -86,6 +88,16 @@ export class OrdersController {
     @Body() body: { assignedToId: string | null },
   ) {
     return this.orders.assign(id, body?.assignedToId ?? null, this.user(req));
+  }
+
+  /** Assigns the visible selection atomically; never leaves half the rows changed. */
+  @Roles('ADMIN')
+  @Patch('assignment/bulk')
+  bulkAssign(
+    @Req() req: Request,
+    @Body() body: { orderIds?: string[]; assignedToId?: string | null },
+  ) {
+    return this.orders.bulkAssign(body?.orderIds ?? [], body?.assignedToId ?? null, this.user(req));
   }
 
   /** Deliberately open to both roles — moderators move their own orders. */
