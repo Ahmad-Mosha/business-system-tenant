@@ -33,9 +33,13 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
   const purchasing = new PurchasingService(db, ledger);
   const user = await db.getRepository(User).save({ email: `test-${Date.now()}@example.invalid`, name: 'Test', passwordHash: 'unused', role: 'ADMIN' });
   const actor = { id: user.id, name: user.name, role: 'ADMIN' as const, email: user.email };
-  async function stock(quantity: number) {
-    const product = await db.getRepository(Product).save({ name: 'Integrity test' });
+  async function emptyProduct() {
+    const product = await db.getRepository(Product).save({ name: `Integrity test ${randomUUID()}` });
     const variant = await db.getRepository(ProductVariant).save({ productId: product.id, unitCost: '10.00' });
+    return { product, variant };
+  }
+  async function stock(quantity: number) {
+    const { variant } = await emptyProduct();
     await db.getRepository(StockMovement).save({ variantId: variant.id, quantity, reason: 'COUNT' });
     return variant.id;
   }
@@ -335,6 +339,66 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     assert.equal(movement.unitCost, '12.0000');
     assert.equal(movement.avgCostAfter, '12.0000');
     assert.match(movement.note, /Corrected supplier invoice/);
+  });
+  await t.test('archiving cannot hide stock, open work, listings or draft purchases', async () => {
+    const catalog = new CatalogService(db, finance);
+
+    const stockedId = await stock(1);
+    const stocked = await db.getRepository(ProductVariant).findOneByOrFail({ id: stockedId });
+    await assert.rejects(catalog.archiveProduct(stocked.productId));
+    assert.equal((await db.getRepository(Product).findOneByOrFail({ id: stocked.productId })).active, true);
+
+    const orderedId = await stock(1);
+    const ordered = await db.getRepository(ProductVariant).findOneByOrFail({ id: orderedId });
+    const order = await orders.create(actor, input(orderedId));
+    assert.equal(await balance(orderedId), 0);
+    await assert.rejects(catalog.archiveProduct(ordered.productId));
+
+    const listed = await emptyProduct();
+    await catalog.addListing(listed.product.id, {
+      channel: 'easyorders',
+      externalId: randomUUID(),
+    });
+    await assert.rejects(catalog.archiveProduct(listed.product.id));
+
+    const drafted = await emptyProduct();
+    const supplier = await purchasing.createSupplier({ name: `Archive supplier ${randomUUID()}` });
+    await purchasing.createInvoice({
+      supplierId: supplier.id,
+      invoiceDate: '2026-09-17',
+      payment: 'CREDIT',
+      lines: [{ variantId: drafted.variant.id, quantity: 1, unitCost: '10.00' }],
+    }, user.id);
+    await assert.rejects(catalog.archiveProduct(drafted.product.id));
+
+    await orders.updateStatus(actor, order.id, 'DELIVERED');
+    await catalog.archiveProduct(ordered.productId);
+    assert.equal((await db.getRepository(ProductVariant).findOneByOrFail({ id: orderedId })).active, false);
+    await assert.rejects(catalog.recordStock(orderedId, 1, 'ADJUSTMENT', user.id));
+    await assert.rejects(catalog.updateVariant(orderedId, { sellingPrice: '20.00' }, user.id));
+    await assert.rejects(purchasing.createInvoice({
+      supplierId: supplier.id,
+      invoiceDate: '2026-09-17',
+      payment: 'CREDIT',
+      lines: [{ variantId: orderedId, quantity: 1, unitCost: '10.00' }],
+    }, user.id));
+
+    const competing = await emptyProduct();
+    const race = await Promise.allSettled([
+      catalog.archiveProduct(competing.product.id),
+      catalog.recordStock(competing.variant.id, 1, 'ADJUSTMENT', user.id, 'Concurrent count'),
+    ]);
+    assert.equal(race.filter((result) => result.status === 'fulfilled').length, 1);
+    const competingActive = (await db.getRepository(Product).findOneByOrFail({ id: competing.product.id })).active;
+    assert.equal(await balance(competing.variant.id), competingActive ? 1 : 0);
+
+    await orders.updateStatus(actor, order.id, 'RETURNED', {
+      reason: 'Sellable return after product was archived',
+      restock: true,
+    });
+    assert.equal(await balance(orderedId), 1);
+    assert.equal((await db.getRepository(Product).findOneByOrFail({ id: ordered.productId })).active, true);
+    assert.equal((await db.getRepository(ProductVariant).findOneByOrFail({ id: orderedId })).active, true);
   });
   await t.test('custom expenses deduplicate requests and reverse without deleting history', async () => {
     const expenses = new ExpensesService(db, ledger);

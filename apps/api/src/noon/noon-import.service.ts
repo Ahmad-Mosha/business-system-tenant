@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { DataSource, EntityManager, In } from 'typeorm';
 import { ChannelListing } from '../catalog/channel-listing.entity';
 import { FinanceService } from '../finance/finance.service';
+import { lockStock } from '../inventory/stock-lock';
 import { StockMovement } from '../inventory/stock-movement.entity';
 import { NoonImport } from './noon-import.entity';
 import { NoonTransaction } from './noon-transaction.entity';
@@ -104,9 +105,14 @@ export class NoonImportService {
     const wanted = new Set(rows.map((r) => r.partnerSku).filter((s): s is string => !!s));
     if (!wanted.size) return new Map();
 
-    const existing = await tx.find(ChannelListing, {
-      where: { channel: 'noon', partnerSku: In([...wanted]) },
-    });
+    const existing: Array<Pick<ChannelListing, 'id' | 'variantId' | 'partnerSku'>> = await tx.query(
+      `SELECT l.id, l.variant_id AS "variantId", l.partner_sku AS "partnerSku"
+       FROM channel_listing l
+       JOIN product_variant v ON v.id = l.variant_id
+       JOIN product p ON p.id = v.product_id
+       WHERE l.channel = 'noon' AND l.partner_sku = ANY($1::text[]) AND v.active AND p.active`,
+      [[...wanted]],
+    );
 
     const out = new Map<string, { listingId: string; variantId: string }>();
     for (const l of existing) {
@@ -158,7 +164,19 @@ export class NoonImportService {
         });
       }
     }
-    if (movements.length) await tx.insert(StockMovement, movements);
+    if (movements.length) {
+      const variantIds = movements.flatMap((movement) => movement.variantId ? [movement.variantId] : []);
+      await lockStock(tx, variantIds);
+      const activeRows: Array<{ id: string }> = await tx.query(
+        `SELECT v.id FROM product_variant v
+         JOIN product p ON p.id = v.product_id
+         WHERE v.id = ANY($1::uuid[]) AND v.active AND p.active`,
+        [variantIds],
+      );
+      const active = new Set(activeRows.map((row) => row.id));
+      const safe = movements.filter((movement) => movement.variantId && active.has(movement.variantId));
+      if (safe.length) await tx.insert(StockMovement, safe);
+    }
   }
 
   /**
