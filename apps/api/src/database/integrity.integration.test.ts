@@ -28,7 +28,6 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
   await ledger.seedAccounts();
   const finance = new FinanceService(db, ledger);
   const orders = new OrdersService(db, finance);
-  await orders.onModuleInit();
   const purchasing = new PurchasingService(db, ledger);
   const user = await db.getRepository(User).save({ email: `test-${Date.now()}@example.invalid`, name: 'Test', passwordHash: 'unused', role: 'ADMIN' });
   const actor = { id: user.id, name: user.name, role: 'ADMIN' as const, email: user.email };
@@ -53,6 +52,19 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     body.items.push({ ...body.items[0] });
     await assert.rejects(orders.create(actor, body));
     assert.equal(await balance(id), 3);
+  });
+  await t.test('order numbers advance uniquely across concurrent orders', async () => {
+    const id = await stock(2);
+    const [first, second] = await Promise.all([
+      orders.create(actor, input(id)),
+      orders.create(actor, input(id)),
+    ]);
+    assert.notEqual(first.orderNumber, second.orderNumber);
+    assert.match(first.orderNumber, /^PM-\d+$/);
+    assert.match(second.orderNumber, /^PM-\d+$/);
+    await assert.rejects(
+      db.query('UPDATE customer_order SET order_number = $1 WHERE id = $2', [first.orderNumber, second.id]),
+    );
   });
   await t.test('concurrent payment and cancellation requests post exactly once', async () => {
     const id = await stock(1);

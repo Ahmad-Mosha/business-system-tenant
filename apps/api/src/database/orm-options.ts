@@ -15,4 +15,7 @@ export const ormOptions = {
   namingStrategy: new SnakeNamingStrategy(),
   // Matches both the .ts source (CLI, via ts-node) and the compiled .js (runtime dist/).
   migrations: [__dirname + '/migrations/*{.ts,.js}'],
+  // A failed schema change rolls back as a unit; production data must never
+  // be left between the old and new schema.
+  migrationsTransactionMode: 'all' as const,
 };
