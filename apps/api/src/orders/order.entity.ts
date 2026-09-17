@@ -103,6 +103,7 @@ export class Order {
 
   /** Short human reference used when talking to customers, e.g. `PM-1042`. */
   @Index('ix_order_number')
+  @Index('uq_order_number', { unique: true })
   @Column({ type: 'text' })
   orderNumber: string;
 

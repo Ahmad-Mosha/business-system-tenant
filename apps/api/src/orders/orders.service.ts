@@ -3,7 +3,6 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
-  OnModuleInit,
 } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
@@ -13,6 +12,7 @@ import { FinanceService } from '../finance/finance.service';
 import { StockMovement } from '../inventory/stock-movement.entity';
 import { OrderEvent } from './order-event.entity';
 import { OrderItem } from './order-item.entity';
+import { nextOrderNumber } from './order-number';
 import {
   ALLOWED_TRANSITIONS,
   EGYPT_GOVERNORATES,
@@ -51,21 +51,11 @@ export interface OrderFilters {
 }
 
 @Injectable()
-export class OrdersService implements OnModuleInit {
+export class OrdersService {
   constructor(
     @InjectDataSource() private readonly db: DataSource,
     private readonly finance: FinanceService,
   ) {}
-
-  async onModuleInit() {
-    // A database sequence, so two concurrent orders can never share a number.
-    await this.db.query('CREATE SEQUENCE IF NOT EXISTS order_number_seq START 1000');
-  }
-
-  private async nextOrderNumber(tx: EntityManager): Promise<string> {
-    const [{ nextval }] = await tx.query("SELECT nextval('order_number_seq')");
-    return `PM-${nextval}`;
-  }
 
   /**
    * A moderator only ever sees their own orders. The restriction is applied to
@@ -194,7 +184,7 @@ export class OrdersService implements OnModuleInit {
       const shipping = Number(input.shippingCost ?? 0);
 
       const order = await tx.save(Order, {
-        orderNumber: await this.nextOrderNumber(tx),
+        orderNumber: await nextOrderNumber(tx),
         source: 'SOCIAL' as const,
         externalId: null,
         // A moderator creating an order already owns it.

@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { DataSource, EntityManager, IsNull } from 'typeorm';
 import { FinanceService } from '../../finance/finance.service';
 import { OrderItem } from '../../orders/order-item.entity';
+import { nextOrderNumber } from '../../orders/order-number';
 import { Order } from '../../orders/order.entity';
 import { OrdersService } from '../../orders/orders.service';
 import { OrderEvent } from '../../orders/order-event.entity';
@@ -157,10 +158,8 @@ export class EasyOrdersService {
       const shipping = Number(payload.shipping_cost ?? 0);
       const total = Number(payload.total_cost ?? subtotal + shipping);
 
-      const [{ nextval }] = await tx.query("SELECT nextval('order_number_seq')");
-
       const order = await tx.save(Order, {
-        orderNumber: `PM-${nextval}`,
+        orderNumber: await nextOrderNumber(tx),
         source: 'EASYORDERS' as const,
         externalId: payload.id,
         status: 'NEW' as const,

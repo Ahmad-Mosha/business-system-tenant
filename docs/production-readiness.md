@@ -65,13 +65,16 @@ baseline; older architecture proposals are not the implementation.
    12 characters and rejects the known development defaults. Account seeding is
    serialized across API processes; existing user databases do not depend on
    seed-password environment variables. Local development retains its defaults.
+9. **Order-number integrity — implemented.** The sequence is owned by a
+   transactional migration and advances to at least the highest existing
+   `PM-<number>` after a restore. A database unique index prevents duplicates
+   across manual and Easy Orders ingestion. Existing orders are never rewritten;
+   a historical duplicate aborts and rolls back the migration for reconciliation.
 
 Further audit findings to resolve as the associated flow is changed:
 - Easy Orders failed delivery fingerprints currently prevent automatic retry;
   concurrent deliveries can hit uniqueness errors. Late paid notifications can
   overwrite a refund. Validate payload quantities and amounts.
-- Order numbers are generated from a runtime-created sequence without a unique
-  constraint; restored databases can start below existing numbers.
 - Product cost edits bypass valuation history. Stock removal reasons allow
   inconsistent direction; manual purchase uses the old average as receipt cost.
 - Several list totals rely on a window count and show zero on an empty later page.
