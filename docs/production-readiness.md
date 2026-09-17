@@ -59,6 +59,12 @@ baseline; older architecture proposals are not the implementation.
    included. The server validates the full set and active moderator before one
    atomic write and records an audit event for each changed order. Assignee
    filtering, feedback, Arabic RTL and English were checked at desktop widths.
+8. **Production auth bootstrap — implemented.** Production startup requires a
+   session signing secret of at least 32 characters. A new empty production
+   database requires explicit initial admin and moderator passwords of at least
+   12 characters and rejects the known development defaults. Account seeding is
+   serialized across API processes; existing user databases do not depend on
+   seed-password environment variables. Local development retains its defaults.
 
 Further audit findings to resolve as the associated flow is changed:
 - Easy Orders failed delivery fingerprints currently prevent automatic retry;
