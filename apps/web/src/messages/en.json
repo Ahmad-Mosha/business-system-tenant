@@ -202,7 +202,10 @@
         "returnDetails": "Enter a reason and choose the condition of the received goods.",
         "paymentTransition": "This payment change is not available for this order.",
         "missingPayment": "Reconcile the original payment before returning this paid order.",
-        "noRefundDue": "No customer refund is due."
+        "noRefundDue": "No customer refund is due.",
+        "assignee": "Choose an active moderator.",
+        "bulkSelection": "Select between 1 and 200 valid orders.",
+        "bulkMissing": "One or more selected orders no longer exist. Refresh the list and try again."
       },
       "cheque": {
         "settled": "{status, select, CLEARED {This cheque has already cleared.} BOUNCED {This cheque has already bounced.} other {This cheque is no longer pending.}}"
@@ -271,11 +274,23 @@
     "search": "Search orders, customers, phones…",
     "allChannels": "All channels",
     "anyStatus": "Any status",
+    "allAssignees": "All assignees",
     "noMatch": "No orders match this view",
     "noMatchHint": "Try another status or channel, or clear the search.",
     "none": "No orders yet",
     "noneHint": "Website orders arrive here on their own. Social orders are entered by hand.",
     "unmapped": "{count, plural, one {# item isn’t linked to inventory, so it won’t move stock.} other {# items aren’t linked to inventory, so they won’t move stock.}}",
+    "bulk": {
+      "selectionHint": "Select visible orders to assign them together.",
+      "selected": "{count, plural, one {# order selected} other {# orders selected}}",
+      "selectAll": "Select all {count} visible orders",
+      "selectOrder": "Select order {number}",
+      "chooseAssignee": "Choose a moderator",
+      "assign": "Assign selected",
+      "noChanges": "These orders already have that assignment.",
+      "assigned": "{count, plural, one {Assigned # order to {name}.} other {Assigned # orders to {name}.}}",
+      "unassigned": "{count, plural, one {Unassigned # order.} other {Unassigned # orders.}}"
+    },
     "columns": {
       "order": "Order",
       "customer": "Customer",
