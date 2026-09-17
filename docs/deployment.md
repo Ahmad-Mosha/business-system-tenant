@@ -48,9 +48,10 @@ DATABASE_URL=... npm run migration:generate -w @prime/api -- src/database/migrat
 ```
 Review the generated SQL before committing — this is a money schema.
 
-**Not in any migration:** `order_number_seq` is created by
-`OrdersService.onModuleInit`. When copying real data into a new database,
-`setval` it to the last used order number.
+`order_number_seq` is migration-owned and synchronized forward to the highest
+existing `PM-<number>` whenever its integrity migration first runs. Order
+numbers have a database unique index. A restored database therefore cannot
+restart at `PM-1000` or create a duplicate human-facing number.
 
 **Auth:** the two named accounts (`admin@admin.com`, `moderator@moderator.com`)
 seed themselves on first boot into an empty user table. Their passwords come
@@ -76,6 +77,26 @@ both happen automatically on the API's boot.
 ```bash
 ssh -i ~/Downloads/prime-key.pem ec2-user@prime-market.duckdns.org
 cd ~/dashboard && git pull && docker compose -f docker-compose.prod.yml up -d --build api web
+```
+
+Before any release containing a database migration, create a fresh custom-format
+backup from the direct Neon connection and verify that PostgreSQL can read its
+catalog. Keep the backup outside the server being updated:
+
+```bash
+pg_dump --format=custom --no-owner --no-acl "$DATABASE_URL" > prime-market-before-deploy.dump
+pg_restore --list prime-market-before-deploy.dump > /dev/null
+```
+
+For the order-number integrity migration, run this read-only preflight first. It
+must return no rows; if it finds a duplicate, stop and reconcile it explicitly.
+The migration itself raises an error and rolls back without changing any order:
+
+```sql
+SELECT order_number, count(*)
+FROM customer_order
+GROUP BY order_number
+HAVING count(*) > 1;
 ```
 Rebuild `api` and `web` together — they're developed as a pair on `main`, and
 an old web against a new API (or the reverse) is an untested combination. A
