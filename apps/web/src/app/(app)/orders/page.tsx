@@ -1,5 +1,6 @@
 import { Plus, ShoppingBag } from 'lucide-react';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { FilterBar } from '@/components/filter-bar';
 import { MetricCard, MetricGrid } from '@/components/metric-card';
 import { ALL_ORDER_STATUSES } from '@/components/order-status';
@@ -54,6 +55,9 @@ export default async function OrdersPage({
     const qs = next.toString();
     return qs ? `/orders?${qs}` : '/orders';
   };
+  const lastPage = Math.max(Math.ceil(total / PAGE_SIZE), 1);
+  if (page > lastPage) redirect(pageHref(lastPage));
+
   const pagination = (
     <TablePagination
       page={page}

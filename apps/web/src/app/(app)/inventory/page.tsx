@@ -1,5 +1,6 @@
 import { Package, Plus } from 'lucide-react';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { Amount } from '@/components/amount';
 import { FilterBar } from '@/components/filter-bar';
 import { MetricCard, MetricGrid } from '@/components/metric-card';
@@ -87,6 +88,8 @@ export default async function InventoryPage({
     const qs = next.toString();
     return qs ? `/inventory?${qs}` : '/inventory';
   };
+  const lastPage = Math.max(Math.ceil(total / PAGE_SIZE), 1);
+  if (page > lastPage) redirect(pageHref(lastPage));
 
   return (
     <Page fill>

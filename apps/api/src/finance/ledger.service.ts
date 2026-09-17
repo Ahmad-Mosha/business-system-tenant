@@ -251,7 +251,20 @@ export class LedgerService {
        LIMIT ${limit} OFFSET ${offset}`,
       params,
     );
-    return { entries: rows, total: rows[0]?.totalCount ?? 0, limit, offset };
+    let total = rows[0]?.totalCount ?? 0;
+    // count(*) OVER() has no row to carry the total on an empty later page.
+    // Count only in that exceptional case so ordinary ledger reads stay one
+    // query while stale page URLs still receive an accurate result.
+    if (rows.length === 0 && offset > 0) {
+      const [count] = await tx.query(
+        `SELECT count(*)::int AS total
+         FROM ledger_entry e
+         ${whereSql}`,
+        params,
+      );
+      total = count.total;
+    }
+    return { entries: rows, total, limit, offset };
   }
 
   /**
