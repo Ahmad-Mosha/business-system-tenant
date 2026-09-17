@@ -23,26 +23,24 @@ export class BostaController {
   }
 
   /**
-   * List all live Bosta shipments for Prime Market.
-   * Open to both ADMIN and MODERATOR.
+   * Admins see the account board; moderators see their assigned orders only.
    */
   @Get('shipments')
-  async listShipments() {
-    return this.bostaService.listDeliveries();
+  async listShipments(@Req() req: Request) {
+    return this.bostaService.listDeliveries(this.user(req));
   }
 
   /**
-   * Track any Bosta shipment live by tracking number.
-   * Open to both ADMIN and MODERATOR.
+   * Track a Bosta shipment live within the signed-in user's order scope.
    */
   @Get('track/:trackingNumber')
-  async track(@Param('trackingNumber') trackingNumber: string) {
+  async track(@Req() req: Request, @Param('trackingNumber') trackingNumber: string) {
     const cleanTn = (trackingNumber ?? '').trim();
     if (!cleanTn) {
       throw new BadRequestException('Tracking number is required');
     }
 
-    const result = await this.bostaService.track(cleanTn);
+    const result = await this.bostaService.trackForUser(this.user(req), cleanTn);
     if (!result) {
       throw new NotFoundException(
         problem('shipment.notFound', `Shipment not found for tracking number: ${cleanTn}`, { trackingNumber: cleanTn }),

@@ -47,6 +47,8 @@ external order. Exact failed deliveries can retry; concurrent redeliveries do
 not duplicate orders, stock, or money. Status events arriving before their order
 stay visible as failures for retry. Invalid quantities, dates, and money are
 rejected before writes, and a late paid event cannot undo a return/refund state.
+Bosta's account-wide board is admin-only in scope; moderators see and refresh
+only shipments linked to orders assigned to them.
 
 ## Toolchain (what's real)
 

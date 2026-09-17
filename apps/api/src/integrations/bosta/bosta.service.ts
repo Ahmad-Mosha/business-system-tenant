@@ -102,17 +102,23 @@ export class BostaService {
     return this.normalizeBostaDelivery(raw);
   }
 
-  /**
-   * Lists every live Bosta shipment on the account.
-   *
-   * ponytail: no per-moderator scoping — everyone sees the whole board, same as
-   * the admin. It was scoped to "orders assigned to me" before; Ahmad pulled
-   * that pending a decision on what a moderator should actually see here. Add
-   * the `SessionUser` filter back when that's settled.
-   */
+  /** Lists the live account board, scoped to the moderator's assigned orders. */
   async listDeliveries(
+    user: SessionUser,
     query?: { search?: string; status?: string },
   ): Promise<ShipmentTrackingDto[]> {
+    let allowedTracking: Set<string> | null = null;
+    if (user.role === 'MODERATOR') {
+      const rows: Array<{ trackingNumber: string }> = await this.db.query(
+        `SELECT tracking_number AS "trackingNumber"
+         FROM customer_order
+         WHERE assigned_to_id = $1 AND tracking_number IS NOT NULL`,
+        [user.id],
+      );
+      allowedTracking = new Set(rows.map((row) => row.trackingNumber));
+      if (allowedTracking.size === 0) return [];
+    }
+
     // One call returns every delivery on the account, so the page costs a
     // single request rather than one per order.
     const deliveries = await this.bostaClient.listDeliveries();
@@ -126,6 +132,10 @@ export class BostaService {
         }
       })
       .filter((r): r is ShipmentTrackingDto => r !== null);
+
+    if (allowedTracking) {
+      list = list.filter((delivery) => allowedTracking.has(delivery.trackingNumber));
+    }
 
     if (query?.search) {
       const s = query.search.toLowerCase().trim();
@@ -145,6 +155,21 @@ export class BostaService {
     }
 
     return list;
+  }
+
+  /** A moderator can refresh only a shipment linked to one of their orders. */
+  async trackForUser(user: SessionUser, trackingNumber: string): Promise<ShipmentTrackingDto | null> {
+    if (user.role === 'MODERATOR') {
+      const [assigned] = await this.db.query(
+        `SELECT 1
+         FROM customer_order
+         WHERE assigned_to_id = $1 AND tracking_number = $2
+         LIMIT 1`,
+        [user.id, trackingNumber],
+      );
+      if (!assigned) return null;
+    }
+    return this.track(trackingNumber);
   }
 
   /**
