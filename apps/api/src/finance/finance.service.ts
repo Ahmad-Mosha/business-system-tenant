@@ -278,7 +278,13 @@ export class FinanceService {
   // ── Automatic entries called from other modules ─────────────────────────
 
   /** An order was marked paid — money is now in hand, booked against revenue. */
-  recordOrderPayment(tx: EntityManager, orderId: string, amount: string) {
+  recordOrderPayment(
+    tx: EntityManager,
+    orderId: string,
+    amount: string,
+    shippingCost: string,
+    actorId?: string | null,
+  ) {
     return this.ledger.post(
       {
         amount,
@@ -287,6 +293,8 @@ export class FinanceService {
         kind: 'ORDER_SALE',
         sourceType: 'order',
         sourceId: orderId,
+        actorId: actorId ?? null,
+        orderShippingCost: shippingCost,
       },
       tx,
     );
@@ -295,7 +303,7 @@ export class FinanceService {
   /** Remove revenue now; keep collected cash until the actual refund. */
   async recordOrderReturn(tx: EntityManager, orderId: string, actorId: string) {
     const [sale] = await tx.query(
-      `SELECT e.amount FROM ledger_entry e
+      `SELECT e.amount, e.order_shipping_cost AS "orderShippingCost" FROM ledger_entry e
        WHERE e.source_type = 'order' AND e.source_id = $1 AND e.kind = 'ORDER_SALE'
          AND e.reverses_id IS NULL
          AND NOT EXISTS (SELECT 1 FROM ledger_entry r WHERE r.reverses_id = e.id)
@@ -303,7 +311,8 @@ export class FinanceService {
     );
     if (!sale) throw new BadRequestException(problem('order.missingPayment', 'reconcile the original payment before returning this paid order'));
     await this.ledger.post({ amount: sale.amount, debit: 'SALES', credit: 'CUSTOMER_REFUNDS',
-      kind: 'RETURN', sourceType: 'order', sourceId: orderId, actorId }, tx);
+      kind: 'RETURN', sourceType: 'order', sourceId: orderId, actorId,
+      orderShippingCost: sale.orderShippingCost }, tx);
   }
 
   async refundReturnedOrder(tx: EntityManager, orderId: string, actorId: string) {

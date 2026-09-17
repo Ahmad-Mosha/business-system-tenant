@@ -486,8 +486,6 @@ export interface PeriodSummary {
   channelFees: string;
   shipping: string;
   otherExpense: string;
-  grossProfit: string;
-  netProfit: string;
 }
 
 export const getCashSeries = (days = 90) =>
@@ -495,17 +493,15 @@ export const getCashSeries = (days = 90) =>
 export const getPeriodSummary = (from?: string, to?: string) =>
   get<PeriodSummary>(`/finance/summary${from && to ? `?from=${from}&to=${to}` : ''}`);
 
-export interface ProfitPoint {
-  period: string;
-  revenue: string;
-  cogs: string;
-  channelFees: string;
+export interface BusinessProfitReport {
+  sales: string;
   shipping: string;
-  grossProfit: string;
-  netProfit: string;
+  businessProfit: string;
+  unreconciledEntries: number;
+  series: Array<{ period: string; sales: string; shipping: string; businessProfit: string }>;
 }
-export const getProfitSeries = (from: string, to: string, bucket: 'day' | 'week' | 'month') =>
-  get<ProfitPoint[]>(`/finance/profit-series?from=${from}&to=${to}&bucket=${bucket}`);
+export const getBusinessProfit = (from: string, to: string, bucket: 'day' | 'week' | 'month') =>
+  get<BusinessProfitReport>(`/finance/business-profit?from=${from}&to=${to}&bucket=${bucket}`);
 
 /** Money into and out of the treasury between two dates — per bucket, and by where. */
 export interface CashFlow {

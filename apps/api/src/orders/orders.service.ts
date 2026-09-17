@@ -480,7 +480,7 @@ export class OrdersService implements OnModuleInit {
       // The money is only actually in hand the moment it turns PAID — not on
       // every save, and not when it's already been counted once before.
       if (next === 'PAID' && from !== 'PAID') {
-        await this.finance.recordOrderPayment(tx, orderId, order.total);
+        await this.finance.recordOrderPayment(tx, orderId, order.total, order.shippingCost, user.id);
       } else if (from === 'PAID' && next !== 'PAID') {
         await this.finance.reverseOrderPayment(tx, orderId, user.id);
       }

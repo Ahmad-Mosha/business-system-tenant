@@ -23,6 +23,7 @@ export interface PostEntry {
   sourceType?: string | null;
   sourceId?: string | null;
   actorId?: string | null;
+  orderShippingCost?: string | number | null;
 }
 
 export interface EntryFilter {
@@ -94,6 +95,10 @@ export class LedgerService {
         sourceType: input.sourceType ?? null,
         sourceId: input.sourceId ?? null,
         actorId: input.actorId ?? null,
+        orderShippingCost:
+          input.orderShippingCost === undefined || input.orderShippingCost === null
+            ? null
+            : this.normaliseNonNegativeAmount(input.orderShippingCost),
       }),
     );
   }
@@ -131,6 +136,7 @@ export class LedgerService {
         sourceType: original.sourceType,
         sourceId: original.sourceId,
         actorId: actorId ?? null,
+        orderShippingCost: original.orderShippingCost,
       },
       tx,
     ).then(async (rev) => {
@@ -380,11 +386,7 @@ export class LedgerService {
     return { series, sources };
   }
 
-  /**
-   * Revenue and cost components for a period, from the profit accounts. The
-   * gross/net split is a choice of which of these to subtract — open decision
-   * #6 — so the raw components are returned and the interpretation stays thin.
-   */
+  /** Raw accounting revenue and cost components for the period. */
   async periodSummary(
     from: string,
     to: string,
@@ -409,84 +411,111 @@ export class LedgerService {
     );
 
     const n = (v: string) => Number(v);
-    const grossProfit = n(r.revenue) - n(r.cogs) - n(r.channelFees);
-    const netProfit = grossProfit - n(r.shipping) - n(r.otherExpense);
     return {
       revenue: n(r.revenue).toFixed(2),
       cogs: n(r.cogs).toFixed(2),
       channelFees: n(r.channelFees).toFixed(2),
       shipping: n(r.shipping).toFixed(2),
       otherExpense: n(r.otherExpense).toFixed(2),
-      grossProfit: grossProfit.toFixed(2),
-      netProfit: netProfit.toFixed(2),
     };
   }
 
   /**
-   * The same revenue/cost components as `periodSummary`, bucketed over time
-   * (day/week/month) — every bucket present, empty ones as zero, same
-   * `generate_series` pattern as `flow()`. Drives the overview's profit chart.
+   * The owners' confirmed operating measure for manual/social and Easy Orders:
+   * selling amount minus the shipping amount captured with the payment. A
+   * return or payment reversal carries the same snapshot and therefore removes
+   * the exact amount originally recognised. Legacy rows with no snapshot are
+   * excluded rather than assigned a shipping value we cannot prove.
    */
-  async profitSeries(
+  async businessProfit(
     from: string,
     to: string,
     bucket: 'day' | 'week' | 'month',
     tx: EntityManager = this.db.manager,
-  ): Promise<
-    Array<{
+  ): Promise<{
+    sales: string;
+    shipping: string;
+    businessProfit: string;
+    unreconciledEntries: number;
+    series: Array<{ period: string; sales: string; shipping: string; businessProfit: string }>;
+  }> {
+    const rows: Array<{
       period: string;
-      revenue: string;
-      cogs: string;
-      channelFees: string;
+      sales: string;
       shipping: string;
-      grossProfit: string;
-      netProfit: string;
-    }>
-  > {
-    const PROFIT_ACCOUNTS = ['SALES', 'COGS', 'CHANNEL_FEES', 'SHIPPING', 'OTHER_EXPENSE'] as const;
-    const acct = (code: string) =>
-      `COALESCE(SUM(e.amount) FILTER (WHERE e.credit_code = '${code}'), 0)
-       - COALESCE(SUM(e.amount) FILTER (WHERE e.debit_code = '${code}'), 0)`;
-    const expense = (code: string) =>
-      `COALESCE(SUM(e.amount) FILTER (WHERE e.debit_code = '${code}'), 0)
-       - COALESCE(SUM(e.amount) FILTER (WHERE e.credit_code = '${code}'), 0)`;
-
-    return tx.query(
-      `WITH moves AS (
-         SELECT date_trunc($3, e.occurred_at::date::timestamp)::date AS period,
-                ${acct('SALES')}          AS revenue,
-                ${expense('COGS')}         AS cogs,
-                ${expense('CHANNEL_FEES')} AS "channelFees",
-                ${expense('SHIPPING')}     AS shipping,
-                ${expense('OTHER_EXPENSE')} AS "otherExpense"
+      businessProfit: string;
+      unreconciledEntries: number;
+    }> = await tx.query(
+      `WITH scoped AS (
+         SELECT date_trunc($3, (e.occurred_at AT TIME ZONE 'Africa/Cairo')::date::timestamp)::date AS period,
+                CASE WHEN e.credit_code = 'SALES' THEN 1 ELSE -1 END AS sign,
+                e.amount,
+                e.order_shipping_cost AS shipping
          FROM ledger_entry e
-         WHERE (e.debit_code = ANY($4) OR e.credit_code = ANY($4))
-           AND e.occurred_at::date BETWEEN $1::date AND $2::date
-         GROUP BY 1
+         WHERE e.source_type = 'order'
+           AND e.kind IN ('ORDER_SALE', 'RETURN')
+           AND (e.debit_code = 'SALES' OR e.credit_code = 'SALES')
+           AND (e.occurred_at AT TIME ZONE 'Africa/Cairo')::date BETWEEN $1::date AND $2::date
+       ), moves AS (
+         SELECT period,
+                COALESCE(SUM(sign * amount) FILTER (WHERE shipping IS NOT NULL), 0) AS sales,
+                COALESCE(SUM(sign * shipping) FILTER (WHERE shipping IS NOT NULL), 0) AS shipping,
+                count(*) FILTER (WHERE shipping IS NULL)::int AS "unreconciledEntries"
+         FROM scoped
+         GROUP BY period
+       ), totals AS (
+         SELECT COALESCE(SUM(sign * amount) FILTER (WHERE shipping IS NOT NULL), 0) AS sales,
+                COALESCE(SUM(sign * shipping) FILTER (WHERE shipping IS NOT NULL), 0) AS shipping,
+                count(*) FILTER (WHERE shipping IS NULL)::int AS "unreconciledEntries"
+         FROM scoped
        )
        SELECT g::date::text AS period,
-              COALESCE(m.revenue, 0)::text AS revenue,
-              COALESCE(m.cogs, 0)::text AS cogs,
-              COALESCE(m."channelFees", 0)::text AS "channelFees",
+              COALESCE(m.sales, 0)::text AS sales,
               COALESCE(m.shipping, 0)::text AS shipping,
-              (COALESCE(m.revenue, 0) - COALESCE(m.cogs, 0) - COALESCE(m."channelFees", 0))::text AS "grossProfit",
-              (COALESCE(m.revenue, 0) - COALESCE(m.cogs, 0) - COALESCE(m."channelFees", 0)
-                - COALESCE(m.shipping, 0) - COALESCE(m."otherExpense", 0))::text AS "netProfit"
+              (COALESCE(m.sales, 0) - COALESCE(m.shipping, 0))::text AS "businessProfit",
+              t."unreconciledEntries",
+              t.sales::text AS "totalSales",
+              t.shipping::text AS "totalShipping"
        FROM generate_series(
               date_trunc($3, $1::date::timestamp),
               $2::date::timestamp,
               ('1 ' || $3)::interval
             ) g
        LEFT JOIN moves m ON m.period = g::date
+       CROSS JOIN totals t
        ORDER BY g`,
-      [from, to, bucket, PROFIT_ACCOUNTS],
+      [from, to, bucket],
     );
+
+    const first = rows[0] as (typeof rows[number] & { totalSales: string; totalShipping: string }) | undefined;
+    const sales = Number(first?.totalSales ?? 0);
+    const shipping = Number(first?.totalShipping ?? 0);
+    return {
+      sales: sales.toFixed(2),
+      shipping: shipping.toFixed(2),
+      businessProfit: (sales - shipping).toFixed(2),
+      unreconciledEntries: Number(first?.unreconciledEntries ?? 0),
+      series: rows.map(({ period, sales: rowSales, shipping: rowShipping, businessProfit }) => ({
+        period,
+        sales: Number(rowSales).toFixed(2),
+        shipping: Number(rowShipping).toFixed(2),
+        businessProfit: Number(businessProfit).toFixed(2),
+      })),
+    };
   }
 
   private normaliseAmount(value: string | number): string {
     const str = typeof value === 'number' ? value.toFixed(2) : value.trim();
     if (!MONEY.test(str) || Number(str) <= 0) {
       throw new BadRequestException('amount must be a positive value like 1500.00');
+    }
+    return Number(str).toFixed(2);
+  }
+
+  private normaliseNonNegativeAmount(value: string | number): string {
+    const str = typeof value === 'number' ? value.toFixed(2) : value.trim();
+    if (!MONEY.test(str)) {
+      throw new BadRequestException('order shipping must be a non-negative amount like 50.00');
     }
     return Number(str).toFixed(2);
   }
