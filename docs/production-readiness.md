@@ -36,6 +36,9 @@ baseline; older architecture proposals are not the implementation.
    location balances. Old pooled movements remain WAREHOUSE: reconcile actual
    noon stock explicitly, because old data cannot establish its location.
    Multi-variant inventory valuation now sums each variant's actual cost.
+   Archiving cannot hide remaining stock, open orders, channel listings or draft
+   purchases. Inactive variants reject new operational writes; a later sellable
+   customer return reactivates its product so restored stock remains visible.
 4. **Purchasing — implemented.** By-value/per-unit landed costs are exposed with
    a live estimate. Largest-remainder allocation conserves every cent without
    negative shares; AVCO and movement costs retain 4 decimals. Costs paid separately
