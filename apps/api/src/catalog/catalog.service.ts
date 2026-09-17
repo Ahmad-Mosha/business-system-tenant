@@ -4,6 +4,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
 import { FinanceService } from '../finance/finance.service';
 import { STOCK_LOCATIONS, StockMovement, type StockLocation, type StockReason } from '../inventory/stock-movement.entity';
+import { lockStock } from '../inventory/stock-lock';
 import { ChannelListing } from './channel-listing.entity';
 import { PRODUCT_CATEGORIES, type ProductCategory } from './product.entity';
 import { ProductVariant } from './product-variant.entity';
@@ -240,7 +241,16 @@ export class CatalogService {
       [id],
     );
 
-    return { ...product, variants, listings };
+    const [{ draftPurchases }] = await this.db.query(
+      `SELECT count(DISTINCT i.id)::int AS "draftPurchases"
+       FROM purchase_invoice i
+       JOIN purchase_invoice_line l ON l.invoice_id = i.id
+       JOIN product_variant v ON v.id = l.variant_id
+       WHERE v.product_id = $1 AND i.status = 'DRAFT'`,
+      [id],
+    );
+
+    return { ...product, variants, listings, draftPurchases };
   }
 
   /**
@@ -342,10 +352,67 @@ export class CatalogService {
    * it out of the manual-order search.
    */
   async archiveProduct(id: string) {
-    const product = await this.db.getRepository(Product).findOneBy({ id });
-    if (!product) throw new NotFoundException(problem('notFound', 'product not found'));
-
     await this.db.transaction(async (tx) => {
+      const variants = await tx.find(ProductVariant, { where: { productId: id }, select: { id: true } });
+      await lockStock(tx, variants.map((variant) => variant.id));
+      const product = await tx.findOne(Product, {
+        where: { id },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!product) throw new NotFoundException(problem('notFound', 'product not found'));
+      if (!product.active) return;
+
+      const [blockers] = await tx.query(
+        `SELECT
+           COALESCE((SELECT SUM(m.quantity)
+             FROM stock_movement m
+             JOIN product_variant v ON v.id = m.variant_id
+             WHERE v.product_id = $1), 0)::int AS stock,
+           COALESCE((SELECT SUM(i.quantity)
+             FROM order_item i
+             JOIN product_variant v ON v.id = i.variant_id
+             JOIN customer_order o ON o.id = i.order_id
+             WHERE v.product_id = $1
+               AND o.status NOT IN ('CANCELLED', 'RETURNED', 'DELIVERED')), 0)::int AS "openUnits",
+           (SELECT count(*)::int
+             FROM channel_listing l
+             JOIN product_variant v ON v.id = l.variant_id
+             WHERE v.product_id = $1) AS listings,
+           (SELECT count(DISTINCT i.id)::int
+             FROM purchase_invoice i
+             JOIN purchase_invoice_line l ON l.invoice_id = i.id
+             JOIN product_variant v ON v.id = l.variant_id
+             WHERE v.product_id = $1 AND i.status = 'DRAFT') AS drafts`,
+        [id],
+      );
+      if (blockers.stock !== 0) {
+        throw new BadRequestException(
+          problem('product.archiveStock', 'reconcile all stock before archiving this product', {
+            count: Math.abs(Number(blockers.stock)),
+          }),
+        );
+      }
+      if (blockers.openUnits > 0) {
+        throw new BadRequestException(
+          problem('product.archiveOrders', 'finish its open orders before archiving this product', {
+            count: Number(blockers.openUnits),
+          }),
+        );
+      }
+      if (blockers.listings > 0) {
+        throw new BadRequestException(
+          problem('product.archiveListings', 'unlink its sales channels before archiving this product', {
+            count: Number(blockers.listings),
+          }),
+        );
+      }
+      if (blockers.drafts > 0) {
+        throw new BadRequestException(
+          problem('product.archiveDrafts', 'finish or delete its draft purchase invoices before archiving', {
+            count: Number(blockers.drafts),
+          }),
+        );
+      }
       await tx.update(Product, { id }, { active: false });
       await tx.update(ProductVariant, { productId: id }, { active: false });
     });
@@ -368,6 +435,9 @@ export class CatalogService {
         lock: { mode: 'pessimistic_write' },
       });
       if (!variant) throw new NotFoundException(problem('notFound', 'variant not found'));
+      if (!variant.active) {
+        throw new BadRequestException(problem('product.archived', 'this product is archived'));
+      }
 
       for (const [field, value] of [
         ['unitCost', patch.unitCost],
@@ -449,17 +519,27 @@ export class CatalogService {
     productId: string,
     input: { channel?: string; externalId?: string; variantId?: string },
   ) {
-    const product = await this.db.getRepository(Product).findOne({
-      where: { id: productId },
-      relations: { variants: true },
+    return this.db.transaction(async (tx) => {
+      const product = await tx.findOne(Product, {
+        where: { id: productId },
+        relations: { variants: true },
+      });
+      if (!product) throw new NotFoundException(problem('notFound', 'product not found'));
+      if (!product.active) {
+        throw new BadRequestException(problem('product.archived', 'this product is archived'));
+      }
+
+      const variantId = await this.resolveListingVariant(product, input.variantId);
+      await lockStock(tx, [variantId]);
+      const active = await tx.findOne(Product, {
+        where: { id: productId, active: true },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!active) {
+        throw new BadRequestException(problem('product.archived', 'this product is archived'));
+      }
+      return this.insertListing(tx, variantId, input.channel ?? '', input.externalId ?? '');
     });
-    if (!product) throw new NotFoundException(problem('notFound', 'product not found'));
-
-    const variantId = await this.resolveListingVariant(product, input.variantId);
-
-    return this.db.transaction((tx) =>
-      this.insertListing(tx, variantId, input.channel ?? '', input.externalId ?? ''),
-    );
   }
 
   /**
@@ -594,6 +674,9 @@ export class CatalogService {
     return this.db.transaction(async (tx) => {
       const variant = await tx.findOne(ProductVariant, { where: { id: variantId }, lock: { mode: 'pessimistic_write' } });
       if (!variant) throw new NotFoundException(problem('notFound', 'variant not found'));
+      if (!variant.active) {
+        throw new BadRequestException(problem('product.archived', 'this product is archived'));
+      }
       const [{ onHand }] = await tx.query(
         'SELECT COALESCE(SUM(quantity), 0)::int AS "onHand" FROM stock_movement WHERE variant_id = $1 AND location = $2',
         [variantId, location],
@@ -636,6 +719,9 @@ export class CatalogService {
     return this.db.transaction(async (tx) => {
       const variant = await tx.findOne(ProductVariant, { where: { id: variantId }, lock: { mode: 'pessimistic_write' } });
       if (!variant) throw new NotFoundException(problem('notFound', 'variant not found'));
+      if (!variant.active) {
+        throw new BadRequestException(problem('product.archived', 'this product is archived'));
+      }
       const [{ onHand }] = await tx.query('SELECT COALESCE(SUM(quantity), 0)::int AS "onHand" FROM stock_movement WHERE variant_id = $1 AND location = $2', [variantId, from]);
       if (quantity > onHand) throw new BadRequestException(problem('stock.remove', 'insufficient stock at source location', { available: Math.max(onHand, 0) }));
       const transferId = randomUUID();

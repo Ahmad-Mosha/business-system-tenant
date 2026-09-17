@@ -242,11 +242,6 @@ export class PurchasingService {
     this.validateInvoiceInput(input);
 
     const wantedVariantIds = [...new Set(input.lines.map((l) => l.variantId))];
-    const variants = await this.db.getRepository(ProductVariant).findBy({ id: In(wantedVariantIds) });
-    if (variants.length !== wantedVariantIds.length) {
-      throw new BadRequestException(problem('invoice.productsGone', 'one or more products no longer exist'));
-    }
-
     const lines = input.lines.map((l) => ({
       variantId: l.variantId,
       quantity: l.quantity,
@@ -258,6 +253,13 @@ export class PurchasingService {
     const extraCosts = round2(Number(input.extraCosts ?? 0));
 
     const invoiceId = await this.db.transaction(async (tx) => {
+      await lockStock(tx, wantedVariantIds);
+      const variants = await tx.findBy(ProductVariant, { id: In(wantedVariantIds) });
+      if (variants.length !== wantedVariantIds.length || variants.some((variant) => !variant.active)) {
+        throw new BadRequestException(
+          problem('invoice.productsGone', 'choose active products for every invoice line'),
+        );
+      }
       const supplier = await tx.findOneBy(Supplier, { id: input.supplierId, active: true });
       if (!supplier) throw new BadRequestException(problem('invoice.supplierGone', 'choose an active supplier'));
       const invoice = await tx.save(PurchaseInvoice, {
@@ -311,6 +313,15 @@ export class PurchasingService {
       invoice.lines = await tx.find(PurchaseInvoiceLine, { where: { invoiceId: id }, order: { id: 'ASC' } });
       await lockStock(tx, invoice.lines.map((l) => l.variantId));
       if (!invoice.lines.length) throw new BadRequestException(problem('invoice.noLines', 'add at least one line before posting'));
+      const activeVariants = await tx.findBy(ProductVariant, {
+        id: In(invoice.lines.map((line) => line.variantId)),
+        active: true,
+      });
+      if (activeVariants.length !== new Set(invoice.lines.map((line) => line.variantId)).size) {
+        throw new BadRequestException(
+          problem('invoice.productsGone', 'choose active products for every invoice line'),
+        );
+      }
 
       const shares = allocateExtraCosts(
         invoice.lines.map((l) => ({ lineTotal: Number(l.lineTotal), quantity: l.quantity })),

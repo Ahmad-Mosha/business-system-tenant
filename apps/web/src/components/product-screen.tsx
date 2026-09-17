@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, Pencil, Trash2, X } from 'lucide-react';
+import { Archive, Check, Pencil, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
@@ -92,6 +92,13 @@ export function ProductScreen({
     0,
   );
   const state = stockState(onHand);
+  const archiveBlockers = [
+    ...(onHand !== 0 ? [t('archiveStock', { count: Math.abs(onHand) })] : []),
+    ...(inOrders > 0 ? [t('archiveOrders', { count: inOrders })] : []),
+    ...(product.listings.length > 0 ? [t('archiveListings', { count: product.listings.length })] : []),
+    ...(product.draftPurchases > 0 ? [t('archiveDrafts', { count: product.draftPurchases })] : []),
+  ];
+  const canArchive = archiveBlockers.length === 0;
   const categoryName = !product.category
     ? te('category.NONE')
     : isOneOf(CATEGORIES, product.category)
@@ -139,21 +146,32 @@ export function ProductScreen({
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="outline" className="text-destructive hover:bg-destructive-subtle hover:text-destructive">
-                    <Trash2 />
-                    {t('delete')}
+                    <Archive />
+                    {t('archive')}
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>{t.rich('deleteTitle', { name: product.name, bdi })}</AlertDialogTitle>
-                    <AlertDialogDescription>{t('deleteDescription')}</AlertDialogDescription>
+                    <AlertDialogTitle>
+                      {canArchive
+                        ? t.rich('archiveTitle', { name: product.name, bdi })
+                        : t('archiveBlockedTitle')}
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {t(canArchive ? 'archiveDescription' : 'archiveBlockedDescription')}
+                    </AlertDialogDescription>
                   </AlertDialogHeader>
+                  {!canArchive ? (
+                    <ul className="list-disc space-y-1 ps-5 text-xs text-muted-foreground">
+                      {archiveBlockers.map((blocker) => <li key={blocker}>{blocker}</li>)}
+                    </ul>
+                  ) : null}
                   <AlertDialogFooter>
                     <AlertDialogCancel disabled={archiving}>{tc('cancel')}</AlertDialogCancel>
                     <AlertDialogAction
                       variant="destructive"
                       className="bg-destructive text-white hover:bg-destructive/90"
-                      disabled={archiving}
+                      disabled={archiving || !canArchive}
                       onClick={(e) => {
                         e.preventDefault();
                         startArchive(async () => {
@@ -163,7 +181,7 @@ export function ProductScreen({
                       }}
                     >
                       {archiving ? <Spinner /> : null}
-                      {t('deleteConfirm')}
+                      {t('archiveConfirm')}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
