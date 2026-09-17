@@ -688,12 +688,14 @@
       "salesRevenue": "Sales revenue",
       "otherExpenses": "Other expenses",
       "noCosts": "No sales or costs recorded.",
-      "noCogs": "Cost of goods sold isn’t posted to the books yet, so there’s no profit figure here.",
-      "profitTitle": "Profit",
-      "profitHint": "Revenue, cost of goods, and fees, {span}.",
-      "costOfGoods": "Cost of goods",
-      "grossProfit": "Gross profit",
-      "netProfit": "Net profit"
+      "profitTitle": "Business profit",
+      "profitHint": "Paid manual and Easy Orders: selling amount minus order shipping, {span}. Returns reverse the original figure.",
+      "sellingAmount": "Selling amount",
+      "orderShipping": "Order shipping",
+      "businessProfit": "Business profit",
+      "businessProfitEmpty": "No reconciled paid manual or Easy Orders in this period.",
+      "legacyProfitMissing": "{count, plural, one {# older order entry is excluded because its shipping snapshot is missing.} other {# older order entries are excluded because their shipping snapshots are missing.}}",
+      "expensesSeparate": "Operating expenses are tracked separately and do not change the owners’ selling amount minus shipping measure."
     },
     "treasury": {
       "description": "Cash on hand, every movement in and out of it, and cheques waiting to clear.",

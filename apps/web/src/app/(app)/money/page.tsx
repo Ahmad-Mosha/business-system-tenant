@@ -27,10 +27,10 @@ import {
 import {
   getCashFlow,
   getCashSeries,
+  getBusinessProfit,
   getFinanceOverview,
   getMoneyAccounts,
   getPeriodSummary,
-  getProfitSeries,
   type CashFlow,
 } from '@/lib/api';
 import { daysAgo, money, today } from '@/lib/format';
@@ -98,13 +98,13 @@ export default async function MoneyOverviewPage({
   // The same length of time just before, for "vs the previous 30 days".
   const before = { from: daysAgo(range.days * 2 - 1), to: daysAgo(range.days) };
 
-  const [accounts, days, flow, previous, summary, profitSeries] = await Promise.all([
+  const [accounts, days, flow, previous, summary, businessProfit] = await Promise.all([
     getMoneyAccounts(),
     getCashSeries(range.days),
     getCashFlow(from, to, range.bucket),
     getCashFlow(before.from, before.to, 'month'),
     getPeriodSummary(from, to),
-    getProfitSeries(from, to, range.bucket),
+    getBusinessProfit(from, to, range.bucket),
   ]);
 
   // Before the opening balance there were no books, not a zero balance — so
@@ -243,7 +243,7 @@ export default async function MoneyOverviewPage({
             <div className="border-t pt-4">
               <h3 className="mb-1 text-sm font-medium">{t('overview.profitTitle')}</h3>
               <p className="mb-3 text-xs text-muted-foreground">{t('overview.profitHint', { span: last })}</p>
-              <ProfitSection summary={summary} series={profitSeries} bucket={range.bucket} />
+              <ProfitSection report={businessProfit} bucket={range.bucket} />
             </div>
           </CardContent>
         </Card>
@@ -302,9 +302,7 @@ export default async function MoneyOverviewPage({
           </CardHeader>
           <CardContent className="grid gap-4">
             <BarList items={costs} empty={t('overview.noCosts')} />
-            {/* Nothing posts cost of goods sold yet, so a profit figure here would
-                be revenue minus fees — flattering and wrong. */}
-            <p className="border-t pt-3 text-xs text-muted-foreground">{t('overview.noCogs')}</p>
+            <p className="border-t pt-3 text-xs text-muted-foreground">{t('overview.expensesSeparate')}</p>
           </CardContent>
         </Card>
       </div>

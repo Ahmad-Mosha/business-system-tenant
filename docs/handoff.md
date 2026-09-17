@@ -4,7 +4,7 @@ Read this first when continuing the build in a new session. It records what is
 **actually** built and running, which is not the same as the phased plan in
 [roadmap.md](roadmap.md).
 
-Last updated: 2026-09-16.
+Last updated: 2026-09-17.
 
 ---
 
@@ -25,6 +25,10 @@ Separately paid extras affect cash rather than supplier debt. Create-and-post is
 atomic. Receipt/average costs retain four decimal places.
 `/money/expenses` records paid expenses with inline custom categories. Corrections
 void and reverse, never delete. Categories do not change the chart of accounts.
+`/money` now shows the confirmed manual/social and Easy Orders business measure:
+paid selling amount minus the order's shipping. Payment entries snapshot shipping;
+returns and payment reversals carry the same snapshot. Legacy entries without one
+are visibly excluded for reconciliation rather than backfilled with guesses.
 
 ## Toolchain (what's real)
 
@@ -87,36 +91,23 @@ port-22 rule's source to "My IP" in the AWS console. As of 2026-09-16 EC2 runs
 
 ---
 
-## Numbers audit (2026-09-15) — read before touching money
+## Money semantics — read before changing reports
 
-Traced end to end in code. Cash and stock value are correct. **Profit is not.**
-
-1. **COGS is never posted.** The `COGS` account, entry kind and the
-   `periodSummary` formula all exist, but nothing writes a `debit COGS / credit
-   INVENTORY` entry, and `OrdersService.debitStockForOrder` doesn't even set
-   `unit_cost` on SALE movements. Any gross/net profit shown treats cost of
-   goods as zero. The UI deliberately hides profit while COGS is zero.
-2. **Placeholder formula** (`ledger.service.ts`): `gross = revenue − COGS −
-   channel fees`, `net = gross − shipping − other`. Not owner-confirmed.
-3. **Revenue** posts `debit CASH / credit SALES` for `order.total` only when an
-   order's payment turns PAID (`FinanceService.recordOrderPayment`), and
-   reverses when it leaves PAID. Marking an order RETURNED does **not** reverse
-   revenue by itself — the payment status has to change too.
-4. **`product_variant.sellingPrice`** is only a pre-fill for the manual order
-   form. It never feeds revenue, stock value or profit (revenue comes from
-   `order_item.unitPrice`).
-5. **Manual stock movements** (product screen) touch the ledger only for
-   `PURCHASE` + positive quantity + a unit cost on file. Every other reason, or
-   any removal, changes the count only. The form currently allows any reason
-   with either direction (e.g. "Purchased −201") — worth constraining.
-6. **noon/Amazon** sales don't create orders or stock movements at all
-   (`Order.source` is `EASYORDERS | SOCIAL` only); noon fees/COGS aren't posted.
-7. No stock locations — one pool per variant, no warehouse vs noon split.
-
-**Blocked on the owners.** Questions are in
-[owner-questions-money-system.md](owner-questions-money-system.md) (Egyptian
-Arabic, for the meeting). Don't implement COGS posting, profit definitions,
-returns handling or noon posting until those are answered.
+- Cash and accounting account balances come only from the append-only ledger.
+  Paid orders post `CASH ← SALES`; a received paid return posts
+  `SALES → CUSTOMER_REFUNDS`, and the actual refund later posts
+  `CUSTOMER_REFUNDS → CASH`.
+- The owner's **business profit** measure is separate from accounting gross or
+  net profit. For paid manual/social and Easy Orders it is `order total − order
+  shipping`. `ledger_entry.order_shipping_cost` is the immutable snapshot used
+  by the report. Null means a legacy entry that must be reconciled, not zero.
+- Expense records post `OTHER_EXPENSE → CASH`. They remain visible beside the
+  business measure but are not subtracted from that confirmed formula.
+- Purchase goods and receipt extras capitalize into inventory. Separately paid
+  extras reduce cash; financed goods create supplier payable. Variant AVCO and
+  receipt movement costs retain four decimal places.
+- noon/Amazon report figures remain their own financial source. Deeper stock and
+  ledger integration is deferred; do not blend them into the manual/Easy measure.
 
 ---
 
@@ -128,10 +119,10 @@ returns handling or noon posting until those are answered.
   screen (`channel-listings.tsx`) and Add Product (`new-product-form.tsx`, "+"
   per channel, `formData.getAll`) now support it. Multi-**variant** products
   still can't be mapped.
-- **Profit section on `/money`** (PR #57) — under the cash-on-hand chart: stat
-  row + stacked bars (COGS, channel fees, gross profit) with a gross-margin
-  line, from `GET /finance/profit-series?from&to&bucket`. Shows the
-  "COGS not posted yet" note instead while COGS is zero (i.e. in production).
+- **Business-profit section on `/money`** — selling amount, order shipping and
+  their difference, plus a signed time series from
+  `GET /finance/business-profit?from&to&bucket`. It covers only paid
+  manual/social and Easy Orders and reverses the original values on a return.
 - **Demo seed** `apps/api/scripts/seed-demo-money.ts` — local only, needs
   `DATABASE_URL` inline, tags everything `[DEMO]`. The demo rows were deleted
   from the local DB after the 2026-09-16 meeting.
@@ -141,9 +132,10 @@ returns handling or noon posting until those are answered.
 Double-entry-lite: `ledger_account` (14 fixed accounts, seeded on boot) +
 append-only `ledger_entry` (one debit + one credit + positive amount). Every
 balance is a `SUM`. AVCO costing on purchase invoices; landed cost allocated by
-value. Spec: [money-module-build.md](money-module-build.md). Owner guide:
+value or per unit. Spec: [money-module-build.md](money-module-build.md). Owner guide:
 [دليل-الوحدة-المالية.md](دليل-الوحدة-المالية.md). Screens: `/money`,
-`/money/treasury`, `/money/purchases`, `/money/suppliers`, `/money/ledger`.
+`/money/expenses`, `/money/treasury`, `/money/purchases`, `/money/suppliers`,
+`/money/ledger`.
 Supplier "owed" is derived from invoices, not the `SUPPLIER_PAYABLE` balance.
 
 ## Orders, team, integrations

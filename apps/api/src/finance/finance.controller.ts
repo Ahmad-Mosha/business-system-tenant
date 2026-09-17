@@ -9,6 +9,12 @@ import { FinanceService } from './finance.service';
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+function isDate(value: string | undefined): value is string {
+  if (!value || !ISO_DATE.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
+}
+
 /** Cash is admin-only, same as noon's financial data. */
 @Roles('ADMIN')
 @Controller('finance')
@@ -68,14 +74,16 @@ export class FinanceController {
     return this.ledger.periodSummary(f, t);
   }
 
-  /** Revenue and cost components, bucketed over time — the overview's profit chart. */
-  @Get('profit-series')
-  profitSeries(@Query('from') from?: string, @Query('to') to?: string, @Query('bucket') bucket?: string) {
-    if (!from || !to || !ISO_DATE.test(from) || !ISO_DATE.test(to) || from > to) {
-      throw new BadRequestException('from and to are required as YYYY-MM-DD, with from on or before to');
+  /** Confirmed owner measure for manual/social and Easy Orders: sale minus order shipping. */
+  @Get('business-profit')
+  businessProfit(@Query('from') from?: string, @Query('to') to?: string, @Query('bucket') bucket?: string) {
+    if (!isDate(from) || !isDate(to) || from > to) {
+      throw new BadRequestException('from and to are required as real YYYY-MM-DD dates, with from on or before to');
     }
+    const days = (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000;
+    if (days > 366) throw new BadRequestException('business profit ranges cannot exceed 367 days');
     const b = bucket === 'week' || bucket === 'month' ? bucket : 'day';
-    return this.ledger.profitSeries(from, to, b);
+    return this.ledger.businessProfit(from, to, b);
   }
 
   /** The full ledger, filtered — where every "trace" link lands. */

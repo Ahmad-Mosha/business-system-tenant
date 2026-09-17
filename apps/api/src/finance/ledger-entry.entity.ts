@@ -62,6 +62,15 @@ export class LedgerEntry {
   @Column({ type: 'numeric', precision: 14, scale: 2 })
   amount: string;
 
+  /**
+   * Shipping captured when a manual/Easy Order sale was posted. This is a
+   * business-reporting snapshot: later edits to the order must not rewrite the
+   * profit that was recognised at payment time. Null means the legacy entry
+   * predates snapshotting and needs reconciliation; zero is a known value.
+   */
+  @Column({ name: 'order_shipping_cost', type: 'numeric', precision: 14, scale: 2, nullable: true })
+  orderShippingCost: string | null;
+
   @ManyToOne(() => LedgerAccount, { nullable: false, onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'debit_code' })
   debit: LedgerAccount;

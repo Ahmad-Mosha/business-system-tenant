@@ -85,6 +85,36 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
       assert.equal(await balance(id), restock ? 2 : 1);
     });
   }
+  await t.test('business profit snapshots shipping and reverses the original measure', async () => {
+    const [{ today }] = await db.query("SELECT (now() AT TIME ZONE 'Africa/Cairo')::date::text AS today");
+    const before = await ledger.businessProfit(today, today, 'day');
+
+    const legacy = await ledger.post({
+      amount: '99.00', debit: 'CASH', credit: 'SALES', kind: 'ORDER_SALE',
+      sourceType: 'order', sourceId: randomUUID(),
+    });
+    const withLegacy = await ledger.businessProfit(today, today, 'day');
+    assert.equal(withLegacy.sales, before.sales);
+    assert.equal(withLegacy.businessProfit, before.businessProfit);
+    assert.equal(withLegacy.unreconciledEntries, before.unreconciledEntries + 1);
+    await ledger.reverse(legacy.id);
+
+    const id = await stock(1);
+    const order = await orders.create(actor, { ...input(id), shippingCost: '5.00' });
+    await orders.updatePayment(actor, order.id, 'PAID');
+    const paid = await ledger.businessProfit(today, today, 'day');
+    assert.equal(Number(paid.sales), Number(before.sales) + 25);
+    assert.equal(Number(paid.shipping), Number(before.shipping) + 5);
+    assert.equal(Number(paid.businessProfit), Number(before.businessProfit) + 20);
+
+    await orders.updateStatus(actor, order.id, 'CONFIRMED');
+    await orders.updateStatus(actor, order.id, 'SHIPPED');
+    await orders.updateStatus(actor, order.id, 'RETURNED', { reason: 'Profit reversal test', restock: true });
+    const returned = await ledger.businessProfit(today, today, 'day');
+    assert.equal(returned.sales, before.sales);
+    assert.equal(returned.shipping, before.shipping);
+    assert.equal(returned.businessProfit, before.businessProfit);
+  });
   await t.test('moderators cannot cancel, and shipped goods require a received return', async () => {
     const id = await stock(2);
     const moderator = { ...actor, role: 'MODERATOR' as const };

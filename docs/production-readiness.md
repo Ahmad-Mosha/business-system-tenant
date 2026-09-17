@@ -1,4 +1,4 @@
-# Production readiness — 2026-09-16
+# Production readiness — 2026-09-17
 
 This is the active implementation checklist. `handoff.md` describes the deployed
 baseline; older architecture proposals are not the implementation.
@@ -47,8 +47,12 @@ baseline; older architecture proposals are not the implementation.
    categories, date/category/search filters, a ledger link and reasoned voids.
    Requests are idempotent and voids retain/reverse the original. Categories are
    independent of accounting accounts; purchases stay in landed cost, not expenses.
-6. **Business profit.** Replace the obsolete COGS gate with the confirmed business
-   measure, with clear channel scope and no double-counted shipping.
+6. **Business profit — implemented.** Paid manual/social and Easy Orders snapshot
+   their order shipping on the sale ledger entry. The dashboard reports selling
+   amount minus that shipping and returns/reversals carry the original snapshot,
+   so later order edits cannot change history. Operating expenses stay separate.
+   Legacy entries with no shipping snapshot are excluded and counted for explicit
+   reconciliation rather than assigned a guessed value. Cairo dates drive buckets.
 7. **Daily operations UX.** Bulk assignment with visible-page selection, clear
    selection scope, authorization and atomic server writes. Check English/Arabic,
    normal laptop and wide desktop layouts, states and feedback.
