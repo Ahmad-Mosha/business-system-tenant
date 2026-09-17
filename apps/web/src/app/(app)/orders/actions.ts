@@ -35,6 +35,24 @@ export async function assignOrder(orderId: string, assignedToId: string | null) 
   return change(orderId, `/orders/${orderId}/assignment`, { assignedToId });
 }
 
+export type BulkAssignmentResult =
+  | { ok: true; updated: number }
+  | { ok: false; message: string };
+
+export async function bulkAssignOrders(
+  orderIds: string[],
+  assignedToId: string | null,
+): Promise<BulkAssignmentResult> {
+  const result = await apiRequest<{ updated: number }>('/orders/assignment/bulk', 'PATCH', {
+    orderIds,
+    assignedToId,
+  });
+  if (!result.ok) return result;
+  revalidatePath('/orders');
+  for (const orderId of orderIds) revalidatePath(`/orders/${orderId}`);
+  return { ok: true, updated: result.data.updated };
+}
+
 export type CreateOrderState = { status: 'idle' } | { status: 'error'; message: string };
 
 /** What the order form sends — the same for a new order and an edit. */

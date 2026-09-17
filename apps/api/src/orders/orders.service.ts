@@ -22,9 +22,11 @@ import {
 } from './order.entity';
 import { problem } from '../problem';
 import { lockStock } from '../inventory/stock-lock';
+import { User } from '../auth/user.entity';
 
 /** Egyptian mobile: 01[0125] + 8 digits, with or without a +20/0020/20 prefix. */
 const EGYPT_PHONE = /^(?:\+?20|0)?1[0125]\d{8}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const GOVERNORATES = new Set<string>(EGYPT_GOVERNORATES);
 
 export interface CreateOrderInput {
@@ -262,7 +264,9 @@ export class OrdersService implements OnModuleInit {
   }
 
   async assign(orderId: string, assigneeId: string | null, actor: SessionUser) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException();
     return this.db.transaction(async (tx) => {
+      await this.assertAssignee(tx, assigneeId);
       const order = await tx.findOne(Order, { where: { id: orderId }, lock: { mode: 'pessimistic_write' } });
       if (!order) throw new NotFoundException(problem('notFound', 'order not found'));
       const previous = order.assignedToId;
@@ -274,6 +278,76 @@ export class OrdersService implements OnModuleInit {
       await this.record(tx, orderId, 'ASSIGNED', previous, assigneeId ?? 'unassigned', actor);
       return order;
     });
+  }
+
+  /**
+   * Assigns every selected row as one operation. Locks in UUID order so two
+   * overlapping bulk requests cannot deadlock, and fails the whole selection
+   * if any order or moderator is no longer available.
+   */
+  async bulkAssign(orderIds: string[], assigneeId: string | null, actor: SessionUser) {
+    if (actor.role !== 'ADMIN') throw new ForbiddenException();
+    if (!Array.isArray(orderIds) || orderIds.length === 0 || orderIds.length > 200) {
+      throw new BadRequestException(problem('order.bulkSelection', 'select between 1 and 200 orders'));
+    }
+    const unique = [...new Set(orderIds)];
+    if (unique.some((id) => !UUID.test(id))) {
+      throw new BadRequestException(problem('order.bulkSelection', 'one or more selected order ids are invalid'));
+    }
+
+    return this.db.transaction(async (tx) => {
+      await this.assertAssignee(tx, assigneeId);
+      const orders = await tx
+        .getRepository(Order)
+        .createQueryBuilder('order')
+        .where('order.id IN (:...ids)', { ids: unique })
+        .orderBy('order.id', 'ASC')
+        .setLock('pessimistic_write')
+        .getMany();
+      if (orders.length !== unique.length) {
+        throw new BadRequestException(problem('order.bulkMissing', 'one or more selected orders no longer exist'));
+      }
+
+      const changed: Array<{ order: Order; previous: string | null }> = [];
+      for (const order of orders) {
+        if (order.assignedToId === assigneeId) continue;
+        const previous = order.assignedToId;
+        order.assignedToId = assigneeId;
+        if (assigneeId && order.status === 'NEW') order.status = 'ASSIGNED';
+        if (!assigneeId && order.status === 'ASSIGNED') order.status = 'NEW';
+        changed.push({ order, previous });
+      }
+
+      if (changed.length) {
+        await tx.save(changed.map((item) => item.order));
+        await tx.insert(
+          OrderEvent,
+          changed.map(({ order, previous }) => ({
+            orderId: order.id,
+            type: 'ASSIGNED' as const,
+            fromValue: previous,
+            toValue: assigneeId ?? 'unassigned',
+            actorId: actor.id,
+            actorName: actor.name,
+          })),
+        );
+      }
+      return { updated: changed.length, selected: unique.length };
+    });
+  }
+
+  private async assertAssignee(tx: EntityManager, assigneeId: string | null) {
+    if (!assigneeId) return;
+    if (!UUID.test(assigneeId)) {
+      throw new BadRequestException(problem('order.assignee', 'choose an active moderator'));
+    }
+    const assignee = await tx.findOne(User, {
+      where: { id: assigneeId },
+      select: { id: true, active: true, role: true },
+    });
+    if (!assignee?.active || assignee.role !== 'MODERATOR') {
+      throw new BadRequestException(problem('order.assignee', 'choose an active moderator'));
+    }
   }
 
   /**
