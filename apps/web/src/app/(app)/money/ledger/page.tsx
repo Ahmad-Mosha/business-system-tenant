@@ -1,5 +1,6 @@
 import { ArrowRight, BookText } from 'lucide-react';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { Fragment } from 'react';
@@ -87,6 +88,9 @@ export default async function LedgerPage({
     const qs = next.toString();
     return qs ? `/money/ledger?${qs}` : '/money/ledger';
   };
+  const lastPage = Math.max(Math.ceil(total / PAGE_SIZE), 1);
+  if (page > lastPage) redirect(pageHref(lastPage));
+
   const accountHref = (c: string) => {
     const next = new URLSearchParams(keep);
     next.set('code', c);
