@@ -63,9 +63,10 @@ development keeps its zero-configuration defaults.
   ```
 - Entities, naming strategy and migration glob are shared between the app and
   the CLI in `src/database/orm-options.ts` + `entities.ts`.
-- **`order_number_seq` is not in any migration** — `OrdersService.onModuleInit`
-  creates it (`START 1000`). Any fresh database copied from real data must have
-  it `setval`'d to the last used number, or order numbers restart at PM-1000.
+- `order_number_seq` and order-number uniqueness are migration-owned. The
+  integrity migration only moves the sequence forward to the highest existing
+  `PM-<number>`; it does not rewrite orders. Duplicate historical numbers make
+  the transaction fail unchanged so they can be reconciled explicitly.
 
 ## Environments
 
