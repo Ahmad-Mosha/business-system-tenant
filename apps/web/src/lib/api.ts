@@ -305,6 +305,7 @@ export interface ProductDetail {
   name: string;
   category: string | null;
   discovered: boolean;
+  draftPurchases: number;
   variants: Array<{
     id: string;
     name: string;
