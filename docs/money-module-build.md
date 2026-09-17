@@ -147,8 +147,9 @@ A posted invoice is immutable; a mistake is a new reversing invoice.
   time on sales (that value **is** COGS). Period COGS = `Σ(−quantity · unit_cost)`
   over `SALE` rows.
 - **`product_variant.unit_cost`**: keep the column name, its meaning becomes
-  *moving-average cost*. Manual edits still allowed (Admin), recorded as an
-  `ADJUSTMENT` movement so the change is traceable.
+  *moving-average cost*. Manual edits are Admin-only, require a reason, record
+  an `ADJUSTMENT` movement, and post the matching value change between
+  `INVENTORY` and `INVENTORY_ADJUSTMENT`.
 
 > `ponytail:` AVCO assumes movements are costed in `occurred_at` order. A
 > backdated receipt inserted before existing sales would need a recost pass —
