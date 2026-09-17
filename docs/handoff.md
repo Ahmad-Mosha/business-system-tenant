@@ -143,7 +143,7 @@ port-22 rule's source to "My IP" in the AWS console. As of 2026-09-16 EC2 runs
 
 ## Money module
 
-Double-entry-lite: `ledger_account` (14 fixed accounts, seeded on boot) +
+Double-entry-lite: `ledger_account` (16 fixed accounts, seeded on boot) +
 append-only `ledger_entry` (one debit + one credit + positive amount). Every
 balance is a `SUM`. AVCO costing on purchase invoices; landed cost allocated by
 value or per unit. Spec: [money-module-build.md](money-module-build.md). Owner guide:
@@ -151,6 +151,9 @@ value or per unit. Spec: [money-module-build.md](money-module-build.md). Owner g
 `/money/expenses`, `/money/treasury`, `/money/purchases`, `/money/suppliers`,
 `/money/ledger`.
 Supplier "owed" is derived from invoices, not the `SUPPLIER_PAYABLE` balance.
+Manual quantity and average-cost corrections post against the dedicated
+`INVENTORY_ADJUSTMENT` account. Purchased stock can only enter through a
+purchase invoice so supplier, landed cost, stock, and money stay atomic.
 
 ## Orders, team, integrations
 

@@ -42,7 +42,9 @@ baseline; older architecture proposals are not the implementation.
    credit CASH and count as settled, so supplier debt includes only what is owed.
    Supplier creation works inline even with no existing suppliers. Create-and-post
    is one database transaction; failed posting cannot leave duplicate hidden drafts.
-   Manual cost corrections are locked and create an audit movement.
+   Manual cost corrections are locked, require a reason, create an audit
+   movement, and post a balanced inventory revaluation. Generic stock changes
+   cannot be labelled as purchases; bought stock goes through purchase invoices.
 5. **Expenses — implemented.** Dedicated paid-expense records with inline custom
    categories, date/category/search filters, a ledger link and reasoned voids.
    Requests are idempotent and voids retain/reverse the original. Categories are
@@ -78,8 +80,6 @@ baseline; older architecture proposals are not the implementation.
     return/refund payment state.
 
 Further audit findings to resolve as the associated flow is changed:
-- Product cost edits bypass valuation history. Stock removal reasons allow
-  inconsistent direction; manual purchase uses the old average as receipt cost.
 - Several list totals rely on a window count and show zero on an empty later page.
 - Bosta collection reconciliation and historical marketplace stock posting remain
   deferred; delivery must never imply cash received.
