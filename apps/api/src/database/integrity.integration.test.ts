@@ -72,6 +72,27 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
       db.query('UPDATE customer_order SET order_number = $1 WHERE id = $2', [first.orderNumber, second.id]),
     );
   });
+  await t.test('empty later pages retain their filtered totals', async () => {
+    const variantId = await stock(1);
+    const customerName = `Pagination ${randomUUID()}`;
+    await orders.create(actor, { ...input(variantId), customerName });
+    const orderPage = await orders.list(actor, { search: customerName, limit: 20, offset: 20 });
+    assert.equal(orderPage.orders.length, 0);
+    assert.equal(orderPage.total, 1);
+
+    const sourceId = randomUUID();
+    await ledger.post({
+      amount: '1',
+      debit: 'CASH',
+      credit: 'OWNER_CAPITAL',
+      kind: 'CASH_DEPOSIT',
+      sourceType: 'pagination-test',
+      sourceId,
+    });
+    const ledgerPage = await ledger.entries({ sourceType: 'pagination-test', sourceId, limit: 30, offset: 30 });
+    assert.equal(ledgerPage.entries.length, 0);
+    assert.equal(ledgerPage.total, 1);
+  });
   await t.test('concurrent Easy Orders deliveries create and process one order', async () => {
     const externalId = randomUUID();
     const payload = {
