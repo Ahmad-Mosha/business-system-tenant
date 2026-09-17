@@ -29,6 +29,10 @@ void and reverse, never delete. Categories do not change the chart of accounts.
 paid selling amount minus the order's shipping. Payment entries snapshot shipping;
 returns and payment reversals carry the same snapshot. Legacy entries without one
 are visibly excluded for reconciliation rather than backfilled with guesses.
+Admins can now select the orders visible on the current page and assign or
+unassign them together. The API validates the full selection and moderator before
+making one atomic change, and each changed order keeps its assignment audit event.
+The assignee filter and page-scoped selection work in both Arabic and English.
 
 ## Toolchain (what's real)
 
