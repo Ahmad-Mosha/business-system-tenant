@@ -216,7 +216,7 @@
         "overpay": "{scope, select, invoice {Only {owed} is left on this invoice} other {Only {owed} is owed to {supplier}}} — you tried to pay {paid}."
       },
       "invoice": {
-        "productsGone": "One or more products no longer exist.",
+        "productsGone": "Choose active products for every invoice line.",
         "postedDelete": "A posted invoice can’t be deleted — reverse it instead.",
         "posted": "This invoice is already posted.",
         "noLines": "Add at least one line before posting.",
@@ -232,7 +232,16 @@
       "stock": {
         "remove": "{available, plural, =0 {Nothing on hand to remove.} other {Only # on hand — you can remove up to #.}}",
         "direction": "Choose a reason that matches adding or removing stock.",
-        "transfer": "Choose different warehouses and a positive whole quantity."
+        "transfer": "Choose different warehouses and a positive whole quantity.",
+        "costReason": "Enter a reason for this unit-cost correction.",
+        "usePurchaseInvoice": "Record bought stock with a purchase invoice."
+      },
+      "product": {
+        "archived": "This product is archived.",
+        "archiveStock": "Reconcile its {count} remaining stock units before archiving.",
+        "archiveOrders": "Finish open orders containing {count} units before archiving.",
+        "archiveListings": "Unlink its {count} sales-channel listings before archiving.",
+        "archiveDrafts": "Finish or delete its {count} draft purchase invoices before archiving."
       },
       "sync": {
         "notConfigured": "The Easy Orders connection isn’t set up.",
@@ -524,10 +533,16 @@
     "back": "Back to inventory",
     "description": "Stock, cost and the channels that sell it.",
     "edit": "Edit",
-    "delete": "Delete",
-    "deleteTitle": "Delete “<bdi>{name}</bdi>”?",
-    "deleteDescription": "It leaves Inventory. Its order and stock history is kept, not erased — nothing that already references this product changes.",
-    "deleteConfirm": "Delete product",
+    "archive": "Archive",
+    "archiveTitle": "Archive “<bdi>{name}</bdi>”?",
+    "archiveDescription": "It leaves the working inventory. Its order and stock history remains intact.",
+    "archiveConfirm": "Archive product",
+    "archiveBlockedTitle": "This product is still active",
+    "archiveBlockedDescription": "Resolve these items before archiving it:",
+    "archiveStock": "Reconcile {count} units still in stock.",
+    "archiveOrders": "Finish open orders containing {count} units.",
+    "archiveListings": "Unlink {count} sales-channel listings.",
+    "archiveDrafts": "Finish or delete {count} draft purchase invoices.",
     "updated": "Product updated.",
     "details": "Product details",
     "name": "Name",
