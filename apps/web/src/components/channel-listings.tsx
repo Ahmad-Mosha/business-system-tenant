@@ -65,10 +65,13 @@ function ChannelSection({
   const t = useTranslations('product');
   const tr = useTranslations();
   const name = tr(`enums.channel.${channel}`);
-  const nextDraftId = useRef(0);
-  const [drafts, setDrafts] = useState<number[]>(listings.length === 0 ? [nextDraftId.current++] : []);
+  const nextDraftId = useRef(1);
+  const [drafts, setDrafts] = useState<number[]>(listings.length === 0 ? [0] : []);
 
-  const addDraft = () => setDrafts((d) => [...d, nextDraftId.current++]);
+  const addDraft = () => {
+    const id = nextDraftId.current++;
+    setDrafts((d) => [...d, id]);
+  };
   const removeDraft = (id: number) => setDrafts((d) => d.filter((x) => x !== id));
 
   return (
