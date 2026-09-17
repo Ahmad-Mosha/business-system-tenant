@@ -81,9 +81,12 @@ baseline; older architecture proposals are not the implementation.
     arriving before their order fail visibly for retry. Quantities, dates and
     amounts are validated before writes, and late paid events cannot replace a
     return/refund payment state.
+11. **Pagination integrity — implemented.** Orders and ledger entries preserve
+    their filtered totals when an old URL points beyond the last page. All
+    paginated operation screens return the user to the final valid page instead
+    of showing a false empty state or an invalid item range.
 
 Further audit findings to resolve as the associated flow is changed:
-- Several list totals rely on a window count and show zero on an empty later page.
 - Bosta collection reconciliation and historical marketplace stock posting remain
   deferred; delivery must never imply cash received.
 

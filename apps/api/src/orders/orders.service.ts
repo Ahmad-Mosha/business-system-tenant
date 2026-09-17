@@ -110,9 +110,23 @@ export class OrdersService {
       params,
     );
 
+    let total = rows[0]?.totalCount ?? 0;
+    // A window count only exists when the requested page has a row. Keep the
+    // normal one-query path, but recover the real filtered total when an old
+    // bookmark points beyond the final page.
+    if (rows.length === 0 && offset > 0) {
+      const [count] = await this.db.query(
+        `SELECT count(*)::int AS total
+         FROM customer_order o
+         ${finalSql}`,
+        params,
+      );
+      total = count.total;
+    }
+
     return {
       orders: rows,
-      total: rows[0]?.totalCount ?? 0,
+      total,
       limit,
       offset,
     };

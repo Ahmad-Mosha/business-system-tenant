@@ -23,6 +23,8 @@ until an owner reconciles actual noon holdings. No quantities are guessed.
 Products can be archived only after stock, open orders, channel listings and
 draft purchases are cleared. A sellable return reactivates an archived product
 so returned inventory cannot disappear from the working list.
+Paginated operation lists keep accurate filtered totals on empty later pages and
+redirect stale page URLs to the final valid page.
 Purchase entry supports by-value/per-unit landed costs and inline supplier creation.
 Separately paid extras affect cash rather than supplier debt. Create-and-post is
 atomic. Receipt/average costs retain four decimal places.
