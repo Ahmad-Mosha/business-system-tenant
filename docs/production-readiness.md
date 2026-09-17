@@ -53,9 +53,12 @@ baseline; older architecture proposals are not the implementation.
    so later order edits cannot change history. Operating expenses stay separate.
    Legacy entries with no shipping snapshot are excluded and counted for explicit
    reconciliation rather than assigned a guessed value. Cairo dates drive buckets.
-7. **Daily operations UX.** Bulk assignment with visible-page selection, clear
-   selection scope, authorization and atomic server writes. Check English/Arabic,
-   normal laptop and wide desktop layouts, states and feedback.
+7. **Daily operations UX — bulk assignment implemented.** Admins can select all
+   visible orders or individual rows, then assign or unassign them together.
+   Selection resets when the filter or page changes, so hidden orders are never
+   included. The server validates the full set and active moderator before one
+   atomic write and records an audit event for each changed order. Assignee
+   filtering, feedback, Arabic RTL and English were checked at desktop widths.
 
 Further audit findings to resolve as the associated flow is changed:
 - Easy Orders failed delivery fingerprints currently prevent automatic retry;

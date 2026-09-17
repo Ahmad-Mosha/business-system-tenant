@@ -8,6 +8,7 @@ import { ormOptions } from './orm-options';
 import { LedgerService } from '../finance/ledger.service';
 import { FinanceService } from '../finance/finance.service';
 import { OrdersService } from '../orders/orders.service';
+import { Order } from '../orders/order.entity';
 import { PurchasingService } from '../purchasing/purchasing.service';
 import { CatalogService } from '../catalog/catalog.service';
 import { Product } from '../catalog/product.entity';
@@ -61,6 +62,37 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     await assert.rejects(orders.update(actor, order.id, input(id)));
     await Promise.all([orders.updateStatus(actor, order.id, 'CANCELLED'), orders.updateStatus(actor, order.id, 'CANCELLED')]);
     assert.equal(await balance(id), 1);
+  });
+  await t.test('bulk assignment is authorized, validated and atomic', async () => {
+    const moderator = await db.getRepository(User).save({
+      email: `bulk-${randomUUID()}@example.invalid`, name: 'Bulk moderator', passwordHash: 'unused', role: 'MODERATOR',
+    });
+    const inactive = await db.getRepository(User).save({
+      email: `inactive-${randomUUID()}@example.invalid`, name: 'Inactive moderator', passwordHash: 'unused',
+      role: 'MODERATOR', active: false,
+    });
+    const id = await stock(2);
+    const first = await orders.create(actor, input(id));
+    const second = await orders.create(actor, input(id));
+
+    const result = await orders.bulkAssign([second.id, first.id, first.id], moderator.id, actor);
+    assert.deepEqual(result, { updated: 2, selected: 2 });
+    const assigned = await db.query(
+      'SELECT id, assigned_to_id AS "assignedToId", status FROM customer_order WHERE id = ANY($1) ORDER BY id',
+      [[first.id, second.id]],
+    );
+    assert.ok(assigned.every((order: { assignedToId: string; status: string }) =>
+      order.assignedToId === moderator.id && order.status === 'ASSIGNED'));
+    assert.equal(Number((await db.query(
+      "SELECT count(*) AS n FROM order_event WHERE order_id = ANY($1) AND type = 'ASSIGNED'",
+      [[first.id, second.id]],
+    ))[0].n), 2);
+    assert.equal((await orders.bulkAssign([first.id, second.id], moderator.id, actor)).updated, 0);
+
+    await assert.rejects(orders.bulkAssign([first.id, randomUUID()], null, actor));
+    assert.equal((await db.getRepository(Order).findOneByOrFail({ id: first.id })).assignedToId, moderator.id);
+    await assert.rejects(orders.bulkAssign([first.id], inactive.id, actor));
+    await assert.rejects(orders.bulkAssign([first.id], null, { ...actor, role: 'MODERATOR' }));
   });
   for (const restock of [true, false]) {
     await t.test(`paid return preserves cash until refund; restock=${restock}`, async () => {
