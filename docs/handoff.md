@@ -33,6 +33,10 @@ Admins can now select the orders visible on the current page and assign or
 unassign them together. The API validates the full selection and moderator before
 making one atomic change, and each changed order keeps its assignment audit event.
 The assignee filter and page-scoped selection work in both Arabic and English.
+Production startup now rejects a missing or short JWT signing secret. An empty
+production user table also rejects missing, short, or known development seed
+passwords instead of creating public accounts with fallback credentials. Local
+development keeps its zero-configuration defaults.
 
 ## Toolchain (what's real)
 

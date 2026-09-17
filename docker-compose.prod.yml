@@ -35,8 +35,8 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       API_PORT: 3001
       JWT_SECRET: ${JWT_SECRET}
-      # Real credentials for the two named accounts — never left at the dev
-      # defaults on a publicly reachable box. See auth.service.ts.
+      # Initial account credentials. An empty production database will refuse
+      # to boot unless both meet the requirements in .env.prod.example.
       ADMIN_SEED_PASSWORD: ${ADMIN_SEED_PASSWORD}
       MODERATOR_SEED_PASSWORD: ${MODERATOR_SEED_PASSWORD}
       EASY_ORDER_KEY: ${EASY_ORDER_KEY}
