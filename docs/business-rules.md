@@ -104,16 +104,14 @@ shipping, customs, clearance — must end up reflected in what a unit actually
 cost. The owner's example: a shipment of 100 pieces with 5,000 EGP of shipping
 needs that 5,000 fairly distributed across the goods.
 
-**[Open] — the single most consequential accounting decision.** How unit cost is
-computed when purchase costs differ: weighted average, FIFO, or per-batch cost.
-**[Open]** How landed costs are allocated: per unit, by value, by weight, or
-another rule.
+**[Confirmed implementation] Unit cost uses weighted average (AVCO).** Landed
+cost can be allocated by goods value or per unit. Shipping, customs and similar
+receipt costs capitalize into stock; costs paid separately reduce cash and are
+not added to supplier debt.
 
-Both are required before profit can be calculated at all, and both are
-explicitly the business's call, not a technical default.
-
-**[Open]** Supplier records, purchase invoices, payment terms, returns to
-supplier, and supplier-direct-to-customer shipping. None are defined.
+**[Implemented] Supplier records and purchase invoices** support cash/credit,
+inline supplier creation and traceable supplier payments. Supplier returns and
+supplier-direct-to-customer shipping remain undefined.
 
 ---
 
@@ -216,10 +214,17 @@ owner. It is not part of daily operations or moderator work.
 or similar). Salaries may become an expense later as the team grows. Do not
 model overheads speculatively.
 
-**[Open]** The exact definitions, for this business, of **cash**, **stock
-value**, **gross profit**, **net profit**, and **margin** — including which
-costs belong in which. Analytics cannot be trusted until these are pinned down.
-**[Open]** Which manual financial transaction types are permitted.
+**[Confirmed] For manual/social and Easy Orders, business profit is the paid
+selling amount minus that order's shipping.** Returns reverse the original
+sale and shipping snapshot. This owner measure is separate from accounting
+gross/net profit and from cash flow. Amazon and noon continue to use their own
+report figures until deeper integration is built.
+
+**[Confirmed] Manual paid expenses are explicit records with user-created
+categories.** Purchase shipping/customs belong to landed stock cost and must not
+be entered again as operating expenses.
+
+**[Open]** Which additional free-form cash voucher types are permitted.
 **[Open]** Whether a bank account is tracked in the system at all.
 
 ---
@@ -249,4 +254,6 @@ recorded events.
 The questions it has to answer: what sells, on which channel, what makes money,
 what loses money, what gets returned, and where the operational problems are.
 
-Blocked until the profit definitions in §7 are settled.
+The confirmed manual/Easy Orders measure may be reported now. Cross-channel
+profit comparisons remain deferred until noon/Amazon integration preserves
+their own report figures and attribution.
