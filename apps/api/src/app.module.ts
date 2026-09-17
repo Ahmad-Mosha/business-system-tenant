@@ -1,13 +1,14 @@
 import { ExpensesController } from './finance/expenses.controller';
 import { ExpensesService } from './finance/expenses.service';
 import { Module, type OnModuleInit } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthController } from './auth/auth.controller';
 import { AuthGuard } from './auth/auth.guard';
 import { AuthService } from './auth/auth.service';
+import { resolveJwtSecret } from './auth/bootstrap-config';
 import { CatalogController } from './catalog/catalog.controller';
 import { CatalogService } from './catalog/catalog.service';
 import { ENTITIES } from './database/entities';
@@ -33,10 +34,17 @@ import { NoonReportingService } from './reporting/noon-reporting.service';
     // The API runs with its own directory as cwd, so the repo-root .env is
     // named explicitly; a local apps/api/.env still wins if one exists.
     ConfigModule.forRoot({ isGlobal: true, envFilePath: ['.env', '../../.env'] }),
-    JwtModule.register({
+    JwtModule.registerAsync({
       global: true,
-      secret: process.env.JWT_SECRET ?? 'dev-only-insecure-secret',
-      signOptions: { expiresIn: '12h' },
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        secret: resolveJwtSecret({
+          NODE_ENV: config.get<string>('NODE_ENV'),
+          JWT_SECRET: config.get<string>('JWT_SECRET'),
+        }),
+        signOptions: { expiresIn: '12h' },
+      }),
     }),
     TypeOrmModule.forRoot({
       type: 'postgres',
@@ -86,7 +94,7 @@ export class AppModule implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    await this.auth.seedDevUsers();
+    await this.auth.seedInitialUsers();
     await this.ledger.seedAccounts();
   }
 }
