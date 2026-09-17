@@ -70,11 +70,14 @@ baseline; older architecture proposals are not the implementation.
    `PM-<number>` after a restore. A database unique index prevents duplicates
    across manual and Easy Orders ingestion. Existing orders are never rewritten;
    a historical duplicate aborts and rolls back the migration for reconciliation.
+10. **Easy Orders ingestion integrity — implemented.** Raw deliveries are stored
+    first and serialized per external order. Concurrent identical or changed
+    redeliveries process once; failed fingerprints remain retryable. Statuses
+    arriving before their order fail visibly for retry. Quantities, dates and
+    amounts are validated before writes, and late paid events cannot replace a
+    return/refund payment state.
 
 Further audit findings to resolve as the associated flow is changed:
-- Easy Orders failed delivery fingerprints currently prevent automatic retry;
-  concurrent deliveries can hit uniqueness errors. Late paid notifications can
-  overwrite a refund. Validate payload quantities and amounts.
 - Product cost edits bypass valuation history. Stock removal reasons allow
   inconsistent direction; manual purchase uses the old average as receipt cost.
 - Several list totals rely on a window count and show zero on an empty later page.
