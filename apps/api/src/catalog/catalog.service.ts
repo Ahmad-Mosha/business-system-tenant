@@ -353,31 +353,83 @@ export class CatalogService {
 
   async updateVariant(
     variantId: string,
-    patch: { sku?: string | null; unitCost?: string | null; sellingPrice?: string | null; name?: string },
+    patch: {
+      sku?: string | null;
+      unitCost?: string | null;
+      sellingPrice?: string | null;
+      name?: string;
+      costReason?: string;
+    },
     userId?: string,
   ) {
     return this.db.transaction(async (tx) => {
-    const variant = await tx.findOne(ProductVariant, { where: { id: variantId }, lock: { mode: 'pessimistic_write' } });
-    if (!variant) throw new NotFoundException(problem('notFound', 'variant not found'));
+      const variant = await tx.findOne(ProductVariant, {
+        where: { id: variantId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!variant) throw new NotFoundException(problem('notFound', 'variant not found'));
 
-    for (const [field, value] of [
-      ['unitCost', patch.unitCost],
-      ['sellingPrice', patch.sellingPrice],
-    ] as const) {
-      if (value !== undefined && value !== null && value !== '' && !(field === 'unitCost' ? /^\d+(\.\d{1,4})?$/ : MONEY).test(value)) {
-        throw new BadRequestException(`${field} must be an amount like 120.50`);
+      for (const [field, value] of [
+        ['unitCost', patch.unitCost],
+        ['sellingPrice', patch.sellingPrice],
+      ] as const) {
+        if (
+          value !== undefined &&
+          value !== null &&
+          value !== '' &&
+          !(field === 'unitCost' ? /^\d+(\.\d{1,4})?$/ : MONEY).test(value)
+        ) {
+          throw new BadRequestException(`${field} must be an amount like 120.50`);
+        }
       }
-    }
 
-    if (patch.sku !== undefined) variant.sku = patch.sku?.trim() || null;
-    if (patch.name !== undefined) variant.name = patch.name.trim() || 'Default';
-    if (patch.unitCost !== undefined && Number(patch.unitCost) !== Number(variant.unitCost)) {
-      await tx.insert(StockMovement, { variantId, quantity: 0, reason: 'ADJUSTMENT', unitCost: patch.unitCost || null,
-        createdById: userId ?? null, note: `Unit cost corrected from ${variant.unitCost ?? 'unknown'} to ${patch.unitCost || 'unknown'}` });
-      variant.unitCost = patch.unitCost || null;
-    }
-    if (patch.sellingPrice !== undefined) variant.sellingPrice = patch.sellingPrice || null;
-    return tx.save(variant);
+      if (patch.sku !== undefined) variant.sku = patch.sku?.trim() || null;
+      if (patch.name !== undefined) variant.name = patch.name.trim() || 'Default';
+      if (patch.unitCost !== undefined) {
+        const nextCost = patch.unitCost || null;
+        const costChanged =
+          (variant.unitCost === null) !== (nextCost === null) ||
+          (variant.unitCost !== null && nextCost !== null && Number(variant.unitCost) !== Number(nextCost));
+        if (costChanged) {
+          const correctionReason = patch.costReason?.trim();
+          if (!userId || !correctionReason || correctionReason.length > 500) {
+            throw new BadRequestException(
+              problem('stock.costReason', 'enter a reason for this unit-cost correction'),
+            );
+          }
+
+          const [{ onHand }] = await tx.query(
+            'SELECT COALESCE(SUM(quantity), 0)::int AS "onHand" FROM stock_movement WHERE variant_id = $1',
+            [variantId],
+          );
+          const oldCost = Number(variant.unitCost ?? 0);
+          const newCost = Number(nextCost ?? 0);
+          const movementId = randomUUID();
+          const note = `Unit cost corrected from ${variant.unitCost ?? 'unknown'} to ${nextCost ?? 'unknown'} — ${correctionReason}`;
+          await tx.insert(StockMovement, {
+            id: movementId,
+            variantId,
+            quantity: 0,
+            reason: 'ADJUSTMENT',
+            unitCost: nextCost,
+            avgCostAfter: nextCost,
+            createdById: userId,
+            sourceType: 'cost_correction',
+            sourceId: movementId,
+            note,
+          });
+          await this.finance.recordInventoryAdjustment(
+            tx,
+            Number(onHand) * (newCost - oldCost),
+            movementId,
+            userId,
+            note,
+          );
+          variant.unitCost = nextCost;
+        }
+      }
+      if (patch.sellingPrice !== undefined) variant.sellingPrice = patch.sellingPrice || null;
+      return tx.save(variant);
     });
   }
 
@@ -522,8 +574,19 @@ export class CatalogService {
     location: StockLocation = 'WAREHOUSE',
   ) {
     if (!STOCK_LOCATIONS.includes(location)) throw new BadRequestException('unknown stock location');
-    if ((['PURCHASE', 'RETURN'].includes(reason) && quantity < 0) || (reason === 'DAMAGE' && quantity > 0) || ['SALE', 'TRANSFER'].includes(reason)) {
-      throw new BadRequestException(problem('stock.direction', 'this reason does not match the stock direction'));
+    if (reason === 'PURCHASE') {
+      throw new BadRequestException(
+        problem('stock.usePurchaseInvoice', 'record purchased stock with a purchase invoice'),
+      );
+    }
+    if (
+      ['SALE', 'TRANSFER'].includes(reason) ||
+      (reason === 'RETURN' && quantity <= 0) ||
+      (reason === 'DAMAGE' && quantity >= 0)
+    ) {
+      throw new BadRequestException(
+        problem('stock.direction', 'this reason does not match the stock direction'),
+      );
     }
     if (!Number.isInteger(quantity) || quantity === 0) {
       throw new BadRequestException('quantity must be a non-zero whole number');
@@ -540,14 +603,26 @@ export class CatalogService {
         throw new BadRequestException(problem('stock.remove', refused, { available: Math.max(onHand, 0) }));
       }
 
-      const result = await this.addMovement(tx, variantId, quantity, reason, userId, note, variant.unitCost, location);
-      // A purchase converts cash into stock — record the cash side too, same
-      // transaction, so the two ledgers can never drift apart. No cost on
-      // file means no known cash amount, so it's skipped rather than guessed.
-      if (reason === 'PURCHASE' && quantity > 0 && variant.unitCost) {
+      const result = await this.addMovement(
+        tx,
+        variantId,
+        quantity,
+        reason,
+        userId,
+        note,
+        variant.unitCost,
+        location,
+      );
+      if (variant.unitCost) {
         const movementId = result.identifiers[0]?.id as string;
-        const amount = (quantity * Number(variant.unitCost)).toFixed(2);
-        await this.finance.recordPurchase(tx, amount, movementId);
+        await this.finance.recordInventoryAdjustment(
+          tx,
+          quantity * Number(variant.unitCost),
+          movementId,
+          userId,
+          note?.trim() || `${reason.toLowerCase()} stock correction`,
+          quantity < 0 ? 'STOCK_LOSS' : 'ADJUSTMENT',
+        );
       }
       return result;
     });

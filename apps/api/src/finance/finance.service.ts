@@ -159,6 +159,37 @@ export class FinanceService {
     );
   }
 
+  /**
+   * Keeps the journal aligned with a hand-entered stock or average-cost
+   * correction. A positive value enters inventory; a negative value writes
+   * inventory down. The dedicated counter-account makes operational gains and
+   * losses visible without mixing them into cash expenses.
+   */
+  recordInventoryAdjustment(
+    tx: EntityManager,
+    valueChange: number,
+    sourceId: string,
+    actorId: string,
+    memo: string,
+    kind: 'ADJUSTMENT' | 'STOCK_LOSS' = 'ADJUSTMENT',
+  ) {
+    const amount = Math.abs(valueChange).toFixed(2);
+    if (Number(amount) === 0) return Promise.resolve(null);
+    return this.ledger.post(
+      {
+        amount,
+        debit: valueChange > 0 ? 'INVENTORY' : 'INVENTORY_ADJUSTMENT',
+        credit: valueChange > 0 ? 'INVENTORY_ADJUSTMENT' : 'INVENTORY',
+        kind,
+        sourceType: 'stock_movement',
+        sourceId,
+        actorId,
+        memo,
+      },
+      tx,
+    );
+  }
+
   /** A real noon bank transfer landed — receivable becomes actual cash. */
   recordNoonPayout(tx: EntityManager, amount: string, sourceId: string) {
     return this.ledger.post(

@@ -57,6 +57,7 @@ export const LEDGER_ACCOUNTS = [
   { code: 'OPENING_EQUITY', nameAr: 'رصيد افتتاحي', nameEn: 'Opening balance', kind: 'EQUITY' },
   { code: 'SALES', nameAr: 'المبيعات', nameEn: 'Sales revenue', kind: 'INCOME' },
   { code: 'COGS', nameAr: 'تكلفة البضاعة المباعة', nameEn: 'Cost of goods sold', kind: 'EXPENSE' },
+  { code: 'INVENTORY_ADJUSTMENT', nameAr: 'تسويات المخزون', nameEn: 'Inventory adjustments', kind: 'EXPENSE' },
   { code: 'CHANNEL_FEES', nameAr: 'عمولات ورسوم القنوات', nameEn: 'Channel fees', kind: 'EXPENSE' },
   { code: 'SHIPPING', nameAr: 'مصاريف الشحن', nameEn: 'Shipping', kind: 'EXPENSE' },
   { code: 'OTHER_EXPENSE', nameAr: 'مصروفات أخرى', nameEn: 'Other expenses', kind: 'EXPENSE' },
