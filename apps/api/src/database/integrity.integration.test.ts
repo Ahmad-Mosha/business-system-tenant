@@ -285,6 +285,57 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     await assert.rejects(catalog.recordStock(id, -1, 'PURCHASE', user.id));
     await assert.rejects(catalog.recordStock(id, 1, 'DAMAGE', user.id));
   });
+  await t.test('manual stock corrections have valid directions and balanced value entries', async () => {
+    const catalog = new CatalogService(db, finance);
+    const id = await stock(5);
+    const inventoryBefore = Number(await ledger.balanceOf('INVENTORY'));
+    const adjustmentBefore = Number(await ledger.balanceOf('INVENTORY_ADJUSTMENT'));
+
+    await assert.rejects(catalog.recordStock(id, 1, 'PURCHASE', user.id));
+    await assert.rejects(catalog.recordStock(id, -1, 'RETURN', user.id));
+    await assert.rejects(catalog.recordStock(id, 1, 'DAMAGE', user.id));
+    await assert.rejects(catalog.recordStock(id, -1, 'SALE', user.id));
+    assert.equal(await balance(id), 5);
+
+    await catalog.recordStock(id, -2, 'DAMAGE', user.id, 'Broken during handling');
+    assert.equal(await balance(id), 3);
+    assert.equal(Number(await ledger.balanceOf('INVENTORY')), inventoryBefore - 20);
+    assert.equal(Number(await ledger.balanceOf('INVENTORY_ADJUSTMENT')), adjustmentBefore + 20);
+
+    await catalog.recordStock(id, 1, 'RETURN', user.id, 'External customer return');
+    assert.equal(await balance(id), 4);
+    assert.equal(Number(await ledger.balanceOf('INVENTORY')), inventoryBefore - 10);
+    assert.equal(Number(await ledger.balanceOf('INVENTORY_ADJUSTMENT')), adjustmentBefore + 10);
+  });
+  await t.test('average-cost corrections require a reason and revalue current stock', async () => {
+    const catalog = new CatalogService(db, finance);
+    const id = await stock(5);
+    const inventoryBefore = Number(await ledger.balanceOf('INVENTORY'));
+    const adjustmentBefore = Number(await ledger.balanceOf('INVENTORY_ADJUSTMENT'));
+
+    await assert.rejects(catalog.updateVariant(id, { unitCost: '12.0000' }, user.id));
+    assert.equal((await db.getRepository(ProductVariant).findOneByOrFail({ id })).unitCost, '10.0000');
+
+    await catalog.updateVariant(
+      id,
+      { unitCost: '12.0000', costReason: 'Corrected supplier invoice' },
+      user.id,
+    );
+    assert.equal((await db.getRepository(ProductVariant).findOneByOrFail({ id })).unitCost, '12.0000');
+    assert.equal(Number(await ledger.balanceOf('INVENTORY')), inventoryBefore + 10);
+    assert.equal(Number(await ledger.balanceOf('INVENTORY_ADJUSTMENT')), adjustmentBefore - 10);
+
+    const [movement] = await db.query(
+      `SELECT quantity, unit_cost AS "unitCost", avg_cost_after AS "avgCostAfter", note
+       FROM stock_movement WHERE variant_id = $1 AND source_type = 'cost_correction'
+       ORDER BY created_at DESC LIMIT 1`,
+      [id],
+    );
+    assert.equal(movement.quantity, 0);
+    assert.equal(movement.unitCost, '12.0000');
+    assert.equal(movement.avgCostAfter, '12.0000');
+    assert.match(movement.note, /Corrected supplier invoice/);
+  });
   await t.test('custom expenses deduplicate requests and reverse without deleting history', async () => {
     const expenses = new ExpensesService(db, ledger);
     const cash = Number(await ledger.balanceOf('CASH'));

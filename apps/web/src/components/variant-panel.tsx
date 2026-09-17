@@ -1,6 +1,7 @@
 'use client';
 
-import { ArrowDownLeft, ArrowUpRight, History, Minus, Plus } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, History, Minus, Pencil, Plus } from 'lucide-react';
+import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
@@ -36,8 +37,8 @@ import { num } from '@/i18n/rich';
 import { useFormat } from '@/i18n/use-format';
 
 /** The reasons a person records by hand — SALE is recorded by orders. Names: `enums.stockReason`. */
-const REASONS = ['PURCHASE', 'RETURN', 'DAMAGE', 'COUNT', 'ADJUSTMENT'] as const;
-const ALL_REASONS = [...REASONS, 'SALE', 'TRANSFER'] as const;
+const REASONS = ['RETURN', 'DAMAGE', 'COUNT', 'ADJUSTMENT'] as const;
+const ALL_REASONS = [...REASONS, 'PURCHASE', 'SALE', 'TRANSFER'] as const;
 
 /** The notes the API writes on stock it moves for an order (orders.service.ts); any other note is a person's. */
 const ORDER_NOTES = {
@@ -90,14 +91,16 @@ export function VariantPanel({
   const f = useFormat();
   const [pending, start] = useTransition();
   const [qty, setQty] = useState('1');
-  const [reason, setReason] = useState<string>('PURCHASE');
+  const [reason, setReason] = useState<string>('ADJUSTMENT');
   const [location, setLocation] = useState<'WAREHOUSE' | 'NOON'>('WAREHOUSE');
   const [note, setNote] = useState('');
   const [direction, setDirection] = useState<'in' | 'out'>('in');
   const [cost, setCost] = useState(variant.unitCost ?? '');
+  const [costReason, setCostReason] = useState('');
   const [price, setPrice] = useState(variant.sellingPrice ?? '');
 
-  const pricesDirty = cost !== (variant.unitCost ?? '') || price !== (variant.sellingPrice ?? '');
+  const costDirty = cost !== (variant.unitCost ?? '');
+  const pricesDirty = costDirty || price !== (variant.sellingPrice ?? '');
   // The API refuses a removal below zero too; this just says so before asking.
   const count = Number(qty) || 0;
   const available = Math.max(location === 'WAREHOUSE' ? variant.warehouseOnHand : variant.noonOnHand, 0);
@@ -105,8 +108,15 @@ export function VariantPanel({
 
   const save = () =>
     start(async () => {
-      const r = await updateVariant(variant.id, { unitCost: cost || null, sellingPrice: price || null });
-      if (r.ok) toast.success(t('saved'));
+      const r = await updateVariant(variant.id, {
+        unitCost: cost || null,
+        sellingPrice: price || null,
+        costReason: costDirty ? costReason : undefined,
+      });
+      if (r.ok) {
+        toast.success(t('saved'));
+        setCostReason('');
+      }
       else toast.error(r.message);
     });
 
@@ -173,7 +183,26 @@ export function VariantPanel({
               <MoneyField id={`price-${variant.id}`} value={price} onChange={setPrice} disabled={pending} />
             </Field>
           </div>
-          <Button variant="outline" onClick={save} disabled={pending || !pricesDirty} className="w-fit">
+          {costDirty ? (
+            <Field>
+              <FieldLabel htmlFor={`cost-reason-${variant.id}`}>{t('costReason')}</FieldLabel>
+              <Input
+                id={`cost-reason-${variant.id}`}
+                value={costReason}
+                onChange={(e) => setCostReason(e.target.value)}
+                dir="auto"
+                maxLength={500}
+                disabled={pending}
+                placeholder={t('costReasonPlaceholder')}
+              />
+            </Field>
+          ) : null}
+          <Button
+            variant="outline"
+            onClick={save}
+            disabled={pending || !pricesDirty || (costDirty && !costReason.trim())}
+            className="w-fit"
+          >
             {pending ? <Spinner /> : null}
             {t('savePrices')}
           </Button>
@@ -219,7 +248,7 @@ export function VariantPanel({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent position="popper">
-                  {REASONS.filter((r) => direction === 'in' ? r !== 'DAMAGE' : !['PURCHASE', 'RETURN'].includes(r)).map((r) => (
+                  {REASONS.filter((r) => direction === 'in' ? r !== 'DAMAGE' : r !== 'RETURN').map((r) => (
                     <SelectItem key={r} value={r}>
                       {tr(`enums.stockReason.${r}`)}
                     </SelectItem>
@@ -229,6 +258,12 @@ export function VariantPanel({
             </Field>
           </div>
           <Field><FieldLabel htmlFor={`note-${variant.id}`}>{t('note')}</FieldLabel><Input id={`note-${variant.id}`} value={note} onChange={(e) => setNote(e.target.value)} dir="auto" disabled={pending} /></Field>
+          <p className="text-xs text-muted-foreground">
+            {t('purchaseHint')}{' '}
+            <Link href="/money/purchases/new" className="font-medium text-foreground underline underline-offset-4">
+              {t('newPurchase')}
+            </Link>
+          </p>
           <div className="flex flex-wrap items-center gap-3">
             <Button onClick={move} disabled={pending || !Number.isInteger(count) || count <= 0 || tooMany} className="w-fit">
               {pending ? <Spinner /> : direction === 'in' ? <Plus /> : <Minus />}
@@ -258,16 +293,21 @@ export function VariantPanel({
               <TableBody>
                 {movements.map((m) => {
                   const inbound = m.quantity > 0;
-                  const Icon = inbound ? ArrowDownLeft : ArrowUpRight;
+                  const correction = m.quantity === 0;
+                  const Icon = correction ? Pencil : inbound ? ArrowDownLeft : ArrowUpRight;
                   return (
                     <TableRow key={m.id}>
                       <TableCell className="h-12 max-w-0">
                         <div className="flex min-w-0 items-center gap-3">
                           <span
-                            title={tr(inbound ? 'ledger.in' : 'ledger.out')}
+                            title={correction ? tr('enums.stockReason.ADJUSTMENT') : tr(inbound ? 'ledger.in' : 'ledger.out')}
                             className={cn(
                               'flex size-7 shrink-0 items-center justify-center',
-                              inbound ? 'bg-success-subtle text-success' : 'bg-destructive-subtle text-destructive',
+                              correction
+                                ? 'bg-muted text-muted-foreground'
+                                : inbound
+                                  ? 'bg-success-subtle text-success'
+                                  : 'bg-destructive-subtle text-destructive',
                             )}
                           >
                             <Icon className="size-3.5 rtl:-scale-x-100" />
@@ -289,9 +329,12 @@ export function VariantPanel({
                         </div>
                       </TableCell>
                       <TableCell
-                        className={cn('num text-end font-semibold', inbound ? 'text-success' : 'text-destructive')}
+                        className={cn(
+                          'num text-end font-semibold',
+                          correction ? 'text-muted-foreground' : inbound ? 'text-success' : 'text-destructive',
+                        )}
                       >
-                        <bdi>{`${inbound ? '+' : '−'}${Math.abs(m.quantity)}`}</bdi>
+                        <bdi>{correction ? '—' : `${inbound ? '+' : '−'}${Math.abs(m.quantity)}`}</bdi>
                       </TableCell>
                       <TableCell className="num text-end text-muted-foreground">{m.runningTotal}</TableCell>
                     </TableRow>
