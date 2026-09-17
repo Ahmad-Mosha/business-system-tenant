@@ -61,7 +61,12 @@ export async function recordStock(variantId: string, quantity: number, reason: s
 
 export async function updateVariant(
   variantId: string,
-  patch: { sku?: string | null; unitCost?: string | null; sellingPrice?: string | null },
+  patch: {
+    sku?: string | null;
+    unitCost?: string | null;
+    sellingPrice?: string | null;
+    costReason?: string;
+  },
 ) {
   return write(`/catalog/variants/${variantId}`, 'PATCH', patch, '/inventory');
 }
