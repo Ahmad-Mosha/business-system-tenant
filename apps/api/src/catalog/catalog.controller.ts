@@ -19,7 +19,7 @@ import { PRODUCT_CATEGORIES, type ProductCategory } from './product.entity';
 import { CatalogService, type CreateProductInput } from './catalog.service';
 import { problem } from '../problem';
 
-const REASONS: StockReason[] = ['PURCHASE', 'SALE', 'RETURN', 'ADJUSTMENT', 'DAMAGE', 'COUNT'];
+const REASONS: StockReason[] = ['RETURN', 'ADJUSTMENT', 'DAMAGE', 'COUNT'];
 
 /**
  * Inventory is an admin responsibility, with one exception: moderators need to
@@ -135,7 +135,13 @@ export class CatalogController {
   updateVariant(
     @Req() req: Request,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: { sku?: string | null; unitCost?: string | null; sellingPrice?: string | null; name?: string },
+    @Body() body: {
+      sku?: string | null;
+      unitCost?: string | null;
+      sellingPrice?: string | null;
+      name?: string;
+      costReason?: string;
+    },
   ) {
     return this.catalog.updateVariant(id, body, req.user!.id);
   }
@@ -147,6 +153,11 @@ export class CatalogController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: { quantity: number; reason: StockReason; note?: string; location?: StockLocation },
   ) {
+    if (body?.reason === 'PURCHASE') {
+      throw new BadRequestException(
+        problem('stock.usePurchaseInvoice', 'record purchased stock with a purchase invoice'),
+      );
+    }
     if (!REASONS.includes(body?.reason)) {
       throw new BadRequestException(`reason must be one of: ${REASONS.join(', ')}`);
     }
