@@ -7,7 +7,6 @@ import {
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
 import type { SessionUser } from '../auth/auth.guard';
-import { ChannelListing } from '../catalog/channel-listing.entity';
 import { FinanceService } from '../finance/finance.service';
 import { StockMovement } from '../inventory/stock-movement.entity';
 import { OrderEvent } from './order-event.entity';
@@ -233,7 +232,7 @@ export class OrdersService {
       `SELECT v.id, COALESCE(v.name || ' — ' || p.name, p.name) AS name,
               COALESCE((SELECT SUM(quantity) FROM stock_movement m WHERE m.variant_id = v.id AND m.location = 'WAREHOUSE'), 0)::int AS "onHand"
        FROM product_variant v JOIN product p ON p.id = v.product_id
-       WHERE v.id = ANY($1)`,
+       WHERE v.id = ANY($1) AND v.active AND p.active`,
       [linked.map((i) => i.variantId)],
     );
     const onHand = new Map(rows.map((r) => [r.id, r]));
@@ -490,7 +489,14 @@ export class OrdersService {
       const wasOut = from === 'CANCELLED';
       const isOut = next === 'CANCELLED' || next === 'RETURNED';
       if (!wasOut && isOut) {
-        await OrdersService.creditStockForOrder(tx, orderId, next, user.id, returned?.reason);
+        await OrdersService.creditStockForOrder(
+          tx,
+          orderId,
+          next,
+          user.id,
+          returned?.reason,
+          next === 'RETURNED' && returned?.restock === true,
+        );
         if (next === 'RETURNED' && !returned?.restock) {
           const items = await tx.find(OrderItem, { where: { orderId } });
           const damaged = items.filter((i) => i.variantId).map((i) => ({
@@ -607,10 +613,16 @@ export class OrdersService {
     externalId: string,
     externalVariantId = '',
   ): Promise<string | null> {
-    const listing = await tx.findOne(ChannelListing, {
-      where: { channel: channel as never, externalId, externalVariantId },
-      select: { variantId: true },
-    });
+    const [listing] = await tx.query(
+      `SELECT l.variant_id AS "variantId"
+       FROM channel_listing l
+       JOIN product_variant v ON v.id = l.variant_id
+       JOIN product p ON p.id = v.product_id
+       WHERE l.channel = $1 AND l.external_id = $2 AND l.external_variant_id = $3
+         AND v.active AND p.active
+       LIMIT 1`,
+      [channel, externalId, externalVariantId],
+    );
     return listing?.variantId ?? null;
   }
 
@@ -651,8 +663,23 @@ export class OrdersService {
     reason: 'CANCELLED' | 'RETURNED' | 'EDITED',
     actorId?: string,
     note?: string,
+    reactivate = false,
   ): Promise<void> {
     const items = await tx.find(OrderItem, { where: { orderId } });
+    const variantIds = items.flatMap((item) => item.variantId ? [item.variantId] : []);
+    await lockStock(tx, variantIds);
+    if (reactivate && variantIds.length) {
+      await tx.query(
+        `UPDATE product_variant SET active = true, updated_at = now()
+         WHERE id = ANY($1::uuid[])`,
+        [variantIds],
+      );
+      await tx.query(
+        `UPDATE product SET active = true, updated_at = now()
+         WHERE id IN (SELECT product_id FROM product_variant WHERE id = ANY($1::uuid[]))`,
+        [variantIds],
+      );
+    }
     const movements = items
       .filter((i) => i.variantId)
       .map((i) => ({
@@ -670,7 +697,6 @@ export class OrdersService {
               : 'order cancelled'),
       }));
     if (movements.length) {
-      await lockStock(tx, movements.map((m) => m.variantId));
       await tx.insert(StockMovement, movements);
     }
   }
