@@ -85,6 +85,10 @@ baseline; older architecture proposals are not the implementation.
     their filtered totals when an old URL points beyond the last page. All
     paginated operation screens return the user to the final valid page instead
     of showing a false empty state or an invalid item range.
+12. **Shipment access — implemented.** Admins can inspect the full Bosta account
+    board. Moderators receive only tracking records linked to their assigned
+    orders, and direct live-refresh requests enforce the same boundary without
+    revealing whether another customer's tracking number exists.
 
 Further audit findings to resolve as the associated flow is changed:
 - Bosta collection reconciliation and historical marketplace stock posting remain
