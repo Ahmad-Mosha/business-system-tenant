@@ -1,5 +1,6 @@
 import { Receipt } from 'lucide-react';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { ExpenseForm, VoidExpense } from '@/components/expense-form';
 import { Amount } from '@/components/amount';
@@ -18,11 +19,21 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
   const q = new URLSearchParams();
   for (const key of ['category', 'search', 'from', 'to', 'page']) if (params[key]) q.set(key, params[key]);
   const [data, categories, t, f] = await Promise.all([getExpenses(q.toString()), getExpenseCategories(), getTranslations('expenses'), getFormat()]);
+  const pageHref = (page: number) => {
+    const next = new URLSearchParams(q);
+    if (page > 1) next.set('page', String(page));
+    else next.delete('page');
+    const query = next.toString();
+    return query ? `/money/expenses?${query}` : '/money/expenses';
+  };
+  const lastPage = Math.max(Math.ceil(data.total / 50), 1);
+  if (data.page > lastPage) redirect(pageHref(lastPage));
+
   return <Page fill>
     <PageHeader title={t('title')} description={t('description')} actions={<ExpenseForm categories={categories} />} />
     <MetricGrid><MetricCard label={t('total')} value={<Amount value={data.totalAmount} />} hint={t('totalHint')} /></MetricGrid>
     <FilterBar search={{ param: 'search', placeholder: t('search') }} filters={[{ kind: 'select', param: 'category', all: t('allCategories'), options: categories.map((c) => ({ value: c.id, label: c.name })) }, { kind: 'dates', from: 'from', to: 'to' }]} />
-    <TablePanel minWidth="48rem" footer={<TablePagination page={data.page} pageSize={50} total={data.total} count={data.expenses.length} noun="expenses" href={(page) => { const next = new URLSearchParams(q); next.set('page', String(page)); return `/money/expenses?${next}`; }} />}>
+    <TablePanel minWidth="48rem" footer={<TablePagination page={data.page} pageSize={50} total={data.total} count={data.expenses.length} noun="expenses" href={pageHref} />}>
       {!data.expenses.length ? <TableEmpty icon={Receipt} title={t('empty')} description={t('emptyHint')} /> : <Table><TableHeader><TableRow>
         <TableHead>{t('date')}</TableHead><TableHead>{t('category')}</TableHead><TableHead>{t('note')}</TableHead><TableHead className="text-end">{t('amount')}</TableHead><TableHead>{t('status')}</TableHead><TableHead />
       </TableRow></TableHeader><TableBody>{data.expenses.map((e) => <TableRow key={e.id} id={e.id}>
