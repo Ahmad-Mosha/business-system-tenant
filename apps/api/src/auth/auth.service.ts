@@ -5,28 +5,26 @@ import { Repository } from 'typeorm';
 import { hashPassword, verifyPassword } from './password';
 import { User, type UserRole } from './user.entity';
 import type { SessionUser } from './auth.guard';
+import { resolveInitialPasswords } from './bootstrap-config';
 import { problem } from '../problem';
 
 /**
- * The two named accounts, created on boot only when the table is empty.
- * Passwords come from the environment so a publicly reachable deployment
- * never boots with the known dev defaults still live — set
- * ADMIN_SEED_PASSWORD / MODERATOR_SEED_PASSWORD in production. Only read
- * once, at the moment of seeding; changing them later has no effect on an
- * account that already exists.
+ * The two named accounts, created on boot only when the table is empty. Their
+ * passwords are resolved at startup, after ConfigModule has loaded local env
+ * files. Production refuses missing or known development credentials.
  */
-const SEED_USERS: Array<{ email: string; password: string; name: string; role: UserRole }> = [
+const INITIAL_USERS: Array<{ email: string; name: string; role: UserRole; password: 'admin' | 'moderator' }> = [
   {
     email: 'admin@admin.com',
-    password: process.env.ADMIN_SEED_PASSWORD ?? 'admin123',
     name: 'Admin',
     role: 'ADMIN',
+    password: 'admin',
   },
   {
     email: 'moderator@moderator.com',
-    password: process.env.MODERATOR_SEED_PASSWORD ?? 'moderator123',
     name: 'Moderator',
     role: 'MODERATOR',
+    password: 'moderator',
   },
 ];
 
@@ -40,28 +38,28 @@ export class AuthService {
   ) {}
 
   /**
-   * Seeds the two development accounts, but only into an empty table, so real
-   * accounts are never overwritten once the system is in use.
+   * Seeds initial accounts only into an empty table. The table lock makes this
+   * safe when more than one API process starts against a new database.
    */
-  async seedDevUsers(): Promise<void> {
+  async seedInitialUsers(): Promise<void> {
     if ((await this.users.count()) > 0) return;
-    if (process.env.NODE_ENV === 'production' && !process.env.ADMIN_SEED_PASSWORD) {
-      this.log.error(
-        'production boot with an empty user table and no ADMIN_SEED_PASSWORD set — ' +
-          'seeding the known dev password anyway. Set it and restart before this is public.',
-      );
+    const passwords = resolveInitialPasswords(process.env);
+    const users = await Promise.all(INITIAL_USERS.map(async (user) => ({
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      passwordHash: await hashPassword(passwords[user.password]),
+    })));
+
+    const seeded = await this.users.manager.transaction(async (tx) => {
+      await tx.query('LOCK TABLE app_user IN SHARE ROW EXCLUSIVE MODE');
+      if ((await tx.count(User)) > 0) return false;
+      await tx.save(User, users.map((user) => tx.create(User, user)));
+      return true;
+    });
+    if (seeded) {
+      this.log.warn(`seeded initial accounts: ${INITIAL_USERS.map((user) => user.email).join(', ')}`);
     }
-    for (const u of SEED_USERS) {
-      await this.users.save(
-        this.users.create({
-          email: u.email,
-          name: u.name,
-          role: u.role,
-          passwordHash: await hashPassword(u.password),
-        }),
-      );
-    }
-    this.log.warn(`seeded development accounts: ${SEED_USERS.map((u) => u.email).join(', ')}`);
   }
 
   async signIn(email: string, password: string): Promise<{ token: string; user: SessionUser }> {
