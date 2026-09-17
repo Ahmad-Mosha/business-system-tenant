@@ -54,9 +54,12 @@ Review the generated SQL before committing — this is a money schema.
 
 **Auth:** the two named accounts (`admin@admin.com`, `moderator@moderator.com`)
 seed themselves on first boot into an empty user table. Their passwords come
-from `ADMIN_SEED_PASSWORD` / `MODERATOR_SEED_PASSWORD` — **set real values in
-production**, or the known dev defaults (`admin123`, `moderator123`) go live
-on the public internet. The API logs an error on boot if it's missing.
+from `ADMIN_SEED_PASSWORD` / `MODERATOR_SEED_PASSWORD`. An empty production
+database refuses to boot unless both are at least 12 characters and differ
+from the known development defaults. `JWT_SECRET` is always required in
+production and must contain at least 32 characters. These checks stop the API
+instead of allowing an insecure fallback. Seed passwords are only read while
+the user table is empty; changing them does not reset existing accounts.
 
 ## How
 
