@@ -16,6 +16,8 @@ import { ProductVariant } from '../catalog/product-variant.entity';
 import { StockMovement } from '../inventory/stock-movement.entity';
 import { User } from '../auth/user.entity';
 import { EasyOrdersService } from '../integrations/easyorders/easyorders.service';
+import { BostaService } from '../integrations/bosta/bosta.service';
+import type { BostaDeliveryRaw } from '../integrations/bosta/bosta.client';
 
 // Explicit, disposable local database only. Never uses the application's DATABASE_URL.
 const url = process.env.TEST_DATABASE_URL;
@@ -92,6 +94,50 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     const ledgerPage = await ledger.entries({ sourceType: 'pagination-test', sourceId, limit: 30, offset: 30 });
     assert.equal(ledgerPage.entries.length, 0);
     assert.equal(ledgerPage.total, 1);
+  });
+  await t.test('moderators see only shipments assigned to them', async () => {
+    const moderator = await db.getRepository(User).save({
+      email: `moderator-${randomUUID()}@example.invalid`,
+      name: 'Shipment moderator',
+      passwordHash: 'unused',
+      role: 'MODERATOR',
+    });
+    const variantId = await stock(2);
+    const ownOrder = await orders.create(actor, { ...input(variantId), customerName: 'Assigned shipment' });
+    const otherOrder = await orders.create(actor, { ...input(variantId), customerName: 'Other shipment' });
+    await db.getRepository(Order).update(ownOrder.id, {
+      assignedToId: moderator.id,
+      trackingNumber: 'ASSIGNED-TRACKING',
+    });
+    await db.getRepository(Order).update(otherOrder.id, {
+      assignedToId: user.id,
+      trackingNumber: 'OTHER-TRACKING',
+    });
+
+    const deliveries: BostaDeliveryRaw[] = [
+      { trackingNumber: 'ASSIGNED-TRACKING', state: { value: 'In transit', code: 30 }, receiver: { fullName: 'Assigned customer' } },
+      { trackingNumber: 'OTHER-TRACKING', state: { value: 'In transit', code: 30 }, receiver: { fullName: 'Other customer' } },
+    ];
+    const client = {
+      listDeliveries: async () => deliveries,
+      getDelivery: async (trackingNumber: string) =>
+        deliveries.find((delivery) => delivery.trackingNumber === trackingNumber) ?? null,
+    };
+    const bosta = new BostaService(client as never, db);
+    const moderatorActor = {
+      id: moderator.id,
+      name: moderator.name,
+      role: 'MODERATOR' as const,
+      email: moderator.email,
+    };
+
+    assert.deepEqual(
+      (await bosta.listDeliveries(moderatorActor)).map((delivery) => delivery.trackingNumber),
+      ['ASSIGNED-TRACKING'],
+    );
+    assert.equal((await bosta.listDeliveries(actor)).length, 2);
+    assert.equal((await bosta.trackForUser(moderatorActor, 'ASSIGNED-TRACKING'))?.receiver.name, 'Assigned customer');
+    assert.equal(await bosta.trackForUser(moderatorActor, 'OTHER-TRACKING'), null);
   });
   await t.test('concurrent Easy Orders deliveries create and process one order', async () => {
     const externalId = randomUUID();
