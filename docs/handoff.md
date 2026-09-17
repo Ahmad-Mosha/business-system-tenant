@@ -37,6 +37,11 @@ Production startup now rejects a missing or short JWT signing secret. An empty
 production user table also rejects missing, short, or known development seed
 passwords instead of creating public accounts with fallback credentials. Local
 development keeps its zero-configuration defaults.
+Easy Orders webhook deliveries are stored before processing and serialized per
+external order. Exact failed deliveries can retry; concurrent redeliveries do
+not duplicate orders, stock, or money. Status events arriving before their order
+stay visible as failures for retry. Invalid quantities, dates, and money are
+rejected before writes, and a late paid event cannot undo a return/refund state.
 
 ## Toolchain (what's real)
 
