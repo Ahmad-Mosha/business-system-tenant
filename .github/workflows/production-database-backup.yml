@@ -1,0 +1,64 @@
+name: Production database backup
+
+on:
+  schedule:
+    - cron: "17 1 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: production-database-backup
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    name: Back up Neon production
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+      BACKUP_PASSPHRASE: ${{ secrets.PRODUCTION_BACKUP_PASSPHRASE }}
+      DUMP_PATH: ${{ runner.temp }}/prime-market-production.dump
+      ENCRYPTED_PATH: ${{ runner.temp }}/prime-market-production.dump.enc
+
+    steps:
+      - name: Create and validate PostgreSQL backup
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$DATABASE_URL"
+          test -n "$BACKUP_PASSPHRASE"
+          docker run --rm \
+            -e DATABASE_URL \
+            -e PGCONNECT_TIMEOUT=20 \
+            -v "$RUNNER_TEMP:/backup" \
+            postgres:17-alpine \
+            sh -lc 'pg_dump --format=custom --no-owner --no-acl "$DATABASE_URL" > /backup/prime-market-production.dump'
+          docker run --rm \
+            -v "$RUNNER_TEMP:/backup:ro" \
+            postgres:17-alpine \
+            pg_restore --list /backup/prime-market-production.dump > /dev/null
+
+      - name: Encrypt backup
+        shell: bash
+        run: |
+          set -euo pipefail
+          openssl enc -aes-256-cbc -pbkdf2 -salt \
+            -in "$DUMP_PATH" \
+            -out "$ENCRYPTED_PATH" \
+            -pass env:BACKUP_PASSPHRASE
+          rm -f "$DUMP_PATH"
+          sha256sum "$ENCRYPTED_PATH" > "$ENCRYPTED_PATH.sha256"
+
+      - name: Store encrypted backup outside EC2
+        uses: actions/upload-artifact@v4
+        with:
+          name: prime-market-production-${{ github.run_number }}-${{ github.run_attempt }}
+          path: |
+            ${{ env.ENCRYPTED_PATH }}
+            ${{ env.ENCRYPTED_PATH }}.sha256
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 0
