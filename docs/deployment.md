@@ -88,6 +88,40 @@ pg_dump --format=custom --no-owner --no-acl "$DATABASE_URL" > prime-market-befor
 pg_restore --list prime-market-before-deploy.dump > /dev/null
 ```
 
+### Automatic production backups
+
+The production database is hosted by Neon, outside EC2. Stopping or terminating
+the EC2 instance makes the website unavailable but does not remove the Neon
+database. Do not rely on EC2's local Postgres volume or a dump stored on EC2 for
+recovery, because both disappear with the instance.
+
+`.github/workflows/production-database-backup.yml` creates a PostgreSQL 17
+custom-format dump every day, validates its restore catalog, encrypts it with
+AES-256, and uploads the encrypted file as a GitHub Actions artifact retained
+for 90 days. The workflow also supports a manual run. It requires these Actions
+secrets:
+
+- `PRODUCTION_DATABASE_URL`: the direct Neon production connection string.
+- `PRODUCTION_BACKUP_PASSPHRASE`: a long random passphrase also kept outside
+  GitHub so a backup remains decryptable.
+
+To restore a downloaded artifact, first verify its checksum, then decrypt and
+inspect it before restoring into a new empty database:
+
+```bash
+sha256sum -c prime-market-production.dump.enc.sha256
+openssl enc -d -aes-256-cbc -pbkdf2 \
+  -in prime-market-production.dump.enc \
+  -out prime-market-production.dump \
+  -pass env:PRODUCTION_BACKUP_PASSPHRASE
+pg_restore --list prime-market-production.dump > /dev/null
+pg_restore --no-owner --no-acl --dbname="$RESTORE_DATABASE_URL" \
+  prime-market-production.dump
+```
+
+Always restore into a separate empty database first. Confirm the row counts and
+application behavior before changing the live connection string.
+
 For the order-number integrity migration, run this read-only preflight first. It
 must return no rows; if it finds a duplicate, stop and reconcile it explicitly.
 The migration itself raises an error and rolls back without changing any order:
