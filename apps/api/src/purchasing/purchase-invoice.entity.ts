@@ -17,17 +17,26 @@ export type PurchasePayment = 'CASH' | 'CREDIT';
 export type CostAllocation = 'BY_VALUE' | 'PER_UNIT';
 export type PaidStatus = 'DRAFT' | 'UNPAID' | 'PARTIAL' | 'PAID';
 
-/** Where an invoice sits on the paid axis, derived from `settledAmount`. */
-export function paidStatusOf(i: {
+export interface PurchaseSettlement {
   status: PurchaseStatus;
   payment: PurchasePayment;
+  goodsTotal: string | number;
+  extraCostsPaidSeparately: boolean;
   landedTotal: string | number;
   settledAmount: string | number;
-}): PaidStatus {
+}
+
+/** Amount payable to the goods supplier, excluding extras paid to third parties. */
+export function payableTotalOf(i: Pick<PurchaseSettlement, 'goodsTotal' | 'extraCostsPaidSeparately' | 'landedTotal'>) {
+  return Number(i.extraCostsPaidSeparately ? i.goodsTotal : i.landedTotal);
+}
+
+/** Where an invoice sits on the paid axis, derived from `settledAmount`. */
+export function paidStatusOf(i: PurchaseSettlement): PaidStatus {
   if (i.status === 'DRAFT') return 'DRAFT';
   if (i.payment === 'CASH') return 'PAID'; // paid the moment it posts
   const settled = Number(i.settledAmount);
-  const total = Number(i.landedTotal);
+  const total = payableTotalOf(i);
   if (settled >= total - 0.005) return 'PAID';
   if (settled > 0.005) return 'PARTIAL';
   return 'UNPAID';

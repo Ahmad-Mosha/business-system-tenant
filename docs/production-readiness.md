@@ -42,7 +42,8 @@ baseline; older architecture proposals are not the implementation.
 4. **Purchasing — implemented.** By-value/per-unit landed costs are exposed with
    a live estimate. Largest-remainder allocation conserves every cent without
    negative shares; AVCO and movement costs retain 4 decimals. Costs paid separately
-   credit CASH and count as settled, so supplier debt includes only what is owed.
+   credit CASH and are excluded from the supplier payable total; invoice paid
+   status and “paid so far” include only money actually paid to that supplier.
    Supplier creation works inline even with no existing suppliers. Create-and-post
    is one database transaction; failed posting cannot leave duplicate hidden drafts.
    Manual cost corrections are locked, require a reason, create an audit

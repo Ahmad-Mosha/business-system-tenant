@@ -501,7 +501,15 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     assert.equal((await purchasing.supplierDetail(supplier.id)).balance, '30.00');
     assert.equal(await ledger.balanceOf('SUPPLIER_PAYABLE', { supplierId: supplier.id }), '30.00');
     assert.equal(Number(await ledger.balanceOf('CASH')), cash - 1);
-    assert.equal(inv.settledAmount, '1.00');
+    assert.equal(inv.payableTotal, '30.00');
+    assert.equal(inv.settledAmount, '0.00');
+    assert.equal(inv.paidStatus, 'UNPAID');
+    await purchasing.recordSupplierPayment(supplier.id, '10.00', undefined, user.id, inv.id);
+    const partiallyPaid = await purchasing.getInvoice(inv.id);
+    assert.equal(partiallyPaid.settledAmount, '10.00');
+    assert.equal(partiallyPaid.payableTotal, '30.00');
+    assert.equal(partiallyPaid.paidStatus, 'PARTIAL');
+    assert.equal((await purchasing.supplierDetail(supplier.id)).balance, '20.00');
     await assert.rejects(purchasing.createInvoice({ supplierId: supplier.id, invoiceDate: '2026-09-16', payment: 'CREDIT', allocation: 'INVALID' as never, lines: [{ variantId: id, quantity: 1, unitCost: '1.00' }] }, user.id));
   });
   await t.test('an invoice is received once and cannot be overpaid concurrently', async () => {

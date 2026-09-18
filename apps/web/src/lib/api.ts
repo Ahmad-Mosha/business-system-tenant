@@ -441,6 +441,7 @@ export interface PurchaseInvoiceRow {
   extraCosts: string;
   landedTotal: string;
   settledAmount: string;
+  payableTotal: string;
   paidStatus: PaidStatus;
   postedAt: string | null;
   supplierName: string;
@@ -476,6 +477,7 @@ export interface PurchaseInvoiceDetail {
   extraCosts: string;
   landedTotal: string;
   settledAmount: string;
+  payableTotal: string;
   paidStatus: PaidStatus;
   postedAt: string | null;
   lines: PurchaseInvoiceLine[];

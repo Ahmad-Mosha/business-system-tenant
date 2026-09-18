@@ -36,7 +36,7 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
   const supplier = isCredit ? await getSupplier(invoice.supplierId).catch(() => null) : null;
 
   const draft = invoice.status === 'DRAFT';
-  const remaining = Number(invoice.landedTotal) - Number(invoice.settledAmount);
+  const remaining = Number(invoice.payableTotal) - Number(invoice.settledAmount);
   const canPay = isCredit && invoice.paidStatus !== 'PAID' && remaining > 0.005;
   // Landed cost is part of inventory value, distinct from the supplier balance.
   const hasExtras = Number(invoice.extraCosts) > 0;
