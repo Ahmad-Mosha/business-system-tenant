@@ -20,8 +20,6 @@ jobs:
     env:
       DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
       BACKUP_PASSPHRASE: ${{ secrets.PRODUCTION_BACKUP_PASSPHRASE }}
-      DUMP_PATH: ${{ runner.temp }}/prime-market-production.dump
-      ENCRYPTED_PATH: ${{ runner.temp }}/prime-market-production.dump.enc
 
     steps:
       - name: Create and validate PostgreSQL backup
@@ -46,19 +44,20 @@ jobs:
         run: |
           set -euo pipefail
           openssl enc -aes-256-cbc -pbkdf2 -salt \
-            -in "$DUMP_PATH" \
-            -out "$ENCRYPTED_PATH" \
+            -in "$RUNNER_TEMP/prime-market-production.dump" \
+            -out "$RUNNER_TEMP/prime-market-production.dump.enc" \
             -pass env:BACKUP_PASSPHRASE
-          rm -f "$DUMP_PATH"
-          sha256sum "$ENCRYPTED_PATH" > "$ENCRYPTED_PATH.sha256"
+          rm -f "$RUNNER_TEMP/prime-market-production.dump"
+          sha256sum "$RUNNER_TEMP/prime-market-production.dump.enc" \
+            > "$RUNNER_TEMP/prime-market-production.dump.enc.sha256"
 
       - name: Store encrypted backup outside EC2
         uses: actions/upload-artifact@v4
         with:
           name: prime-market-production-${{ github.run_number }}-${{ github.run_attempt }}
           path: |
-            ${{ env.ENCRYPTED_PATH }}
-            ${{ env.ENCRYPTED_PATH }}.sha256
+            ${{ runner.temp }}/prime-market-production.dump.enc
+            ${{ runner.temp }}/prime-market-production.dump.enc.sha256
           if-no-files-found: error
           retention-days: 90
           compression-level: 0
