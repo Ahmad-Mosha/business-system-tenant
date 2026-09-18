@@ -48,8 +48,9 @@ jobs:
             -out "$RUNNER_TEMP/prime-market-production.dump.enc" \
             -pass env:BACKUP_PASSPHRASE
           rm -f "$RUNNER_TEMP/prime-market-production.dump"
-          sha256sum "$RUNNER_TEMP/prime-market-production.dump.enc" \
-            > "$RUNNER_TEMP/prime-market-production.dump.enc.sha256"
+          cd "$RUNNER_TEMP"
+          sha256sum prime-market-production.dump.enc \
+            > prime-market-production.dump.enc.sha256
 
       - name: Store encrypted backup outside EC2
         uses: actions/upload-artifact@v4
