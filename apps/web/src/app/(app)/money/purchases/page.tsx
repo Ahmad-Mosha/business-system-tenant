@@ -35,7 +35,7 @@ export default async function PurchasesPage() {
   // balances use, so the two can't disagree.
   const owed = posted
     .filter((i) => i.payment === 'CREDIT')
-    .reduce((n, i) => n + Number(i.landedTotal) - Number(i.settledAmount), 0);
+    .reduce((n, i) => n + Number(i.payableTotal) - Number(i.settledAmount), 0);
 
   const newInvoice = (
     <Button asChild>

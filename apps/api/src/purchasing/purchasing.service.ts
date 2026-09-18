@@ -8,6 +8,7 @@ import { allocateExtraCosts, allocateOldestFirst, movingAverage, round2 } from '
 import {
   type CostAllocation,
   paidStatusOf,
+  payableTotalOf,
   PurchaseInvoice,
   PurchaseInvoiceLine,
   type PurchasePayment,
@@ -59,7 +60,10 @@ export class PurchasingService {
   ): Promise<Map<string, number>> {
     const rows: Array<{ supplierId: string; owed: string }> = await tx.query(
       `SELECT supplier_id AS "supplierId",
-              COALESCE(SUM(GREATEST(landed_total - settled_amount, 0)), 0) AS owed
+              COALESCE(SUM(GREATEST(
+                CASE WHEN extra_costs_paid_separately THEN goods_total ELSE landed_total END
+                - settled_amount, 0
+              )), 0) AS owed
        FROM purchase_invoice
        WHERE status = 'POSTED' AND payment = 'CREDIT'
        GROUP BY supplier_id`,
@@ -113,7 +117,11 @@ export class PurchasingService {
     return {
       ...supplier,
       balance,
-      invoices: invoices.map((i) => ({ ...i, paidStatus: paidStatusOf(i) })),
+      invoices: invoices.map((i) => ({
+        ...i,
+        payableTotal: payableTotalOf(i).toFixed(2),
+        paidStatus: paidStatusOf(i),
+      })),
       payments: payments.entries,
     };
   }
@@ -153,7 +161,7 @@ export class PurchasingService {
       }
 
       const owed = round2(
-        targets.reduce((s, i) => s + Math.max(0, Number(i.landedTotal) - Number(i.settledAmount)), 0),
+        targets.reduce((s, i) => s + Math.max(0, payableTotalOf(i) - Number(i.settledAmount)), 0),
       );
       const scope = invoiceId ? 'left on this invoice' : `owed to ${supplier.name}`;
       const about = { scope: invoiceId ? 'invoice' : 'supplier', supplier: supplier.name };
@@ -169,7 +177,7 @@ export class PurchasingService {
       }
 
       const applied = allocateOldestFirst(
-        targets.map((i) => Number(i.landedTotal) - Number(i.settledAmount)),
+        targets.map((i) => payableTotalOf(i) - Number(i.settledAmount)),
         value,
       );
       for (const [i, inv] of targets.entries()) {
@@ -206,6 +214,7 @@ export class PurchasingService {
       `SELECT i.id, i.invoice_no AS "invoiceNo", i.invoice_date AS "invoiceDate",
               i.status, i.payment, i.goods_total AS "goodsTotal",
               i.extra_costs AS "extraCosts", i.landed_total AS "landedTotal",
+              i.extra_costs_paid_separately AS "extraCostsPaidSeparately",
               i.settled_amount AS "settledAmount",
               i.posted_at AS "postedAt", s.name AS "supplierName",
               (SELECT count(*)::int FROM purchase_invoice_line l WHERE l.invoice_id = i.id) AS "lineCount"
@@ -214,7 +223,11 @@ export class PurchasingService {
        ORDER BY i.invoice_date DESC, i.created_at DESC
        LIMIT 100`,
     );
-    return rows.map((r: Parameters<typeof paidStatusOf>[0]) => ({ ...r, paidStatus: paidStatusOf(r) }));
+    return rows.map((r: Parameters<typeof paidStatusOf>[0]) => ({
+      ...r,
+      payableTotal: payableTotalOf(r).toFixed(2),
+      paidStatus: paidStatusOf(r),
+    }));
   }
 
   async getInvoice(id: string) {
@@ -234,7 +247,12 @@ export class PurchasingService {
        ORDER BY p.name`,
       [id],
     );
-    return { ...invoice, paidStatus: paidStatusOf(invoice), lines };
+    return {
+      ...invoice,
+      payableTotal: payableTotalOf(invoice).toFixed(2),
+      paidStatus: paidStatusOf(invoice),
+      lines,
+    };
   }
 
   /** Creates a DRAFT invoice — no stock or money moves until it is posted. */
@@ -390,7 +408,9 @@ export class PurchasingService {
           status: 'POSTED',
           postedAt: new Date(),
           // A cash invoice is paid the moment it posts.
-          settledAmount: invoice.payment === 'CASH' ? invoice.landedTotal : invoice.extraCostsPaidSeparately ? invoice.extraCosts : '0',
+          settledAmount: invoice.payment === 'CASH'
+            ? (invoice.extraCostsPaidSeparately ? invoice.goodsTotal : invoice.landedTotal)
+            : '0',
         },
       );
       this.log.log(`purchase invoice ${id} posted: ${invoice.lines.length} lines, ${invoice.landedTotal}`);
