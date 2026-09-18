@@ -96,6 +96,10 @@ only shipments linked to orders assigned to them.
 - EC2's old `db` container is still running with the pre-migration data as a
   rollback path. Backup: `~/prime_market_backup_20260915.dump` on the box.
   Don't remove either without Ahmad's go-ahead.
+- Production is also backed up daily outside EC2 by
+  `.github/workflows/production-database-backup.yml`. Each PostgreSQL 17 dump is
+  restore-catalog checked, AES-256 encrypted, and retained as a GitHub Actions
+  artifact for 90 days. The decryption passphrase is kept outside GitHub.
 - Turso/libSQL was evaluated and rejected (no TypeORM driver, Postgres-only SQL,
   `numeric` money). Don't re-propose it.
 
