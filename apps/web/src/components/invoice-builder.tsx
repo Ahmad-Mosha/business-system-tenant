@@ -35,6 +35,7 @@ import {
   FieldTitle,
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { NumberField } from '@/components/number-field';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Select,
@@ -60,13 +61,14 @@ interface Line {
   key: string;
   variantId: string;
   label: string;
-  quantity: number;
+  /** As typed; a whole number of at least 1 before the invoice can be saved. */
+  quantity: string;
   unitCost: string;
   onHand: number | null;
 }
 
 const cellInput =
-  'h-8 border-transparent bg-transparent px-2 text-end shadow-none hover:border-input focus-visible:border-ring';
+  'h-8 border-transparent bg-transparent px-2 shadow-none hover:border-input focus-visible:border-ring';
 
 export function InvoiceBuilder({
   suppliers,
@@ -94,13 +96,14 @@ export function InvoiceBuilder({
   const [creating, setCreating] = useState<string | null>(null);
 
   const supplier = supplierOptions.find((s) => s.id === supplierId);
-  const goodsTotal = lines.reduce((s, l) => s + l.quantity * (Number(l.unitCost) || 0), 0);
+  const qty = (l: Line) => Number(l.quantity) || 0;
+  const goodsTotal = lines.reduce((s, l) => s + qty(l) * (Number(l.unitCost) || 0), 0);
   const extraValue = Number(extraCosts) || 0;
   const total = goodsTotal + extraValue;
-  const totalUnits = lines.reduce((sum, l) => sum + l.quantity, 0);
-  const missing = !/^\d+(\.\d{1,2})?$/.test(extraCosts)
+  const totalUnits = lines.reduce((sum, l) => sum + qty(l), 0);
+  const missing = !/^\d+(\.\d{1,2})?$/.test(extraCosts || '0')
     ? tr('validation.extraCosts')
-    : lines.some((l) => !Number.isInteger(l.quantity) || l.quantity < 1)
+    : lines.some((l) => !Number.isInteger(qty(l)) || qty(l) < 1)
       ? tr('validation.lineQuantity')
       : !supplierId
     ? tr('validation.chooseSupplier')
@@ -116,7 +119,7 @@ export function InvoiceBuilder({
     setLines((ls) =>
       ls.some((l) => l.variantId === variantId)
         ? ls
-        : [...ls, { key: crypto.randomUUID(), variantId, label, quantity: 1, unitCost, onHand }],
+        : [...ls, { key: crypto.randomUUID(), variantId, label, quantity: '1', unitCost, onHand }],
     );
 
   const submit = (asDraft: boolean) => {
@@ -126,9 +129,9 @@ export function InvoiceBuilder({
       invoiceDate,
       payment,
       allocation,
-      extraCosts,
+      extraCosts: extraCosts || '0',
       extraCostsPaidSeparately: separateCosts,
-      lines: lines.map((l) => ({ variantId: l.variantId, quantity: l.quantity, unitCost: l.unitCost })),
+      lines: lines.map((l) => ({ variantId: l.variantId, quantity: qty(l), unitCost: l.unitCost })),
     };
     start(async () => {
       const res = await saveInvoice(payload, asDraft);
@@ -274,34 +277,31 @@ export function InvoiceBuilder({
                           ) : null}
                         </TableCell>
                         <TableCell className="py-1.5">
-                          <Input
-                            type="number"
-                            min={1}
+                          <NumberField
                             value={l.quantity}
-                            onFocus={(e) => e.currentTarget.select()}
-                            onChange={(e) =>
-                              patchLine(l.key, { quantity: Math.max(1, Number(e.target.value) || 1) })
-                            }
+                            onValueChange={(v) => patchLine(l.key, { quantity: v })}
+                            decimals={0}
+                            min={1}
                             aria-label={tr('product.stock.quantity')}
+                            aria-invalid={qty(l) < 1}
                             disabled={pending}
-                            className={`num ${cellInput}`}
+                            className={cellInput}
                           />
                         </TableCell>
                         <TableCell className="py-1.5">
-                          <Input
-                            inputMode="decimal"
+                          <NumberField
                             value={l.unitCost}
-                            onFocus={(e) => e.currentTarget.select()}
-                            onChange={(e) => patchLine(l.key, { unitCost: e.target.value })}
+                            onValueChange={(v) => patchLine(l.key, { unitCost: v })}
+                            group
                             placeholder="0.00"
                             aria-label={t('invoice.columns.unitCost')}
                             aria-invalid={!(Number(l.unitCost) > 0)}
                             disabled={pending}
-                            className={`num ${cellInput}`}
+                            className={cellInput}
                           />
                         </TableCell>
                         <TableCell className="num text-end font-medium">
-                          {money(l.quantity * (Number(l.unitCost) || 0))}
+                          {money(qty(l) * (Number(l.unitCost) || 0))}
                         </TableCell>
                         {extraValue > 0 ? <TableCell className="num text-end text-muted-foreground">{money(Number(l.unitCost || 0) + (allocation === 'BY_VALUE' ? (goodsTotal > 0 ? extraValue * Number(l.unitCost || 0) / goodsTotal : 0) : extraValue / totalUnits))}</TableCell> : null}
                         <TableCell className="pe-2">
@@ -334,7 +334,7 @@ export function InvoiceBuilder({
           </Card>
           <Card><CardHeader><CardTitle>{t('landed.title')}</CardTitle><CardDescription>{t('landed.description')}</CardDescription></CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
-              <Field><FieldLabel htmlFor="extra-costs">{t('landed.amount')}</FieldLabel><Input id="extra-costs" inputMode="decimal" value={extraCosts} onChange={(e) => setExtraCosts(e.target.value)} disabled={pending} className="num" /></Field>
+              <Field><FieldLabel htmlFor="extra-costs">{t('landed.amount')}</FieldLabel><NumberField id="extra-costs" value={extraCosts} onValueChange={setExtraCosts} group disabled={pending} suffix={tr('common.egp')} /></Field>
               <Field><FieldLabel htmlFor="allocation">{t('landed.allocation')}</FieldLabel><Select value={allocation} onValueChange={(v) => setAllocation(v as typeof allocation)} disabled={pending}><SelectTrigger id="allocation"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="BY_VALUE">{t('landed.byValue')}</SelectItem><SelectItem value="PER_UNIT">{t('landed.perUnit')}</SelectItem></SelectContent></Select></Field>
               <label className="flex items-start gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={separateCosts} onChange={(e) => setSeparateCosts(e.target.checked)} disabled={pending} className="mt-1" />{t('landed.paidSeparately')}</label>
               {extraValue > 0 ? <p className="text-xs text-muted-foreground sm:col-span-2">{t('landed.paymentHint', { cash: money(payment === 'CASH' ? total : separateCosts ? extraValue : 0), supplier: money(payment === 'CREDIT' ? total - (separateCosts ? extraValue : 0) : 0) })}</p> : null}

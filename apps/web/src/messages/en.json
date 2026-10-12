@@ -385,6 +385,7 @@
       "paymentCollected": "Payment already collected",
       "create": "Create order",
       "needsItem": "Add at least one item.",
+      "needsQuantity": "Every item needs a quantity of at least 1.",
       "needsNameAndPrice": "Every item needs a name and a price.",
       "needsPhone": "Add a valid phone number.",
       "needsGovernorate": "Pick a governorate.",

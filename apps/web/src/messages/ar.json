@@ -385,6 +385,7 @@
       "paymentCollected": "تم تحصيل المبلغ بالفعل",
       "create": "إنشاء الطلب",
       "needsItem": "أضف صنفًا واحدًا على الأقل.",
+      "needsQuantity": "كل صنف يحتاج إلى كمية لا تقل عن 1.",
       "needsNameAndPrice": "كل صنف يحتاج إلى اسم وسعر.",
       "needsPhone": "أدخل رقم هاتف صحيحًا.",
       "needsGovernorate": "اختر المحافظة.",
