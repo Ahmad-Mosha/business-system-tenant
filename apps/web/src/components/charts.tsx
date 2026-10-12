@@ -1,8 +1,9 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useId, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import {
   Area,
   AreaChart,
@@ -10,7 +11,6 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
-  LabelList,
   ReferenceLine,
   XAxis,
   YAxis,
@@ -29,9 +29,10 @@ import { money } from '@/lib/format';
 
 /**
  * Every chart in the app, on shadcn's chart (Recharts underneath). Each one is
- * fed straight from an API aggregate — none of them sums a page of rows — and
- * colours come from the theme: teal for the brand's own figures, success and
- * destructive only where a value means money in or out.
+ * fed straight from an API aggregate — none of them sums a page of rows. The
+ * look is deliberately plain: thin lines, flat fills, dashed hairline grids, no
+ * gradients. Teal is money in and the business's own figures; money out is a
+ * quiet grey, not alarm red — red is kept for a value below zero.
  *
  * Right-to-left, by kind rather than blanket mirroring: time series keep time
  * running left to right, the most common pattern in Arabic charts and the way
@@ -56,10 +57,8 @@ const signedMoney = (v: number) => (v > 0 ? '+' : v < 0 ? '−' : '') + money(Ma
 /** Amounts in a breakdown read unsigned unless they're below zero. */
 const signedOrPlain = (v: number) => (v < 0 ? '−' : '') + money(Math.abs(v));
 
-/** A gradient id that's safe inside `url(#…)`. */
-function useGradientId() {
-  return `g${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
-}
+/** Money out, in charts and breakdowns: present, but never louder than money in. */
+export const OUT_FILL = 'color-mix(in srgb, var(--foreground) 28%, transparent)';
 
 /** Room for the value axis — Arabic compact figures ("1.1 مليون") run longer. */
 const useAxisWidth = () => (useDirection() === 'rtl' ? 64 : 52);
@@ -82,39 +81,6 @@ function ChartEmpty({ children, className = 'h-64' }: { children: ReactNode; cla
   );
 }
 
-const sparkConfig = { balance: { color: 'var(--chart-4)' } } satisfies ChartConfig;
-
-/** A small trend line under a figure. Flat grey when the period ended lower. */
-export function Sparkline({ points }: { points: number[] }) {
-  const id = useGradientId();
-  if (points.length < 2) return null;
-  const rising = points[points.length - 1] >= points[0];
-  const stroke = rising ? 'var(--color-balance)' : 'var(--muted-foreground)';
-  return (
-    <ChartContainer config={sparkConfig} className="aspect-auto h-8 w-full" aria-hidden>
-      <AreaChart data={points.map((balance, i) => ({ i, balance }))} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
-        <defs>
-          <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={stroke} stopOpacity={0.25} />
-            <stop offset="100%" stopColor={stroke} stopOpacity={0} />
-          </linearGradient>
-        </defs>
-        <YAxis hide domain={['dataMin', 'dataMax']} />
-        <Area
-          dataKey="balance"
-          type="monotone"
-          stroke={stroke}
-          strokeWidth={1.5}
-          fill={`url(#${id})`}
-          isAnimationActive={false}
-          dot={false}
-          activeDot={false}
-        />
-      </AreaChart>
-    </ChartContainer>
-  );
-}
-
 /** The treasury's closing balance, day by day. */
 export function CashBalanceChart({
   series,
@@ -125,36 +91,31 @@ export function CashBalanceChart({
 }) {
   const t = useTranslations('charts');
   const f = useFormat();
-  const id = useGradientId();
   const axisWidth = useAxisWidth();
   const tick = useTick();
   if (series.length < 2) {
     return <ChartEmpty className={className}>{t('notEnoughHistory')}</ChartEmpty>;
   }
-  const config = { balance: { label: t('cashOnHand'), color: 'var(--chart-4)' } } satisfies ChartConfig;
+  const config = { balance: { label: t('cashOnHand'), color: 'var(--primary)' } } satisfies ChartConfig;
   const data = series.map((p) => ({ date: p.date, balance: Number(p.balance) }));
   return (
     <ChartContainer config={config} className={`aspect-auto w-full ${className}`}>
-      <AreaChart accessibilityLayer data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-        <defs>
-          <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="var(--color-balance)" stopOpacity={0.28} />
-            <stop offset="95%" stopColor="var(--color-balance)" stopOpacity={0.02} />
-          </linearGradient>
-        </defs>
-        <CartesianGrid vertical={false} />
+      <AreaChart accessibilityLayer data={data} margin={{ top: 8, right: 0, bottom: 0, left: 0 }}>
+        <CartesianGrid vertical={false} strokeDasharray="3 4" />
         <XAxis
           dataKey="date"
           tickLine={false}
           axisLine={false}
-          tickMargin={8}
-          minTickGap={40}
+          tickMargin={10}
+          minTickGap={48}
           tickFormatter={(v: string) => tick(f.dayShort(v))}
         />
         <YAxis
+          orientation="right"
           tickLine={false}
           axisLine={false}
           width={axisWidth}
+          tickCount={4}
           domain={['auto', 'auto']}
           tickFormatter={(v: number) => tick(f.compact(v))}
         />
@@ -171,8 +132,10 @@ export function CashBalanceChart({
           dataKey="balance"
           type="monotone"
           stroke="var(--color-balance)"
-          strokeWidth={2}
-          fill={`url(#${id})`}
+          strokeWidth={1.75}
+          fill="var(--color-balance)"
+          fillOpacity={0.06}
+          activeDot={{ r: 3.5, strokeWidth: 2, stroke: 'var(--card)' }}
         />
       </AreaChart>
     </ChartContainer>
@@ -199,26 +162,28 @@ export function CashFlowChart({
     return <ChartEmpty>{t('noMovement')}</ChartEmpty>;
   }
   const config = {
-    in: { label: t('moneyIn'), color: 'var(--success)' },
-    out: { label: t('moneyOut'), color: 'var(--destructive)' },
+    in: { label: t('moneyIn'), color: 'var(--primary)' },
+    out: { label: t('moneyOut'), color: OUT_FILL },
   } satisfies ChartConfig;
   const weekOf = (date: string) => t('weekOf', { date });
   return (
     <ChartContainer config={config} className="aspect-auto h-64 w-full">
-      <BarChart accessibilityLayer data={data} stackOffset="sign" margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-        <CartesianGrid vertical={false} />
+      <BarChart accessibilityLayer data={data} stackOffset="sign" margin={{ top: 8, right: 0, bottom: 0, left: 0 }}>
+        <CartesianGrid vertical={false} strokeDasharray="3 4" />
         <XAxis
           dataKey="period"
           tickLine={false}
           axisLine={false}
-          tickMargin={8}
+          tickMargin={10}
           minTickGap={24}
           tickFormatter={(v: string) => tick(bucketLabel(f, weekOf, v, bucket))}
         />
         <YAxis
+          orientation="right"
           tickLine={false}
           axisLine={false}
           width={axisWidth}
+          tickCount={5}
           tickFormatter={(v: number) => tick(f.compact(Math.abs(v)))}
         />
         <ReferenceLine y={0} stroke="var(--border)" />
@@ -231,8 +196,8 @@ export function CashFlowChart({
             />
           }
         />
-        <Bar dataKey="in" stackId="flow" fill="var(--color-in)" maxBarSize={36} />
-        <Bar dataKey="out" stackId="flow" fill="var(--color-out)" maxBarSize={36} />
+        <Bar dataKey="in" stackId="flow" fill="var(--color-in)" radius={[2, 2, 0, 0]} maxBarSize={22} />
+        <Bar dataKey="out" stackId="flow" fill="var(--color-out)" radius={[2, 2, 0, 0]} maxBarSize={22} />
       </BarChart>
     </ChartContainer>
   );
@@ -270,24 +235,25 @@ export function ProfitChart({
   }
 
   const config = {
-    businessProfit: { label: tm('businessProfit'), color: 'var(--chart-4)' },
+    businessProfit: { label: tm('businessProfit'), color: 'var(--primary)' },
   } satisfies ChartConfig;
   const weekOf = (date: string) => t('weekOf', { date });
 
   return (
     <ChartContainer key={rtl ? 'rtl' : 'ltr'} config={config} className="aspect-auto h-64 w-full">
-      <BarChart accessibilityLayer data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-        <CartesianGrid vertical={false} />
+      <BarChart accessibilityLayer data={data} margin={{ top: 8, right: 0, bottom: 0, left: 0 }}>
+        <CartesianGrid vertical={false} strokeDasharray="3 4" />
         <XAxis
           dataKey="period"
           tickLine={false}
           axisLine={false}
-          tickMargin={8}
+          tickMargin={10}
           minTickGap={24}
           tickFormatter={(v: string) => tick(bucketLabel(f, weekOf, v, bucket))}
         />
         <YAxis
           orientation={rtl ? 'right' : 'left'}
+          tickCount={4}
           tickLine={false}
           axisLine={false}
           width={axisWidth}
@@ -303,7 +269,7 @@ export function ProfitChart({
             />
           }
         />
-        <Bar dataKey="businessProfit" fill="var(--color-businessProfit)" maxBarSize={44}>
+        <Bar dataKey="businessProfit" fill="var(--color-businessProfit)" radius={[2, 2, 0, 0]} maxBarSize={28}>
           {data.map((point) => (
             <Cell
               key={point.period}
@@ -327,73 +293,49 @@ export interface BarItem {
 }
 
 /**
- * Horizontal bars, label then bar then amount — for "what made this up"
- * breakdowns. Labels sit in their own column, not inside the bar, so a small
- * amount's label never squeezes into a small bar. In Arabic the whole row
- * mirrors: label on the right, bar growing leftward, amount at its end. A bar
- * with an `href` opens the records behind it.
+ * A ranked breakdown — "what made this up" — as a plain list: each line its
+ * name and amount, with a thin bar underneath scaled to the largest line, and
+ * (with `share`) its part of the whole. Plain markup rather than a chart, so it
+ * mirrors in Arabic by itself and long names wrap instead of being clipped. A
+ * line with an `href` opens the records behind it.
  */
-export function BarList({ items, empty }: { items: BarItem[]; empty: string }) {
-  const t = useTranslations('charts');
-  const router = useRouter();
-  const rtl = useDirection() === 'rtl';
+export function BarList({ items, empty, share = true }: { items: BarItem[]; empty: string; share?: boolean }) {
   if (items.length === 0) return <ChartEmpty className="h-24">{empty}</ChartEmpty>;
-  const config = { size: { label: t('amount') } } satisfies ChartConfig;
-  const data = items.map((i) => ({ ...i, size: Math.abs(i.value) }));
+  const sizes = items.map((i) => Math.abs(i.value));
+  const largest = Math.max(...sizes) || 1;
+  const whole = sizes.reduce((n, v) => n + v, 0) || 1;
   return (
-    // Keyed by direction: Recharts keeps a reversed axis's geometry across a
-    // language switch, so a new direction gets a fresh chart.
-    <ChartContainer
-      key={rtl ? 'rtl' : 'ltr'}
-      config={config}
-      className="aspect-auto w-full"
-      style={{ height: items.length * 36 }}
-    >
-      <BarChart
-        accessibilityLayer
-        data={data}
-        layout="vertical"
-        margin={rtl ? { top: 0, right: 0, bottom: 0, left: 84 } : { top: 0, right: 84, bottom: 0, left: 0 }}
-        barCategoryGap={6}
-      >
-        <YAxis
-          dataKey="label"
-          type="category"
-          orientation={rtl ? 'right' : 'left'}
-          width={176}
-          tickLine={false}
-          axisLine={false}
-          tick={{ fontSize: 12, fill: 'var(--foreground)' }}
-        />
-        <XAxis dataKey="size" type="number" hide reversed={rtl} domain={[0, 'dataMax']} />
-        <ChartTooltip
-          cursor={false}
-          content={<ChartTooltipContent hideIndicator nameKey="label" valueFormatter={money} />}
-        />
-        <Bar
-          dataKey="size"
-          minPointSize={3}
-          className={data.some((i) => i.href) ? 'cursor-pointer' : undefined}
-          onClick={(bar: { payload?: BarItem }) => {
-            if (bar.payload?.href) router.push(bar.payload.href);
-          }}
-        >
-          {data.map((i) => (
-            <Cell key={i.key} fill={i.fill} fillOpacity={0.6} />
-          ))}
-          {/* "right" is past the bar's end in both directions: on the reversed
-              axis bars have negative width, and Recharts flips the side. */}
-          <LabelList
-            dataKey="value"
-            position="right"
-            offset={8}
-            className="num fill-foreground"
-            fontSize={12}
-            formatter={(v) => signedOrPlain(Number(v))}
-          />
-        </Bar>
-      </BarChart>
-    </ChartContainer>
+    <ul className="-mx-2 grid gap-0.5">
+      {items.map((i, n) => {
+        const line = (
+          <>
+            <span className="flex items-baseline justify-between gap-3">
+              <span className="min-w-0 truncate">{i.label}</span>
+              <span className="flex shrink-0 items-baseline gap-2.5">
+                <span className={`num font-medium ${i.value < 0 ? 'text-destructive' : ''}`}>{signedOrPlain(i.value)}</span>
+                {share ? (
+                  <span className="num w-8 text-end text-xs text-muted-foreground">{`${Math.round((sizes[n] / whole) * 100)}%`}</span>
+                ) : null}
+              </span>
+            </span>
+            <span className="mt-2 block h-1 overflow-hidden rounded-full bg-muted">
+              <span className="block h-full rounded-full" style={{ width: `${Math.max((sizes[n] / largest) * 100, 1.5)}%`, background: i.fill }} />
+            </span>
+          </>
+        );
+        return (
+          <li key={i.key}>
+            {i.href ? (
+              <Link href={i.href} className="block rounded-md px-2 py-2 text-[13px] transition-colors hover:bg-muted/60">
+                {line}
+              </Link>
+            ) : (
+              <div className="px-2 py-2 text-[13px]">{line}</div>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -405,14 +347,14 @@ export function MonthlyProceedsChart({ periods }: { periods: Period[] }) {
   const router = useRouter();
   const axisWidth = useAxisWidth();
   const tick = useTick();
-  const config = { netProceeds: { label: t('netProceeds'), color: 'var(--chart-3)' } } satisfies ChartConfig;
+  const config = { netProceeds: { label: t('netProceeds'), color: 'var(--primary)' } } satisfies ChartConfig;
   const data = [...periods]
     .sort((a, b) => a.month.localeCompare(b.month))
     .map((p) => ({ ...p, netProceeds: Number(p.netProceeds) }));
   return (
     <ChartContainer config={config} className="aspect-auto h-60 w-full">
       <BarChart accessibilityLayer data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-        <CartesianGrid vertical={false} />
+        <CartesianGrid vertical={false} strokeDasharray="3 4" />
         <XAxis
           dataKey="month"
           tickLine={false}
@@ -437,7 +379,8 @@ export function MonthlyProceedsChart({ periods }: { periods: Period[] }) {
         <Bar
           dataKey="netProceeds"
           fill="var(--color-netProceeds)"
-          maxBarSize={48}
+          radius={[2, 2, 0, 0]}
+          maxBarSize={36}
           className="cursor-pointer"
           onClick={(bar: { payload?: Period }) => {
             if (bar.payload?.month) router.push(`/months/${bar.payload.month}`);

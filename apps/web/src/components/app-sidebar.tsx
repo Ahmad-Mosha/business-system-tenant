@@ -214,7 +214,7 @@ function NavUser({ user }: { user: SessionUser }) {
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="size-8">
-                <AvatarFallback className="bg-[linear-gradient(160deg,var(--accent),var(--muted))] font-heading text-xs font-semibold text-accent-foreground">
+                <AvatarFallback className="bg-sidebar-accent font-heading text-xs font-semibold text-sidebar-accent-foreground">
                   {user.name.slice(0, 1).toUpperCase()}
                 </AvatarFallback>
               </Avatar>

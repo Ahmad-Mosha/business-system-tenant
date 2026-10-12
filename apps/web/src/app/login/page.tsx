@@ -16,16 +16,7 @@ export default async function LoginPage() {
   const t = await getTranslations();
 
   return (
-    <div className="relative isolate flex h-svh items-center justify-center overflow-y-auto bg-canvas p-6">
-      {/* A soft teal light from above and a fading dot grid: depth without a picture to load. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(60rem_28rem_at_50%_-10%,color-mix(in_srgb,var(--primary)_14%,transparent),transparent_70%)]"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(color-mix(in_srgb,var(--foreground)_9%,transparent)_1px,transparent_1px)] [mask-image:radial-gradient(ellipse_at_center,black_20%,transparent_70%)] bg-size-[22px_22px]"
-      />
+    <div className="relative flex h-svh items-center justify-center overflow-y-auto bg-canvas p-6">
       {/* Before signing in is when the language matters most — first-time
           visitors land in Arabic, and English is one click away. */}
       <LanguageToggle className="absolute top-4 end-4" />
@@ -36,7 +27,7 @@ export default async function LoginPage() {
           <p className="mt-1.5 text-[13px] text-muted-foreground">{t('auth.title')}</p>
         </div>
 
-        <div className="rounded-2xl bg-card p-6 shadow-lg ring-1 ring-foreground/8 sm:p-7">
+        <div className="rounded-xl bg-card p-6 shadow-sm ring-1 ring-foreground/8 sm:p-7">
           <LoginForm />
         </div>
 

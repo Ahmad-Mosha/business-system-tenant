@@ -7,7 +7,9 @@ import { cn } from '@/lib/utils';
 /**
  * The owners' operating measure for manual/social and Easy Orders. This is
  * deliberately named business profit: the accounting revenue and expense
- * accounts remain visible elsewhere on the page as a separate view.
+ * accounts remain visible elsewhere on the page as a separate view. The three
+ * figures read as a sum — selling amount, minus shipping, equals profit — beside
+ * the chart of it over time.
  */
 export function ProfitSection({
   report,
@@ -22,39 +24,33 @@ export function ProfitSection({
   const profit = Number(report.businessProfit);
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4 border-b pb-4 sm:grid-cols-3">
-        <Stat label={t('sellingAmount')} value={<Amount value={sales} />} />
-        <Stat label={t('orderShipping')} value={<Amount value={shipping} />} />
-        <Stat
-          label={t('businessProfit')}
-          value={
-            <Amount
-              value={profit}
-              signed
-              className={cn(profit > 0 && 'text-success', profit < 0 && 'text-destructive')}
-            />
-          }
-        />
-      </div>
-      {report.unreconciledEntries > 0 ? (
-        <p className="border-s-2 border-warning ps-3 text-xs text-muted-foreground">
-          {t('legacyProfitMissing', { count: report.unreconciledEntries })}
-        </p>
-      ) : null}
+    <div className="grid gap-6 lg:grid-cols-[13rem_minmax(0,1fr)]">
+      <dl className="grid content-start gap-4 text-[13px]">
+        <div>
+          <dt className="text-muted-foreground">{t('sellingAmount')}</dt>
+          <dd className="mt-1 text-lg font-semibold">
+            <Amount value={sales} />
+          </dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground">{t('orderShipping')}</dt>
+          <dd className="mt-1 text-lg font-semibold">
+            <Amount value={-shipping} />
+          </dd>
+        </div>
+        <div className="border-t pt-4">
+          <dt className="font-medium">{t('businessProfit')}</dt>
+          <dd className="mt-1 text-[22px] font-semibold tracking-[-0.02em]">
+            <Amount value={profit} className={cn(profit < 0 && 'text-destructive')} />
+          </dd>
+        </div>
+        {report.unreconciledEntries > 0 ? (
+          <p className="border-s-2 border-warning ps-3 text-xs text-muted-foreground">
+            {t('legacyProfitMissing', { count: report.unreconciledEntries })}
+          </p>
+        ) : null}
+      </dl>
       <ProfitChart series={report.series} bucket={bucket} />
-    </div>
-  );
-}
-
-function Stat({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) {
-  return (
-    <div>
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="flex items-baseline gap-1.5">
-        <span className="text-base font-semibold">{value}</span>
-        {hint ? <span className="num text-xs text-muted-foreground">({hint})</span> : null}
-      </p>
     </div>
   );
 }
