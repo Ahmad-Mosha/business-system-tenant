@@ -304,12 +304,8 @@ export function VariantPanel({
                           <span
                             title={correction ? tr('enums.stockReason.ADJUSTMENT') : tr(inbound ? 'ledger.in' : 'ledger.out')}
                             className={cn(
-                              'flex size-7 shrink-0 items-center justify-center',
-                              correction
-                                ? 'bg-muted text-muted-foreground'
-                                : inbound
-                                  ? 'bg-success-subtle text-success'
-                                  : 'bg-destructive-subtle text-destructive',
+                              'flex size-7 shrink-0 items-center justify-center rounded-md bg-muted',
+                              correction ? 'text-muted-foreground' : inbound ? 'text-success' : 'text-destructive',
                             )}
                           >
                             <Icon className="size-3.5 rtl:-scale-x-100" />
