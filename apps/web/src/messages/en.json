@@ -54,7 +54,8 @@
       "operations": "Operations",
       "money": "Money",
       "noon": "noon",
-      "admin": "Admin"
+      "admin": "Admin",
+      "sales": "Sales"
     },
     "items": {
       "orders": "Orders",
@@ -70,7 +71,9 @@
       "products": "Products",
       "imports": "Imports",
       "team": "Team",
-      "expenses": "Expenses"
+      "expenses": "Expenses",
+      "salesInvoices": "Sales invoices",
+      "customers": "Customers"
     },
     "crumbs": {
       "new": "New",
@@ -107,7 +110,8 @@
     "payments": "{count, plural, =0 {No payments} one {# payment} other {# payments}}",
     "imports": "{count, plural, =0 {No imports} one {# import} other {# imports}}",
     "settlementLines": "{count, plural, =0 {no settlement lines} one {# settlement line} other {# settlement lines}}",
-    "expenses": "{count, plural, one {# expense} other {# expenses}}"
+    "expenses": "{count, plural, one {# expense} other {# expenses}}",
+    "customers": "{count, plural, =0 {No customers} one {# customer} other {# customers}}"
   },
   "filters": {
     "reset": "Reset",
@@ -266,6 +270,21 @@
         "archiveOwed": "{owed} is still owed to this supplier. Settle it before archiving.",
         "archiveDrafts": "This supplier has draft invoices. Post or delete them before archiving.",
         "inUse": "This supplier has invoices or payments, so it can't be deleted. Archive it instead."
+      },
+      "customer": {
+        "name": "Enter the customer’s name.",
+        "archiveOwed": "This customer still owes {owed}. Collect it before archiving.",
+        "archiveDrafts": "This customer has draft invoices. Post or delete them before archiving.",
+        "inUse": "This customer has invoices, so they can’t be deleted. Archive them instead."
+      },
+      "sales": {
+        "postedEdit": "A posted invoice can’t be edited.",
+        "postedDelete": "A posted invoice can’t be deleted.",
+        "discountTooLarge": "The discount can’t be more than the invoice subtotal.",
+        "customerGone": "Choose an active customer.",
+        "discount": "Enter a discount like 250.00.",
+        "noLines": "Add at least one product.",
+        "linePrice": "Every product needs a price greater than 0."
       }
     }
   },
@@ -1289,6 +1308,11 @@
     "stockLocation": {
       "WAREHOUSE": "Our warehouse",
       "NOON": "Noon warehouse"
+    },
+    "salesStatus": {
+      "DRAFT": "Draft",
+      "POSTED": "Posted",
+      "VOID": "Void"
     }
   },
   "expenses": {
@@ -1332,5 +1356,142 @@
     "show": "Show costs",
     "hideHint": "Hide costs and money figures from people nearby",
     "showHint": "Costs are hidden. Point at a figure to see it, or click to show all"
+  },
+  "sales": {
+    "title": "Sales invoices",
+    "description": "Selling on invoice — wholesale and direct sales outside the order workflow.",
+    "new": "New sales invoice",
+    "empty": "No sales invoices yet",
+    "emptyHint": "Create one when you sell to a customer outside the usual orders.",
+    "columns": {
+      "invoice": "Invoice",
+      "customer": "Customer",
+      "date": "Date",
+      "status": "Status",
+      "total": "Total",
+      "paid": "Paid",
+      "lines": "Products"
+    },
+    "draftNumber": "Draft",
+    "drafts": "Drafts",
+    "draftsHint": "Not posted yet — nothing has left stock",
+    "invoices": "Invoices",
+    "draftValue": "Value of drafts",
+    "draftValueHint": "If every draft were posted as it stands",
+    "builder": {
+      "title": "New sales invoice",
+      "description": "Sell to a customer on invoice. Nothing leaves stock until it is posted.",
+      "editTitle": "Edit draft invoice",
+      "editDescription": "Nothing leaves stock until it is posted.",
+      "customerAndDate": "Customer and date",
+      "customer": "Customer",
+      "choose": "Choose…",
+      "invoiceDate": "Invoice date",
+      "notes": "Notes",
+      "notesPlaceholder": "Delivery terms, references — printed on the invoice",
+      "products": "Products",
+      "productsHint": "Type either the unit price or the line total: the other is calculated, and the one you typed stays fixed if the quantity changes.",
+      "searchPlaceholder": "Add a product — search by Arabic name or SKU",
+      "inStock": "{count} in stock",
+      "cost": "cost {amount}",
+      "noProducts": "No products yet — search above to add the first one.",
+      "overStock": "<b>{name}</b>: only <num>{count}</num> in the warehouse.",
+      "belowCost": "<b>{name}</b> is priced below its inventory cost of <num>{cost}</num>.",
+      "summary": "Summary",
+      "subtotal": "Subtotal · {items}",
+      "discount": "Discount",
+      "total": "Total",
+      "profit": "Gross profit",
+      "profitHint": "Total minus today’s inventory cost of the products. {margin} of the total.",
+      "profitUnknown": "Some products have no inventory cost yet.",
+      "saveDraft": "Save draft",
+      "draftSaved": "Draft saved",
+      "draftUpdated": "Draft updated",
+      "postingSoon": "Posting — taking the goods out of stock and recording the sale — is the next step.",
+      "missing": {
+        "customer": "Choose a customer.",
+        "product": "Add at least one product.",
+        "quantity": "Every product needs a quantity of at least 1.",
+        "price": "Every product needs a price.",
+        "discount": "The discount can’t be more than the subtotal."
+      }
+    },
+    "detail": {
+      "back": "Sales invoices",
+      "titleDraft": "Draft sales invoice",
+      "title": "Invoice {number}",
+      "description": "<strong>{customer}</strong> · {date}",
+      "lines": "Products",
+      "totals": "Totals",
+      "editDraft": "Edit draft",
+      "deleteDraft": "Delete draft",
+      "deleteDraftTitle": "Delete this draft?",
+      "deleteDraftDescription": "Nothing was recorded from a draft, so deleting it changes no stock or money. This can’t be undone.",
+      "draftDeleted": "Draft deleted",
+      "draftNote": "A draft is a plan: nothing has left stock and nothing is in the books yet.",
+      "columns": {
+        "product": "Product",
+        "qty": "Qty",
+        "unitPrice": "Unit price",
+        "lineTotal": "Line total",
+        "cost": "Cost",
+        "profit": "Profit"
+      },
+      "stockNow": "{count} in stock now"
+    },
+    "postedCount": "{count, plural, =0 {None posted yet} other {# posted}}"
+  },
+  "customers": {
+    "title": "Customers",
+    "description": "Businesses you sell to on invoice, and what each still owes.",
+    "add": "Add customer",
+    "addHint": "Name, phone and a note. You can add their invoices after.",
+    "addedToast": "Customer added",
+    "edit": "Edit",
+    "editTitle": "Edit customer",
+    "editHint": "Name, phone and note. Their invoices are not affected.",
+    "updated": "Customer updated",
+    "name": "Name",
+    "namePlaceholder": "Business or person",
+    "phone": "Phone",
+    "notePlaceholder": "Area, contact person, terms…",
+    "empty": "No customers yet",
+    "emptyHint": "Add the businesses you sell to wholesale.",
+    "showArchived": "Archived customers",
+    "showActive": "Active customers",
+    "archivedEmpty": "No archived customers.",
+    "columns": {
+      "customer": "Customer",
+      "phone": "Phone",
+      "balance": "Owes",
+      "added": "Added"
+    },
+    "settled": "Settled",
+    "total": "Customers",
+    "owedTotal": "Owed to you",
+    "nobodyOwes": "Nobody owes you",
+    "across": "Across {customers}",
+    "detail": {
+      "back": "Customers",
+      "fallback": "No phone or note",
+      "owed": "Owes you",
+      "invoices": "Invoices",
+      "noInvoices": "No invoices for this customer yet.",
+      "archive": "Archive",
+      "archiveTitle": "Archive “<bdi>{name}</bdi>”?",
+      "archiveDescription": "They leave the customer lists and can’t be chosen on new invoices. Their invoices stay as they are, and you can restore them at any time.",
+      "archiveConfirm": "Archive customer",
+      "archived": "Customer archived",
+      "restore": "Restore",
+      "restored": "Customer restored",
+      "archivedBanner": "This customer is archived. They can’t be chosen on new invoices.",
+      "delete": "Delete",
+      "deleteTitle": "Delete “<bdi>{name}</bdi>”?",
+      "deleteDescription": "This customer has no invoices, so they can be removed completely. This can’t be undone.",
+      "deleteConfirm": "Delete customer",
+      "deleted": "Customer deleted",
+      "newInvoice": "New invoice"
+    },
+    "activeHint": "Active — archived ones are listed separately"
   }
 }

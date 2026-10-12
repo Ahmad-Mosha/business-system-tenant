@@ -561,3 +561,76 @@ export const getExpenses = (query: string) => get<{
   expenses: Array<{ id: string; amount: string; spentOn: string; note: string | null; category: string; voidedAt: string | null; voidReason: string | null }>;
   total: number; totalAmount: string; page: number;
 }>(`/expenses?${query}`);
+
+// ── Sales ────────────────────────────────────────────────────────────────
+
+export interface CustomerRow {
+  id: string;
+  name: string;
+  phone: string | null;
+  note: string | null;
+  active: boolean;
+  /** Unpaid remainder of their posted invoices. */
+  balance: string;
+  createdAt: string;
+}
+
+export type SalesInvoiceStatus = 'DRAFT' | 'POSTED' | 'VOID';
+
+export interface SalesInvoiceRow {
+  id: string;
+  /** Given when posted; null for a draft. */
+  invoiceNumber: string | null;
+  invoiceDate: string;
+  status: SalesInvoiceStatus;
+  goodsTotal: string;
+  discount: string;
+  total: string;
+  paidAmount: string;
+  customerId: string;
+  customerName: string;
+  updatedAt: string;
+  lineCount: number;
+}
+
+export interface CustomerDetail extends CustomerRow {
+  invoices: SalesInvoiceRow[];
+}
+
+export interface SalesInvoiceLine {
+  id: string;
+  variantId: string;
+  label: string;
+  quantity: number;
+  unitPrice: string;
+  lineTotal: string;
+  /** Inventory cost per piece frozen when posted; null on a draft. */
+  unitCost: string | null;
+  /** Today's inventory cost — what a draft would book. */
+  currentCost: string | null;
+  /** Warehouse stock now. */
+  onHand: number;
+}
+
+export interface SalesInvoiceDetail {
+  id: string;
+  invoiceNumber: string | null;
+  invoiceDate: string;
+  status: SalesInvoiceStatus;
+  customerId: string;
+  customer: { id: string; name: string; phone: string | null };
+  goodsTotal: string;
+  discount: string;
+  total: string;
+  paidAmount: string;
+  notes: string | null;
+  postedAt: string | null;
+  updatedAt: string;
+  lines: SalesInvoiceLine[];
+}
+
+export const getCustomers = (archived = false) =>
+  get<CustomerRow[]>(archived ? '/customers?status=archived' : '/customers');
+export const getCustomer = (id: string) => get<CustomerDetail>(`/customers/${id}`);
+export const getSalesInvoices = () => get<SalesInvoiceRow[]>('/sales-invoices');
+export const getSalesInvoice = (id: string) => get<SalesInvoiceDetail>(`/sales-invoices/${id}`);

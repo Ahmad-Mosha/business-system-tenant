@@ -111,8 +111,10 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
             <TableBody>
               {invoice.lines.map((l) => (
                 <TableRow key={l.id}>
-                  <TableCell className="max-w-0 truncate font-medium">
-                    <bdi>{l.label}</bdi>
+                  <TableCell className="min-w-40 whitespace-normal">
+                    <p className="line-clamp-2 leading-snug font-medium" title={l.label}>
+                      <bdi>{l.label}</bdi>
+                    </p>
                   </TableCell>
                   <TableCell className="num text-end">{l.quantity}</TableCell>
                   <TableCell className="num text-end">{unitMoney(l.unitCost)}</TableCell>
