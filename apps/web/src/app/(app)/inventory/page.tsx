@@ -112,7 +112,7 @@ export default async function InventoryPage({
       <MetricGrid>
         <MetricCard
           label={t('stockValue')}
-          value={<Amount value={summary.stockValue} />}
+          value={<span data-sensitive><Amount value={summary.stockValue} /></span>}
           tone={summary.missingCost > 0 ? 'warning' : 'default'}
           hint={summary.missingCost > 0 ? t('missingCost', { count: summary.missingCost }) : t('atCost')}
         />
@@ -263,14 +263,14 @@ export default async function InventoryPage({
                     <TableCell className="num text-end text-muted-foreground">
                       {p.inOrders > 0 ? f.count(p.inOrders) : '—'}
                     </TableCell>
-                    <TableCell className="text-end">
+                    <TableCell className="text-end" data-sensitive>
                       {p.unitCost ? (
                         <Amount value={p.unitCost} />
                       ) : (
                         <span className="text-xs text-warning">{tc('notSet')}</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-end">
+                    <TableCell className="text-end" data-sensitive>
                       {p.unitCost && p.onHand > 0 ? (
                         <Amount value={p.stockValue} className="font-medium" />
                       ) : (

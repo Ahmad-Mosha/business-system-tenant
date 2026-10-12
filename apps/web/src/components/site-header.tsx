@@ -15,10 +15,12 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 
+import { PrivacyToggle } from '@/components/privacy-toggle';
 import { locate } from '@/lib/nav';
 import { useFormat } from '@/i18n/use-format';
 
-export function SiteHeader() {
+/** `privacy` is the eye's starting state, for admins — the only people shown costs. */
+export function SiteHeader({ privacy }: { privacy?: boolean }) {
   const t = useTranslations('nav');
   const f = useFormat();
   const pathname = usePathname();
@@ -68,6 +70,11 @@ export function SiteHeader() {
             ))}
           </BreadcrumbList>
         </Breadcrumb>
+      ) : null}
+      {privacy !== undefined ? (
+        <div className="ms-auto">
+          <PrivacyToggle initial={privacy} />
+        </div>
       ) : null}
     </header>
   );

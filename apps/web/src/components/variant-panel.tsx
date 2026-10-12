@@ -179,7 +179,7 @@ export function VariantPanel({
           <div className="grid grid-cols-2 gap-3">
             <Field>
               <FieldLabel htmlFor={`cost-${variant.id}`}>{tr('product.unitCost')}</FieldLabel>
-              <MoneyField id={`cost-${variant.id}`} value={cost} onChange={setCost} decimals={4} disabled={pending} />
+              <MoneyField id={`cost-${variant.id}`} value={cost} onChange={setCost} decimals={4} sensitive disabled={pending} />
             </Field>
             <Field>
               <FieldLabel htmlFor={`price-${variant.id}`}>{t('sellingPrice')}</FieldLabel>
@@ -365,12 +365,15 @@ function MoneyField({
   value,
   onChange,
   decimals = 2,
+  sensitive,
   disabled,
 }: {
   id: string;
   value: string;
   onChange: (v: string) => void;
   decimals?: number;
+  /** A cost: masked in privacy mode. */
+  sensitive?: boolean;
   disabled?: boolean;
 }) {
   const t = useTranslations('common');
@@ -381,6 +384,7 @@ function MoneyField({
       onValueChange={onChange}
       decimals={decimals}
       group
+      data-sensitive={sensitive || undefined}
       placeholder={t('notSet')}
       disabled={disabled}
       suffix={t('egp')}

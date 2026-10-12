@@ -29,10 +29,10 @@ const REASONS: StockReason[] = ['RETURN', 'ADJUSTMENT', 'DAMAGE', 'COUNT'];
 export class CatalogController {
   constructor(private readonly catalog: CatalogService) {}
 
-  /** Open to both roles — the manual order form needs it. */
+  /** Open to both roles — the manual order form needs it. Costs are admin-only. */
   @Get('variants/search')
-  searchVariants(@Query('q') q?: string) {
-    return this.catalog.searchVariants((q ?? '').trim());
+  searchVariants(@Req() req: Request, @Query('q') q?: string) {
+    return this.catalog.searchVariants((q ?? '').trim(), req.user?.role === 'ADMIN');
   }
 
   @Roles('ADMIN')
