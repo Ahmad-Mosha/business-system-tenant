@@ -333,7 +333,8 @@ export function InvoiceBuilder({
                 placeholder={t('newInvoice.searchPlaceholder')}
                 disabledReason={(h) => (lines.some((l) => l.variantId === h.id) ? t('newInvoice.added') : null)}
                 meta={(h) => t('newInvoice.onHand', { count: h.onHand })}
-                onPick={(h) => addLine(h.id, h.label, h.onHand, h.unitCost ? Number(h.unitCost).toFixed(2) : '')}
+                // The supplier's price on the latest posted invoice — never the inventory cost, which includes shipping.
+                onPick={(h) => addLine(h.id, h.label, h.onHand, h.lastPurchasePrice ? trimZeros(h.lastPurchasePrice) : '')}
                 onCreate={setCreating}
               />
             </CardContent>

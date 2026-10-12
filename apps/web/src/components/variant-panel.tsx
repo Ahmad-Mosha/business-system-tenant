@@ -178,7 +178,7 @@ export function VariantPanel({
           <p className="text-xs font-medium">{t('pricing')}</p>
           <div className="grid grid-cols-2 gap-3">
             <Field>
-              <FieldLabel htmlFor={`cost-${variant.id}`}>{tr('product.unitCost')}</FieldLabel>
+              <FieldLabel htmlFor={`cost-${variant.id}`}>{tr('inventory.columns.unitCost')}</FieldLabel>
               <MoneyField id={`cost-${variant.id}`} value={cost} onChange={setCost} decimals={4} sensitive disabled={pending} />
             </Field>
             <Field>

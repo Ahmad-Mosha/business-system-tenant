@@ -141,6 +141,7 @@ export class PurchaseInvoiceLine {
   @JoinColumn({ name: 'variant_id' })
   variant: ProductVariant;
 
+  @Index('ix_purchase_line_variant')
   @Column({ name: 'variant_id', type: 'uuid' })
   variantId: string;
 

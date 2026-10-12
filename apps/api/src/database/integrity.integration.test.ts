@@ -577,6 +577,7 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     const [forModerator] = await controller.searchVariants(as('MODERATOR'), product.name);
     const [forAdmin] = await controller.searchVariants(as('ADMIN'), product.name);
     assert.equal(forModerator.unitCost, null);
+    assert.equal(forModerator.lastPurchasePrice, null);
     assert.equal(forAdmin.unitCost, '10.0000');
   });
   await t.test('suppliers archive only when settled, and delete only when never used', async () => {
@@ -632,5 +633,36 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     assert.equal(await ledger.balanceOf('SUPPLIER_PAYABLE', { supplierId: supplier.id }), '100.00');
     await assert.rejects(purchasing.updateDraft(draft.id, { supplierId: supplier.id, invoiceDate: '2026-10-11', payment: 'CREDIT',
       lines: [{ variantId: id, quantity: 1, unitCost: '1' }] }), /cannot be edited/);
+  });
+  await t.test('last and average purchase prices come from posted invoices at the supplier price', async () => {
+    const catalog = new CatalogService(db, finance);
+    const name = `Priced ${randomUUID()}`;
+    const created = await catalog.createProduct({ name, sku: `SKU-${randomUUID().slice(0, 8)}` }, user.id);
+    const variantId = created.variantId;
+    const supplier = await purchasing.createSupplier({ name: `Price supplier ${randomUUID()}` });
+    const row = async () => (await catalog.listProducts({ search: name }))[0];
+    assert.equal((await row()).lastPurchasePrice, null); // no history: nothing invented
+    assert.equal((await row()).avgPurchasePrice, null);
+    const buy = (invoiceDate: string, lines: Array<{ quantity: number; unitCost: string }>, post = true, extraCosts = '0') =>
+      purchasing.createInvoice({ supplierId: supplier.id, invoiceDate, payment: 'CREDIT', extraCosts,
+        lines: lines.map((l) => ({ variantId, ...l })) }, user.id, post);
+    await buy('2026-10-01', [{ quantity: 10, unitCost: '100' }]);
+    await buy('2026-10-05', [{ quantity: 10, unitCost: '130' }], true, '500'); // shipping is landed cost, not price
+    assert.equal((await row()).lastPurchasePrice, '130.0000');
+    assert.equal((await row()).avgPurchasePrice, '115.0000');
+    await buy('2026-10-20', [{ quantity: 5, unitCost: '999' }], false); // a draft is a plan, not a purchase
+    assert.equal((await row()).lastPurchasePrice, '130.0000');
+    await buy('2026-09-01', [{ quantity: 10, unitCost: '50' }]); // back-dated: averaged, but not "last"
+    assert.equal((await row()).lastPurchasePrice, '130.0000');
+    assert.equal((await row()).avgPurchasePrice, '93.3333');
+    await buy('2026-10-10', [{ quantity: 2, unitCost: '100' }, { quantity: 3, unitCost: '110' }]);
+    const latest = await row();
+    assert.equal(latest.lastPurchasePrice, '106.0000');
+    assert.equal(latest.lastPurchaseDate, '2026-10-10');
+    assert.equal(latest.purchasedUnits, 35);
+    const detail = await catalog.getProduct(created.id);
+    assert.equal(detail.purchases.length, 5);
+    assert.equal(detail.lastPurchasePrice, '106.0000');
+    assert.equal((await catalog.listProducts({ search: detail.variants[0].sku }))[0].id, created.id); // search by SKU
   });
 });

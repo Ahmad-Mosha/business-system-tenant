@@ -130,7 +130,10 @@ export async function searchVariants(term: string) {
       label: string;
       sku: string | null;
       sellingPrice: string | null;
+      /** Admins only — null for moderators. */
       unitCost: string | null;
+      /** The supplier's price on the latest posted invoice; admins only. */
+      lastPurchasePrice: string | null;
       onHand: number;
     }>
   >(`/catalog/variants/search?q=${encodeURIComponent(term)}`, 'GET');

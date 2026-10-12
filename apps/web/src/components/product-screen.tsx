@@ -1,6 +1,7 @@
 'use client';
 
 import { Archive, ArchiveRestore, Check, Pencil, Trash2, X } from 'lucide-react';
+import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
@@ -26,6 +27,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
@@ -33,7 +35,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { VariantPanel, type Movement } from '@/components/variant-panel';
 import type { ProductDetail } from '@/lib/api';
 import { CATEGORIES } from '@/lib/categories';
-import { money } from '@/lib/format';
+import { money, unitMoney } from '@/lib/format';
 import { LOW_STOCK, stockState } from '@/lib/stock';
 import { isOneOf } from '@/lib/utils';
 import { bdi } from '@/i18n/rich';
@@ -293,7 +295,7 @@ export function ProductScreen({
           hint={inOrders > 0 ? t('inOpenOrdersHint') : t('nothingWaiting')}
         />
         <MetricCard
-          label={t('unitCost')}
+          label={tr('inventory.columns.unitCost')}
           value={only ? <span data-sensitive><Amount value={only.unitCost} /></span> : t('varies')}
           tone={only && !only.unitCost ? 'warning' : 'default'}
           hint={
@@ -333,6 +335,76 @@ export function ProductScreen({
           <ChannelListings product={product} />
         </Card>
       </div>
+
+      <PurchaseHistory product={product} />
     </Page>
+  );
+}
+
+/**
+ * What this product was bought for — the supplier's price, kept apart from the
+ * inventory cost above (which adds shipping and customs). Posted invoices only.
+ */
+function PurchaseHistory({ product }: { product: ProductDetail }) {
+  const t = useTranslations('product.purchases');
+  const ti = useTranslations('inventory');
+  const f = useFormat();
+  return (
+    <Card className="pb-0">
+      <CardHeader>
+        <CardTitle>{t('title')}</CardTitle>
+        <CardDescription>{t('hint')}</CardDescription>
+      </CardHeader>
+      {product.purchases.length === 0 ? (
+        <p className="border-t p-8 text-center text-[13px] text-muted-foreground">{ti('noPurchases')}</p>
+      ) : (
+        <>
+          <CardContent className="flex flex-wrap gap-8 border-t py-4" data-sensitive-scope>
+            <div>
+              <p className="text-xs text-muted-foreground">{ti('columns.lastPurchase')}</p>
+              <p className="num text-lg font-semibold">{unitMoney(product.lastPurchasePrice)}</p>
+              <p className="text-xs text-muted-foreground">
+                {product.lastPurchaseDate ? f.date(product.lastPurchaseDate) : null}
+                {product.lastPurchaseSupplier ? <> · <bdi>{product.lastPurchaseSupplier}</bdi></> : null}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">{ti('columns.avgPurchase')}</p>
+              <p className="num text-lg font-semibold">{unitMoney(product.avgPurchasePrice)}</p>
+              <p className="text-xs text-muted-foreground">
+                {ti('purchaseBasis', { units: f.count(product.purchasedUnits ?? 0), invoices: f.count(product.purchaseInvoices ?? 0) })}
+              </p>
+            </div>
+          </CardContent>
+          <Table data-sensitive-scope>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t('date')}</TableHead>
+                <TableHead>{t('supplier')}</TableHead>
+                <TableHead className="text-end">{t('quantity')}</TableHead>
+                <TableHead className="text-end">{t('unitPrice')}</TableHead>
+                <TableHead className="text-end">{t('landed')}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {product.purchases.map((p) => (
+                <TableRow key={`${p.invoiceId}-${p.variantId}-${p.quantity}-${p.unitCost}`} className="relative">
+                  <TableCell>
+                    <Link href={`/money/purchases/${p.invoiceId}`} className="after:absolute after:inset-0 hover:underline">
+                      {f.date(p.invoiceDate)}
+                    </Link>
+                    {p.invoiceNo ? <span className="ms-2 text-xs text-muted-foreground"><bdi>{p.invoiceNo}</bdi></span> : null}
+                  </TableCell>
+                  <TableCell className="max-w-0 truncate"><bdi>{p.supplier}</bdi></TableCell>
+                  <TableCell className="num text-end">{f.count(p.quantity)}</TableCell>
+                  <TableCell className="num text-end">{unitMoney(p.unitCost)}</TableCell>
+                  <TableCell className="num text-end text-muted-foreground">{p.landedUnitCost ? unitMoney(p.landedUnitCost) : '—'}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </>
+      )}
+    </Card>
   );
 }

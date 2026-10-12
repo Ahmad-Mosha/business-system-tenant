@@ -519,9 +519,11 @@
       "stock": "Stock",
       "onHand": "On hand",
       "inOrders": "In orders",
-      "unitCost": "Unit cost",
+      "unitCost": "Inventory cost",
       "stockValue": "Stock value",
-      "channels": "Channels"
+      "channels": "Channels",
+      "lastPurchase": "Last purchase",
+      "avgPurchase": "Avg purchase"
     },
     "sync": "Sync website",
     "synced": "Website catalogue synced: {updated} updated, {unmatched} unmatched.",
@@ -539,7 +541,16 @@
     "showArchived": "Archived products",
     "archivedTitle": "Archived products",
     "archivedDescription": "Hidden from inventory, orders and purchases. Open one to restore it.",
-    "backToInventory": "Back to inventory"
+    "backToInventory": "Back to inventory",
+    "help": {
+      "unitCost": "Average cost of a piece in stock, including shipping and customs. Stock value is worked out from it.",
+      "lastPurchase": "What the supplier charged per piece on the latest posted invoice, before shipping and customs.",
+      "avgPurchase": "What the supplier charged per piece across every posted invoice, weighted by quantity, before shipping and customs."
+    },
+    "noPurchases": "No posted purchases yet",
+    "boughtFrom": "From {supplier}",
+    "purchaseBasis": "{units} pieces on {invoices} invoices",
+    "varies": "Varies"
   },
   "product": {
     "back": "Back to inventory",
@@ -672,7 +683,16 @@
     "deleteDescription": "This product has never moved stock, sold, been bought or been linked to a channel, so it can be removed completely. This can't be undone.",
     "deleteConfirm": "Delete product",
     "deleted": "Product deleted",
-    "archivedBanner": "This product is archived. It's hidden from inventory, orders and purchases until you restore it."
+    "archivedBanner": "This product is archived. It's hidden from inventory, orders and purchases until you restore it.",
+    "purchases": {
+      "title": "Purchase history",
+      "hint": "What suppliers charged per piece on posted invoices, before shipping and customs. Inventory cost above includes those.",
+      "date": "Date",
+      "supplier": "Supplier",
+      "quantity": "Qty",
+      "unitPrice": "Supplier price",
+      "landed": "With shipping"
+    }
   },
   "validation": {
     "amount": "Enter an amount, e.g. {example}",
