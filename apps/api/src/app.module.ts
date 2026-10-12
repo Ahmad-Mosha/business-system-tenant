@@ -28,6 +28,8 @@ import { OrdersService } from './orders/orders.service';
 import { PurchasesController, SuppliersController } from './purchasing/purchasing.controller';
 import { PurchasingService } from './purchasing/purchasing.service';
 import { NoonReportingService } from './reporting/noon-reporting.service';
+import { CustomersController, SalesInvoicesController } from './sales/sales.controller';
+import { SalesService } from './sales/sales.service';
 
 @Module({
   imports: [
@@ -68,6 +70,8 @@ import { NoonReportingService } from './reporting/noon-reporting.service';
     FinanceController,
     SuppliersController,
     PurchasesController,
+    CustomersController,
+    SalesInvoicesController,
   ],
   providers: [
     ExpensesService,
@@ -85,6 +89,7 @@ import { NoonReportingService } from './reporting/noon-reporting.service';
     FinanceService,
     LedgerService,
     PurchasingService,
+    SalesService,
   ],
 })
 export class AppModule implements OnModuleInit {

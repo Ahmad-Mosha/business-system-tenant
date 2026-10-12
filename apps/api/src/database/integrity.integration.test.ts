@@ -12,6 +12,7 @@ import { Order } from '../orders/order.entity';
 import { PurchasingService } from '../purchasing/purchasing.service';
 import { CatalogService } from '../catalog/catalog.service';
 import { CatalogController } from '../catalog/catalog.controller';
+import { SalesService } from '../sales/sales.service';
 import type { Request } from 'express';
 import { Product } from '../catalog/product.entity';
 import { ProductVariant } from '../catalog/product-variant.entity';
@@ -664,5 +665,35 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     assert.equal(detail.purchases.length, 5);
     assert.equal(detail.lastPurchasePrice, '106.0000');
     assert.equal((await catalog.listProducts({ search: detail.variants[0].sku }))[0].id, created.id); // search by SKU
+  });
+  await t.test('sales invoice drafts price exactly, never duplicate, and move nothing', async () => {
+    const sales = new SalesService(db);
+    const a = await stock(10);
+    const b = await stock(5);
+    const customer = await sales.createCustomer({ name: `Wholesale ${randomUUID()}` });
+    const requestId = randomUUID();
+    const body = { requestId, customerId: customer.id, invoiceDate: '2026-10-12', discount: '20',
+      lines: [{ variantId: a, quantity: 3, lineTotal: '100' }, { variantId: b, quantity: 2, unitPrice: '45.5' }] };
+    const [first, second] = await Promise.all([sales.createDraft(body, user.id), sales.createDraft(body, user.id)]);
+    assert.equal(first.id, second.id);
+    assert.equal(first.goodsTotal, '191.00'); // 100.00 typed + 2 × 45.50
+    assert.equal(first.discount, '20.00');
+    assert.equal(first.total, '171.00');
+    assert.equal(first.lines.find((l: { variantId: string }) => l.variantId === a).unitPrice, '33.3333');
+    assert.equal(await balance(a), 10); // a draft moves no stock
+    const [{ n }] = await db.query("SELECT count(*)::int AS n FROM ledger_entry WHERE source_id = $1", [first.id]);
+    assert.equal(n, 0); // nor money
+
+    const edited = await sales.updateDraft(first.id, { ...body, discount: '0', lines: [{ variantId: a, quantity: 4, unitPrice: '30' }] });
+    assert.equal(edited.total, '120.00');
+    assert.equal(edited.lines.length, 1);
+    await assert.rejects(sales.updateDraft(first.id, { ...body, discount: '500' }), /cannot exceed/);
+
+    await assert.rejects(sales.updateCustomer(customer.id, { active: false }), /draft invoices/);
+    await assert.rejects(sales.deleteCustomer(customer.id), /archive them instead/);
+    await sales.deleteDraft(first.id);
+    await sales.updateCustomer(customer.id, { active: false });
+    assert.ok((await sales.listCustomers(true)).some((c) => c.id === customer.id));
+    await sales.deleteCustomer(customer.id);
   });
 });
