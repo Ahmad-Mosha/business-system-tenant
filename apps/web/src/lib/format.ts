@@ -19,6 +19,14 @@ export function money(v: string | number | null | undefined): string {
   return keepSign(EGP.format(Number(v)));
 }
 
+const EGP_UNIT = new Intl.NumberFormat('en-EG', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+
+/** A per-unit cost, which can carry 4 decimals (100 ÷ 3 = `33.3333`): `120.00`, `33.3333`. */
+export function unitMoney(v: string | number | null | undefined): string {
+  if (v === null || v === undefined || v === '') return '—';
+  return keepSign(EGP_UNIT.format(Number(v)));
+}
+
 /** Compact form for dense table cells, where the piastres are noise. */
 export function moneyWhole(v: string | number | null | undefined): string {
   if (v === null || v === undefined || v === '') return '—';

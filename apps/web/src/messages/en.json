@@ -875,7 +875,7 @@
       "cashNow": "Paid in cash now",
       "cashNowHint": "Comes out of the till on posting",
       "productsReceived": "Products received",
-      "productsHint": "Pick from inventory, or add a new product on the spot.",
+      "productsHint": "Pick from inventory or add a new product. Type either the unit cost or the line total: the other is calculated, and the one you typed stays fixed if the quantity changes.",
       "searchPlaceholder": "Add a product — search by Arabic name or SKU",
       "added": "Added",
       "onHand": "{count} on hand",
@@ -889,7 +889,8 @@
       "postTotal": "Post — <num>{total}</num>",
       "saveDraft": "Save as draft",
       "draftSaved": "Draft saved.",
-      "posted": "Invoice posted."
+      "posted": "Invoice posted.",
+      "calculated": "Calculated from what you typed"
     },
     "pay": {
       "title": "Pay supplier",

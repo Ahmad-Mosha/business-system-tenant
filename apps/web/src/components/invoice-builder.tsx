@@ -57,6 +57,8 @@ import {
 } from '@/components/ui/table';
 import type { SupplierRow } from '@/lib/api';
 import { money } from '@/lib/format';
+import { priceLine } from '@/lib/purchase-line';
+import { cn } from '@/lib/utils';
 import { b, num, strong } from '@/i18n/rich';
 
 interface Line {
@@ -65,7 +67,10 @@ interface Line {
   label: string;
   /** As typed; a whole number of at least 1 before the invoice can be saved. */
   quantity: string;
+  /** What was typed — `source` says which one; the other is derived (lib/purchase-line). */
   unitCost: string;
+  lineTotal?: string;
+  source?: 'unit' | 'total';
   onHand: number | null;
 }
 
@@ -131,7 +136,9 @@ export function InvoiceBuilder({
 
   const supplier = supplierOptions.find((s) => s.id === supplierId);
   const qty = (l: Line) => Number(l.quantity) || 0;
-  const goodsTotal = lines.reduce((s, l) => s + qty(l) * (Number(l.unitCost) || 0), 0);
+  const priced = new Map(lines.map((l) => [l.key, priceLine(l)]));
+  const price = (l: Line) => priced.get(l.key)!;
+  const goodsTotal = lines.reduce((s, l) => s + (Number(price(l).lineTotal) || 0), 0);
   const extraValue = Number(extraCosts) || 0;
   const total = goodsTotal + extraValue;
   const totalUnits = lines.reduce((sum, l) => sum + qty(l), 0);
@@ -143,7 +150,7 @@ export function InvoiceBuilder({
     ? tr('validation.chooseSupplier')
     : !lines.length
       ? tr('validation.addProduct')
-      : lines.some((l) => !(Number(l.unitCost) > 0))
+      : lines.some((l) => !(Number(price(l).lineTotal) > 0))
         ? tr('validation.lineCost')
         : null;
 
@@ -166,7 +173,11 @@ export function InvoiceBuilder({
       allocation,
       extraCosts: extraCosts || '0',
       extraCostsPaidSeparately: separateCosts,
-      lines: lines.map((l) => ({ variantId: l.variantId, quantity: qty(l), unitCost: l.unitCost })),
+      lines: lines.map((l) => ({
+        variantId: l.variantId,
+        quantity: qty(l),
+        ...(l.source === 'total' ? { lineTotal: price(l).lineTotal } : { unitCost: l.unitCost }),
+      })),
     };
     start(async () => {
       const res = await saveInvoice(payload, asDraft);
@@ -328,20 +339,31 @@ export function InvoiceBuilder({
                         </TableCell>
                         <TableCell className="py-1.5">
                           <NumberField
-                            value={l.unitCost}
-                            onValueChange={(v) => patchLine(l.key, { unitCost: v })}
+                            value={price(l).unitCost}
+                            onValueChange={(v) => patchLine(l.key, { unitCost: v, source: 'unit' })}
+                            decimals={4}
                             group
                             placeholder="0.00"
                             aria-label={t('invoice.columns.unitCost')}
-                            aria-invalid={!(Number(l.unitCost) > 0)}
+                            aria-invalid={!(Number(price(l).lineTotal) > 0)}
+                            title={l.source === 'total' ? t('newInvoice.calculated') : undefined}
                             disabled={pending}
-                            className={cellInput}
+                            className={cn(cellInput, l.source === 'total' && 'text-muted-foreground')}
                           />
                         </TableCell>
-                        <TableCell className="num text-end font-medium">
-                          {money(qty(l) * (Number(l.unitCost) || 0))}
+                        <TableCell className="py-1.5">
+                          <NumberField
+                            value={price(l).lineTotal}
+                            onValueChange={(v) => patchLine(l.key, { lineTotal: v, source: 'total' })}
+                            group
+                            placeholder="0.00"
+                            aria-label={t('invoice.columns.lineTotal')}
+                            title={l.source !== 'total' ? t('newInvoice.calculated') : undefined}
+                            disabled={pending}
+                            className={cn(cellInput, 'font-medium', l.source !== 'total' && 'text-muted-foreground')}
+                          />
                         </TableCell>
-                        {extraValue > 0 ? <TableCell className="num text-end text-muted-foreground">{money(Number(l.unitCost || 0) + (allocation === 'BY_VALUE' ? (goodsTotal > 0 ? extraValue * Number(l.unitCost || 0) / goodsTotal : 0) : extraValue / totalUnits))}</TableCell> : null}
+                        {extraValue > 0 ? <TableCell className="num text-end text-muted-foreground">{money(Number(price(l).unitCost || 0) + (allocation === 'BY_VALUE' ? (goodsTotal > 0 ? extraValue * Number(price(l).unitCost || 0) / goodsTotal : 0) : extraValue / totalUnits))}</TableCell> : null}
                         <TableCell className="pe-2">
                           <Button
                             variant="ghost"

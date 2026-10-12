@@ -15,3 +15,10 @@ test('the day and the month turn over at midnight in Cairo, not on the server', 
   assert.equal(daysAgo(1, afterMidnightInCairo), '2026-09-30');
   assert.equal(daysAgo(30, afterMidnightInCairo), '2026-09-01');
 });
+
+test('a unit cost shows up to four decimals and never pads beyond two', async () => {
+  const { unitMoney } = await import('./format');
+  assert.equal(unitMoney('33.3333'), '33.3333');
+  assert.equal(unitMoney('120.0000'), '120.00');
+  assert.equal(unitMoney('2650.5'), '2,650.50');
+});

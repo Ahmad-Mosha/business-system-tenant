@@ -548,4 +548,24 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     await assert.rejects(orders.create({ id: other.id, name: other.name, role: 'MODERATOR', email: other.email }, body));
     assert.equal(await balance(id), 3);
   });
+  await t.test('a typed line total is the amount owed, received and booked exactly', async () => {
+    const id = await stock(0);
+    const supplier = await purchasing.createSupplier({ name: `Total supplier ${randomUUID()}` });
+    const invoice = await purchasing.createInvoice({ supplierId: supplier.id, invoiceDate: '2026-10-12', payment: 'CREDIT',
+      lines: [{ variantId: id, quantity: 3, lineTotal: '100' }] }, user.id, true);
+    assert.equal(invoice.goodsTotal, '100.00');
+    assert.equal(invoice.lines[0].unitCost, '33.3333');
+    assert.equal(invoice.lines[0].lineTotal, '100.00');
+    assert.equal((await purchasing.supplierDetail(supplier.id)).balance, '100.00');
+    assert.equal(await ledger.balanceOf('SUPPLIER_PAYABLE', { supplierId: supplier.id }), '100.00');
+    assert.equal(await balance(id), 3);
+    const [variant] = await db.query('SELECT unit_cost FROM product_variant WHERE id = $1', [id]);
+    assert.equal(variant.unit_cost, '33.3333');
+    // A typed unit cost with four decimals rounds the line, never the other way round.
+    const byUnit = await purchasing.createInvoice({ supplierId: supplier.id, invoiceDate: '2026-10-12', payment: 'CREDIT',
+      lines: [{ variantId: id, quantity: 3, unitCost: '33.3333' }] }, user.id);
+    assert.equal(byUnit.lines[0].lineTotal, '100.00');
+    await assert.rejects(purchasing.createInvoice({ supplierId: supplier.id, invoiceDate: '2026-10-12', payment: 'CREDIT',
+      lines: [{ variantId: id, quantity: 3, lineTotal: '100.001' }] }, user.id));
+  });
 });

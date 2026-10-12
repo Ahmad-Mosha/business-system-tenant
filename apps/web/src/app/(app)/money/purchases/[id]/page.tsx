@@ -18,7 +18,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { getPurchase, getSupplier } from '@/lib/api';
-import { money } from '@/lib/format';
+import { money, unitMoney } from '@/lib/format';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
 import { getTranslations } from 'next-intl/server';
@@ -91,10 +91,10 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
                     <bdi>{l.label}</bdi>
                   </TableCell>
                   <TableCell className="num text-end">{l.quantity}</TableCell>
-                  <TableCell className="num text-end">{money(l.unitCost)}</TableCell>
+                  <TableCell className="num text-end">{unitMoney(l.unitCost)}</TableCell>
                   {hasExtras ? (
                     <TableCell className="num text-end text-muted-foreground">
-                      {l.landedUnitCost ? money(l.landedUnitCost) : '—'}
+                      {l.landedUnitCost ? unitMoney(l.landedUnitCost) : '—'}
                     </TableCell>
                   ) : null}
                   <TableCell className="num text-end font-medium">{money(l.lineTotal)}</TableCell>
