@@ -14,7 +14,8 @@ export function BrandMark({ className }: { className?: string }) {
         className,
       )}
     >
-      P
+      {/* The monogram is part of the logo, not words to translate. */}
+      {'P'}
     </span>
   );
 }
