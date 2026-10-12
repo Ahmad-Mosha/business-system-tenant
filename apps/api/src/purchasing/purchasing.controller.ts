@@ -80,6 +80,7 @@ export class PurchasesController {
     @Req() req: Request,
     @Body()
     body: {
+      requestId?: string;
       supplierId?: string;
       invoiceNo?: string;
       invoiceDate?: string;
@@ -94,6 +95,7 @@ export class PurchasesController {
     if (!Array.isArray(body?.lines)) throw new BadRequestException('lines are required');
     return this.purchasing.createInvoice(
       {
+        requestId: body.requestId,
         supplierId: body.supplierId ?? '',
         invoiceNo: body.invoiceNo,
         invoiceDate: body.invoiceDate ?? '',

@@ -4,7 +4,13 @@ import { accountByCode } from '@/lib/money';
 import { requireAdmin } from '@/lib/session';
 
 export default async function NewPurchasePage() {
-  await requireAdmin();
+  const user = await requireAdmin();
   const [suppliers, accounts] = await Promise.all([getSuppliers(), getMoneyAccounts()]);
-  return <InvoiceBuilder suppliers={suppliers} cashBalance={accountByCode(accounts, 'CASH')?.balance ?? '0'} />;
+  return (
+    <InvoiceBuilder
+      suppliers={suppliers}
+      cashBalance={accountByCode(accounts, 'CASH')?.balance ?? '0'}
+      draftKey={`${user.id}:purchase:new`}
+    />
+  );
 }

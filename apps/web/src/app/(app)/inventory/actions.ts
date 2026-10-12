@@ -4,7 +4,11 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { apiRequest } from '@/lib/api-request';
 
-export type CreateProductState = { status: 'idle' } | { status: 'error'; message: string };
+export type CreateProductState =
+  | { status: 'idle' }
+  | { status: 'error'; message: string }
+  /** The form clears its draft, then opens the product. */
+  | { status: 'saved'; id: string };
 
 type Result = { ok: true } | { ok: false; message: string };
 
@@ -41,7 +45,7 @@ export async function addProduct(
   });
   if (!created.ok) return { status: 'error', message: created.message };
   revalidatePath('/inventory');
-  redirect(`/inventory/${created.data.id}`);
+  return { status: 'saved', id: created.data.id };
 }
 
 export async function updateProduct(productId: string, patch: { name?: string; category?: string | null }) {

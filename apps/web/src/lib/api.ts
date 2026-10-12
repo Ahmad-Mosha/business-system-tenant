@@ -152,6 +152,8 @@ export interface OrderDetail extends Omit<OrderRow, 'assignedToName' | 'itemCoun
   shippingCost: string;
   externalId: string | null;
   externalStatus: string | null;
+  /** Changes on every save — an unsaved edit draft remembers which version it began from. */
+  updatedAt: string;
   assignedTo: { id: string; name: string } | null;
   items: Array<{
     id: string;

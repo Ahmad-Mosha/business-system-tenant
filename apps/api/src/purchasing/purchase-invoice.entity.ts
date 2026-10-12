@@ -7,6 +7,7 @@ import {
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
+  Unique,
   UpdateDateColumn,
 } from 'typeorm';
 import { ProductVariant } from '../catalog/product-variant.entity';
@@ -49,6 +50,7 @@ export function paidStatusOf(i: PurchaseSettlement): PaidStatus {
  * A posted invoice is immutable; a mistake is a new reversing invoice.
  */
 @Entity('purchase_invoice')
+@Unique('uq_purchase_invoice_request', ['requestId'])
 export class PurchaseInvoice {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -60,6 +62,10 @@ export class PurchaseInvoice {
   @Index('ix_purchase_supplier')
   @Column({ name: 'supplier_id', type: 'uuid' })
   supplierId: string;
+
+  /** The submitting form's id, so a resent submission returns this invoice instead of a second one. */
+  @Column({ name: 'request_id', type: 'uuid', nullable: true })
+  requestId: string | null;
 
   /** The supplier's own invoice reference, if there is one. */
   @Column({ type: 'text', nullable: true })

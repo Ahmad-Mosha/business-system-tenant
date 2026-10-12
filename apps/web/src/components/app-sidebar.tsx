@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 import { useTheme } from 'next-themes';
 import { useState, useTransition } from 'react';
 import { signOut } from '@/app/login/actions';
+import { clearAllDrafts } from '@/hooks/use-draft';
 import { LanguageMenuGroup } from '@/components/language-switcher';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -247,7 +248,7 @@ function NavUser({ user }: { user: SessionUser }) {
             <DropdownMenuSeparator />
             <LanguageMenuGroup />
             <DropdownMenuSeparator />
-            <DropdownMenuItem disabled={signingOut} onSelect={() => startSignOut(() => signOut())}>
+            <DropdownMenuItem disabled={signingOut} onSelect={() => startSignOut(() => { clearAllDrafts(); return signOut(); })}>
               <LogOut className="rtl:-scale-x-100" />
               {t('user.signOut')}
             </DropdownMenuItem>
