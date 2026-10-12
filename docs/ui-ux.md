@@ -84,9 +84,14 @@ exists behind the theme toggle.
 
 | Role | Use |
 |---|---|
-| Ground | White background and cards, `sidebar` a step off-white |
+| Ground | A softly tinted `sheet` for the working area, white cards and fields raised on it, the `canvas` frame (sidebar) a step deeper. Dark mode is a layered deep slate, not black |
 | Primary (teal) | Primary actions and charts. The current selection (pressed toggles, active filters, checked choice cards) uses `highlight` — the same teal in light, a brighter one in dark where primary is too dim as text |
 | Semantic | `success`, `warning`, `destructive` (+ `-subtle` fills) — state only, never identity. Dark enough for 12px text on white |
+
+**No gradients, glows or decorative tiles** — they read as template design.
+Colour goes only on the mark that carries meaning: an arrow, an amount, a status
+dot. Never `color-mix(in oklch, …)`: Chrome drops the hue and greys turn brown;
+mix `in srgb`.
 
 Statuses go through `ToneBadge` (`neutral`, `muted`, `progress`, `success`,
 `warning`, `danger`) — a coloured mark and a plain word, no box, one mapping
@@ -109,7 +114,9 @@ per domain status, never ad-hoc colours.
 The content sits on an inset sheet beside a collapsible, 13rem sidebar (modules
 fold open). `Page` → `PageHeader` (title, description, actions, optional back)
 → `MetricGrid` (one strip of figures with hairline dividers) → `FilterBar`
-(URL-synced) → `TablePanel` with `TablePagination`. List screens use `<Page fill>`: on desktop the table scrolls
+(URL-synced) → `TablePanel` with `TablePagination`. The header carries the
+search-and-jump palette (Ctrl/⌘ K, `components/command-menu.tsx`): screens,
+create actions, and live results for orders, products and customers. List screens use `<Page fill>`: on desktop the table scrolls
 inside its panel and the filters and pagination never leave the screen; under
 `lg` the page scrolls. Forms are cards with a sticky summary column; small
 records use `FormDialog`.
@@ -119,7 +126,11 @@ records use `FormDialog`.
   only where real history exists.
 - Tables: 44px rows, muted header, row-link overlay on the first cell; the
   dropdown chevrons of in-row menus show only on the hovered row.
-- Every list has an empty state that says why it's empty and what to do.
+- Every list has an empty state that says why it's empty and what to do. A
+  failed outside service (Bosta) says so in plain words with a retry — never a
+  raw error, never a list of zeros.
+- A list worked from a phone gets a card layout under `md` (Orders): number,
+  name and total on top, the in-row menus underneath.
 - The one filter a list is mostly used by can be `segments` in the `FilterBar`
   (all options on show, with counts) — Inventory's stock level.
 
@@ -157,9 +168,12 @@ shadcn's chart (`components/ui/chart.tsx`, Recharts v3); every chart lives in
 - **Only honest comparisons.** A trend or "vs before" appears only when the
   earlier window is entirely inside the books; the cash chart starts at the
   opening balance, which is where the books began, not a gain.
-- Colour: the treasury's balance is teal; money in/out uses `success` /
-  `destructive`, the same as the ledger rows. A bar that stands for records
-  opens them (a breakdown bar → that account's ledger for the window).
+- Plain drawing: thin lines, flat light fills, dashed hairline grids, small
+  bar radii — no gradient fills.
+- Colour: the treasury's balance and money in are teal; money out is a quiet
+  grey (`OUT_FILL`), red only for a value below zero. Breakdowns ("where it
+  came from / went") are ranked lists with a thin share bar (`BarList`), each
+  line opening that account's ledger for the window.
 - Cost of goods sold isn't posted yet, so no screen shows a profit figure.
 
 ---
