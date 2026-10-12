@@ -50,7 +50,7 @@ export function TablePanel({
   return (
     <section
       className={cn(
-        'flex flex-col overflow-hidden bg-card text-card-foreground ring-1 ring-foreground/10 lg:min-h-0',
+        'flex flex-col overflow-hidden rounded-xl bg-card text-card-foreground shadow-xs ring-1 ring-foreground/8 lg:min-h-0',
         className,
       )}
     >
@@ -62,7 +62,7 @@ export function TablePanel({
         {children}
       </div>
       {footer ? (
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t px-4 py-2">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t bg-[color-mix(in_oklch,var(--muted)_35%,var(--card))] px-5 py-2.5">
           {footer}
         </div>
       ) : null}
