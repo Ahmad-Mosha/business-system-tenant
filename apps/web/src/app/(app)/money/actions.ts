@@ -141,6 +141,7 @@ export interface InvoiceLinePayload {
   unitCost: string;
 }
 export interface InvoicePayload {
+  requestId: string;
   supplierId: string;
   invoiceNo?: string;
   invoiceDate: string;

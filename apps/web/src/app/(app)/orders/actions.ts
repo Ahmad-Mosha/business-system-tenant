@@ -1,7 +1,6 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import type { ShipmentTracking } from '@/lib/api';
 import { apiRequest } from '@/lib/api-request';
@@ -53,11 +52,16 @@ export async function bulkAssignOrders(
   return { ok: true, updated: result.data.updated };
 }
 
-export type CreateOrderState = { status: 'idle' } | { status: 'error'; message: string };
+export type CreateOrderState =
+  | { status: 'idle' }
+  | { status: 'error'; message: string }
+  /** The form clears its draft, then opens the order. */
+  | { status: 'saved'; id: string };
 
 /** What the order form sends — the same for a new order and an edit. */
 function orderBody(formData: FormData) {
   return {
+    requestId: formData.get('requestId') || undefined,
     customerName: formData.get('customerName'),
     customerPhone: formData.get('customerPhone'),
     governorate: formData.get('governorate'),
@@ -98,7 +102,7 @@ export async function createOrder(
   }
 
   revalidatePath('/orders');
-  redirect(`/orders/${created.data.id}`);
+  return { status: 'saved', id: created.data.id };
 }
 
 /** Edit an existing order — same payload as creation, applied in place. */
@@ -114,7 +118,7 @@ export async function updateOrder(
   if (!saved.ok) return { status: 'error', message: saved.message };
 
   revalidateOrder(orderId);
-  redirect(`/orders/${orderId}`);
+  return { status: 'saved', id: orderId };
 }
 
 /** Product lookup for the manual order form. */

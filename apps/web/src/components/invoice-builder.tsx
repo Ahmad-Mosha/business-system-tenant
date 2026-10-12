@@ -10,6 +10,8 @@ import { SupplierForm } from '@/components/supplier-form';
 import { AddProductDialog } from '@/components/add-product-dialog';
 import { Amount } from '@/components/amount';
 import { DatePicker, todayISO } from '@/components/date-picker';
+import { DraftNotice } from '@/components/draft-notice';
+import { useDraft } from '@/hooks/use-draft';
 import { Page, PageHeader } from '@/components/page';
 import { VariantSearch } from '@/components/variant-search';
 import {
@@ -70,12 +72,28 @@ interface Line {
 const cellInput =
   'h-8 border-transparent bg-transparent px-2 shadow-none hover:border-input focus-visible:border-ring';
 
+interface InvoiceForm {
+  /** One id per invoice being entered: a resend can never record it twice. */
+  requestId: string;
+  supplierId: string;
+  invoiceNo: string;
+  invoiceDate: string;
+  payment: 'CASH' | 'CREDIT';
+  allocation: 'BY_VALUE' | 'PER_UNIT';
+  extraCosts: string;
+  separateCosts: boolean;
+  lines: Line[];
+}
+
 export function InvoiceBuilder({
   suppliers,
   cashBalance,
+  draftKey,
 }: {
   suppliers: SupplierRow[];
   cashBalance: string;
+  /** Identifies this user's unfinished invoice in the browser. */
+  draftKey: string;
 }) {
   const t = useTranslations('money');
   const tr = useTranslations();
@@ -85,14 +103,30 @@ export function InvoiceBuilder({
 
   const [newSuppliers, setNewSuppliers] = useState<SupplierRow[]>([]);
   const supplierOptions = [...suppliers, ...newSuppliers.filter((s) => !suppliers.some((existing) => existing.id === s.id))];
-  const [extraCosts, setExtraCosts] = useState('0');
-  const [allocation, setAllocation] = useState<'BY_VALUE' | 'PER_UNIT'>('BY_VALUE');
-  const [separateCosts, setSeparateCosts] = useState(true);
-  const [supplierId, setSupplierId] = useState('');
-  const [invoiceNo, setInvoiceNo] = useState('');
-  const [invoiceDate, setInvoiceDate] = useState(todayISO());
-  const [payment, setPayment] = useState<'CASH' | 'CREDIT'>('CREDIT');
-  const [lines, setLines] = useState<Line[]>([]);
+  // Everything typed lives in one object so it can be kept as a draft.
+  const [form, setForm] = useState<InvoiceForm>(() => ({
+    requestId: crypto.randomUUID(),
+    supplierId: '',
+    invoiceNo: '',
+    invoiceDate: todayISO(),
+    payment: 'CREDIT',
+    allocation: 'BY_VALUE',
+    extraCosts: '0',
+    separateCosts: true,
+    lines: [],
+  }));
+  const [initialForm] = useState(form);
+  const draft = useDraft({ key: draftKey, value: form, initial: initialForm, apply: setForm });
+  const { supplierId, invoiceNo, invoiceDate, payment, allocation, extraCosts, separateCosts, lines } = form;
+  const set = <K extends keyof InvoiceForm>(key: K) => (value: InvoiceForm[K]) => setForm((f) => ({ ...f, [key]: value }));
+  const setSupplierId = set('supplierId');
+  const setInvoiceNo = set('invoiceNo');
+  const setInvoiceDate = set('invoiceDate');
+  const setPayment = set('payment');
+  const setAllocation = set('allocation');
+  const setExtraCosts = set('extraCosts');
+  const setSeparateCosts = set('separateCosts');
+  const setLines = (update: (lines: Line[]) => Line[]) => setForm((f) => ({ ...f, lines: update(f.lines) }));
   const [creating, setCreating] = useState<string | null>(null);
 
   const supplier = supplierOptions.find((s) => s.id === supplierId);
@@ -124,6 +158,7 @@ export function InvoiceBuilder({
 
   const submit = (asDraft: boolean) => {
     const payload: InvoicePayload = {
+      requestId: form.requestId,
       supplierId,
       invoiceNo: invoiceNo.trim() || undefined,
       invoiceDate,
@@ -140,6 +175,7 @@ export function InvoiceBuilder({
         setConfirming(false);
         return;
       }
+      draft.clear();
       toast.success(t(asDraft ? 'newInvoice.draftSaved' : 'newInvoice.posted'));
       router.push(`/money/purchases/${res.id}`);
     });
@@ -163,6 +199,8 @@ export function InvoiceBuilder({
         title={t('newInvoice.title')}
         description={t('newInvoice.description')}
       />
+
+      <DraftNotice draft={draft} onUndo={setForm} />
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="grid min-w-0 gap-6">
@@ -401,6 +439,7 @@ export function InvoiceBuilder({
               {missing && !pending ? (
                 <p className="text-center text-xs text-muted-foreground">{missing}</p>
               ) : null}
+              <p className="text-center text-xs text-muted-foreground">{tr('drafts.autosaved')}</p>
             </CardContent>
           </Card>
         </aside>

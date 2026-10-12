@@ -1249,5 +1249,14 @@
     "status": "Status",
     "recorded": "Recorded",
     "trace": "Ledger"
+  },
+  "drafts": {
+    "restored": "Unsaved work from {when} was restored.",
+    "stale": "You have unsaved changes from {when}, made before this record was last updated.",
+    "restore": "Restore them",
+    "discard": "Discard draft",
+    "discarded": "Draft discarded",
+    "undo": "Undo",
+    "autosaved": "Saved on this device as you type. Nothing is recorded until you submit."
   }
 }

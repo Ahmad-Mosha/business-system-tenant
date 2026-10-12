@@ -524,4 +524,28 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     assert.equal((await purchasing.supplierDetail(supplier.id)).balance, '0.00');
     assert.equal(await ledger.balanceOf('SUPPLIER_PAYABLE', { supplierId: supplier.id }), '0.00');
   });
+  await t.test('a resent purchase submission creates one invoice, one receipt and one entry', async () => {
+    const id = await stock(0);
+    const supplier = await purchasing.createSupplier({ name: `Resend supplier ${randomUUID()}` });
+    const requestId = randomUUID();
+    const body = { requestId, supplierId: supplier.id, invoiceDate: '2026-10-12', payment: 'CASH' as const,
+      lines: [{ variantId: id, quantity: 4, unitCost: '25.00' }] };
+    const sent = await Promise.all([purchasing.createInvoice(body, user.id, true), purchasing.createInvoice(body, user.id, true)]);
+    assert.equal(sent[0].id, sent[1].id);
+    assert.equal((await purchasing.createInvoice(body, user.id, true)).id, sent[0].id);
+    assert.equal(await balance(id), 4);
+    const [{ n }] = await db.query("SELECT count(*)::int AS n FROM ledger_entry WHERE source_type = 'purchase_invoice' AND source_id = $1", [sent[0].id]);
+    assert.equal(n, 1);
+  });
+  await t.test('a resent order submission creates one order and moves stock once', async () => {
+    const id = await stock(5);
+    const requestId = randomUUID();
+    const body = { ...input(id, 2), requestId };
+    const sent = await Promise.all([orders.create(actor, body), orders.create(actor, body)]);
+    assert.equal(sent[0].id, sent[1].id);
+    assert.equal(await balance(id), 3);
+    const other = await db.getRepository(User).save({ email: `other-${Date.now()}@example.invalid`, name: 'Other', passwordHash: 'unused', role: 'MODERATOR' });
+    await assert.rejects(orders.create({ id: other.id, name: other.name, role: 'MODERATOR', email: other.email }, body));
+    assert.equal(await balance(id), 3);
+  });
 });

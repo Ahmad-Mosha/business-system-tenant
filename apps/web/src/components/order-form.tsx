@@ -3,9 +3,12 @@
 import { AlertTriangle, CheckCircle2, Plus, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
+import { useRouter } from 'next/navigation';
 import { useActionState, useRef, useState } from 'react';
 import { createOrder, updateOrder, type CreateOrderState } from '@/app/(app)/orders/actions';
 import { Amount } from '@/components/amount';
+import { DraftNotice } from '@/components/draft-notice';
+import { useDraft } from '@/hooks/use-draft';
 import { Page, PageHeader } from '@/components/page';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -81,24 +84,49 @@ const cellInput =
  * either way, because they collect exactly the same thing. The summary rides
  * alongside the work (sticky), with the submit and anything blocking it.
  */
+interface OrderFormState {
+  /** One id per order being entered: a resend can never create it twice. */
+  requestId: string;
+  customerName: string;
+  phone: string;
+  governorate: string;
+  address: string;
+  method: string;
+  notes: string;
+  shipping: string;
+  paymentCollected: boolean;
+  lines: Line[];
+}
+
 export function OrderForm({
   assignsToSelf,
   order,
+  draftKey,
 }: {
   assignsToSelf?: boolean;
   order?: OrderDetail;
+  /** Identifies this user's unfinished work on this order (or a new one) in the browser. */
+  draftKey: string;
 }) {
   const t = useTranslations('orders');
   const tc = useTranslations('common');
   const te = useTranslations('enums');
   const tn = useTranslations('nouns');
+  const tr = useTranslations();
+  const router = useRouter();
   const editing = !!order;
-  const [state, submit, pending] = useActionState(
-    editing ? updateOrder.bind(null, order.id) : createOrder,
-    INITIAL,
-  );
-  const [lines, setLines] = useState<Line[]>(
-    () =>
+  // Everything typed lives in one object so it can be kept as a draft.
+  const [form, setForm] = useState<OrderFormState>(() => ({
+    requestId: crypto.randomUUID(),
+    customerName: order?.customerName ?? '',
+    phone: order?.customerPhone ?? '',
+    governorate: order?.governorate ?? '',
+    address: order?.address ?? '',
+    method: order?.paymentMethod ?? 'COD',
+    notes: order?.notes ?? '',
+    shipping: order?.shippingCost ?? '0',
+    paymentCollected: false,
+    lines:
       order?.items.map((i, ix) => ({
         key: `e${ix}`,
         variantId: i.variantId ?? undefined,
@@ -106,11 +134,20 @@ export function OrderForm({
         quantity: String(i.quantity),
         unitPrice: i.unitPrice,
       })) ?? [],
-  );
-  const [shipping, setShipping] = useState(order?.shippingCost ?? '0');
-  const [phone, setPhone] = useState(order?.customerPhone ?? '');
-  const [governorate, setGovernorate] = useState(order?.governorate ?? '');
-  const [method, setMethod] = useState<string>(order?.paymentMethod ?? 'COD');
+  }));
+  const [initialForm] = useState(form);
+  const draft = useDraft({ key: draftKey, value: form, initial: initialForm, apply: setForm, version: order?.updatedAt });
+  const { lines, shipping, phone, governorate, method } = form;
+  const set = <K extends keyof OrderFormState>(key: K) => (value: OrderFormState[K]) => setForm((f) => ({ ...f, [key]: value }));
+  const setLines = (update: (lines: Line[]) => Line[]) => setForm((f) => ({ ...f, lines: update(f.lines) }));
+  const [state, submit, pending] = useActionState(async (previous: CreateOrderState, data: FormData) => {
+    const next = await (editing ? updateOrder.bind(null, order.id) : createOrder)(previous, data);
+    if (next.status === 'saved') {
+      draft.clear();
+      router.push(`/orders/${next.id}`);
+    }
+    return next;
+  }, INITIAL);
   const seq = useRef(0);
 
   const addLine = (hit?: VariantHit) => {
@@ -183,6 +220,8 @@ export function OrderForm({
         )}
       />
 
+      <input type="hidden" name="requestId" value={form.requestId} />
+
       <Page>
         <PageHeader
           back={{ href: back, label: editing ? t('form.backToOrder') : t('back') }}
@@ -201,6 +240,8 @@ export function OrderForm({
           }
         />
 
+        <DraftNotice draft={draft} onUndo={setForm} />
+
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
           <div className="grid min-w-0 gap-6">
             <div className="grid gap-6 xl:grid-cols-2">
@@ -217,7 +258,8 @@ export function OrderForm({
                         name="customerName"
                         dir="auto"
                         required
-                        defaultValue={order?.customerName ?? ''}
+                        value={form.customerName}
+                        onChange={(e) => set('customerName')(e.target.value)}
                         placeholder={t('form.namePlaceholder')}
                         disabled={pending}
                       />
@@ -232,7 +274,7 @@ export function OrderForm({
                         dir="ltr"
                         placeholder="01xxxxxxxxx"
                         value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
+                        onChange={(e) => set('phone')(e.target.value)}
                         aria-invalid={phoneBad}
                         disabled={pending}
                         className="num"
@@ -254,7 +296,7 @@ export function OrderForm({
                       <Select
                         name="governorate"
                         value={governorate}
-                        onValueChange={setGovernorate}
+                        onValueChange={set('governorate')}
                         disabled={pending}
                       >
                         <SelectTrigger id="governorate" className="w-full">
@@ -275,7 +317,8 @@ export function OrderForm({
                         id="address"
                         name="address"
                         dir="auto"
-                        defaultValue={order?.address ?? ''}
+                        value={form.address}
+                        onChange={(e) => set('address')(e.target.value)}
                         placeholder={t('form.addressPlaceholder')}
                         disabled={pending}
                       />
@@ -423,7 +466,7 @@ export function OrderForm({
                   <RadioGroup
                     name="paymentMethod"
                     value={method}
-                    onValueChange={setMethod}
+                    onValueChange={set('method')}
                     disabled={pending}
                     aria-label={t('detail.paymentMethod')}
                     className="grid gap-2 sm:grid-cols-3"
@@ -447,7 +490,8 @@ export function OrderForm({
                       name="notes"
                       dir="auto"
                       rows={2}
-                      defaultValue={order?.notes ?? ''}
+                      value={form.notes}
+                      onChange={(e) => set('notes')(e.target.value)}
                       placeholder={t('form.notesPlaceholder')}
                       disabled={pending}
                       className="min-h-16 resize-none"
@@ -479,7 +523,7 @@ export function OrderForm({
                       id="shippingCost"
                       name="shippingCost"
                       value={shipping}
-                      onValueChange={setShipping}
+                      onValueChange={set('shipping')}
                       group
                       disabled={pending}
                       suffix={tc('egp')}
@@ -493,7 +537,13 @@ export function OrderForm({
 
                 {!editing ? (
                   <Field orientation="horizontal" className="mt-1">
-                    <Checkbox id="paymentCollected" name="paymentCollected" disabled={pending} />
+                    <Checkbox
+                      id="paymentCollected"
+                      name="paymentCollected"
+                      checked={form.paymentCollected}
+                      onCheckedChange={(v) => set('paymentCollected')(v === true)}
+                      disabled={pending}
+                    />
                     <FieldLabel htmlFor="paymentCollected" className="font-normal">
                       {t('form.paymentCollected')}
                     </FieldLabel>
@@ -508,6 +558,7 @@ export function OrderForm({
                 {missing && !pending ? (
                   <p className="text-center text-xs text-muted-foreground">{missing}</p>
                 ) : null}
+                <p className="text-center text-xs text-muted-foreground">{tr('drafts.autosaved')}</p>
 
                 {overStock.map((l) => (
                   <Alert key={`o${l.key}`} variant="destructive">

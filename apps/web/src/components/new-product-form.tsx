@@ -3,9 +3,12 @@
 import { AlertTriangle, Plus, X } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
+import { useRouter } from 'next/navigation';
 import { useActionState, useRef, useState } from 'react';
 import { addProduct, type CreateProductState } from '@/app/(app)/inventory/actions';
+import { DraftNotice } from '@/components/draft-notice';
 import { Page, PageHeader } from '@/components/page';
+import { useDraft } from '@/hooks/use-draft';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
@@ -35,14 +38,52 @@ const MONEY = /^\d+(\.\d{1,2})?$/;
  * Every rule here mirrors CatalogService.createProduct — checked as it's
  * typed, not after a round trip that comes back with the same message.
  */
-export function NewProductForm() {
+type Listings = Record<(typeof LISTING_CHANNELS)[number], string[]>;
+
+interface ProductFormState {
+  name: string;
+  category: string;
+  sku: string;
+  unitCost: string;
+  openingStock: string;
+  listings: Listings;
+}
+
+export function NewProductForm({ draftKey }: { draftKey: string }) {
   const t = useTranslations('product');
   const tr = useTranslations();
-  const [state, submit, pending] = useActionState(addProduct, INITIAL);
-  const [name, setName] = useState('');
-  const [category, setCategory] = useState('');
-  const [unitCost, setUnitCost] = useState('');
-  const [openingStock, setOpeningStock] = useState('0');
+  const router = useRouter();
+  const [form, setForm] = useState<ProductFormState>(() => ({
+    name: '',
+    category: '',
+    sku: '',
+    unitCost: '',
+    openingStock: '0',
+    listings: Object.fromEntries(LISTING_CHANNELS.map((c) => [c, ['']])) as Listings,
+  }));
+  const [initialForm] = useState(form);
+  const draft = useDraft({ key: draftKey, value: form, initial: initialForm, apply: setForm });
+  const { name, category, unitCost, openingStock } = form;
+  const set = <K extends keyof ProductFormState>(key: K) => (value: ProductFormState[K]) =>
+    setForm((f) => ({ ...f, [key]: value }));
+  const setName = set('name');
+  const setCategory = set('category');
+  const setUnitCost = set('unitCost');
+  const setOpeningStock = set('openingStock');
+  // A double click would otherwise add the product — and its opening stock — twice.
+  const sending = useRef(false);
+  const [state, submit, pending] = useActionState(async (previous: CreateProductState, data: FormData) => {
+    try {
+      const next = await addProduct(previous, data);
+      if (next.status === 'saved') {
+        draft.clear();
+        router.push(`/inventory/${next.id}`);
+      }
+      return next;
+    } finally {
+      sending.current = false;
+    }
+  }, INITIAL);
 
   const nameOk = name.trim().length > 0;
   const costOk = unitCost.trim() === '' || MONEY.test(unitCost.trim());
@@ -58,7 +99,15 @@ export function NewProductForm() {
         description={t('new.description')}
       />
 
-      <form action={submit}>
+      <DraftNotice draft={draft} onUndo={setForm} />
+
+      <form
+        action={submit}
+        onSubmit={(e) => {
+          if (sending.current) e.preventDefault();
+          else sending.current = true;
+        }}
+      >
         <Card>
           <CardContent>
             <FieldGroup>
@@ -113,6 +162,8 @@ export function NewProductForm() {
                     <Input
                       id="sku"
                       name="sku"
+                      value={form.sku}
+                      onChange={(e) => set('sku')(e.target.value)}
                       placeholder={t('new.optional')}
                       disabled={pending}
                       className="font-mono"
@@ -160,7 +211,13 @@ export function NewProductForm() {
                 <FieldDescription>{t('new.alsoSoldOnHint')}</FieldDescription>
                 <div className="grid gap-4">
                   {LISTING_CHANNELS.map((c) => (
-                    <ChannelSkuField key={c} channel={c} pending={pending} />
+                    <ChannelSkuField
+                      key={c}
+                      channel={c}
+                      values={form.listings[c]}
+                      onChange={(values) => setForm((f) => ({ ...f, listings: { ...f.listings, [c]: values } }))}
+                      pending={pending}
+                    />
                   ))}
                 </div>
               </FieldSet>
@@ -174,6 +231,7 @@ export function NewProductForm() {
             </FieldGroup>
           </CardContent>
           <CardFooter className="justify-end gap-2">
+            <p className="me-auto text-xs text-muted-foreground">{tr('drafts.autosaved')}</p>
             <Button variant="ghost" asChild>
               <Link href="/inventory">{tr('common.cancel')}</Link>
             </Button>
@@ -188,17 +246,20 @@ export function NewProductForm() {
   );
 }
 
-/**
- * A channel's SKU inputs — one to start, more via "+". Uncontrolled and
- * native: every row shares the same `name`, so `formData.getAll(name)` on
- * submit collects them all (see `addProduct`) without any client-side
- * assembly.
- */
-function ChannelSkuField({ channel, pending }: { channel: (typeof LISTING_CHANNELS)[number]; pending: boolean }) {
+/** A channel's SKU inputs — one to start, more via "+". Each row submits under the same name (`formData.getAll`). */
+function ChannelSkuField({
+  channel,
+  values,
+  onChange,
+  pending,
+}: {
+  channel: (typeof LISTING_CHANNELS)[number];
+  values: string[];
+  onChange: (values: string[]) => void;
+  pending: boolean;
+}) {
   const t = useTranslations('product');
   const tr = useTranslations();
-  const nextId = useRef(1);
-  const [rows, setRows] = useState<number[]>([0]);
 
   return (
     <Field orientation="horizontal">
@@ -206,35 +267,38 @@ function ChannelSkuField({ channel, pending }: { channel: (typeof LISTING_CHANNE
         {tr(`enums.channel.${channel}`)}
       </FieldLabel>
       <div className="grid flex-1 gap-2">
-        {rows.map((id, i) => (
-          <div key={id} className="flex gap-2">
+        {values.map((value, i) => (
+          <div key={i} className="flex gap-2">
             <Input
               name={`sku_${channel}`}
+              value={value}
+              onChange={(e) => onChange(values.map((v, j) => (j === i ? e.target.value : v)))}
               placeholder={t(`channelSku.${channel}.placeholder`)}
+              dir="ltr"
               disabled={pending}
               className="font-mono"
             />
-            {rows.length > 1 ? (
+            {values.length > 1 ? (
               <Button
                 type="button"
                 variant="outline"
                 size="icon"
                 disabled={pending}
                 aria-label={tr('common.cancel')}
-                onClick={() => setRows((r) => r.filter((x) => x !== id))}
+                onClick={() => onChange(values.filter((_, j) => j !== i))}
                 className="shrink-0 text-muted-foreground"
               >
                 <X />
               </Button>
             ) : null}
-            {i === rows.length - 1 ? (
+            {i === values.length - 1 ? (
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
                 disabled={pending}
                 aria-label={t('listings.addAnother')}
-                onClick={() => setRows((r) => [...r, nextId.current++])}
+                onClick={() => onChange([...values, ''])}
                 className="shrink-0 text-muted-foreground"
               >
                 <Plus />

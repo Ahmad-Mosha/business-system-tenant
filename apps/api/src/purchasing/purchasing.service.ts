@@ -16,9 +16,11 @@ import {
 import { Supplier } from './supplier.entity';
 import { problem } from '../problem';
 import { lockStock } from '../inventory/stock-lock';
+import { isUniqueViolation } from '../database/unique-violation';
 
 const MONEY = /^\d+(\.\d{1,2})?$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const money = (n: number) => n.toFixed(2);
 
 export interface InvoiceLineInput {
@@ -28,6 +30,8 @@ export interface InvoiceLineInput {
 }
 
 export interface CreateInvoiceInput {
+  /** The form's submission id; the same id never creates a second invoice. */
+  requestId?: string;
   supplierId: string;
   invoiceNo?: string;
   invoiceDate: string;
@@ -258,6 +262,9 @@ export class PurchasingService {
   /** Creates a DRAFT invoice — no stock or money moves until it is posted. */
   async createInvoice(input: CreateInvoiceInput, userId: string, postImmediately = false) {
     this.validateInvoiceInput(input);
+    const requestId = input.requestId || null;
+    const earlier = requestId ? await this.db.getRepository(PurchaseInvoice).findOneBy({ requestId }) : null;
+    if (earlier) return this.getInvoice(earlier.id);
 
     const wantedVariantIds = [...new Set(input.lines.map((l) => l.variantId))];
     const lines = input.lines.map((l) => ({
@@ -270,6 +277,7 @@ export class PurchasingService {
     const goodsTotal = round2(lines.reduce((s, l) => s + Number(l.lineTotal), 0));
     const extraCosts = round2(Number(input.extraCosts ?? 0));
 
+    // A concurrent resend of the same request waits on the unique key, then gets the first invoice.
     const invoiceId = await this.db.transaction(async (tx) => {
       await lockStock(tx, wantedVariantIds);
       const variants = await tx.findBy(ProductVariant, { id: In(wantedVariantIds) });
@@ -281,6 +289,7 @@ export class PurchasingService {
       const supplier = await tx.findOneBy(Supplier, { id: input.supplierId, active: true });
       if (!supplier) throw new BadRequestException(problem('invoice.supplierGone', 'choose an active supplier'));
       const invoice = await tx.save(PurchaseInvoice, {
+        requestId,
         supplierId: input.supplierId,
         invoiceNo: input.invoiceNo?.trim() || null,
         invoiceDate: input.invoiceDate,
@@ -299,6 +308,12 @@ export class PurchasingService {
       );
       if (postImmediately) await this.postInvoiceInTransaction(tx, invoice.id, userId);
       return invoice.id;
+    }).catch(async (error: unknown) => {
+      const first = requestId && isUniqueViolation(error, 'uq_purchase_invoice_request')
+        ? await this.db.getRepository(PurchaseInvoice).findOneBy({ requestId })
+        : null;
+      if (!first) throw error;
+      return first.id;
     });
     return this.getInvoice(invoiceId);
   }
@@ -419,6 +434,7 @@ export class PurchasingService {
   private validateInvoiceInput(input: CreateInvoiceInput) {
     if (input.allocation !== undefined && !['BY_VALUE', 'PER_UNIT'].includes(input.allocation)) throw new BadRequestException(problem('invoice.allocation', 'choose a supported allocation method'));
     if (input.extraCostsPaidSeparately !== undefined && typeof input.extraCostsPaidSeparately !== 'boolean') throw new BadRequestException('invalid cost payment');
+    if (input.requestId !== undefined && !UUID.test(input.requestId)) throw new BadRequestException('requestId must be a UUID');
     if (!input.supplierId) throw new BadRequestException('choose a supplier');
     if (!ISO_DATE.test(input.invoiceDate ?? '')) throw new BadRequestException('invoiceDate must be YYYY-MM-DD');
     if (input.payment !== 'CASH' && input.payment !== 'CREDIT') {
