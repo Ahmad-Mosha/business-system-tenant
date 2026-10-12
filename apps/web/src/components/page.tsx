@@ -1,7 +1,6 @@
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { PageIcon } from '@/components/page-icon';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -65,9 +64,7 @@ export function PageHeader({
               <ArrowLeft className="rtl:rotate-180" />
             </Link>
           </Button>
-        ) : (
-          <PageIcon />
-        )}
+        ) : null}
         <div className="min-w-0">
           <div className="flex min-h-8 flex-wrap items-center gap-x-3 gap-y-1">
             <h1 className="min-w-0 text-[22px] leading-8 font-semibold tracking-[-0.02em]">{title}</h1>

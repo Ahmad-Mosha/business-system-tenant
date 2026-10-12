@@ -8,10 +8,9 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        // A solid teal with a faint top light and a hairline one shade deeper,
-        // so the primary action reads as a physical key, not a flat swatch.
+        // Plain solid teal: the one filled button on a screen is the action.
         default:
-          "border-[color-mix(in_srgb,var(--primary),black_14%)] bg-primary text-primary-foreground shadow-xs inset-shadow-[0_1px_0_0_rgb(255_255_255/0.16)] hover:bg-[color-mix(in_srgb,var(--primary),black_7%)] dark:border-[color-mix(in_srgb,var(--primary),white_10%)] dark:hover:bg-[color-mix(in_srgb,var(--primary),white_7%)]",
+          "border-primary bg-primary text-primary-foreground shadow-xs hover:border-[color-mix(in_srgb,var(--primary),black_8%)] hover:bg-[color-mix(in_srgb,var(--primary),black_8%)] dark:hover:border-[color-mix(in_srgb,var(--primary),white_8%)] dark:hover:bg-[color-mix(in_srgb,var(--primary),white_8%)]",
         outline:
           "border-input bg-background text-foreground shadow-xs hover:bg-muted/70 aria-expanded:bg-muted dark:bg-input/25 dark:hover:bg-input/45",
         secondary:

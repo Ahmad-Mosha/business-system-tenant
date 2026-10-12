@@ -70,7 +70,7 @@
  * success / warning / destructive only ever mark state.
  *
  * Surfaces, back to front: the canvas (the frame the sidebar sits on) → the
- * sheet (the working area, softly tinted, with a faint teal wash at its top) →
+ * sheet (the working area, softly tinted) →
  * cards, panels and fields, which are the brightest surface so the work lifts
  * off the page → popovers. Each step is told apart by tone, a hairline and a
  * whisper of shadow, never by heavy fills, so figures and names stay the
@@ -80,8 +80,6 @@
 :root {
   --canvas: oklch(0.952 0.01 205);
   --sheet: oklch(0.977 0.006 205);
-  /* The brand wash at the top of the sheet. */
-  --glow: oklch(0.8 0.11 186 / 0.3);
   --background: oklch(1 0 0);
   --foreground: oklch(0.205 0.012 255);
   --card: oklch(1 0 0);
@@ -132,7 +130,6 @@
 .dark {
   --canvas: oklch(0.148 0.011 245);
   --sheet: oklch(0.172 0.012 245);
-  --glow: oklch(0.6 0.11 186 / 0.2);
   --background: oklch(0.172 0.012 245);
   --foreground: oklch(0.955 0.005 245);
   --card: oklch(0.2 0.013 245);
@@ -217,13 +214,6 @@
 @utility num {
   font-family: var(--font-heading);
   font-variant-numeric: tabular-nums;
-}
-
-/* The teal wash across the top of the working area — atmosphere behind the
-   header, gone before the content starts. */
-@utility sheet-glow {
-  background-image: radial-gradient(75% 300px at 50% -60px, var(--glow), transparent 72%);
-  background-repeat: no-repeat;
 }
 
 /* A name typed in either script, lined up with its column rather than its own
