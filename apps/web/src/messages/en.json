@@ -452,6 +452,7 @@
     "description": "Every live Bosta delivery, in one place.",
     "unreachable": "Could not reach Bosta.",
     "loadFailed": "Could not load shipments from Bosta",
+    "loadFailedHint": "Bosta didn’t answer just now, so nothing is shown rather than a list that looks empty. Orders and their statuses here are unaffected.",
     "live": "Live shipments",
     "liveHint": "Active Bosta deliveries",
     "delivered": "Delivered",

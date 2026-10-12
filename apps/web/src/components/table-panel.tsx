@@ -36,6 +36,7 @@ export function TablePanel({
   children,
   footer,
   toolbar,
+  toolbarClassName,
   minWidth = '42rem',
   className,
 }: {
@@ -43,6 +44,8 @@ export function TablePanel({
   footer?: ReactNode;
   /** A strip above the table, inside the card — a title or tabs. */
   toolbar?: ReactNode;
+  /** E.g. `hidden md:block` for a strip that only works with the full table. */
+  toolbarClassName?: string;
   /** Narrower than this, the table scrolls sideways instead of crushing its columns. */
   minWidth?: string;
   className?: string;
@@ -54,7 +57,7 @@ export function TablePanel({
         className,
       )}
     >
-      {toolbar ? <div className="shrink-0 border-b">{toolbar}</div> : null}
+      {toolbar ? <div className={cn('shrink-0 border-b', toolbarClassName)}>{toolbar}</div> : null}
       <div
         style={{ '--table-min': minWidth } as React.CSSProperties}
         className="min-h-0 flex-1 overflow-auto [&_[data-slot=table-container]]:overflow-visible [&_table]:min-w-(--table-min) [&_thead]:sticky [&_thead]:top-0 [&_thead]:z-10"
