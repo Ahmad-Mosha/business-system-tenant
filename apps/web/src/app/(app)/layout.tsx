@@ -27,7 +27,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     >
       <AppSidebar user={user} />
       <SidebarInset className="min-h-0 min-w-0 overflow-hidden">
-        <SiteHeader privacy={user.role === 'ADMIN' ? privacy : undefined} />
+        <SiteHeader role={user.role} privacy={user.role === 'ADMIN' ? privacy : undefined} />
         {children}
       </SidebarInset>
     </SidebarProvider>
