@@ -816,10 +816,14 @@ export class CatalogService {
     return { created, skipped, failed };
   }
 
-  /** Variants an order line can be attached to, for the manual order form. */
-  searchVariants(term: string) {
+  /**
+   * Variants an order line can be attached to, for the manual order form. The
+   * cost goes to admins only: moderators sell, and costs are financial data.
+   */
+  searchVariants(term: string, withCost = false) {
     return this.db.query(
-      `SELECT v.id, v.sku, v.selling_price AS "sellingPrice", v.unit_cost AS "unitCost",
+      `SELECT v.id, v.sku, v.selling_price AS "sellingPrice",
+              ${withCost ? 'v.unit_cost' : 'NULL'} AS "unitCost",
               CASE WHEN v.name = 'Default' THEN p.name ELSE p.name || ' — ' || v.name END AS label,
               COALESCE((SELECT SUM(quantity) FROM stock_movement m WHERE m.variant_id = v.id AND m.location = 'WAREHOUSE'), 0)::int AS "onHand"
        FROM product_variant v

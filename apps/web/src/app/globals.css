@@ -221,3 +221,27 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/*
+ * Privacy mode — the eye in the header (components/privacy-toggle.tsx). Costs
+ * and money figures blur, a displayed one shows while pointed at, and a typed
+ * cost shows as dots until the eye is opened again. Purely visual: who may see
+ * a figure at all is decided by the API.
+ * Marked by `data-sensitive` on a figure, or `data-sensitive-scope` around a
+ * screen whose figures are all financial (whole-number fields there are
+ * quantities and stay readable).
+ */
+html[data-privacy='hidden'] :is([data-sensitive], [data-sensitive-scope] .num) {
+  filter: blur(6px);
+  transition: filter 120ms;
+}
+html[data-privacy='hidden'] :is([data-sensitive], [data-sensitive-scope] .num):not(input):hover {
+  filter: none;
+}
+html[data-privacy='hidden'] :is(input[data-sensitive], [data-sensitive-scope] input.num:not([inputmode='numeric'])) {
+  filter: none;
+  -webkit-text-security: disc;
+}
+html[data-privacy='hidden'] [data-sensitive-scope] input.num[inputmode='numeric'] {
+  filter: none;
+}

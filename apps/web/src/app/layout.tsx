@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { DM_Sans, Geist_Mono, IBM_Plex_Sans_Arabic, Space_Grotesk } from 'next/font/google';
 import { NextIntlClientProvider } from 'next-intl';
+import { cookies } from 'next/headers';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { ThemeProvider } from '@/components/theme-provider';
 import { DirectionProvider } from '@/components/ui/direction';
@@ -38,10 +39,13 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const locale = await getLocale();
   const dir = directionOf(locale);
+  // Privacy mode is on <html> so dialogs, which render outside the app shell, are covered too.
+  const privacy = (await cookies()).get('pm_privacy')?.value === 'hidden';
   return (
     <html
       lang={languageOf(locale)}
       dir={dir}
+      data-privacy={privacy ? 'hidden' : undefined}
       suppressHydrationWarning
       className={`${sans.variable} ${heading.variable} ${mono.variable} ${arabic.variable} h-full antialiased`}
     >

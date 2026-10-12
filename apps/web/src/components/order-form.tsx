@@ -397,12 +397,10 @@ export function OrderForm({
                                   t('form.linked')
                                 ) : (
                                   <span className="num">
-                                    {[
-                                      t('form.inStock', { count: l.onHand }),
-                                      l.unitCost && t('form.cost', { amount: money(l.unitCost) }),
-                                    ]
-                                      .filter(Boolean)
-                                      .join(' · ')}
+                                    {t('form.inStock', { count: l.onHand })}
+                                    {l.unitCost ? (
+                                      <span data-sensitive>{` · ${t('form.cost', { amount: money(l.unitCost) })}`}</span>
+                                    ) : null}
                                   </span>
                                 )}
                               </p>
@@ -571,7 +569,7 @@ export function OrderForm({
                 {belowCost.map((l) => (
                   <Alert key={`b${l.key}`} variant="warning">
                     <AlertTriangle />
-                    <AlertDescription>
+                    <AlertDescription data-sensitive>
                       {t.rich('form.belowCost', { name: l.title, cost: money(l.unitCost), bdi, num })}
                     </AlertDescription>
                   </Alert>

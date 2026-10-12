@@ -11,6 +11,8 @@ import { OrdersService } from '../orders/orders.service';
 import { Order } from '../orders/order.entity';
 import { PurchasingService } from '../purchasing/purchasing.service';
 import { CatalogService } from '../catalog/catalog.service';
+import { CatalogController } from '../catalog/catalog.controller';
+import type { Request } from 'express';
 import { Product } from '../catalog/product.entity';
 import { ProductVariant } from '../catalog/product-variant.entity';
 import { StockMovement } from '../inventory/stock-movement.entity';
@@ -567,5 +569,14 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     assert.equal(byUnit.lines[0].lineTotal, '100.00');
     await assert.rejects(purchasing.createInvoice({ supplierId: supplier.id, invoiceDate: '2026-10-12', payment: 'CREDIT',
       lines: [{ variantId: id, quantity: 3, lineTotal: '100.001' }] }, user.id));
+  });
+  await t.test('moderators searching products never receive their cost', async () => {
+    const { product } = await emptyProduct();
+    const controller = new CatalogController(new CatalogService(db, finance));
+    const as = (role: 'ADMIN' | 'MODERATOR') => ({ user: { ...actor, role } }) as unknown as Request;
+    const [forModerator] = await controller.searchVariants(as('MODERATOR'), product.name);
+    const [forAdmin] = await controller.searchVariants(as('ADMIN'), product.name);
+    assert.equal(forModerator.unitCost, null);
+    assert.equal(forAdmin.unitCost, '10.0000');
   });
 });

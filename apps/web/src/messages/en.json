@@ -1259,5 +1259,11 @@
     "discarded": "Draft discarded",
     "undo": "Undo",
     "autosaved": "Saved on this device as you type. Nothing is recorded until you submit."
+  },
+  "privacy": {
+    "hide": "Hide costs",
+    "show": "Show costs",
+    "hideHint": "Hide costs and money figures from people nearby",
+    "showHint": "Costs are hidden. Point at a figure to see it, or click to show all"
   }
 }

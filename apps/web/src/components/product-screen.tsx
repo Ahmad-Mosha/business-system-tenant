@@ -254,7 +254,7 @@ export function ProductScreen({
         />
         <MetricCard
           label={t('unitCost')}
-          value={only ? <Amount value={only.unitCost} /> : t('varies')}
+          value={only ? <span data-sensitive><Amount value={only.unitCost} /></span> : t('varies')}
           tone={only && !only.unitCost ? 'warning' : 'default'}
           hint={
             !only
@@ -268,7 +268,7 @@ export function ProductScreen({
         />
         <MetricCard
           label={tr('inventory.stockValue')}
-          value={<Amount value={value} />}
+          value={<span data-sensitive><Amount value={value} /></span>}
           hint={t('stockValueHint')}
         />
       </MetricGrid>
