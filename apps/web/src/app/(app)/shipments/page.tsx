@@ -1,25 +1,50 @@
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, RotateCw } from 'lucide-react';
+import Link from 'next/link';
 import { Amount } from '@/components/amount';
 import { MetricCard, MetricGrid } from '@/components/metric-card';
 import { Page, PageHeader } from '@/components/page';
 import { ShipmentsView } from '@/components/shipments-view';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import { getBostaShipments } from '@/lib/api';
 import { requireSession } from '@/lib/session';
 import { getTranslations } from 'next-intl/server';
 
 export default async function ShipmentsPage() {
   await requireSession();
-  const t = await getTranslations('shipments');
+  const [t, tc] = await Promise.all([getTranslations('shipments'), getTranslations('common')]);
 
   // A failed fetch must not read as "zero shipments" — the two look identical
   // to a user with nothing to say anything went wrong.
   let shipments: Awaited<ReturnType<typeof getBostaShipments>> = [];
-  let loadError: string | null = null;
+  let failed = false;
   try {
     shipments = await getBostaShipments();
   } catch (e) {
-    loadError = e instanceof Error ? e.message : t('unreachable');
+    // The reason is for us, in the server log — the screen says what it means.
+    console.warn('shipments: Bosta did not answer', e);
+    failed = true;
+  }
+
+  if (failed) {
+    return (
+      <Page>
+        <PageHeader title={t('title')} description={t('description')} />
+        <Alert variant="destructive">
+          <AlertTriangle />
+          <AlertTitle>{t('loadFailed')}</AlertTitle>
+          <AlertDescription className="grid gap-3">
+            <p>{t('loadFailedHint')}</p>
+            <Button asChild variant="outline" size="sm" className="w-fit">
+              <Link href="/shipments">
+                <RotateCw />
+                {tc('tryAgain')}
+              </Link>
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </Page>
+    );
   }
 
   const delivered = shipments.filter((s) => s.status === 'DELIVERED').length;
@@ -37,14 +62,6 @@ export default async function ShipmentsPage() {
   return (
     <Page fill>
       <PageHeader title={t('title')} description={t('description')} />
-
-      {loadError ? (
-        <Alert variant="destructive">
-          <AlertTriangle />
-          <AlertTitle>{t('loadFailed')}</AlertTitle>
-          <AlertDescription>{loadError}</AlertDescription>
-        </Alert>
-      ) : null}
 
       <MetricGrid>
         <MetricCard label={t('live')} value={shipments.length} hint={t('liveHint')} />
