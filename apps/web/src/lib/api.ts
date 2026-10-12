@@ -286,9 +286,17 @@ export interface ProductRow {
   /** Units already off on-hand but sitting in an order that hasn't shipped,
    *  delivered or reversed — context, not a second pool of stock. */
   inOrders: number;
+  /** Inventory (valuation) cost per piece: moving average incl. shipping/customs — not a purchase price. */
   unitCost: string | null;
   sellingPrice: string | null;
   channels: string[];
+  /** What the supplier charged per piece on posted invoices (before shipping). Null with no purchase history. */
+  lastPurchasePrice: string | null;
+  lastPurchaseDate: string | null;
+  lastPurchaseSupplier: string | null;
+  avgPurchasePrice: string | null;
+  purchasedUnits: number | null;
+  purchaseInvoices: number | null;
   /** Count across every product matching the current filters, not just this page. */
   totalCount: number;
 }
@@ -312,6 +320,24 @@ export interface ProductDetail {
   draftPurchases: number;
   /** Nothing anywhere refers to it, so it can be deleted rather than archived. */
   deletable: boolean;
+  lastPurchasePrice: string | null;
+  lastPurchaseDate: string | null;
+  lastPurchaseSupplier: string | null;
+  avgPurchasePrice: string | null;
+  purchasedUnits: number | null;
+  purchaseInvoices: number | null;
+  /** The latest posted purchases, newest first. */
+  purchases: Array<{
+    invoiceId: string;
+    invoiceNo: string | null;
+    invoiceDate: string;
+    supplier: string;
+    variantId: string;
+    quantity: number;
+    unitCost: string;
+    landedUnitCost: string | null;
+    lineTotal: string;
+  }>;
   variants: Array<{
     id: string;
     name: string;
