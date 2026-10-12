@@ -44,8 +44,10 @@ export class CatalogController {
     @Query('stock') stock?: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
+    @Query('status') status?: string,
   ) {
     return this.catalog.listProducts({
+      archived: status === 'archived',
       search: search?.trim() || undefined,
       channel: channel?.trim() || undefined,
       category: category?.trim() || undefined,
@@ -63,8 +65,10 @@ export class CatalogController {
     @Query('channel') channel?: string,
     @Query('category') category?: string,
     @Query('stock') stock?: string,
+    @Query('status') status?: string,
   ) {
     return this.catalog.productsSummary({
+      archived: status === 'archived',
       search: search?.trim() || undefined,
       channel: channel?.trim() || undefined,
       category: category?.trim() || undefined,
@@ -102,6 +106,21 @@ export class CatalogController {
   @HttpCode(204)
   async archiveProduct(@Param('id', ParseUUIDPipe) id: string) {
     await this.catalog.archiveProduct(id);
+  }
+
+  @Roles('ADMIN')
+  @Post('products/:id/restore')
+  @HttpCode(204)
+  async restoreProduct(@Param('id', ParseUUIDPipe) id: string) {
+    await this.catalog.restoreProduct(id);
+  }
+
+  /** Only a product with no history at all — see CatalogService.deleteProduct. */
+  @Roles('ADMIN')
+  @Delete('products/:id/permanently')
+  @HttpCode(204)
+  async deleteProduct(@Param('id', ParseUUIDPipe) id: string) {
+    await this.catalog.deleteProduct(id);
   }
 
   /** Link a channel's SKU to this product so a sale there moves its stock. */

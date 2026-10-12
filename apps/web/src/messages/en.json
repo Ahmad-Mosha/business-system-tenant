@@ -221,7 +221,8 @@
         "posted": "This invoice is already posted.",
         "noLines": "Add at least one line before posting.",
         "allocation": "Choose allocation by goods value or units.",
-        "supplierGone": "Choose an active supplier."
+        "supplierGone": "Choose an active supplier.",
+        "postedEdit": "A posted invoice can't be edited."
       },
       "sku": {
         "taken": "SKU “{sku}” is already in use."
@@ -241,7 +242,8 @@
         "archiveStock": "Reconcile its {count} remaining stock units before archiving.",
         "archiveOrders": "Finish open orders containing {count} units before archiving.",
         "archiveListings": "Unlink its {count} sales-channel listings before archiving.",
-        "archiveDrafts": "Finish or delete its {count} draft purchase invoices before archiving."
+        "archiveDrafts": "Finish or delete its {count} draft purchase invoices before archiving.",
+        "inUse": "This product has history (stock, sales, purchases or channel links), so it can't be deleted. Archive it instead."
       },
       "sync": {
         "notConfigured": "The Easy Orders connection isn’t set up.",
@@ -259,6 +261,11 @@
         "amount": "Enter a positive amount with at most two decimals.",
         "reason": "Enter a correction reason.",
         "retryChanged": "This submission was already recorded with different details."
+      },
+      "supplier": {
+        "archiveOwed": "{owed} is still owed to this supplier. Settle it before archiving.",
+        "archiveDrafts": "This supplier has draft invoices. Post or delete them before archiving.",
+        "inUse": "This supplier has invoices or payments, so it can't be deleted. Archive it instead."
       }
     }
   },
@@ -528,7 +535,11 @@
       "destination": "To: {location} · Available: {available}",
       "quantity": "Quantity",
       "note": "Note / reference (optional)"
-    }
+    },
+    "showArchived": "Archived products",
+    "archivedTitle": "Archived products",
+    "archivedDescription": "Hidden from inventory, orders and purchases. Open one to restore it.",
+    "backToInventory": "Back to inventory"
   },
   "product": {
     "back": "Back to inventory",
@@ -653,7 +664,15 @@
       "alsoSoldOnHint": "Optional — a sale there will move this product’s stock.",
       "created": "Product created.",
       "create": "Create and add"
-    }
+    },
+    "restore": "Restore",
+    "restored": "Product restored",
+    "delete": "Delete",
+    "deleteTitle": "Delete “<bdi>{name}</bdi>”?",
+    "deleteDescription": "This product has never moved stock, sold, been bought or been linked to a channel, so it can be removed completely. This can't be undone.",
+    "deleteConfirm": "Delete product",
+    "deleted": "Product deleted",
+    "archivedBanner": "This product is archived. It's hidden from inventory, orders and purchases until you restore it."
   },
   "validation": {
     "amount": "Enter an amount, e.g. {example}",
@@ -858,7 +877,15 @@
       "notYet": "Not yet",
       "post": "Post invoice",
       "posted": "Invoice posted — stock and the ledger updated.",
-      "separateCosts": "Extra costs are paid separately from cash and are included in the settled amount."
+      "separateCosts": "Extra costs are paid separately from cash and are included in the settled amount.",
+      "editDraft": "Edit draft",
+      "deleteDraft": "Delete draft",
+      "deleteDraftTitle": "Delete this draft?",
+      "deleteDraftDescription": "Nothing was recorded from a draft, so deleting it changes no stock or money. This can't be undone.",
+      "draftDeleted": "Draft deleted",
+      "draftUpdated": "Draft saved",
+      "editTitle": "Edit draft invoice",
+      "editDescription": "Nothing moves until you post it."
     },
     "newInvoice": {
       "title": "New purchase invoice",
@@ -919,7 +946,14 @@
       "addedToast": "Supplier added.",
       "name": "Name",
       "namePlaceholder": "e.g. مورد الإسكندرية",
-      "notePlaceholder": "What they supply, terms…"
+      "notePlaceholder": "What they supply, terms…",
+      "edit": "Edit",
+      "editTitle": "Edit supplier",
+      "editHint": "Name, phone and note. Invoices and payments are not affected.",
+      "updated": "Supplier updated",
+      "showArchived": "Archived suppliers",
+      "showActive": "Active suppliers",
+      "archivedEmpty": "No archived suppliers."
     },
     "supplier": {
       "back": "Back to suppliers",
@@ -935,7 +969,20 @@
       "payments": "Payments",
       "paymentsHint": "Cash paid to them, newest first.",
       "noPayments": "No payments yet.",
-      "payment": "Payment"
+      "payment": "Payment",
+      "archive": "Archive",
+      "archiveTitle": "Archive “<bdi>{name}</bdi>”?",
+      "archiveDescription": "It leaves the supplier lists and can't be chosen on new invoices. Its invoices and payments stay as they are, and you can restore it at any time.",
+      "archiveConfirm": "Archive supplier",
+      "archived": "Supplier archived",
+      "restore": "Restore",
+      "restored": "Supplier restored",
+      "delete": "Delete",
+      "deleteTitle": "Delete “<bdi>{name}</bdi>”?",
+      "deleteDescription": "This supplier has no invoices or payments, so it can be removed completely. This can't be undone.",
+      "deleteConfirm": "Delete supplier",
+      "deleted": "Supplier deleted",
+      "archivedBanner": "This supplier is archived. It can't be chosen on new invoices."
     },
     "landed": {
       "title": "Landed costs",

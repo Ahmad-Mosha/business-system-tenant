@@ -1,4 +1,4 @@
-import { Package, Plus } from 'lucide-react';
+import { Archive, Package, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Amount } from '@/components/amount';
@@ -57,8 +57,9 @@ export default async function InventoryPage({
 
   // Everything but the stock level: the figures and the stock-level counts
   // describe this set, so choosing a level never zeroes the others.
+  const archived = params.status === 'archived';
   const scope = new URLSearchParams();
-  for (const key of ['search', 'channel', 'category'] as const) {
+  for (const key of ['search', 'channel', 'category', 'status'] as const) {
     if (params[key]) scope.set(key, params[key]);
   }
   const stock = STOCK_LEVELS.find((s) => s.value === params.stock)?.value;
@@ -94,21 +95,31 @@ export default async function InventoryPage({
   return (
     <Page fill>
       <PageHeader
-        title={t('title')}
-        description={t('description')}
+        title={archived ? t('archivedTitle') : t('title')}
+        description={archived ? t('archivedDescription') : t('description')}
+        back={archived ? { href: '/inventory', label: t('backToInventory') } : undefined}
         actions={
-          <>
-            <SyncWebsiteButton />
-            <Button asChild>
-              <Link href="/inventory/new">
-                <Plus />
-                {t('add')}
-              </Link>
-            </Button>
-          </>
+          archived ? undefined : (
+            <>
+              <Button variant="ghost" asChild>
+                <Link href="/inventory?status=archived">
+                  <Archive />
+                  {t('showArchived')}
+                </Link>
+              </Button>
+              <SyncWebsiteButton />
+              <Button asChild>
+                <Link href="/inventory/new">
+                  <Plus />
+                  {t('add')}
+                </Link>
+              </Button>
+            </>
+          )
         }
       />
 
+      {archived ? null : (
       <MetricGrid>
         <MetricCard
           label={t('stockValue')}
@@ -138,6 +149,7 @@ export default async function InventoryPage({
           hint={t('outHint')}
         />
       </MetricGrid>
+      )}
 
       <FilterBar
         search={{ param: 'search', placeholder: t('search') }}

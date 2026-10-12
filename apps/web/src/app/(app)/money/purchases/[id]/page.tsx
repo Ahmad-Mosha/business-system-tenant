@@ -1,5 +1,8 @@
-import { CheckCircle2, Info } from 'lucide-react';
+import { CheckCircle2, Info, Pencil, Trash2 } from 'lucide-react';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { deleteDraftInvoice } from '@/app/(app)/money/actions';
+import { ConfirmAction } from '@/components/confirm-action';
 import type { ReactNode } from 'react';
 import { Amount } from '@/components/amount';
 import { Page, PageHeader } from '@/components/page';
@@ -55,7 +58,28 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
         })}
         actions={
           draft ? (
-            <PostInvoiceButton id={invoice.id} total={invoice.landedTotal} />
+            <>
+              <ConfirmAction
+                trigger={
+                  <Button variant="outline" className="text-destructive hover:bg-destructive-subtle hover:text-destructive">
+                    <Trash2 />
+                    {t('deleteDraft')}
+                  </Button>
+                }
+                title={t('deleteDraftTitle')}
+                description={t('deleteDraftDescription')}
+                confirmLabel={t('deleteDraft')}
+                destructive
+                action={deleteDraftInvoice.bind(null, invoice.id)}
+              />
+              <Button variant="outline" asChild>
+                <Link href={`/money/purchases/${invoice.id}/edit`}>
+                  <Pencil />
+                  {t('editDraft')}
+                </Link>
+              </Button>
+              <PostInvoiceButton id={invoice.id} total={invoice.landedTotal} />
+            </>
           ) : canPay && supplier ? (
             <PaySupplier
               supplierId={invoice.supplierId}

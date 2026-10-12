@@ -59,6 +59,18 @@ export async function archiveProduct(productId: string) {
   redirect('/inventory');
 }
 
+/** Brings an archived product back to the working list. */
+export async function restoreProduct(productId: string) {
+  return write(`/catalog/products/${productId}/restore`, 'POST', undefined, `/inventory/${productId}`);
+}
+
+/** Removes a product that has no history at all; the API refuses anything else. */
+export async function deleteProduct(productId: string) {
+  const r = await write(`/catalog/products/${productId}/permanently`, 'DELETE', undefined);
+  if (!r.ok) return r;
+  redirect('/inventory');
+}
+
 export async function recordStock(variantId: string, quantity: number, reason: string, note?: string, location: 'WAREHOUSE' | 'NOON' = 'WAREHOUSE') {
   return write(`/catalog/variants/${variantId}/stock`, 'POST', { quantity, reason, note, location }, '/inventory');
 }

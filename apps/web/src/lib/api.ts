@@ -307,7 +307,11 @@ export interface ProductDetail {
   name: string;
   category: string | null;
   discovered: boolean;
+  /** False once archived. */
+  active: boolean;
   draftPurchases: number;
+  /** Nothing anywhere refers to it, so it can be deleted rather than archived. */
+  deletable: boolean;
   variants: Array<{
     id: string;
     name: string;
@@ -482,6 +486,8 @@ export interface PurchaseInvoiceDetail {
   payableTotal: string;
   paidStatus: PaidStatus;
   postedAt: string | null;
+  /** Changes on every save — a local edit draft remembers which version it began from. */
+  updatedAt: string;
   lines: PurchaseInvoiceLine[];
 }
 
@@ -517,7 +523,8 @@ export interface CashFlow {
 export const getCashFlow = (from: string, to: string, bucket: 'day' | 'week' | 'month') =>
   get<CashFlow>(`/finance/cash-flow?from=${from}&to=${to}&bucket=${bucket}`);
 
-export const getSuppliers = () => get<SupplierRow[]>('/suppliers');
+export const getSuppliers = (archived = false) =>
+  get<SupplierRow[]>(archived ? '/suppliers?status=archived' : '/suppliers');
 export const getSupplier = (id: string) => get<SupplierDetail>(`/suppliers/${id}`);
 export const getPurchases = () => get<PurchaseInvoiceRow[]>('/purchases');
 export const getPurchase = (id: string) => get<PurchaseInvoiceDetail>(`/purchases/${id}`);

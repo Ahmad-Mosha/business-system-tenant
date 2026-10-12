@@ -1,10 +1,12 @@
 'use client';
 
-import { Archive, Check, Pencil, X } from 'lucide-react';
+import { Archive, ArchiveRestore, Check, Pencil, Trash2, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
-import { archiveProduct, updateProduct } from '@/app/(app)/inventory/actions';
+import { archiveProduct, deleteProduct, restoreProduct, updateProduct } from '@/app/(app)/inventory/actions';
+import { ConfirmAction } from '@/components/confirm-action';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Amount } from '@/components/amount';
 import { ChannelListings } from '@/components/channel-listings';
 import { MetricCard, MetricGrid, type MetricTone } from '@/components/metric-card';
@@ -77,6 +79,28 @@ export function ProductScreen({
       } else toast.error(r.message);
     });
 
+  const restore = () =>
+    startArchive(async () => {
+      const r = await restoreProduct(product.id);
+      if (r.ok) toast.success(t('restored'));
+      else toast.error(r.message);
+    });
+  const deleteButton = product.deletable ? (
+    <ConfirmAction
+      trigger={
+        <Button variant="outline" className="text-destructive hover:bg-destructive-subtle hover:text-destructive">
+          <Trash2 />
+          {t('delete')}
+        </Button>
+      }
+      title={t.rich('deleteTitle', { name: product.name, bdi })}
+      description={t('deleteDescription')}
+      confirmLabel={t('deleteConfirm')}
+      destructive
+      action={() => deleteProduct(product.id)}
+    />
+  ) : null;
+
   const cancel = () => {
     setName(product.name);
     setCategory(product.category ?? '');
@@ -137,12 +161,21 @@ export function ProductScreen({
                 {tc('save')}
               </Button>
             </>
+          ) : !product.active ? (
+            <>
+              <Button variant="outline" onClick={restore} disabled={archiving}>
+                {archiving ? <Spinner /> : <ArchiveRestore />}
+                {t('restore')}
+              </Button>
+              {deleteButton}
+            </>
           ) : (
             <>
               <Button variant="outline" onClick={() => setEditing(true)}>
                 <Pencil />
                 {t('edit')}
               </Button>
+              {product.deletable ? deleteButton : (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="outline" className="text-destructive hover:bg-destructive-subtle hover:text-destructive">
@@ -170,7 +203,6 @@ export function ProductScreen({
                     <AlertDialogCancel disabled={archiving}>{tc('cancel')}</AlertDialogCancel>
                     <AlertDialogAction
                       variant="destructive"
-                      className="bg-destructive text-white hover:bg-destructive/90"
                       disabled={archiving || !canArchive}
                       onClick={(e) => {
                         e.preventDefault();
@@ -186,10 +218,18 @@ export function ProductScreen({
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
+              )}
             </>
           )
         }
       />
+
+      {!product.active ? (
+        <Alert>
+          <Archive />
+          <AlertDescription>{t('archivedBanner')}</AlertDescription>
+        </Alert>
+      ) : null}
 
       {editing ? (
         <Card>

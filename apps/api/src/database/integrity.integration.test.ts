@@ -579,4 +579,58 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     assert.equal(forModerator.unitCost, null);
     assert.equal(forAdmin.unitCost, '10.0000');
   });
+  await t.test('suppliers archive only when settled, and delete only when never used', async () => {
+    const id = await stock(0);
+    const owing = await purchasing.createSupplier({ name: `Owing ${randomUUID()}` });
+    await purchasing.createInvoice({ supplierId: owing.id, invoiceDate: '2026-10-12', payment: 'CREDIT',
+      lines: [{ variantId: id, quantity: 1, unitCost: '50' }] }, user.id, true);
+    await assert.rejects(purchasing.updateSupplier(owing.id, { active: false }), /settle what is owed/);
+    await assert.rejects(purchasing.deleteSupplier(owing.id), /archive it instead/);
+    await purchasing.recordSupplierPayment(owing.id, '50', undefined, user.id);
+    await purchasing.updateSupplier(owing.id, { active: false });
+    assert.ok((await purchasing.listSuppliers(true)).some((sup) => sup.id === owing.id));
+    assert.ok(!(await purchasing.listSuppliers()).some((sup) => sup.id === owing.id));
+    await purchasing.updateSupplier(owing.id, { active: true });
+
+    const drafting = await purchasing.createSupplier({ name: `Drafting ${randomUUID()}` });
+    await purchasing.createInvoice({ supplierId: drafting.id, invoiceDate: '2026-10-12', payment: 'CREDIT',
+      lines: [{ variantId: id, quantity: 1, unitCost: '5' }] }, user.id);
+    await assert.rejects(purchasing.updateSupplier(drafting.id, { active: false }), /draft invoices/);
+
+    const mistake = await purchasing.createSupplier({ name: `Mistake ${randomUUID()}` });
+    await purchasing.updateSupplier(mistake.id, { name: 'Corrected name', phone: '01000000000' });
+    await purchasing.deleteSupplier(mistake.id);
+    await assert.rejects(purchasing.supplierDetail(mistake.id));
+  });
+  await t.test('a product is restored from the archive, and deleted only with no history', async () => {
+    const catalog = new CatalogService(db, finance);
+    const unused = await catalog.createProduct({ name: `Unused ${randomUUID()}` }, user.id);
+    assert.equal((await catalog.getProduct(unused.id)).deletable, true);
+    await catalog.archiveProduct(unused.id);
+    assert.ok((await catalog.listProducts({ archived: true, search: 'Unused' })).some((p: { id: string }) => p.id === unused.id));
+    await catalog.restoreProduct(unused.id);
+    assert.equal((await catalog.getProduct(unused.id)).active, true);
+    await catalog.deleteProduct(unused.id);
+    await assert.rejects(catalog.getProduct(unused.id));
+
+    const stocked = await catalog.createProduct({ name: `Stocked ${randomUUID()}`, openingStock: 2, unitCost: '10' }, user.id);
+    assert.equal((await catalog.getProduct(stocked.id)).deletable, false);
+    await assert.rejects(catalog.deleteProduct(stocked.id), /archive it instead/);
+  });
+  await t.test('a draft invoice is edited freely and posts what was last saved; a posted one is locked', async () => {
+    const id = await stock(0);
+    const supplier = await purchasing.createSupplier({ name: `Editing ${randomUUID()}` });
+    const draft = await purchasing.createInvoice({ supplierId: supplier.id, invoiceDate: '2026-10-12', payment: 'CREDIT',
+      lines: [{ variantId: id, quantity: 10, unitCost: '1' }] }, user.id);
+    const edited = await purchasing.updateDraft(draft.id, { supplierId: supplier.id, invoiceNo: 'S-9', invoiceDate: '2026-10-11', payment: 'CREDIT',
+      lines: [{ variantId: id, quantity: 3, lineTotal: '100' }] });
+    assert.equal(edited.goodsTotal, '100.00');
+    assert.equal(edited.lines.length, 1);
+    assert.equal(await balance(id), 0); // a draft moves nothing
+    await purchasing.postInvoice(draft.id, user.id);
+    assert.equal(await balance(id), 3);
+    assert.equal(await ledger.balanceOf('SUPPLIER_PAYABLE', { supplierId: supplier.id }), '100.00');
+    await assert.rejects(purchasing.updateDraft(draft.id, { supplierId: supplier.id, invoiceDate: '2026-10-11', payment: 'CREDIT',
+      lines: [{ variantId: id, quantity: 1, unitCost: '1' }] }), /cannot be edited/);
+  });
 });
