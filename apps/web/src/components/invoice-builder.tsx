@@ -354,8 +354,8 @@ export function InvoiceBuilder({
                   <TableBody>
                     {lines.map((l) => (
                       <TableRow key={l.key}>
-                        <TableCell className="max-w-0">
-                          <p className="truncate font-medium">
+                        <TableCell className="min-w-40 whitespace-normal">
+                          <p className="line-clamp-2 leading-snug font-medium" title={l.label}>
                             <bdi>{l.label}</bdi>
                           </p>
                           {l.onHand !== null ? (

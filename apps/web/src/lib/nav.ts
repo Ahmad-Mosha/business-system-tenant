@@ -1,5 +1,7 @@
 import {
   BarChart3,
+  Contact,
+  FileText,
   BookText,
   CalendarRange,
   ClipboardList,
@@ -53,6 +55,15 @@ export const NAVIGATION: NavGroup[] = [
       { href: '/orders', key: 'orders', icon: ShoppingBag },
       { href: '/shipments', key: 'shipments', icon: Truck },
       { href: '/inventory', key: 'inventory', icon: Package, roles: ['ADMIN'] },
+    ],
+  },
+  {
+    // Selling on invoice — wholesale — beside the order workflow, never through it.
+    key: 'sales',
+    icon: FileText,
+    items: [
+      { href: '/sales', key: 'salesInvoices', icon: FileText, roles: ['ADMIN'] },
+      { href: '/customers', key: 'customers', icon: Contact, roles: ['ADMIN'] },
     ],
   },
   {
