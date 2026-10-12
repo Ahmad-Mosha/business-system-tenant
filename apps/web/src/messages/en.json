@@ -1559,5 +1559,29 @@
       "newInvoice": "New invoice"
     },
     "activeHint": "Active — archived ones are listed separately"
+  },
+  "search": {
+    "title": "Search",
+    "trigger": "Search or jump to…",
+    "shortcut": "Ctrl K",
+    "shortcutMac": "⌘K",
+    "placeholder": "Search orders, products, customers — or type a screen",
+    "nothing": "Nothing matches “{term}”.",
+    "orders": "Orders",
+    "products": "Products",
+    "customers": "Customers",
+    "inStock": "{count} in stock",
+    "owes": "owes",
+    "createHeading": "Create",
+    "create": {
+      "order": "New order",
+      "sale": "New sales invoice",
+      "purchase": "New purchase invoice",
+      "product": "New product"
+    },
+    "goTo": "Go to",
+    "hintMove": "↑↓ to move",
+    "hintOpen": "Enter to open",
+    "hintClose": "Esc to close"
   }
 }

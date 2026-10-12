@@ -1559,5 +1559,29 @@
       "newInvoice": "فاتورة جديدة"
     },
     "activeHint": "النشطون — المؤرشفون في قائمة منفصلة"
+  },
+  "search": {
+    "title": "البحث",
+    "trigger": "ابحث أو انتقل إلى…",
+    "shortcut": "Ctrl K",
+    "shortcutMac": "⌘K",
+    "placeholder": "ابحث عن طلب أو منتج أو عميل — أو اكتب اسم شاشة",
+    "nothing": "لا توجد نتائج لـ «{term}».",
+    "orders": "الطلبات",
+    "products": "المنتجات",
+    "customers": "العملاء",
+    "inStock": "{count} متوفر",
+    "owes": "عليه",
+    "createHeading": "إنشاء",
+    "create": {
+      "order": "طلب جديد",
+      "sale": "فاتورة بيع جديدة",
+      "purchase": "فاتورة شراء جديدة",
+      "product": "منتج جديد"
+    },
+    "goTo": "انتقل إلى",
+    "hintMove": "↑↓ للتنقل",
+    "hintOpen": "Enter للفتح",
+    "hintClose": "Esc للإغلاق"
   }
 }
