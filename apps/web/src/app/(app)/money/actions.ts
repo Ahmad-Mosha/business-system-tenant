@@ -135,10 +135,12 @@ export async function paySupplier(_prev: FormState, form: FormData): Promise<For
   return state;
 }
 
+/** Quantity with either a unit cost or a line total — whichever was typed. */
 export interface InvoiceLinePayload {
   variantId: string;
   quantity: number;
-  unitCost: string;
+  unitCost?: string;
+  lineTotal?: string;
 }
 export interface InvoicePayload {
   requestId: string;
@@ -196,7 +198,10 @@ export async function saveInvoice(input: InvoicePayload, asDraft: boolean): Prom
           ? 'lineProduct'
           : input.lines.some((l) => !Number.isInteger(l.quantity) || l.quantity < 1)
             ? 'lineQuantity'
-            : input.lines.some((l) => !MONEY.test(l.unitCost) || Number(l.unitCost) <= 0)
+            : input.lines.some((l) =>
+                  l.lineTotal !== undefined
+                    ? !MONEY.test(l.lineTotal) || Number(l.lineTotal) <= 0
+                    : !/^\d+(\.\d{1,4})?$/.test(l.unitCost ?? '') || Number(l.unitCost) <= 0)
               ? 'lineCost'
               : input.extraCosts && !MONEY.test(input.extraCosts)
                 ? 'extraCosts'

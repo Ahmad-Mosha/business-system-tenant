@@ -4,7 +4,7 @@ import { DataSource, EntityManager, In } from 'typeorm';
 import { ProductVariant } from '../catalog/product-variant.entity';
 import { LedgerService } from '../finance/ledger.service';
 import { StockMovement } from '../inventory/stock-movement.entity';
-import { allocateExtraCosts, allocateOldestFirst, movingAverage, round2 } from './costing';
+import { allocateExtraCosts, allocateOldestFirst, lineTotalFor, movingAverage, round2, unitCostFor } from './costing';
 import {
   type CostAllocation,
   paidStatusOf,
@@ -19,14 +19,17 @@ import { lockStock } from '../inventory/stock-lock';
 import { isUniqueViolation } from '../database/unique-violation';
 
 const MONEY = /^\d+(\.\d{1,2})?$/;
+const UNIT_COST = /^\d+(\.\d{1,4})?$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const money = (n: number) => n.toFixed(2);
 
+/** A line is typed as quantity × unit cost, or as quantity + line total (which then wins). */
 export interface InvoiceLineInput {
   variantId: string;
   quantity: number;
-  unitCost: string;
+  unitCost?: string;
+  lineTotal?: string;
 }
 
 export interface CreateInvoiceInput {
@@ -267,13 +270,18 @@ export class PurchasingService {
     if (earlier) return this.getInvoice(earlier.id);
 
     const wantedVariantIds = [...new Set(input.lines.map((l) => l.variantId))];
-    const lines = input.lines.map((l) => ({
-      variantId: l.variantId,
-      quantity: l.quantity,
-      unitCost: Number(l.unitCost).toFixed(2),
-      lineTotal: round2(Number(l.unitCost) * l.quantity).toFixed(2),
-      landedUnitCost: null,
-    }));
+    // Whichever the person typed is kept; the other is derived from it.
+    const lines = input.lines.map((l) => {
+      const typedTotal = l.lineTotal !== undefined && l.lineTotal !== '';
+      const lineTotal = typedTotal ? Number(l.lineTotal).toFixed(2) : lineTotalFor(l.unitCost!, l.quantity);
+      return {
+        variantId: l.variantId,
+        quantity: l.quantity,
+        unitCost: typedTotal ? unitCostFor(lineTotal, l.quantity) : l.unitCost!,
+        lineTotal,
+        landedUnitCost: null,
+      };
+    });
     const goodsTotal = round2(lines.reduce((s, l) => s + Number(l.lineTotal), 0));
     const extraCosts = round2(Number(input.extraCosts ?? 0));
 
@@ -449,7 +457,8 @@ export class PurchasingService {
       if (!Number.isInteger(l.quantity) || l.quantity < 1) {
         throw new BadRequestException('every line needs a whole quantity of at least 1');
       }
-      if (!MONEY.test(l.unitCost ?? '') || Number(l.unitCost) <= 0) {
+      const typedTotal = l.lineTotal !== undefined && l.lineTotal !== '';
+      if (typedTotal ? !MONEY.test(l.lineTotal!) || Number(l.lineTotal) <= 0 : !UNIT_COST.test(l.unitCost ?? '') || Number(l.unitCost) <= 0) {
         throw new BadRequestException('every line needs a unit cost greater than 0');
       }
     }

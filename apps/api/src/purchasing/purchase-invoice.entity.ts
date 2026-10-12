@@ -147,14 +147,15 @@ export class PurchaseInvoiceLine {
   @Column({ type: 'int' })
   quantity: number;
 
-  /** Goods cost per unit, before any allocation. */
-  @Column({ type: 'numeric', precision: 14, scale: 2 })
+  /** Goods cost per unit, before any allocation. Typed, or derived from a typed line total (4 decimals). */
+  @Column({ type: 'numeric', precision: 14, scale: 4 })
   unitCost: string;
 
   /** Per-unit cost after this line's share of extra costs — filled on posting. */
   @Column({ type: 'numeric', precision: 14, scale: 4, nullable: true })
   landedUnitCost: string | null;
 
+  /** What the supplier charges for the line — when typed, kept exactly. */
   @Column({ type: 'numeric', precision: 14, scale: 2 })
   lineTotal: string;
 }
