@@ -11,15 +11,15 @@ const buttonVariants = cva(
         // A solid teal with a faint top light and a hairline one shade deeper,
         // so the primary action reads as a physical key, not a flat swatch.
         default:
-          "border-[color-mix(in_oklch,var(--primary),black_14%)] bg-primary text-primary-foreground shadow-xs inset-shadow-[0_1px_0_0_rgb(255_255_255/0.16)] hover:bg-[color-mix(in_oklch,var(--primary),black_7%)] dark:border-[color-mix(in_oklch,var(--primary),white_10%)] dark:hover:bg-[color-mix(in_oklch,var(--primary),white_7%)]",
+          "border-[color-mix(in_srgb,var(--primary),black_14%)] bg-primary text-primary-foreground shadow-xs inset-shadow-[0_1px_0_0_rgb(255_255_255/0.16)] hover:bg-[color-mix(in_srgb,var(--primary),black_7%)] dark:border-[color-mix(in_srgb,var(--primary),white_10%)] dark:hover:bg-[color-mix(in_srgb,var(--primary),white_7%)]",
         outline:
           "border-input bg-background text-foreground shadow-xs hover:bg-muted/70 aria-expanded:bg-muted dark:bg-input/25 dark:hover:bg-input/45",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_6%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
+          "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_srgb,var(--secondary),var(--foreground)_6%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
         ghost:
           "text-foreground/85 hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/70",
         destructive:
-          "border-destructive/25 bg-destructive-subtle text-destructive hover:bg-[color-mix(in_oklch,var(--destructive-subtle),var(--destructive)_10%)] focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40",
+          "border-destructive/25 bg-destructive-subtle text-destructive hover:bg-[color-mix(in_srgb,var(--destructive-subtle),var(--destructive)_10%)] focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {

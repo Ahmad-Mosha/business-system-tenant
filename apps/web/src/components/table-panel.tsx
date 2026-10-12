@@ -62,7 +62,7 @@ export function TablePanel({
         {children}
       </div>
       {footer ? (
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t bg-[color-mix(in_oklch,var(--muted)_35%,var(--card))] px-5 py-2.5">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t bg-[color-mix(in_srgb,var(--muted)_35%,var(--card))] px-5 py-2.5">
           {footer}
         </div>
       ) : null}

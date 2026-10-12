@@ -17,6 +17,7 @@
   --font-heading: "Space Grotesk", "IBM Plex Sans Arabic", var(--font-space-grotesk), var(--font-arabic), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
   --color-canvas: var(--canvas);
+  --color-sheet: var(--sheet);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -68,13 +69,19 @@
  * "act here / you are here"; everything else is a cool, quiet neutral, and
  * success / warning / destructive only ever mark state.
  *
- * Surfaces, back to front: the canvas (what the sidebar sits on) → the sheet
- * (the working area, `--background`) → cards and panels → popovers. Each step
- * is told apart by a hairline and a whisper of shadow, never by heavy fills, so
- * figures and names stay the loudest thing on screen.
+ * Surfaces, back to front: the canvas (the frame the sidebar sits on) → the
+ * sheet (the working area, softly tinted, with a faint teal wash at its top) →
+ * cards, panels and fields, which are the brightest surface so the work lifts
+ * off the page → popovers. Each step is told apart by tone, a hairline and a
+ * whisper of shadow, never by heavy fills, so figures and names stay the
+ * loudest thing on screen. Dark mode is a deep slate, not black: the same
+ * layers, each a step lighter, with a hairline of light on raised edges.
  */
 :root {
-  --canvas: oklch(0.974 0.003 210);
+  --canvas: oklch(0.952 0.01 205);
+  --sheet: oklch(0.977 0.006 205);
+  /* The brand wash at the top of the sheet. */
+  --glow: oklch(0.8 0.11 186 / 0.3);
   --background: oklch(1 0 0);
   --foreground: oklch(0.205 0.012 255);
   --card: oklch(1 0 0);
@@ -107,7 +114,7 @@
   --sidebar-foreground: oklch(0.3 0.012 255);
   --sidebar-primary: oklch(0.515 0.098 186);
   --sidebar-primary-foreground: oklch(0.99 0.008 186);
-  --sidebar-accent: oklch(0.935 0.005 230);
+  --sidebar-accent: oklch(0.928 0.01 205);
   --sidebar-accent-foreground: oklch(0.205 0.012 255);
   --sidebar-border: oklch(0.918 0.005 240);
   --sidebar-ring: oklch(0.62 0.105 186);
@@ -118,24 +125,27 @@
   --warning-subtle: oklch(0.975 0.035 85);
   --destructive-subtle: oklch(0.971 0.013 17.38);
   /* Elevation: hairline shadows tinted by the ink colour, not grey haze. */
-  --shadow-color: 255 12% 20%;
+  --shadow-color: 215 20% 22%;
+  --shadow-edge: 0 0 #0000;
 }
 
 .dark {
-  --canvas: oklch(0.158 0.006 255);
-  --background: oklch(0.188 0.007 255);
-  --foreground: oklch(0.955 0.004 255);
-  --card: oklch(0.208 0.007 255);
-  --card-foreground: oklch(0.955 0.004 255);
-  --popover: oklch(0.225 0.008 255);
-  --popover-foreground: oklch(0.955 0.004 255);
+  --canvas: oklch(0.148 0.011 245);
+  --sheet: oklch(0.172 0.012 245);
+  --glow: oklch(0.6 0.11 186 / 0.2);
+  --background: oklch(0.172 0.012 245);
+  --foreground: oklch(0.955 0.005 245);
+  --card: oklch(0.2 0.013 245);
+  --card-foreground: oklch(0.955 0.005 245);
+  --popover: oklch(0.222 0.014 245);
+  --popover-foreground: oklch(0.955 0.005 245);
   --primary: oklch(0.585 0.105 184);
   --primary-foreground: oklch(0.985 0.006 186);
   --highlight: oklch(0.79 0.125 182);
-  --secondary: oklch(0.25 0.008 255);
-  --secondary-foreground: oklch(0.955 0.004 255);
-  --muted: oklch(0.245 0.008 255);
-  --muted-foreground: oklch(0.7 0.012 255);
+  --secondary: oklch(0.25 0.013 245);
+  --secondary-foreground: oklch(0.955 0.005 245);
+  --muted: oklch(0.242 0.013 245);
+  --muted-foreground: oklch(0.71 0.015 245);
   --accent: oklch(0.29 0.04 190);
   --accent-foreground: oklch(0.88 0.08 182);
   --destructive: oklch(0.704 0.191 22.216);
@@ -148,11 +158,11 @@
   --chart-4: oklch(0.511 0.096 186.391);
   --chart-5: oklch(0.437 0.078 188.216);
   --sidebar: var(--canvas);
-  --sidebar-foreground: oklch(0.82 0.008 255);
+  --sidebar-foreground: oklch(0.82 0.01 245);
   --sidebar-primary: oklch(0.76 0.12 182);
   --sidebar-primary-foreground: oklch(0.2 0.03 190);
-  --sidebar-accent: oklch(0.225 0.008 255);
-  --sidebar-accent-foreground: oklch(0.97 0.004 255);
+  --sidebar-accent: oklch(0.212 0.013 245);
+  --sidebar-accent-foreground: oklch(0.97 0.005 245);
   --sidebar-border: oklch(1 0 0 / 8.5%);
   --sidebar-ring: oklch(0.7 0.115 184);
   --success: oklch(0.765 0.15 152);
@@ -160,12 +170,14 @@
   --warning: oklch(0.8 0.14 78);
   --warning-subtle: oklch(0.28 0.045 78);
   --destructive-subtle: oklch(0.28 0.06 27);
-  --shadow-color: 255 30% 2%;
+  --shadow-color: 230 40% 3%;
+  /* A hairline of light along the top edge of anything raised. */
+  --shadow-edge: inset 0 1px 0 0 oklch(1 0 0 / 5%);
 }
 
 @theme {
-  --shadow-xs: 0 1px 2px 0 hsl(var(--shadow-color) / 0.06);
-  --shadow-sm: 0 1px 2px 0 hsl(var(--shadow-color) / 0.06), 0 1px 3px 0 hsl(var(--shadow-color) / 0.04);
+  --shadow-xs: var(--shadow-edge), 0 1px 2px 0 hsl(var(--shadow-color) / 0.06);
+  --shadow-sm: var(--shadow-edge), 0 1px 2px 0 hsl(var(--shadow-color) / 0.06), 0 1px 3px 0 hsl(var(--shadow-color) / 0.04);
   --shadow-md: 0 1px 2px 0 hsl(var(--shadow-color) / 0.05), 0 6px 16px -4px hsl(var(--shadow-color) / 0.12);
   --shadow-lg: 0 2px 4px 0 hsl(var(--shadow-color) / 0.05), 0 18px 40px -10px hsl(var(--shadow-color) / 0.24);
 }
@@ -194,7 +206,7 @@
     font-variant-numeric: tabular-nums;
   }
   ::selection {
-    background: color-mix(in oklch, var(--primary) 22%, transparent);
+    background: color-mix(in srgb, var(--primary) 22%, transparent);
   }
 }
 
@@ -205,6 +217,23 @@
 @utility num {
   font-family: var(--font-heading);
   font-variant-numeric: tabular-nums;
+}
+
+/* The teal wash across the top of the working area — atmosphere behind the
+   header, gone before the content starts. */
+@utility sheet-glow {
+  background-image: radial-gradient(75% 300px at 50% -60px, var(--glow), transparent 72%);
+  background-repeat: no-repeat;
+}
+
+/* A name typed in either script, lined up with its column rather than its own
+   writing direction (a `dir="auto"` field aligns Arabic to the right even on
+   an English page). */
+@utility text-page {
+  text-align: left;
+  &:where([dir='rtl'] *) {
+    text-align: right;
+  }
 }
 
 /* Arabic letters join; any letter-spacing, tight or wide, pulls the joins

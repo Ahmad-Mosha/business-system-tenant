@@ -75,7 +75,7 @@ interface Line {
 }
 
 const cellInput =
-  'h-8 border-transparent bg-transparent px-2 shadow-none hover:border-input focus-visible:border-ring';
+  'h-8 border-transparent bg-muted/60 px-2 shadow-none hover:border-input focus-visible:border-ring focus-visible:bg-background dark:bg-muted/60 dark:focus-visible:bg-input/20';
 
 /** Saves a draft's edits, then posts it when asked — a failed post leaves the edits saved on the draft. */
 async function saveDraftEdits(id: string, payload: InvoicePayload, asDraft: boolean) {

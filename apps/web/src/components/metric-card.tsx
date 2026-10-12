@@ -121,6 +121,9 @@ export function MetricGrid({ children }: { children: ReactNode }) {
   const cols =
     count >= 5
       ? '@2xl:grid-cols-3 @5xl:grid-cols-5'
+        // Five never leave a hole: the lead figure takes a full row on a phone
+        // and a double-height column at three across.
+        + (count === 5 ? ' [&>:first-child]:col-span-2 @2xl:[&>:first-child]:col-span-1 @2xl:[&>:first-child]:row-span-2 @5xl:[&>:first-child]:row-span-1' : '')
       : count === 4
         ? '@3xl:grid-cols-4'
         : count === 3
