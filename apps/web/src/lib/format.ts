@@ -60,13 +60,3 @@ export function moneyParts(v: string | number | null | undefined): {
     frac: (abs - Math.trunc(abs)).toFixed(2).slice(1),
   };
 }
-
-/** Groups the integer part of a partial amount as the user types: `1250000` → `1,250,000`. */
-export function groupDigits(raw: string): string {
-  const cleaned = raw.replace(/[^\d.]/g, '');
-  const dot = cleaned.indexOf('.');
-  const intPart = (dot === -1 ? cleaned : cleaned.slice(0, dot)).replace(/^0+(?=\d)/, '');
-  const decPart = dot === -1 ? '' : '.' + cleaned.slice(dot + 1).replace(/\./g, '').slice(0, 2);
-  const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return (grouped || (dot !== -1 ? '0' : '')) + decPart;
-}

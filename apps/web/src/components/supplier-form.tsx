@@ -40,7 +40,7 @@ export function SupplierForm({ onCreated }: { onCreated?: (supplier: { id: strin
         <FieldLabel htmlFor="supplier-phone">
           {t('columns.phone')} {optional}
         </FieldLabel>
-        <Input id="supplier-phone" name="phone" inputMode="tel" placeholder="01…" className="num" />
+        <Input id="supplier-phone" name="phone" inputMode="tel" dir="ltr" placeholder="01…" className="num" />
       </Field>
       <Field>
         <FieldLabel htmlFor="supplier-note">

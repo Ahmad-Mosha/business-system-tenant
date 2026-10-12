@@ -20,7 +20,7 @@ import {
   FieldSet,
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from '@/components/ui/input-group';
+import { NumberField } from '@/components/number-field';
 import { Spinner } from '@/components/ui/spinner';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { LISTING_CHANNELS } from '@/components/channel-listings';
@@ -120,39 +120,32 @@ export function NewProductForm() {
                   </Field>
                   <Field data-invalid={unitCost.length > 0 && !costOk}>
                     <FieldLabel htmlFor="unitCost">{t('unitCost')}</FieldLabel>
-                    <InputGroup>
-                      <InputGroupInput
-                        id="unitCost"
-                        name="unitCost"
-                        inputMode="decimal"
-                        value={unitCost}
-                        onFocus={(e) => e.currentTarget.select()}
-                        onChange={(e) => setUnitCost(e.target.value)}
-                        placeholder={t('new.costPlaceholder')}
-                        aria-invalid={unitCost.length > 0 && !costOk}
-                        disabled={pending}
-                        className="num"
-                      />
-                      <InputGroupAddon align="inline-end">
-                        <InputGroupText>{tr('common.egp')}</InputGroupText>
-                      </InputGroupAddon>
-                    </InputGroup>
+                    <NumberField
+                      id="unitCost"
+                      name="unitCost"
+                      value={unitCost}
+                      onValueChange={setUnitCost}
+                      group
+                      placeholder={t('new.costPlaceholder')}
+                      aria-invalid={unitCost.length > 0 && !costOk}
+                      disabled={pending}
+                      suffix={tr('common.egp')}
+                    />
                     {unitCost.length > 0 && !costOk ? (
                       <FieldError>{t('new.costInvalid')}</FieldError>
                     ) : null}
                   </Field>
                   <Field data-invalid={!stockOk}>
                     <FieldLabel htmlFor="openingStock">{t('new.openingStock')}</FieldLabel>
-                    <Input
+                    <NumberField
                       id="openingStock"
                       name="openingStock"
-                      inputMode="numeric"
                       value={openingStock}
-                      onFocus={(e) => e.currentTarget.select()}
-                      onChange={(e) => setOpeningStock(e.target.value)}
+                      onValueChange={setOpeningStock}
+                      decimals={0}
+                      min={0}
                       aria-invalid={!stockOk}
                       disabled={pending}
-                      className="num"
                     />
                     {!stockOk ? <FieldError>{t('new.stockInvalid')}</FieldError> : null}
                   </Field>

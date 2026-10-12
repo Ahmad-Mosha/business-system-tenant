@@ -13,7 +13,7 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from '@/components/ui/empty';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from '@/components/ui/input-group';
+import { NumberField } from '@/components/number-field';
 import {
   Select,
   SelectContent,
@@ -99,8 +99,11 @@ export function VariantPanel({
   const [costReason, setCostReason] = useState('');
   const [price, setPrice] = useState(variant.sellingPrice ?? '');
 
-  const costDirty = cost !== (variant.unitCost ?? '');
-  const pricesDirty = costDirty || price !== (variant.sellingPrice ?? '');
+  // Compared as numbers: retyping a stored 120.0000 as 120 is not a change.
+  const changed = (next: string, saved: string | null) =>
+    (next === '') !== (saved === null) || (next !== '' && Number(next) !== Number(saved));
+  const costDirty = changed(cost, variant.unitCost);
+  const pricesDirty = costDirty || changed(price, variant.sellingPrice);
   // The API refuses a removal below zero too; this just says so before asking.
   const count = Number(qty) || 0;
   const available = Math.max(location === 'WAREHOUSE' ? variant.warehouseOnHand : variant.noonOnHand, 0);
@@ -176,7 +179,7 @@ export function VariantPanel({
           <div className="grid grid-cols-2 gap-3">
             <Field>
               <FieldLabel htmlFor={`cost-${variant.id}`}>{tr('product.unitCost')}</FieldLabel>
-              <MoneyField id={`cost-${variant.id}`} value={cost} onChange={setCost} disabled={pending} />
+              <MoneyField id={`cost-${variant.id}`} value={cost} onChange={setCost} decimals={4} disabled={pending} />
             </Field>
             <Field>
               <FieldLabel htmlFor={`price-${variant.id}`}>{t('sellingPrice')}</FieldLabel>
@@ -231,14 +234,13 @@ export function VariantPanel({
             </ToggleGroup>
             <Field>
               <FieldLabel htmlFor={`qty-${variant.id}`}>{t('quantity')}</FieldLabel>
-              <Input
+              <NumberField
                 id={`qty-${variant.id}`}
                 value={qty}
-                onChange={(e) => setQty(e.target.value)}
-                onFocus={(e) => e.currentTarget.select()}
-                inputMode="numeric"
+                onValueChange={setQty}
+                decimals={0}
+                min={1}
                 disabled={pending}
-                className="num"
               />
             </Field>
             <Field>
@@ -362,29 +364,26 @@ function MoneyField({
   id,
   value,
   onChange,
+  decimals = 2,
   disabled,
 }: {
   id: string;
   value: string;
   onChange: (v: string) => void;
+  decimals?: number;
   disabled?: boolean;
 }) {
   const t = useTranslations('common');
   return (
-    <InputGroup>
-      <InputGroupInput
-        id={id}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onFocus={(e) => e.currentTarget.select()}
-        inputMode="decimal"
-        placeholder={t('notSet')}
-        disabled={disabled}
-        className="num"
-      />
-      <InputGroupAddon align="inline-end">
-        <InputGroupText>{t('egp')}</InputGroupText>
-      </InputGroupAddon>
-    </InputGroup>
+    <NumberField
+      id={id}
+      value={value}
+      onValueChange={onChange}
+      decimals={decimals}
+      group
+      placeholder={t('notSet')}
+      disabled={disabled}
+      suffix={t('egp')}
+    />
   );
 }
