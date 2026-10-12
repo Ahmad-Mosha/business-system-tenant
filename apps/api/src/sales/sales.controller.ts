@@ -69,4 +69,25 @@ export class SalesInvoicesController {
   async remove(@Param('id', ParseUUIDPipe) id: string) {
     await this.sales.deleteDraft(id);
   }
+
+  /** The one moment a sales invoice moves stock and money. */
+  @Post(':id/post')
+  post(@Req() req: Request, @Param('id', ParseUUIDPipe) id: string, @Body() body: { paidNow?: string }) {
+    return this.sales.postInvoice(id, body?.paidNow, req.user!.id);
+  }
+
+  @Post(':id/payments')
+  pay(@Req() req: Request, @Param('id', ParseUUIDPipe) id: string, @Body() body: { amount?: string; memo?: string }) {
+    return this.sales.recordPayment(id, body?.amount ?? '', body?.memo, req.user!.id);
+  }
+
+  @Post(':id/payments/:entryId/reverse')
+  reversePayment(@Req() req: Request, @Param('id', ParseUUIDPipe) id: string, @Param('entryId', ParseUUIDPipe) entryId: string) {
+    return this.sales.reversePayment(id, entryId, req.user!.id);
+  }
+
+  @Post(':id/void')
+  void(@Req() req: Request, @Param('id', ParseUUIDPipe) id: string, @Body() body: { reason?: string }) {
+    return this.sales.voidInvoice(id, body?.reason ?? '', req.user!.id);
+  }
 }

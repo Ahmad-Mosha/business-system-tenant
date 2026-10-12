@@ -29,6 +29,8 @@ export type LedgerEntryKind =
   | 'NOON_FEE' // noon's commission / fulfilment / ads on a settlement
   | 'NOON_PAYOUT' // noon transferred money to our bank
   | 'ORDER_SALE' // a website / social order delivered
+  | 'SALES_INVOICE' // a sales invoice posted: revenue, owed by the customer
+  | 'CUSTOMER_PAYMENT' // a customer paid against a sales invoice
   | 'COGS' // cost of the goods on a sale
   | 'BOSTA_PAYOUT' // Bosta transferred collected COD to us
   | 'RETURN' // a sale reversed

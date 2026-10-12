@@ -19,6 +19,8 @@ const ENTRY_KINDS = [
   'NOON_FEE',
   'NOON_PAYOUT',
   'ORDER_SALE',
+  'SALES_INVOICE',
+  'CUSTOMER_PAYMENT',
   'COGS',
   'BOSTA_PAYOUT',
   'RETURN',
@@ -54,6 +56,7 @@ const SOURCE_PATH: Record<string, string> = {
   expense: '/money/expenses#',
   order: '/orders/',
   purchase_invoice: '/money/purchases/',
+  sales_invoice: '/sales/',
   supplier: '/money/suppliers/',
 };
 
@@ -65,7 +68,7 @@ export const sourceHref = (e: Pick<LedgerRow, 'sourceType' | 'sourceId'>) =>
  * own English. The row already names the kind, so only the data inside is
  * worth showing: a supplier, an invoice number, who a cheque is from.
  */
-const SYSTEM_MEMO = /^(?:Opening cash balance|Payment to (.+)|Purchase invoice ?(.*)|Cheque from (.+?)(?: cleared)?)$/;
+const SYSTEM_MEMO = /^(?:Opening cash balance|Payment to (.+)|Purchase invoice ?(.*)|Cheque from (.+?)(?: cleared)?|(?:Sales invoice|Paid with|Payment for) (SI-\d+))$/;
 
 export const isSystemMemo = (memo: string) => SYSTEM_MEMO.test(memo);
 
@@ -96,6 +99,7 @@ export const CASH_IN = [
   'AMAZON_RECEIVABLE',
   'BOSTA_COD',
   'CHEQUES_PENDING',
+  'CUSTOMER_RECEIVABLE',
 ] as const;
 export const CASH_OUT = [
   'SALES',
@@ -105,6 +109,7 @@ export const CASH_OUT = [
   'OTHER_EXPENSE',
   'SHIPPING',
   'CHANNEL_FEES',
+  'CUSTOMER_RECEIVABLE',
 ] as const;
 
 /** How an invoice's paid state looks; its name is `enums.paidStatus`. */

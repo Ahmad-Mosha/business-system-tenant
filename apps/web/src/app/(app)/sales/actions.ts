@@ -12,6 +12,7 @@ const MONEY = /^\d+(\.\d{1,2})?$/;
 function revalidateSales(...paths: string[]) {
   revalidatePath('/sales', 'layout');
   revalidatePath('/customers', 'layout');
+  revalidatePath('/money', 'layout');
   for (const p of paths) revalidatePath(p);
 }
 
@@ -127,4 +128,37 @@ export async function deleteSalesDraft(id: string) {
   if (!r.ok) return r;
   revalidateSales();
   redirect('/sales');
+}
+
+/** Takes the goods out of the warehouse and books the sale; `paidNow` is received in cash. */
+export async function postSalesInvoice(id: string, paidNow: string) {
+  const r = await apiRequest(`/sales-invoices/${id}/post`, 'POST', { paidNow: paidNow || '0' });
+  if (!r.ok) return r;
+  revalidateSales(`/sales/${id}`);
+  return { ok: true as const };
+}
+
+export async function recordSalesPayment(id: string, _prev: DialogFormState, form: FormData): Promise<DialogFormState> {
+  const amount = String(form.get('amount') ?? '');
+  if (!MONEY.test(amount) || Number(amount) <= 0) {
+    return { status: 'error', message: (await getTranslations('errors.api.sales'))('paymentAmount') };
+  }
+  const r = await apiRequest(`/sales-invoices/${id}/payments`, 'POST', { amount, memo: String(form.get('memo') ?? '').trim() || undefined });
+  if (!r.ok) return { status: 'error', message: r.message };
+  revalidateSales(`/sales/${id}`);
+  return { status: 'saved' };
+}
+
+export async function reverseSalesPayment(id: string, entryId: string) {
+  const r = await apiRequest(`/sales-invoices/${id}/payments/${entryId}/reverse`, 'POST');
+  if (!r.ok) return r;
+  revalidateSales(`/sales/${id}`);
+  return { ok: true as const };
+}
+
+export async function voidSalesInvoice(id: string, reason: string) {
+  const r = await apiRequest(`/sales-invoices/${id}/void`, 'POST', { reason });
+  if (!r.ok) return r;
+  revalidateSales(`/sales/${id}`);
+  return { ok: true as const };
 }

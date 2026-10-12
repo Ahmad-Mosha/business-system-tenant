@@ -4,6 +4,7 @@ import { getTranslations } from 'next-intl/server';
 import { Amount } from '@/components/amount';
 import { MetricCard, MetricGrid } from '@/components/metric-card';
 import { Page, PageHeader } from '@/components/page';
+import { PaidChip } from '@/components/paid-chip';
 import { TableCount, TableEmpty, TablePanel } from '@/components/table-panel';
 import { ToneBadge } from '@/components/tone-badge';
 import { Button } from '@/components/ui/button';
@@ -11,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { getFormat } from '@/i18n/get-format';
 import { getSalesInvoices } from '@/lib/api';
 import { money } from '@/lib/format';
-import { SALES_TONE } from '@/lib/sales';
+import { SALES_TONE, salesPaidStatus } from '@/lib/sales';
 import { requireAdmin } from '@/lib/session';
 
 export default async function SalesInvoicesPage() {
@@ -20,6 +21,8 @@ export default async function SalesInvoicesPage() {
   const invoices = await getSalesInvoices();
   const drafts = invoices.filter((i) => i.status === 'DRAFT');
   const draftValue = drafts.reduce((n, i) => n + Number(i.total), 0);
+  const posted = invoices.filter((i) => i.status === 'POSTED');
+  const owed = posted.reduce((n, i) => n + Number(i.total) - Number(i.paidAmount), 0);
 
   const newInvoice = (
     <Button asChild>
@@ -35,12 +38,13 @@ export default async function SalesInvoicesPage() {
       <PageHeader title={t('title')} description={t('description')} actions={newInvoice} />
 
       <MetricGrid>
-        <MetricCard label={t('invoices')} value={f.count(invoices.length)} hint={t('postedCount', { count: invoices.filter((i) => i.status === 'POSTED').length })} />
+        <MetricCard label={t('invoices')} value={f.count(invoices.length)} hint={t('postedCount', { count: posted.length })} />
+        <MetricCard label={t('owed')} value={<Amount value={owed} />} hint={t('owedHint')} />
         <MetricCard label={t('drafts')} value={f.count(drafts.length)} hint={t('draftsHint')} />
         <MetricCard label={t('draftValue')} value={<Amount value={draftValue} />} hint={t('draftValueHint')} />
       </MetricGrid>
 
-      <TablePanel minWidth="52rem" footer={<TableCount>{tr('nouns.invoices', { count: invoices.length })}</TableCount>}>
+      <TablePanel minWidth="60rem" footer={<TableCount>{tr('nouns.invoices', { count: invoices.length })}</TableCount>}>
         {invoices.length === 0 ? (
           <TableEmpty icon={FileText} title={t('empty')} description={t('emptyHint')} action={newInvoice} />
         ) : (
@@ -53,6 +57,8 @@ export default async function SalesInvoicesPage() {
                 <TableHead className="w-[110px]">{t('columns.status')}</TableHead>
                 <TableHead className="w-[90px] text-end">{t('columns.lines')}</TableHead>
                 <TableHead className="w-[140px] text-end">{t('columns.total')}</TableHead>
+                <TableHead className="w-[130px]">{t('columns.payment')}</TableHead>
+                <TableHead className="w-[130px] text-end">{t('columns.remaining')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -75,6 +81,10 @@ export default async function SalesInvoicesPage() {
                   </TableCell>
                   <TableCell className="num text-end text-muted-foreground">{f.count(i.lineCount)}</TableCell>
                   <TableCell className="num text-end font-medium">{money(i.total)}</TableCell>
+                  <TableCell>{salesPaidStatus(i) ? <PaidChip status={salesPaidStatus(i)!} /> : null}</TableCell>
+                  <TableCell className="num text-end text-muted-foreground">
+                    {i.status === 'POSTED' && Number(i.total) - Number(i.paidAmount) > 0.005 ? money(Number(i.total) - Number(i.paidAmount)) : '—'}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
