@@ -16,6 +16,8 @@ import { OrderItem } from '../orders/order-item.entity';
 import { Order } from '../orders/order.entity';
 import { PurchaseInvoice, PurchaseInvoiceLine } from '../purchasing/purchase-invoice.entity';
 import { Supplier } from '../purchasing/supplier.entity';
+import { Customer } from '../sales/customer.entity';
+import { SalesInvoice, SalesInvoiceLine } from '../sales/sales-invoice.entity';
 
 /** Shared with app.module.ts (runtime) and database/data-source.ts (CLI) so they can never drift apart. */
 export const ENTITIES = [
@@ -38,4 +40,7 @@ export const ENTITIES = [
   Supplier,
   PurchaseInvoice,
   PurchaseInvoiceLine,
+  Customer,
+  SalesInvoice,
+  SalesInvoiceLine,
 ];
