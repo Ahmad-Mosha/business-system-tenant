@@ -29,7 +29,7 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
       // Half muted, half card, and opaque (the header is sticky): muted text
       // on full `muted` measures 4.3:1, under AA for 12px — this reaches 4.5.
       className={cn(
-        "bg-[color-mix(in_oklch,var(--muted)_55%,var(--card))] [&_tr]:border-b [&_tr]:hover:bg-transparent",
+        "bg-[color-mix(in_srgb,var(--muted)_55%,var(--card))] [&_tr]:border-b [&_tr]:hover:bg-transparent",
         className
       )}
       {...props}

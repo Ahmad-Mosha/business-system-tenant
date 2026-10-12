@@ -77,7 +77,7 @@ const PAYMENT_METHODS = [
 
 /** An inline table input that reads as text until it's pointed at. */
 const cellInput =
-  'h-8 border-transparent bg-transparent px-2 shadow-none hover:border-input focus-visible:border-ring';
+  'h-8 border-transparent bg-muted/60 px-2 shadow-none hover:border-input focus-visible:border-ring focus-visible:bg-background dark:bg-muted/60 dark:focus-visible:bg-input/20';
 
 /**
  * Manual order entry, and the edit screen for an existing one — the same form
@@ -386,7 +386,7 @@ export function OrderForm({
                                 aria-label={t('form.itemName')}
                                 dir="auto"
                                 disabled={pending}
-                                className={cn(cellInput, 'font-medium')}
+                                className={cn(cellInput, 'text-page bg-transparent font-medium dark:bg-transparent')}
                               />
                               <p className="px-2 text-xs text-muted-foreground">
                                 {!l.variantId ? (

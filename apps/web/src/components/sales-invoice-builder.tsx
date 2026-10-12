@@ -55,7 +55,7 @@ interface SalesForm {
   lines: Line[];
 }
 
-const cellInput = 'h-8 border-transparent bg-transparent px-2 shadow-none hover:border-input focus-visible:border-ring';
+const cellInput = 'h-8 border-transparent bg-muted/60 px-2 shadow-none hover:border-input focus-visible:border-ring focus-visible:bg-background dark:bg-muted/60 dark:focus-visible:bg-input/20';
 
 /**
  * Writing a sales invoice: the customer, what they take and at what price, and

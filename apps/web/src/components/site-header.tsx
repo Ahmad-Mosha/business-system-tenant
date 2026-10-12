@@ -43,7 +43,7 @@ export function SiteHeader({ privacy }: { privacy?: boolean }) {
   const crumbs = tail.map(tailLabel).filter((l, i, all) => !(l === t('crumbs.details') && all[i + 1]));
 
   return (
-    <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border/70 bg-background px-4 md:px-5">
+    <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border/70 px-4 md:px-5">
       <SidebarTrigger className="-ms-1.5" />
       <Separator orientation="vertical" className="me-1 data-vertical:h-4" />
       {here ? (
