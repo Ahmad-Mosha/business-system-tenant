@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
-import { saveInvoice, type InvoicePayload } from '@/app/(app)/money/actions';
+import { postInvoice, saveInvoice, updateInvoiceDraft, type InvoicePayload } from '@/app/(app)/money/actions';
 import { SupplierForm } from '@/components/supplier-form';
 import { AddProductDialog } from '@/components/add-product-dialog';
 import { Amount } from '@/components/amount';
@@ -55,9 +55,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import type { SupplierRow } from '@/lib/api';
+import type { PurchaseInvoiceDetail, SupplierRow } from '@/lib/api';
 import { money } from '@/lib/format';
-import { priceLine } from '@/lib/purchase-line';
+import { lineTotalFor, priceLine, trimZeros } from '@/lib/purchase-line';
 import { cn } from '@/lib/utils';
 import { b, num, strong } from '@/i18n/rich';
 
@@ -77,6 +77,16 @@ interface Line {
 const cellInput =
   'h-8 border-transparent bg-transparent px-2 shadow-none hover:border-input focus-visible:border-ring';
 
+/** Saves a draft's edits, then posts it when asked — a failed post leaves the edits saved on the draft. */
+async function saveDraftEdits(id: string, payload: InvoicePayload, asDraft: boolean) {
+  const saved = await updateInvoiceDraft(id, payload);
+  if (!saved.ok || asDraft) return saved;
+  const form = new FormData();
+  form.set('id', id);
+  const posted = await postInvoice({ status: 'idle' }, form);
+  return posted.status === 'error' ? { ok: false as const, message: posted.message } : saved;
+}
+
 interface InvoiceForm {
   /** One id per invoice being entered: a resend can never record it twice. */
   requestId: string;
@@ -94,11 +104,14 @@ export function InvoiceBuilder({
   suppliers,
   cashBalance,
   draftKey,
+  invoice,
 }: {
   suppliers: SupplierRow[];
   cashBalance: string;
   /** Identifies this user's unfinished invoice in the browser. */
   draftKey: string;
+  /** A saved draft being edited; absent for a new invoice. */
+  invoice?: PurchaseInvoiceDetail;
 }) {
   const t = useTranslations('money');
   const tr = useTranslations();
@@ -109,19 +122,44 @@ export function InvoiceBuilder({
   const [newSuppliers, setNewSuppliers] = useState<SupplierRow[]>([]);
   const supplierOptions = [...suppliers, ...newSuppliers.filter((s) => !suppliers.some((existing) => existing.id === s.id))];
   // Everything typed lives in one object so it can be kept as a draft.
-  const [form, setForm] = useState<InvoiceForm>(() => ({
-    requestId: crypto.randomUUID(),
-    supplierId: '',
-    invoiceNo: '',
-    invoiceDate: todayISO(),
-    payment: 'CREDIT',
-    allocation: 'BY_VALUE',
-    extraCosts: '0',
-    separateCosts: true,
-    lines: [],
-  }));
+  const [form, setForm] = useState<InvoiceForm>(() =>
+    invoice
+      ? {
+          requestId: crypto.randomUUID(),
+          supplierId: invoice.supplierId,
+          invoiceNo: invoice.invoiceNo ?? '',
+          invoiceDate: invoice.invoiceDate,
+          payment: invoice.payment,
+          allocation: invoice.allocation,
+          extraCosts: invoice.extraCosts,
+          separateCosts: invoice.extraCostsPaidSeparately,
+          // Reopened on the unit cost when that reproduces the saved total
+          // exactly, otherwise on the total — a saved amount never moves.
+          lines: invoice.lines.map((l) => ({
+            key: l.id,
+            variantId: l.variantId,
+            label: l.label,
+            quantity: String(l.quantity),
+            unitCost: trimZeros(l.unitCost),
+            lineTotal: l.lineTotal,
+            source: lineTotalFor(l.unitCost, l.quantity) === l.lineTotal ? ('unit' as const) : ('total' as const),
+            onHand: null,
+          })),
+        }
+      : {
+          requestId: crypto.randomUUID(),
+          supplierId: '',
+          invoiceNo: '',
+          invoiceDate: todayISO(),
+          payment: 'CREDIT',
+          allocation: 'BY_VALUE',
+          extraCosts: '0',
+          separateCosts: true,
+          lines: [],
+        },
+  );
   const [initialForm] = useState(form);
-  const draft = useDraft({ key: draftKey, value: form, initial: initialForm, apply: setForm });
+  const draft = useDraft({ key: draftKey, value: form, initial: initialForm, apply: setForm, version: invoice?.updatedAt });
   const { supplierId, invoiceNo, invoiceDate, payment, allocation, extraCosts, separateCosts, lines } = form;
   const set = <K extends keyof InvoiceForm>(key: K) => (value: InvoiceForm[K]) => setForm((f) => ({ ...f, [key]: value }));
   const setSupplierId = set('supplierId');
@@ -180,14 +218,14 @@ export function InvoiceBuilder({
       })),
     };
     start(async () => {
-      const res = await saveInvoice(payload, asDraft);
+      const res = invoice ? await saveDraftEdits(invoice.id, payload, asDraft) : await saveInvoice(payload, asDraft);
       if (!res.ok) {
         toast.error(res.message);
         setConfirming(false);
         return;
       }
       draft.clear();
-      toast.success(t(asDraft ? 'newInvoice.draftSaved' : 'newInvoice.posted'));
+      toast.success(t(asDraft ? (invoice ? 'invoice.draftUpdated' : 'newInvoice.draftSaved') : 'newInvoice.posted'));
       router.push(`/money/purchases/${res.id}`);
     });
   };
@@ -206,9 +244,9 @@ export function InvoiceBuilder({
   return (
     <Page>
       <PageHeader
-        back={{ href: '/money/purchases', label: t('invoice.back') }}
-        title={t('newInvoice.title')}
-        description={t('newInvoice.description')}
+        back={invoice ? { href: `/money/purchases/${invoice.id}`, label: t('invoice.back') } : { href: '/money/purchases', label: t('invoice.back') }}
+        title={invoice ? t('invoice.editTitle') : t('newInvoice.title')}
+        description={invoice ? t('invoice.editDescription') : t('newInvoice.description')}
       />
 
       <DraftNotice draft={draft} onUndo={setForm} />

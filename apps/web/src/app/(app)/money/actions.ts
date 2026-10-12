@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { apiRequest } from '@/lib/api-request';
 import type messages from '@/messages/en.json';
@@ -117,6 +118,40 @@ export async function createSupplier(_prev: FormState, form: FormData): Promise<
   return state;
 }
 
+/** Edits a supplier's name, phone or note. */
+export async function updateSupplier(id: string, _prev: FormState, form: FormData): Promise<FormState> {
+  const name = String(form.get('name') ?? '').trim();
+  if (!name) return invalid('supplierName');
+  const state = await send(`/suppliers/${id}`, 'PATCH', {
+    name,
+    phone: String(form.get('phone') ?? '').trim() || null,
+    note: String(form.get('note') ?? '').trim() || null,
+  });
+  if (state.status === 'saved') revalidateSuppliers(id);
+  return state;
+}
+
+/** Archives (false) or restores (true) a supplier; the API refuses archiving one still owed money. */
+export async function setSupplierActive(id: string, active: boolean) {
+  const r = await apiRequest(`/suppliers/${id}`, 'PATCH', { active });
+  if (r.ok) revalidateSuppliers(id);
+  return r.ok ? { ok: true as const } : r;
+}
+
+/** Removes a supplier with no invoices or payments; anything else is refused by the API. */
+export async function deleteSupplier(id: string) {
+  const r = await apiRequest(`/suppliers/${id}`, 'DELETE');
+  if (!r.ok) return r;
+  revalidatePath('/money/suppliers');
+  redirect('/money/suppliers');
+}
+
+function revalidateSuppliers(id: string) {
+  revalidatePath('/money/suppliers');
+  revalidatePath(`/money/suppliers/${id}`);
+  revalidatePath('/money/purchases/new');
+}
+
 export async function paySupplier(_prev: FormState, form: FormData): Promise<FormState> {
   const id = String(form.get('id') ?? '');
   const amount = String(form.get('amount') ?? '').trim();
@@ -187,7 +222,8 @@ async function call(path: string, body?: unknown): Promise<InvoiceResult> {
 }
 
 /** Creates the invoice, and posts it too unless `asDraft`. */
-export async function saveInvoice(input: InvoicePayload, asDraft: boolean): Promise<InvoiceResult> {
+/** The form's own checks, in the reader's language — null when the invoice may be sent. */
+async function checkInvoice(input: InvoicePayload): Promise<string | null> {
   const problem: Check | null = !input.supplierId
     ? 'chooseSupplier'
     : !ISO_DATE.test(input.invoiceDate)
@@ -206,11 +242,35 @@ export async function saveInvoice(input: InvoicePayload, asDraft: boolean): Prom
               : input.extraCosts && !MONEY.test(input.extraCosts)
                 ? 'extraCosts'
                 : null;
-  if (problem) return { ok: false, message: (await invalid(problem)).message };
+  return problem ? (await invalid(problem)).message : null;
+}
+
+export async function saveInvoice(input: InvoicePayload, asDraft: boolean): Promise<InvoiceResult> {
+  const problem = await checkInvoice(input);
+  if (problem) return { ok: false, message: problem };
 
   const result = await call('/purchases', { ...input, postImmediately: !asDraft });
   if (result.ok) revalidatePurchasing();
   return result;
+}
+
+/** Saves changes to a draft invoice; the API refuses once it is posted. */
+export async function updateInvoiceDraft(id: string, input: InvoicePayload): Promise<InvoiceResult> {
+  const problem = await checkInvoice(input);
+  if (problem) return { ok: false, message: problem };
+  const r = await apiRequest<{ id: string }>(`/purchases/${id}`, 'PATCH', input);
+  if (!r.ok) return r;
+  revalidatePurchasing();
+  revalidatePath(`/money/purchases/${id}`);
+  return { ok: true, id };
+}
+
+/** Deletes a draft — it never moved stock or money. */
+export async function deleteDraftInvoice(id: string) {
+  const r = await apiRequest(`/purchases/${id}`, 'DELETE');
+  if (!r.ok) return r;
+  revalidatePurchasing();
+  redirect('/money/purchases');
 }
 
 export async function postInvoice(_prev: FormState, form: FormData): Promise<FormState> {

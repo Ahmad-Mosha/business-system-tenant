@@ -23,6 +23,8 @@ export interface CreateProductInput {
 }
 
 export interface ProductFilters {
+  /** The archived products instead of the working list. */
+  archived?: boolean;
   search?: string;
   channel?: string;
   category?: string;
@@ -72,9 +74,8 @@ export class CatalogService {
       return `$${params.length}`;
     };
 
-    // Archived products are gone from the working list entirely — there is no
-    // "show archived" view yet because nothing has asked for one.
-    const whereClauses: string[] = ['p.active'];
+    // Archived products leave the working list; `archived` shows only them.
+    const whereClauses: string[] = [f.archived ? 'NOT p.active' : 'p.active'];
     if (f.search) whereClauses.push(`p.name ILIKE ${bind(`%${f.search}%`)}`);
     if (f.category) {
       whereClauses.push(
@@ -250,7 +251,48 @@ export class CatalogService {
       [id],
     );
 
-    return { ...product, variants, listings, draftPurchases };
+    return { ...product, variants, listings, draftPurchases, deletable: await this.isUnused(this.db.manager, id) };
+  }
+
+  /** Nothing anywhere refers to it: no stock history, channel link, order line or purchase line. */
+  private async isUnused(tx: EntityManager, productId: string): Promise<boolean> {
+    const [row] = await tx.query(
+      `SELECT NOT EXISTS (SELECT 1 FROM stock_movement m JOIN product_variant v ON v.id = m.variant_id WHERE v.product_id = $1)
+          AND NOT EXISTS (SELECT 1 FROM channel_listing l JOIN product_variant v ON v.id = l.variant_id WHERE v.product_id = $1)
+          AND NOT EXISTS (SELECT 1 FROM order_item i JOIN product_variant v ON v.id = i.variant_id WHERE v.product_id = $1)
+          AND NOT EXISTS (SELECT 1 FROM purchase_invoice_line l JOIN product_variant v ON v.id = l.variant_id WHERE v.product_id = $1)
+          AS unused`,
+      [productId],
+    );
+    return row.unused;
+  }
+
+  /** Brings an archived product back to the working list, variants included. */
+  async restoreProduct(id: string) {
+    await this.db.transaction(async (tx) => {
+      const product = await tx.findOne(Product, { where: { id }, lock: { mode: 'pessimistic_write' } });
+      if (!product) throw new NotFoundException(problem('notFound', 'product not found'));
+      await tx.update(Product, { id }, { active: true });
+      await tx.update(ProductVariant, { productId: id }, { active: true });
+    });
+  }
+
+  /**
+   * Removes a product entered by mistake. Only one with no history at all —
+   * anything that has moved stock, sold, been bought or been linked to a
+   * channel is archived instead, so no record ever loses what it points at.
+   */
+  async deleteProduct(id: string) {
+    await this.db.transaction(async (tx) => {
+      const variants = await tx.find(ProductVariant, { where: { productId: id }, select: { id: true } });
+      await lockStock(tx, variants.map((v) => v.id));
+      const product = await tx.findOne(Product, { where: { id }, lock: { mode: 'pessimistic_write' } });
+      if (!product) throw new NotFoundException(problem('notFound', 'product not found'));
+      if (!(await this.isUnused(tx, id))) {
+        throw new BadRequestException(problem('product.inUse', 'this product has history — archive it instead'));
+      }
+      await tx.delete(Product, { id }); // variants cascade
+    });
   }
 
   /**
