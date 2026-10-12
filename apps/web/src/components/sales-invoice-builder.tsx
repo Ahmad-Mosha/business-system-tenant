@@ -1,16 +1,17 @@
 'use client';
 
-import { AlertTriangle, FileText, Save, Trash2 } from 'lucide-react';
+import { AlertTriangle, FileText, Save, Send, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
-import { saveSalesDraft, updateSalesDraft, type SalesInvoicePayload } from '@/app/(app)/sales/actions';
+import { postSalesInvoice, saveSalesDraft, updateSalesDraft, type SalesInvoicePayload } from '@/app/(app)/sales/actions';
 import { Amount } from '@/components/amount';
 import { CustomerForm } from '@/components/customer-form';
 import { DatePicker, todayISO } from '@/components/date-picker';
 import { DraftNotice } from '@/components/draft-notice';
 import { NumberField } from '@/components/number-field';
+import { PostSalesDialog } from '@/components/sales-invoice-actions';
 import { Page, PageHeader } from '@/components/page';
 import { VariantSearch } from '@/components/variant-search';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -154,7 +155,7 @@ export function SalesInvoiceBuilder({
           ],
     );
 
-  const save = () => {
+  const persist = () => {
     const payload: SalesInvoicePayload = {
       requestId: form.requestId,
       customerId: form.customerId,
@@ -167,13 +168,29 @@ export function SalesInvoiceBuilder({
         ...(l.source === 'total' ? { lineTotal: price(l).lineTotal } : { unitPrice: l.unitPrice }),
       })),
     };
+    return invoice ? updateSalesDraft(invoice.id, payload) : saveSalesDraft(payload);
+  };
+
+  const save = () =>
     start(async () => {
-      const res = invoice ? await updateSalesDraft(invoice.id, payload) : await saveSalesDraft(payload);
+      const res = await persist();
       if (!res.ok) return void toast.error(res.message);
       draft.clear();
       toast.success(t(invoice ? 'draftUpdated' : 'draftSaved'));
       router.push(`/sales/${res.id}`);
     });
+
+  // Saved first, so a refusal (stock taken meanwhile) leaves a draft to fix, not lost typing.
+  const saveAndPost = async (paidNow: string) => {
+    const saved = await persist();
+    if (!saved.ok) return saved;
+    draft.clear();
+    const posted = await postSalesInvoice(saved.id, paidNow);
+    router.push(`/sales/${saved.id}`);
+    if (posted.ok) return posted;
+    const message = tr('sales.post.savedNotPosted', { reason: posted.message });
+    toast.error(message);
+    return { ok: false as const, message };
   };
 
   return (
@@ -359,7 +376,7 @@ export function SalesInvoiceBuilder({
             </CardHeader>
             <CardContent className="grid gap-3 text-[13px]">
               <div className="flex items-baseline justify-between gap-3">
-                <span className="text-muted-foreground">{t('subtotal', { items: tr('nouns.items', { count: units }) })}</span>
+                <span className="text-muted-foreground">{t('subtotal', { items: tr('nouns.units', { count: units }) })}</span>
                 <span className="num">{money(subtotal)}</span>
               </div>
               <div className="flex items-center justify-between gap-3">
@@ -384,7 +401,7 @@ export function SalesInvoiceBuilder({
                 <Amount value={total} className="text-[28px] font-semibold tracking-tight" />
               </div>
 
-              {lines.length ? (
+              {lines.length && lines.every((l) => Number(price(l).lineTotal) > 0) ? (
                 <div className="rounded-lg bg-muted/50 px-3 py-2.5" data-sensitive-scope>
                   <div className="flex items-baseline justify-between gap-3">
                     <span className="text-muted-foreground">{t('profit')}</span>
@@ -396,19 +413,30 @@ export function SalesInvoiceBuilder({
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {costKnown
-                      ? t('profitHint', { margin: total > 0 ? `${((profit / total) * 100).toFixed(1)}%` : '—' })
+                      ? t.rich('profitHint', { margin: total > 0 ? `${((profit / total) * 100).toFixed(1)}%` : '—', num })
                       : t('profitUnknown')}
                   </p>
                 </div>
               ) : null}
 
-              <Button size="lg" onClick={save} disabled={pending || !!missing} className="mt-1 w-full">
+              <PostSalesDialog
+                trigger={
+                  <Button size="lg" disabled={pending || !!missing || over.length > 0} className="mt-1 w-full">
+                    <Send />
+                    {tr('sales.post.saveAndPost')}
+                  </Button>
+                }
+                total={total}
+                customer={options.find((c) => c.id === form.customerId)?.name ?? ''}
+                items={tr('nouns.units', { count: units })}
+                onPost={saveAndPost}
+              />
+              <Button variant="outline" onClick={save} disabled={pending || !!missing} className="w-full">
                 {pending ? <Spinner /> : <Save />}
                 {t('saveDraft')}
               </Button>
               {missing && !pending ? <p className="text-center text-xs text-muted-foreground">{missing}</p> : null}
-              <p className="text-center text-xs text-muted-foreground">{t('postingSoon')}</p>
-              <p className="text-center text-xs text-muted-foreground">{tr('drafts.autosaved')}</p>
+              <p className="text-center text-xs text-muted-foreground">{tr('sales.post.draftHint')} {tr('drafts.autosaved')}</p>
 
               {over.map((l) => (
                 <Alert key={`o${l.key}`} variant="destructive">

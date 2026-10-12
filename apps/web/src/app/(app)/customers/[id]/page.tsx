@@ -8,6 +8,7 @@ import { ConfirmAction } from '@/components/confirm-action';
 import { CustomerForm } from '@/components/customer-form';
 import { MetricCard, MetricGrid } from '@/components/metric-card';
 import { Page, PageHeader } from '@/components/page';
+import { PaidChip } from '@/components/paid-chip';
 import { TableEmpty, TablePanel } from '@/components/table-panel';
 import { ToneBadge } from '@/components/tone-badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -17,7 +18,7 @@ import { getFormat } from '@/i18n/get-format';
 import { bdi } from '@/i18n/rich';
 import { getCustomer } from '@/lib/api';
 import { money } from '@/lib/format';
-import { SALES_TONE } from '@/lib/sales';
+import { SALES_TONE, salesPaidStatus } from '@/lib/sales';
 import { requireAdmin } from '@/lib/session';
 
 export default async function CustomerPage({ params }: { params: Promise<{ id: string }> }) {
@@ -107,7 +108,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
         <MetricCard label={tr('sales.invoices')} value={<Amount value={sold} />} hint={tr('sales.postedCount', { count: posted.length })} />
       </MetricGrid>
 
-      <TablePanel minWidth="40rem">
+      <TablePanel minWidth="48rem">
         {customer.invoices.length === 0 ? (
           <TableEmpty icon={FileText} title={t('noInvoices')} />
         ) : (
@@ -118,6 +119,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                 <TableHead>{tr('sales.columns.date')}</TableHead>
                 <TableHead className="w-[110px]">{tr('sales.columns.status')}</TableHead>
                 <TableHead className="w-[140px] text-end">{tr('sales.columns.total')}</TableHead>
+                <TableHead className="w-[130px]">{tr('sales.columns.payment')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -133,6 +135,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                     <ToneBadge tone={SALES_TONE[i.status]}>{tr(`enums.salesStatus.${i.status}`)}</ToneBadge>
                   </TableCell>
                   <TableCell className="num text-end font-medium">{money(i.total)}</TableCell>
+                  <TableCell>{salesPaidStatus(i) ? <PaidChip status={salesPaidStatus(i)!} /> : null}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

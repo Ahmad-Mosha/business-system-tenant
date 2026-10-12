@@ -51,6 +51,8 @@ export const LEDGER_ACCOUNTS = [
   { code: 'NOON_RECEIVABLE', nameAr: 'رصيد نون', nameEn: 'noon balance', kind: 'ASSET' },
   { code: 'AMAZON_RECEIVABLE', nameAr: 'رصيد أمازون', nameEn: 'Amazon balance', kind: 'ASSET' },
   { code: 'BOSTA_COD', nameAr: 'تحصيلات بوسطة', nameEn: 'Bosta holding', kind: 'ASSET' },
+  // What customers owe on posted sales invoices — revenue booked, cash not yet in.
+  { code: 'CUSTOMER_RECEIVABLE', nameAr: 'مستحقات العملاء', nameEn: 'Customer receivables', kind: 'ASSET' },
   { code: 'SUPPLIER_PAYABLE', nameAr: 'مستحقات الموردين', nameEn: 'Supplier payable', kind: 'LIABILITY' },
   { code: 'CUSTOMER_REFUNDS', nameAr: 'مبالغ مستحقة للعملاء', nameEn: 'Customer refunds due', kind: 'LIABILITY' },
   { code: 'OWNER_CAPITAL', nameAr: 'رأس المال', nameEn: 'Owner capital', kind: 'EQUITY' },

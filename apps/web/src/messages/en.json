@@ -284,7 +284,16 @@
         "customerGone": "Choose an active customer.",
         "discount": "Enter a discount like 250.00.",
         "noLines": "Add at least one product.",
-        "linePrice": "Every product needs a price greater than 0."
+        "linePrice": "Every product needs a price greater than 0.",
+        "paidNow": "Enter the amount paid now like 300.00.",
+        "overpaid": "The amount can’t be more than {total}.",
+        "stockShort": "{name}: only {onHand} in the warehouse, {requested} on the invoice.",
+        "posted": "This invoice is already posted.",
+        "notPosted": "Only a posted invoice can do that.",
+        "paymentAmount": "Enter an amount like 300.00.",
+        "paymentReversed": "This payment is already reversed.",
+        "voidReason": "Write why this invoice is voided.",
+        "voidPaid": "Reverse this invoice’s payments before voiding it."
       }
     }
   },
@@ -1249,7 +1258,9 @@
       "BOSTA_PAYOUT": "Bosta payout",
       "RETURN": "Return",
       "STOCK_LOSS": "Stock loss",
-      "ADJUSTMENT": "Adjustment"
+      "ADJUSTMENT": "Adjustment",
+      "SALES_INVOICE": "Sales invoice",
+      "CUSTOMER_PAYMENT": "Customer payment"
     },
     "paidStatus": {
       "DRAFT": "Draft",
@@ -1265,7 +1276,8 @@
       "NOON_RECEIVABLE": "noon payouts",
       "AMAZON_RECEIVABLE": "Amazon payouts",
       "BOSTA_COD": "Bosta payouts",
-      "CHEQUES_PENDING": "Cheques cleared"
+      "CHEQUES_PENDING": "Cheques cleared",
+      "CUSTOMER_RECEIVABLE": "Customer payments"
     },
     "cashOut": {
       "SALES": "Sales reversed",
@@ -1274,7 +1286,8 @@
       "INVENTORY": "Stock bought for cash",
       "OTHER_EXPENSE": "Expenses",
       "SHIPPING": "Shipping",
-      "CHANNEL_FEES": "Fees and ads"
+      "CHANNEL_FEES": "Fees and ads",
+      "CUSTOMER_RECEIVABLE": "Customer payments reversed"
     },
     "voucherCounter": {
       "OTHER_EXPENSE": "General expense",
@@ -1370,7 +1383,9 @@
       "status": "Status",
       "total": "Total",
       "paid": "Paid",
-      "lines": "Products"
+      "lines": "Products",
+      "payment": "Payment",
+      "remaining": "Remaining"
     },
     "draftNumber": "Draft",
     "drafts": "Drafts",
@@ -1402,12 +1417,11 @@
       "discount": "Discount",
       "total": "Total",
       "profit": "Gross profit",
-      "profitHint": "Total minus today’s inventory cost of the products. {margin} of the total.",
+      "profitHint": "Total minus today’s inventory cost of the products. <num>{margin}</num> of the total.",
       "profitUnknown": "Some products have no inventory cost yet.",
       "saveDraft": "Save draft",
       "draftSaved": "Draft saved",
       "draftUpdated": "Draft updated",
-      "postingSoon": "Posting — taking the goods out of stock and recording the sale — is the next step.",
       "missing": {
         "customer": "Choose a customer.",
         "product": "Add at least one product.",
@@ -1437,9 +1451,61 @@
         "cost": "Cost",
         "profit": "Profit"
       },
-      "stockNow": "{count} in stock now"
+      "stockNow": "{count} in stock now",
+      "profitHintPosted": "Total minus the inventory cost when it was posted. <num>{margin}</num> of the total."
     },
-    "postedCount": "{count, plural, =0 {None posted yet} other {# posted}}"
+    "postedCount": "{count, plural, =0 {None posted yet} other {# posted}}",
+    "post": {
+      "post": "Post invoice",
+      "saveAndPost": "Save and post…",
+      "title": "Post this invoice?",
+      "description": "<num>{items}</num> leave the warehouse and <num>{total}</num> is recorded as sold to <b>{customer}</b>. A posted invoice can’t be edited — it can only be voided, while nothing has been collected.",
+      "paidNow": "Paid now",
+      "paidNowHint": "Cash received at the time of sale. The rest stays owed by the customer.",
+      "nothing": "Nothing yet",
+      "inFull": "In full",
+      "owedAfter": "Still owed after posting",
+      "tooMuch": "The amount paid can’t be more than the invoice total, {total}.",
+      "confirm": "Post invoice",
+      "posted": "Invoice posted",
+      "savedNotPosted": "Saved as a draft, but not posted: {reason}",
+      "shortHint": "Some products are short in the warehouse — reduce their quantities to post.",
+      "draftHint": "Posting takes the goods out of the warehouse and records the sale."
+    },
+    "payments": {
+      "title": "Payments",
+      "empty": "Nothing collected yet.",
+      "record": "Record payment",
+      "recordTitle": "Record a payment",
+      "recordHint": "Money received from <b>{customer}</b> for this invoice.",
+      "left": "Left on this invoice: <num>{amount}</num>",
+      "memoPlaceholder": "Cash, transfer, cheque number…",
+      "recorded": "Payment recorded",
+      "reverse": "Reverse",
+      "reverseTitle": "Reverse this payment?",
+      "reverseDescription": "For a payment recorded by mistake: {amount} leaves the cash and the customer owes it again. The payment stays in the history, marked as reversed.",
+      "reversed": "Payment reversed",
+      "reversedBadge": "Reversed",
+      "paid": "Paid",
+      "remaining": "Remaining",
+      "settled": "Fully paid",
+      "atPosting": "Paid at posting",
+      "payment": "Payment"
+    },
+    "void": {
+      "action": "Void invoice",
+      "title": "Void invoice {number}?",
+      "description": "For an invoice entered by mistake. Every piece returns to the warehouse and the sale is taken out of the books. The invoice stays visible, marked void. This can’t be undone.",
+      "reason": "Why is it voided?",
+      "reasonPlaceholder": "Wrong customer, entered twice…",
+      "confirm": "Void invoice",
+      "done": "Invoice voided",
+      "paidFirst": "<num>{amount}</num> has been collected on this invoice. Reverse those payments first, then void it.",
+      "banner": "Voided on {date} — {reason}. The goods went back to the warehouse and the sale was taken out of the books.",
+      "keep": "Keep invoice"
+    },
+    "owed": "Owed by customers",
+    "owedHint": "The unpaid part of posted invoices"
   },
   "customers": {
     "title": "Customers",

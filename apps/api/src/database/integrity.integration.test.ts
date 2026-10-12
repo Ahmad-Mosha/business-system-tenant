@@ -667,7 +667,7 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     assert.equal((await catalog.listProducts({ search: detail.variants[0].sku }))[0].id, created.id); // search by SKU
   });
   await t.test('sales invoice drafts price exactly, never duplicate, and move nothing', async () => {
-    const sales = new SalesService(db);
+    const sales = new SalesService(db, ledger);
     const a = await stock(10);
     const b = await stock(5);
     const customer = await sales.createCustomer({ name: `Wholesale ${randomUUID()}` });
@@ -695,5 +695,58 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     await sales.updateCustomer(customer.id, { active: false });
     assert.ok((await sales.listCustomers(true)).some((c) => c.id === customer.id));
     await sales.deleteCustomer(customer.id);
+  });
+  await t.test('posting a sales invoice moves stock and books revenue once; void undoes it exactly', async () => {
+    const sales = new SalesService(db, ledger);
+    const a = await stock(5);
+    const customer = await sales.createCustomer({ name: `Credit ${randomUUID()}` });
+    const owed = async () => (await sales.customerDetail(customer.id)).balance;
+    const entries = async (id: string) => db.query(
+      `SELECT debit_code AS debit, credit_code AS credit, amount, kind, reverses_id AS "reversesId"
+       FROM ledger_entry WHERE source_id = $1 ORDER BY created_at`, [id]);
+    const draft = (quantity: number) => sales.createDraft({ customerId: customer.id, invoiceDate: '2026-10-13', discount: '10',
+      lines: [{ variantId: a, quantity, unitPrice: '50' }] }, user.id);
+
+    const tooMany = await draft(6);
+    await assert.rejects(sales.postInvoice(tooMany.id, '0', user.id), /only 5 in stock/);
+    assert.equal(await balance(a), 5);
+    await sales.deleteDraft(tooMany.id);
+
+    const inv = await draft(3); // 150 - 10 = 140
+    await assert.rejects(sales.postInvoice(inv.id, '140.01', user.id), /cannot exceed/);
+    const results = await Promise.allSettled([sales.postInvoice(inv.id, '40', user.id), sales.postInvoice(inv.id, '40', user.id)]);
+    assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1); // a double click posts once
+    const posted = await sales.getInvoice(inv.id);
+    assert.equal(posted.status, 'POSTED');
+    assert.match(posted.invoiceNumber!, /^SI-\d+$/);
+    assert.equal(posted.paidAmount, '40.00');
+    assert.equal(posted.lines[0].unitCost, '10.0000'); // cost frozen on the line
+    assert.equal(await balance(a), 2);
+    assert.equal(await owed(), '100.00');
+    assert.deepEqual((await entries(inv.id)).map((e: { debit: string; credit: string; amount: string }) => `${e.debit}>${e.credit} ${e.amount}`),
+      ['CUSTOMER_RECEIVABLE>SALES 140.00', 'CASH>CUSTOMER_RECEIVABLE 40.00']);
+    await assert.rejects(sales.updateDraft(inv.id, { customerId: customer.id, invoiceDate: '2026-10-13', lines: [{ variantId: a, quantity: 1, unitPrice: '1' }] }), /cannot be edited/);
+    await assert.rejects(sales.deleteDraft(inv.id), /cannot be deleted/);
+
+    await assert.rejects(sales.recordPayment(inv.id, '100.01', undefined, user.id), /cannot exceed/);
+    const paid = await sales.recordPayment(inv.id, '100', 'cash at the shop', user.id);
+    assert.equal(paid.paidAmount, '140.00');
+    assert.equal(await owed(), '0.00');
+    await assert.rejects(sales.voidInvoice(inv.id, 'wrong customer', user.id), /reverse its payments/);
+    for (const p of paid.payments) await sales.reversePayment(inv.id, p.id, user.id);
+    await assert.rejects(sales.reversePayment(inv.id, paid.payments[0].id, user.id), /already reversed/);
+
+    const voided = await sales.voidInvoice(inv.id, 'wrong customer', user.id);
+    assert.equal(voided.status, 'VOID');
+    assert.equal(voided.voidReason, 'wrong customer');
+    assert.equal(voided.paidAmount, '0.00');
+    assert.equal(await balance(a), 5); // every unit back
+    assert.equal(await owed(), '0.00');
+    const net = await db.query(
+      `SELECT code, COALESCE(SUM(CASE WHEN debit_code = code THEN amount ELSE -amount END), 0)::numeric(14,2) AS net
+       FROM ledger_entry, unnest(ARRAY[debit_code, credit_code]) AS code WHERE source_id = $1 GROUP BY code ORDER BY code`, [inv.id]);
+    assert.ok(net.every((r: { net: string }) => r.net === '0.00'), JSON.stringify(net)); // cash, receivable and sales all net to zero
+    await assert.rejects(sales.voidInvoice(inv.id, 'again', user.id), /only a posted invoice/);
+    await assert.rejects(sales.recordPayment(inv.id, '1', undefined, user.id), /only a posted invoice/);
   });
 });

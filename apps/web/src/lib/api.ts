@@ -625,8 +625,20 @@ export interface SalesInvoiceDetail {
   paidAmount: string;
   notes: string | null;
   postedAt: string | null;
+  voidReason: string | null;
+  voidedAt: string | null;
   updatedAt: string;
   lines: SalesInvoiceLine[];
+  /** Money received against it; a reversed one stays listed, marked. */
+  payments: SalesPayment[];
+}
+
+export interface SalesPayment {
+  id: string;
+  amount: string;
+  occurredAt: string;
+  memo: string | null;
+  reversed: boolean;
 }
 
 export const getCustomers = (archived = false) =>

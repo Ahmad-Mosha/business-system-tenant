@@ -74,6 +74,13 @@ export class SalesInvoice {
   @Column({ type: 'timestamptz', nullable: true })
   postedAt: Date | null;
 
+  /** Why a posted invoice was voided; it stays visible, reversed. */
+  @Column({ type: 'text', nullable: true })
+  voidReason: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  voidedAt: Date | null;
+
   @Column({ name: 'created_by_id', type: 'uuid', nullable: true })
   createdById: string | null;
 
