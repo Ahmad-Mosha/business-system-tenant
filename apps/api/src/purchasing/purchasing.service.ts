@@ -4,7 +4,7 @@ import { DataSource, EntityManager, In } from 'typeorm';
 import { ProductVariant } from '../catalog/product-variant.entity';
 import { LedgerService } from '../finance/ledger.service';
 import { StockMovement } from '../inventory/stock-movement.entity';
-import { allocateExtraCosts, allocateOldestFirst, movingAverage, round2 } from './costing';
+import { allocateExtraCosts, allocateOldestFirst, lineTotalFor, movingAverage, round2, unitCostFor } from './costing';
 import {
   type CostAllocation,
   paidStatusOf,
@@ -16,18 +16,25 @@ import {
 import { Supplier } from './supplier.entity';
 import { problem } from '../problem';
 import { lockStock } from '../inventory/stock-lock';
+import { isUniqueViolation } from '../database/unique-violation';
 
 const MONEY = /^\d+(\.\d{1,2})?$/;
+const UNIT_COST = /^\d+(\.\d{1,4})?$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const money = (n: number) => n.toFixed(2);
 
+/** A line is typed as quantity × unit cost, or as quantity + line total (which then wins). */
 export interface InvoiceLineInput {
   variantId: string;
   quantity: number;
-  unitCost: string;
+  unitCost?: string;
+  lineTotal?: string;
 }
 
 export interface CreateInvoiceInput {
+  /** The form's submission id; the same id never creates a second invoice. */
+  requestId?: string;
   supplierId: string;
   invoiceNo?: string;
   invoiceDate: string;
@@ -71,9 +78,10 @@ export class PurchasingService {
     return new Map(rows.map((r) => [r.supplierId, Number(r.owed)]));
   }
 
-  async listSuppliers() {
+  /** Active suppliers for everyday use; `archived` lists the archived ones instead. */
+  async listSuppliers(archived = false) {
     const suppliers = await this.db.getRepository(Supplier).find({
-      where: { active: true },
+      where: { active: !archived },
       order: { name: 'ASC' },
     });
     const owed = await this.owedBySupplier();
@@ -90,18 +98,49 @@ export class PurchasingService {
     });
   }
 
+  /**
+   * Edits a supplier's details, or archives / restores it. Archiving hides it
+   * from new work but keeps its history, so it is refused while anything is
+   * still owed to it or a draft invoice still names it.
+   */
   async updateSupplier(id: string, patch: { name?: string; phone?: string | null; note?: string | null; active?: boolean }) {
-    const repo = this.db.getRepository(Supplier);
-    const supplier = await repo.findOneBy({ id });
-    if (!supplier) throw new NotFoundException(problem('notFound', 'supplier not found'));
-    if (patch.name !== undefined) {
-      if (!patch.name.trim()) throw new BadRequestException('name cannot be empty');
-      supplier.name = patch.name.trim();
-    }
-    if (patch.phone !== undefined) supplier.phone = patch.phone?.trim() || null;
-    if (patch.note !== undefined) supplier.note = patch.note?.trim() || null;
-    if (patch.active !== undefined) supplier.active = patch.active;
-    return repo.save(supplier);
+    return this.db.transaction(async (tx) => {
+      const supplier = await tx.findOne(Supplier, { where: { id }, lock: { mode: 'pessimistic_write' } });
+      if (!supplier) throw new NotFoundException(problem('notFound', 'supplier not found'));
+      if (patch.name !== undefined) {
+        if (!patch.name.trim()) throw new BadRequestException('name cannot be empty');
+        supplier.name = patch.name.trim();
+      }
+      if (patch.phone !== undefined) supplier.phone = patch.phone?.trim() || null;
+      if (patch.note !== undefined) supplier.note = patch.note?.trim() || null;
+      if (patch.active === false && supplier.active) {
+        const owed = (await this.owedBySupplier(tx)).get(id) ?? 0;
+        if (owed > 0.005) {
+          throw new BadRequestException(problem('supplier.archiveOwed', 'settle what is owed before archiving this supplier', { owed: money(owed) }));
+        }
+        if (await tx.exists(PurchaseInvoice, { where: { supplierId: id, status: 'DRAFT' } })) {
+          throw new BadRequestException(problem('supplier.archiveDrafts', 'post or delete its draft invoices before archiving'));
+        }
+      }
+      if (patch.active !== undefined) supplier.active = patch.active;
+      return tx.save(supplier);
+    });
+  }
+
+  /**
+   * Deletes a supplier entered by mistake. Only one nothing refers to: once it
+   * has invoices or payments it is part of the books, and archiving is the way
+   * to retire it.
+   */
+  async deleteSupplier(id: string) {
+    await this.db.transaction(async (tx) => {
+      const supplier = await tx.findOne(Supplier, { where: { id }, lock: { mode: 'pessimistic_write' } });
+      if (!supplier) throw new NotFoundException(problem('notFound', 'supplier not found'));
+      const used = (await tx.exists(PurchaseInvoice, { where: { supplierId: id } })) ||
+        (await tx.query('SELECT 1 FROM ledger_entry WHERE supplier_id = $1 LIMIT 1', [id])).length > 0;
+      if (used) throw new BadRequestException(problem('supplier.inUse', 'this supplier has invoices or payments — archive it instead'));
+      await tx.delete(Supplier, { id });
+    });
   }
 
   async supplierDetail(id: string) {
@@ -258,39 +297,19 @@ export class PurchasingService {
   /** Creates a DRAFT invoice — no stock or money moves until it is posted. */
   async createInvoice(input: CreateInvoiceInput, userId: string, postImmediately = false) {
     this.validateInvoiceInput(input);
+    const requestId = input.requestId || null;
+    const earlier = requestId ? await this.db.getRepository(PurchaseInvoice).findOneBy({ requestId }) : null;
+    if (earlier) return this.getInvoice(earlier.id);
 
-    const wantedVariantIds = [...new Set(input.lines.map((l) => l.variantId))];
-    const lines = input.lines.map((l) => ({
-      variantId: l.variantId,
-      quantity: l.quantity,
-      unitCost: Number(l.unitCost).toFixed(2),
-      lineTotal: round2(Number(l.unitCost) * l.quantity).toFixed(2),
-      landedUnitCost: null,
-    }));
-    const goodsTotal = round2(lines.reduce((s, l) => s + Number(l.lineTotal), 0));
-    const extraCosts = round2(Number(input.extraCosts ?? 0));
+    const { lines, header } = this.priceInvoice(input);
 
+    // A concurrent resend of the same request waits on the unique key, then gets the first invoice.
     const invoiceId = await this.db.transaction(async (tx) => {
-      await lockStock(tx, wantedVariantIds);
-      const variants = await tx.findBy(ProductVariant, { id: In(wantedVariantIds) });
-      if (variants.length !== wantedVariantIds.length || variants.some((variant) => !variant.active)) {
-        throw new BadRequestException(
-          problem('invoice.productsGone', 'choose active products for every invoice line'),
-        );
-      }
-      const supplier = await tx.findOneBy(Supplier, { id: input.supplierId, active: true });
-      if (!supplier) throw new BadRequestException(problem('invoice.supplierGone', 'choose an active supplier'));
+      await this.assertUsable(tx, input);
       const invoice = await tx.save(PurchaseInvoice, {
-        supplierId: input.supplierId,
-        invoiceNo: input.invoiceNo?.trim() || null,
-        invoiceDate: input.invoiceDate,
+        requestId,
+        ...header,
         status: 'DRAFT' as const,
-        payment: input.payment,
-        allocation: input.allocation ?? 'BY_VALUE',
-        goodsTotal: goodsTotal.toFixed(2),
-        extraCosts: extraCosts.toFixed(2),
-        extraCostsPaidSeparately: input.extraCostsPaidSeparately ?? false,
-        landedTotal: round2(goodsTotal + extraCosts).toFixed(2),
         createdById: userId,
       });
       await tx.insert(
@@ -299,8 +318,79 @@ export class PurchasingService {
       );
       if (postImmediately) await this.postInvoiceInTransaction(tx, invoice.id, userId);
       return invoice.id;
+    }).catch(async (error: unknown) => {
+      const first = requestId && isUniqueViolation(error, 'uq_purchase_invoice_request')
+        ? await this.db.getRepository(PurchaseInvoice).findOneBy({ requestId })
+        : null;
+      if (!first) throw error;
+      return first.id;
     });
     return this.getInvoice(invoiceId);
+  }
+
+  /**
+   * Rewrites a draft — header and lines — exactly as `createInvoice` would
+   * build it. A draft moves no stock or money, so editing it changes nothing
+   * else; a posted invoice is refused.
+   */
+  async updateDraft(id: string, input: CreateInvoiceInput) {
+    this.validateInvoiceInput(input);
+    const { lines, header } = this.priceInvoice(input);
+    await this.db.transaction(async (tx) => {
+      const invoice = await tx.findOne(PurchaseInvoice, { where: { id }, lock: { mode: 'pessimistic_write' } });
+      if (!invoice) throw new NotFoundException(problem('notFound', 'invoice not found'));
+      if (invoice.status !== 'DRAFT') {
+        throw new BadRequestException(problem('invoice.postedEdit', 'a posted invoice cannot be edited'));
+      }
+      await this.assertUsable(tx, input);
+      await tx.update(PurchaseInvoice, { id }, header);
+      await tx.delete(PurchaseInvoiceLine, { invoiceId: id });
+      await tx.insert(PurchaseInvoiceLine, lines.map((l) => ({ ...l, invoiceId: id })));
+    });
+    return this.getInvoice(id);
+  }
+
+  /** One pricing for creating and editing: whichever of unit cost or line total was typed is kept, the other derived. */
+  private priceInvoice(input: CreateInvoiceInput) {
+    const lines = input.lines.map((l) => {
+      const typedTotal = l.lineTotal !== undefined && l.lineTotal !== '';
+      const lineTotal = typedTotal ? Number(l.lineTotal).toFixed(2) : lineTotalFor(l.unitCost!, l.quantity);
+      return {
+        variantId: l.variantId,
+        quantity: l.quantity,
+        unitCost: typedTotal ? unitCostFor(lineTotal, l.quantity) : l.unitCost!,
+        lineTotal,
+        landedUnitCost: null,
+      };
+    });
+    const goodsTotal = round2(lines.reduce((s, l) => s + Number(l.lineTotal), 0));
+    const extraCosts = round2(Number(input.extraCosts ?? 0));
+    return {
+      lines,
+      header: {
+        supplierId: input.supplierId,
+        invoiceNo: input.invoiceNo?.trim() || null,
+        invoiceDate: input.invoiceDate,
+        payment: input.payment,
+        allocation: input.allocation ?? 'BY_VALUE',
+        goodsTotal: goodsTotal.toFixed(2),
+        extraCosts: extraCosts.toFixed(2),
+        extraCostsPaidSeparately: input.extraCostsPaidSeparately ?? false,
+        landedTotal: round2(goodsTotal + extraCosts).toFixed(2),
+      },
+    };
+  }
+
+  /** Every line's product and the supplier must still be active. Locks the products like every stock writer. */
+  private async assertUsable(tx: EntityManager, input: CreateInvoiceInput) {
+    const wanted = [...new Set(input.lines.map((l) => l.variantId))];
+    await lockStock(tx, wanted);
+    const variants = await tx.findBy(ProductVariant, { id: In(wanted) });
+    if (variants.length !== wanted.length || variants.some((variant) => !variant.active)) {
+      throw new BadRequestException(problem('invoice.productsGone', 'choose active products for every invoice line'));
+    }
+    const supplier = await tx.findOneBy(Supplier, { id: input.supplierId, active: true });
+    if (!supplier) throw new BadRequestException(problem('invoice.supplierGone', 'choose an active supplier'));
   }
 
   async deleteDraft(id: string) {
@@ -419,6 +509,7 @@ export class PurchasingService {
   private validateInvoiceInput(input: CreateInvoiceInput) {
     if (input.allocation !== undefined && !['BY_VALUE', 'PER_UNIT'].includes(input.allocation)) throw new BadRequestException(problem('invoice.allocation', 'choose a supported allocation method'));
     if (input.extraCostsPaidSeparately !== undefined && typeof input.extraCostsPaidSeparately !== 'boolean') throw new BadRequestException('invalid cost payment');
+    if (input.requestId !== undefined && !UUID.test(input.requestId)) throw new BadRequestException('requestId must be a UUID');
     if (!input.supplierId) throw new BadRequestException('choose a supplier');
     if (!ISO_DATE.test(input.invoiceDate ?? '')) throw new BadRequestException('invoiceDate must be YYYY-MM-DD');
     if (input.payment !== 'CASH' && input.payment !== 'CREDIT') {
@@ -433,7 +524,8 @@ export class PurchasingService {
       if (!Number.isInteger(l.quantity) || l.quantity < 1) {
         throw new BadRequestException('every line needs a whole quantity of at least 1');
       }
-      if (!MONEY.test(l.unitCost ?? '') || Number(l.unitCost) <= 0) {
+      const typedTotal = l.lineTotal !== undefined && l.lineTotal !== '';
+      if (typedTotal ? !MONEY.test(l.lineTotal!) || Number(l.lineTotal) <= 0 : !UNIT_COST.test(l.unitCost ?? '') || Number(l.unitCost) <= 0) {
         throw new BadRequestException('every line needs a unit cost greater than 0');
       }
     }

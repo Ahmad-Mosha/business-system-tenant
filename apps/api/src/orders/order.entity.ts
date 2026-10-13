@@ -97,6 +97,7 @@ export const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
 @Entity('customer_order')
 // An external order must only ever be ingested once.
 @Unique('uq_order_source_external', ['source', 'externalId'])
+@Unique('uq_order_request', ['requestId'])
 export class Order {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -118,6 +119,10 @@ export class Order {
    */
   @Column({ type: 'text', nullable: true })
   externalId: string | null;
+
+  /** The submitting form's id for a manual order — a resend returns this order. */
+  @Column({ name: 'request_id', type: 'uuid', nullable: true })
+  requestId: string | null;
 
   @Index('ix_order_status')
   @Column({ type: 'text', default: 'NEW' })

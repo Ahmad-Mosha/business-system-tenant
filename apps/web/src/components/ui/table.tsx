@@ -29,7 +29,7 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
       // Half muted, half card, and opaque (the header is sticky): muted text
       // on full `muted` measures 4.3:1, under AA for 12px — this reaches 4.5.
       className={cn(
-        "bg-[color-mix(in_oklch,var(--muted)_50%,var(--card))] [&_tr]:border-b [&_tr]:hover:bg-transparent",
+        "bg-[color-mix(in_srgb,var(--muted)_55%,var(--card))] [&_tr]:border-b [&_tr]:hover:bg-transparent",
         className
       )}
       {...props}
@@ -65,7 +65,7 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
     <tr
       data-slot="table-row"
       className={cn(
-        "border-b transition-colors hover:bg-muted/50 has-aria-expanded:bg-muted/50 data-[state=selected]:bg-muted",
+        "border-b border-border/70 transition-colors hover:bg-muted/45 has-aria-expanded:bg-muted/50 data-[state=selected]:bg-highlight/5",
         className
       )}
       {...props}
@@ -78,7 +78,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
     <th
       data-slot="table-head"
       className={cn(
-        "h-9 px-3 text-start align-middle text-xs font-medium whitespace-nowrap text-muted-foreground first:ps-4 last:pe-4 [&:has([role=checkbox])]:pe-0",
+        "h-9 px-3 text-start align-middle text-xs font-medium whitespace-nowrap text-muted-foreground first:ps-5 last:pe-5 [&:has([role=checkbox])]:pe-0",
         className
       )}
       {...props}
@@ -91,7 +91,7 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
     <td
       data-slot="table-cell"
       className={cn(
-        "h-11 px-3 align-middle whitespace-nowrap first:ps-4 last:pe-4 [&:has([role=checkbox])]:pe-0",
+        "h-12 px-3 align-middle whitespace-nowrap first:ps-5 last:pe-5 [&:has([role=checkbox])]:pe-0",
         className
       )}
       {...props}

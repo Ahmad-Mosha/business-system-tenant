@@ -33,12 +33,12 @@ const UNTOUCHED: Mark = { icon: ArrowLeftRight, label: 'untouched', tone: '', ti
 
 /** An account that holds money or stock: its entries are money in and money out. */
 export const MONEY: Record<Direction, Mark> = {
-  up: { icon: ArrowDownLeft, label: 'in', tone: 'text-success', tile: 'bg-success-subtle text-success' },
+  up: { icon: ArrowDownLeft, label: 'in', tone: 'text-success', tile: 'bg-muted text-success' },
   down: {
     icon: ArrowUpRight,
     label: 'out',
     tone: 'text-destructive',
-    tile: 'bg-destructive-subtle text-destructive',
+    tile: 'bg-muted text-destructive',
   },
   none: UNTOUCHED,
 };
@@ -67,9 +67,9 @@ export function EntryCell({ entry, mark, when }: { entry: LedgerRow; mark: Mark;
     <div className="flex min-w-0 items-center gap-3">
       <span
         title={t(`ledger.${mark.label}`)}
-        className={cn('flex size-8 shrink-0 items-center justify-center', mark.tile)}
+        className={cn('flex size-7 shrink-0 items-center justify-center rounded-md', mark.tile)}
       >
-        <mark.icon className="size-4 rtl:-scale-x-100" />
+        <mark.icon className="size-3.5 rtl:-scale-x-100" />
       </span>
       <div className="min-w-0">
         <div className="flex min-w-0 items-center gap-2">

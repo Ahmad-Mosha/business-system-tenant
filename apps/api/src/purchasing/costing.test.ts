@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { allocateExtraCosts, allocateOldestFirst, movingAverage, round2 } from './costing';
+import { allocateExtraCosts, allocateOldestFirst, lineTotalFor, movingAverage, round2, unitCostFor } from './costing';
 
 test('a payment fills the oldest invoice remainders first', () => {
   // three invoices owing 2000, 5000, 1000; pay 6000
@@ -69,4 +69,22 @@ test('many tiny landed shares never make the last line negative', () => {
     assert.equal(Math.round(shares.reduce((sum, share) => sum + share, 0) * 100), 51);
     assert.equal(shares.filter((share) => share === 0.01).length, 51);
   }
+});
+
+test('a typed unit cost gives the line total to the cent, half up', () => {
+  assert.equal(lineTotalFor('33.3333', 3), '100.00');
+  assert.equal(lineTotalFor('135.5', 12), '1626.00');
+  assert.equal(lineTotalFor('0.0050', 1), '0.01');
+  assert.equal(lineTotalFor('0.0049', 1), '0.00');
+  assert.equal(lineTotalFor('1.005', 1), '1.01');
+  assert.equal(lineTotalFor('19.99', 1000), '19990.00');
+  assert.equal(lineTotalFor('12', 7), '84.00');
+});
+
+test('a typed line total keeps its amount and derives the unit cost', () => {
+  assert.equal(unitCostFor('100', 3), '33.3333');
+  assert.equal(unitCostFor('100.00', 6), '16.6667');
+  assert.equal(unitCostFor('10600', 4), '2650.0000');
+  assert.equal(unitCostFor('0.01', 3), '0.0033');
+  assert.equal(unitCostFor('1', 1), '1.0000');
 });

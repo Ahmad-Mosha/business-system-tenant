@@ -21,6 +21,8 @@ test('a memo drops what its row already says', () => {
   assert.equal(entryMemo({ memo: 'Reversal — ORDER_SALE', kind: 'ORDER_SALE', reversesId: 'x' }), null);
   assert.equal(entryMemo({ memo: 'Reversal — Purchase invoice INV-1', kind: 'PURCHASE', reversesId: 'x' }), 'INV-1');
   assert.equal(entryMemo({ memo: 'Purchase invoice', kind: 'PURCHASE', reversesId: null }), null);
+  assert.equal(entryMemo({ memo: 'Paid with SI-1004', kind: 'CUSTOMER_PAYMENT', reversesId: null }), 'SI-1004');
+  assert.equal(entryMemo({ memo: 'Reversal — Sales invoice SI-1004', kind: 'SALES_INVOICE', reversesId: 'x' }), 'SI-1004');
   assert.equal(entryMemo({ memo: 'Opening cash balance', kind: 'OPENING_BALANCE', reversesId: null }), null);
   assert.equal(entryMemo({ memo: 'Payment to مورد تست', kind: 'SUPPLIER_PAYMENT', reversesId: null }), 'مورد تست');
   assert.equal(entryMemo({ memo: 'Cheque from الشريك أحمد cleared', kind: 'CHEQUE_CLEAR', reversesId: null }), 'الشريك أحمد');

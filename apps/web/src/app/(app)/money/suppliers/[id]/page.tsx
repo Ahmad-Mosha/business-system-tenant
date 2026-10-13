@@ -1,4 +1,11 @@
+import { Archive, ArchiveRestore, Trash2 } from 'lucide-react';
 import Link from 'next/link';
+import { deleteSupplier, setSupplierActive } from '@/app/(app)/money/actions';
+import { ConfirmAction } from '@/components/confirm-action';
+import { SupplierForm } from '@/components/supplier-form';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { bdi } from '@/i18n/rich';
 import { notFound } from 'next/navigation';
 import { Amount } from '@/components/amount';
 import { MetricCard, MetricGrid } from '@/components/metric-card';
@@ -32,6 +39,8 @@ export default async function SupplierDetailPage({ params }: { params: Promise<{
   const purchased = posted.reduce((n, i) => n + Number(i.landedTotal), 0);
   const paid = supplier.payments.reduce((n, p) => n + Number(p.amount), 0);
   const owed = Number(supplier.balance);
+  // Never used: nothing in the books points at it, so it can be deleted outright.
+  const unused = supplier.invoices.length === 0 && supplier.payments.length === 0;
 
   return (
     <Page>
@@ -45,8 +54,64 @@ export default async function SupplierDetailPage({ params }: { params: Promise<{
             t('fallback')
           )
         }
-        actions={<PaySupplier supplierId={supplier.id} owed={supplier.balance} />}
+        actions={
+          <>
+            <SupplierForm supplier={supplier} />
+            {supplier.active ? (
+              <ConfirmAction
+                trigger={
+                  <Button variant="outline">
+                    <Archive />
+                    {t('archive')}
+                  </Button>
+                }
+                title={t.rich('archiveTitle', { name: supplier.name, bdi })}
+                description={t('archiveDescription')}
+                confirmLabel={t('archiveConfirm')}
+                success={t('archived')}
+                action={setSupplierActive.bind(null, supplier.id, false)}
+              />
+            ) : (
+              <ConfirmAction
+                trigger={
+                  <Button variant="outline">
+                    <ArchiveRestore />
+                    {t('restore')}
+                  </Button>
+                }
+                title={t('restore')}
+                description={t('archivedBanner')}
+                confirmLabel={t('restore')}
+                success={t('restored')}
+                action={setSupplierActive.bind(null, supplier.id, true)}
+              />
+            )}
+            {unused ? (
+              <ConfirmAction
+                trigger={
+                  <Button variant="outline" className="text-destructive hover:bg-destructive-subtle hover:text-destructive">
+                    <Trash2 />
+                    {t('delete')}
+                  </Button>
+                }
+                title={t.rich('deleteTitle', { name: supplier.name, bdi })}
+                description={t('deleteDescription')}
+                confirmLabel={t('deleteConfirm')}
+                destructive
+                action={deleteSupplier.bind(null, supplier.id)}
+              />
+            ) : null}
+            {supplier.active ? <PaySupplier supplierId={supplier.id} owed={supplier.balance} /> : null}
+          </>
+        }
       />
+
+      {!supplier.active ? (
+        <Alert>
+          <Archive />
+          <AlertDescription>{t('archivedBanner')}</AlertDescription>
+        </Alert>
+      ) : null}
 
       <MetricGrid>
         <MetricCard

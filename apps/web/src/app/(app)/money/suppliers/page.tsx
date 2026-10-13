@@ -1,10 +1,11 @@
-import { Users } from 'lucide-react';
+import { Archive, Users } from 'lucide-react';
 import Link from 'next/link';
 import { Amount } from '@/components/amount';
 import { MetricCard, MetricGrid } from '@/components/metric-card';
 import { Page, PageHeader } from '@/components/page';
 import { SupplierForm } from '@/components/supplier-form';
 import { TableCount, TableEmpty, TablePanel } from '@/components/table-panel';
+import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -19,21 +20,37 @@ import { requireAdmin } from '@/lib/session';
 import { getTranslations } from 'next-intl/server';
 import { getFormat } from '@/i18n/get-format';
 
-export default async function SuppliersPage() {
+export default async function SuppliersPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
   const [f, t, tr] = await Promise.all([getFormat(), getTranslations('money.suppliers'), getTranslations()]);
   await requireAdmin();
-  const suppliers = await getSuppliers();
+  const archived = (await searchParams).status === 'archived';
+  const suppliers = await getSuppliers(archived);
   const owed = suppliers.reduce((n, s) => n + Number(s.balance), 0);
   const owing = suppliers.filter((s) => Number(s.balance) > 0).length;
 
   return (
     <Page fill>
       <PageHeader
-        title={tr('nav.items.suppliers')}
+        title={archived ? t('showArchived') : tr('nav.items.suppliers')}
         description={t('description')}
-        actions={<SupplierForm />}
+        actions={
+          <>
+            <Button variant="ghost" asChild>
+              <Link href={archived ? '/money/suppliers' : '/money/suppliers?status=archived'}>
+                {archived ? <Users /> : <Archive />}
+                {archived ? t('showActive') : t('showArchived')}
+              </Link>
+            </Button>
+            {archived ? null : <SupplierForm />}
+          </>
+        }
       />
 
+      {archived ? null : (
       <MetricGrid>
         <MetricCard label={tr('nav.items.suppliers')} value={suppliers.length} hint={t('active')} />
         <MetricCard
@@ -45,6 +62,7 @@ export default async function SuppliersPage() {
           }
         />
       </MetricGrid>
+      )}
 
       <TablePanel
         footer={
@@ -55,10 +73,10 @@ export default async function SuppliersPage() {
       >
         {suppliers.length === 0 ? (
           <TableEmpty
-            icon={Users}
-            title={t('empty')}
-            description={t('emptyHint')}
-            action={<SupplierForm />}
+            icon={archived ? Archive : Users}
+            title={archived ? t('archivedEmpty') : t('empty')}
+            description={archived ? undefined : t('emptyHint')}
+            action={archived ? undefined : <SupplierForm />}
           />
         ) : (
           <Table>

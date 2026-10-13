@@ -54,7 +54,8 @@
       "operations": "Operations",
       "money": "Money",
       "noon": "noon",
-      "admin": "Admin"
+      "admin": "Admin",
+      "sales": "Sales"
     },
     "items": {
       "orders": "Orders",
@@ -70,7 +71,9 @@
       "products": "Products",
       "imports": "Imports",
       "team": "Team",
-      "expenses": "Expenses"
+      "expenses": "Expenses",
+      "salesInvoices": "Sales invoices",
+      "customers": "Customers"
     },
     "crumbs": {
       "new": "New",
@@ -107,7 +110,8 @@
     "payments": "{count, plural, =0 {No payments} one {# payment} other {# payments}}",
     "imports": "{count, plural, =0 {No imports} one {# import} other {# imports}}",
     "settlementLines": "{count, plural, =0 {no settlement lines} one {# settlement line} other {# settlement lines}}",
-    "expenses": "{count, plural, one {# expense} other {# expenses}}"
+    "expenses": "{count, plural, one {# expense} other {# expenses}}",
+    "customers": "{count, plural, =0 {No customers} one {# customer} other {# customers}}"
   },
   "filters": {
     "reset": "Reset",
@@ -221,7 +225,8 @@
         "posted": "This invoice is already posted.",
         "noLines": "Add at least one line before posting.",
         "allocation": "Choose allocation by goods value or units.",
-        "supplierGone": "Choose an active supplier."
+        "supplierGone": "Choose an active supplier.",
+        "postedEdit": "A posted invoice can't be edited."
       },
       "sku": {
         "taken": "SKU “{sku}” is already in use."
@@ -241,7 +246,8 @@
         "archiveStock": "Reconcile its {count} remaining stock units before archiving.",
         "archiveOrders": "Finish open orders containing {count} units before archiving.",
         "archiveListings": "Unlink its {count} sales-channel listings before archiving.",
-        "archiveDrafts": "Finish or delete its {count} draft purchase invoices before archiving."
+        "archiveDrafts": "Finish or delete its {count} draft purchase invoices before archiving.",
+        "inUse": "This product has history (stock, sales, purchases or channel links), so it can't be deleted. Archive it instead."
       },
       "sync": {
         "notConfigured": "The Easy Orders connection isn’t set up.",
@@ -259,6 +265,35 @@
         "amount": "Enter a positive amount with at most two decimals.",
         "reason": "Enter a correction reason.",
         "retryChanged": "This submission was already recorded with different details."
+      },
+      "supplier": {
+        "archiveOwed": "{owed} is still owed to this supplier. Settle it before archiving.",
+        "archiveDrafts": "This supplier has draft invoices. Post or delete them before archiving.",
+        "inUse": "This supplier has invoices or payments, so it can't be deleted. Archive it instead."
+      },
+      "customer": {
+        "name": "Enter the customer’s name.",
+        "archiveOwed": "This customer still owes {owed}. Collect it before archiving.",
+        "archiveDrafts": "This customer has draft invoices. Post or delete them before archiving.",
+        "inUse": "This customer has invoices, so they can’t be deleted. Archive them instead."
+      },
+      "sales": {
+        "postedEdit": "A posted invoice can’t be edited.",
+        "postedDelete": "A posted invoice can’t be deleted.",
+        "discountTooLarge": "The discount can’t be more than the invoice subtotal.",
+        "customerGone": "Choose an active customer.",
+        "discount": "Enter a discount like 250.00.",
+        "noLines": "Add at least one product.",
+        "linePrice": "Every product needs a price greater than 0.",
+        "paidNow": "Enter the amount paid now like 300.00.",
+        "overpaid": "The amount can’t be more than {total}.",
+        "stockShort": "{name}: only {onHand} in the warehouse, {requested} on the invoice.",
+        "posted": "This invoice is already posted.",
+        "notPosted": "Only a posted invoice can do that.",
+        "paymentAmount": "Enter an amount like 300.00.",
+        "paymentReversed": "This payment is already reversed.",
+        "voidReason": "Write why this invoice is voided.",
+        "voidPaid": "Reverse this invoice’s payments before voiding it."
       }
     }
   },
@@ -385,6 +420,7 @@
       "paymentCollected": "Payment already collected",
       "create": "Create order",
       "needsItem": "Add at least one item.",
+      "needsQuantity": "Every item needs a quantity of at least 1.",
       "needsNameAndPrice": "Every item needs a name and a price.",
       "needsPhone": "Add a valid phone number.",
       "needsGovernorate": "Pick a governorate.",
@@ -416,6 +452,7 @@
     "description": "Every live Bosta delivery, in one place.",
     "unreachable": "Could not reach Bosta.",
     "loadFailed": "Could not load shipments from Bosta",
+    "loadFailedHint": "Bosta didn’t answer just now, so nothing is shown rather than a list that looks empty. Orders and their statuses here are unaffected.",
     "live": "Live shipments",
     "liveHint": "Active Bosta deliveries",
     "delivered": "Delivered",
@@ -511,9 +548,11 @@
       "stock": "Stock",
       "onHand": "On hand",
       "inOrders": "In orders",
-      "unitCost": "Unit cost",
+      "unitCost": "Inventory cost",
       "stockValue": "Stock value",
-      "channels": "Channels"
+      "channels": "Channels",
+      "lastPurchase": "Last purchase",
+      "avgPurchase": "Avg purchase"
     },
     "sync": "Sync website",
     "synced": "Website catalogue synced: {updated} updated, {unmatched} unmatched.",
@@ -527,7 +566,20 @@
       "destination": "To: {location} · Available: {available}",
       "quantity": "Quantity",
       "note": "Note / reference (optional)"
-    }
+    },
+    "showArchived": "Archived products",
+    "archivedTitle": "Archived products",
+    "archivedDescription": "Hidden from inventory, orders and purchases. Open one to restore it.",
+    "backToInventory": "Back to inventory",
+    "help": {
+      "unitCost": "Average cost of a piece in stock, including shipping and customs. Stock value is worked out from it.",
+      "lastPurchase": "What the supplier charged per piece on the latest posted invoice, before shipping and customs.",
+      "avgPurchase": "What the supplier charged per piece across every posted invoice, weighted by quantity, before shipping and customs."
+    },
+    "noPurchases": "No posted purchases yet",
+    "boughtFrom": "From {supplier}",
+    "purchaseBasis": "{units} pieces on {invoices} invoices",
+    "varies": "Varies"
   },
   "product": {
     "back": "Back to inventory",
@@ -652,6 +704,23 @@
       "alsoSoldOnHint": "Optional — a sale there will move this product’s stock.",
       "created": "Product created.",
       "create": "Create and add"
+    },
+    "restore": "Restore",
+    "restored": "Product restored",
+    "delete": "Delete",
+    "deleteTitle": "Delete “<bdi>{name}</bdi>”?",
+    "deleteDescription": "This product has never moved stock, sold, been bought or been linked to a channel, so it can be removed completely. This can't be undone.",
+    "deleteConfirm": "Delete product",
+    "deleted": "Product deleted",
+    "archivedBanner": "This product is archived. It's hidden from inventory, orders and purchases until you restore it.",
+    "purchases": {
+      "title": "Purchase history",
+      "hint": "What suppliers charged per piece on posted invoices, before shipping and customs. Inventory cost above includes those.",
+      "date": "Date",
+      "supplier": "Supplier",
+      "quantity": "Qty",
+      "unitPrice": "Supplier price",
+      "landed": "With shipping"
     }
   },
   "validation": {
@@ -713,9 +782,9 @@
       "inOut": "Money in and out",
       "inOutHint": "{bucket, select, day {Per day} week {Per week} other {Per month}}, {span}. The opening balance isn’t counted — it’s where the books began.",
       "cameFrom": "Where it came from",
-      "cameFromHint": "Money into the treasury, {span}. Open a bar for its entries.",
+      "cameFromHint": "Money into the treasury, {span}. Open a line to see its entries.",
       "wentTo": "Where it went",
-      "wentToHint": "Money out of the treasury, {span}. Open a bar for its entries.",
+      "wentToHint": "Money out of the treasury, {span}. Open a line to see its entries.",
       "nothingIn": "Nothing came in.",
       "nothingOut": "Nothing went out.",
       "performanceHint": "As the books recorded them, {span}.",
@@ -857,7 +926,15 @@
       "notYet": "Not yet",
       "post": "Post invoice",
       "posted": "Invoice posted — stock and the ledger updated.",
-      "separateCosts": "Extra costs are paid separately from cash and are included in the settled amount."
+      "separateCosts": "Extra costs are paid separately from cash and are included in the settled amount.",
+      "editDraft": "Edit draft",
+      "deleteDraft": "Delete draft",
+      "deleteDraftTitle": "Delete this draft?",
+      "deleteDraftDescription": "Nothing was recorded from a draft, so deleting it changes no stock or money. This can't be undone.",
+      "draftDeleted": "Draft deleted",
+      "draftUpdated": "Draft saved",
+      "editTitle": "Edit draft invoice",
+      "editDescription": "Nothing moves until you post it."
     },
     "newInvoice": {
       "title": "New purchase invoice",
@@ -874,7 +951,7 @@
       "cashNow": "Paid in cash now",
       "cashNowHint": "Comes out of the till on posting",
       "productsReceived": "Products received",
-      "productsHint": "Pick from inventory, or add a new product on the spot.",
+      "productsHint": "Pick from inventory or add a new product. Type either the unit cost or the line total: the other is calculated, and the one you typed stays fixed if the quantity changes.",
       "searchPlaceholder": "Add a product — search by Arabic name or SKU",
       "added": "Added",
       "onHand": "{count} on hand",
@@ -888,7 +965,8 @@
       "postTotal": "Post — <num>{total}</num>",
       "saveDraft": "Save as draft",
       "draftSaved": "Draft saved.",
-      "posted": "Invoice posted."
+      "posted": "Invoice posted.",
+      "calculated": "Calculated from what you typed"
     },
     "pay": {
       "title": "Pay supplier",
@@ -917,7 +995,14 @@
       "addedToast": "Supplier added.",
       "name": "Name",
       "namePlaceholder": "e.g. مورد الإسكندرية",
-      "notePlaceholder": "What they supply, terms…"
+      "notePlaceholder": "What they supply, terms…",
+      "edit": "Edit",
+      "editTitle": "Edit supplier",
+      "editHint": "Name, phone and note. Invoices and payments are not affected.",
+      "updated": "Supplier updated",
+      "showArchived": "Archived suppliers",
+      "showActive": "Active suppliers",
+      "archivedEmpty": "No archived suppliers."
     },
     "supplier": {
       "back": "Back to suppliers",
@@ -933,7 +1018,20 @@
       "payments": "Payments",
       "paymentsHint": "Cash paid to them, newest first.",
       "noPayments": "No payments yet.",
-      "payment": "Payment"
+      "payment": "Payment",
+      "archive": "Archive",
+      "archiveTitle": "Archive “<bdi>{name}</bdi>”?",
+      "archiveDescription": "It leaves the supplier lists and can't be chosen on new invoices. Its invoices and payments stay as they are, and you can restore it at any time.",
+      "archiveConfirm": "Archive supplier",
+      "archived": "Supplier archived",
+      "restore": "Restore",
+      "restored": "Supplier restored",
+      "delete": "Delete",
+      "deleteTitle": "Delete “<bdi>{name}</bdi>”?",
+      "deleteDescription": "This supplier has no invoices or payments, so it can be removed completely. This can't be undone.",
+      "deleteConfirm": "Delete supplier",
+      "deleted": "Supplier deleted",
+      "archivedBanner": "This supplier is archived. It can't be chosen on new invoices."
     },
     "landed": {
       "title": "Landed costs",
@@ -1161,7 +1259,9 @@
       "BOSTA_PAYOUT": "Bosta payout",
       "RETURN": "Return",
       "STOCK_LOSS": "Stock loss",
-      "ADJUSTMENT": "Adjustment"
+      "ADJUSTMENT": "Adjustment",
+      "SALES_INVOICE": "Sales invoice",
+      "CUSTOMER_PAYMENT": "Customer payment"
     },
     "paidStatus": {
       "DRAFT": "Draft",
@@ -1177,7 +1277,8 @@
       "NOON_RECEIVABLE": "noon payouts",
       "AMAZON_RECEIVABLE": "Amazon payouts",
       "BOSTA_COD": "Bosta payouts",
-      "CHEQUES_PENDING": "Cheques cleared"
+      "CHEQUES_PENDING": "Cheques cleared",
+      "CUSTOMER_RECEIVABLE": "Customer payments"
     },
     "cashOut": {
       "SALES": "Sales reversed",
@@ -1186,7 +1287,8 @@
       "INVENTORY": "Stock bought for cash",
       "OTHER_EXPENSE": "Expenses",
       "SHIPPING": "Shipping",
-      "CHANNEL_FEES": "Fees and ads"
+      "CHANNEL_FEES": "Fees and ads",
+      "CUSTOMER_RECEIVABLE": "Customer payments reversed"
     },
     "voucherCounter": {
       "OTHER_EXPENSE": "General expense",
@@ -1220,6 +1322,11 @@
     "stockLocation": {
       "WAREHOUSE": "Our warehouse",
       "NOON": "Noon warehouse"
+    },
+    "salesStatus": {
+      "DRAFT": "Draft",
+      "POSTED": "Posted",
+      "VOID": "Void"
     }
   },
   "expenses": {
@@ -1248,5 +1355,234 @@
     "status": "Status",
     "recorded": "Recorded",
     "trace": "Ledger"
+  },
+  "drafts": {
+    "restored": "Unsaved work from {when} was restored.",
+    "stale": "You have unsaved changes from {when}, made before this record was last updated.",
+    "restore": "Restore them",
+    "discard": "Discard draft",
+    "discarded": "Draft discarded",
+    "undo": "Undo",
+    "autosaved": "Saved on this device as you type. Nothing is recorded until you submit."
+  },
+  "privacy": {
+    "hide": "Hide costs",
+    "show": "Show costs",
+    "hideHint": "Hide costs and money figures from people nearby",
+    "showHint": "Costs are hidden. Point at a figure to see it, or click to show all"
+  },
+  "sales": {
+    "title": "Sales invoices",
+    "description": "Selling on invoice — wholesale and direct sales outside the order workflow.",
+    "new": "New sales invoice",
+    "empty": "No sales invoices yet",
+    "emptyHint": "Create one when you sell to a customer outside the usual orders.",
+    "columns": {
+      "invoice": "Invoice",
+      "customer": "Customer",
+      "date": "Date",
+      "status": "Status",
+      "total": "Total",
+      "paid": "Paid",
+      "lines": "Products",
+      "payment": "Payment",
+      "remaining": "Remaining"
+    },
+    "draftNumber": "Draft",
+    "drafts": "Drafts",
+    "draftsHint": "Not posted yet — nothing has left stock",
+    "invoices": "Invoices",
+    "draftValue": "Value of drafts",
+    "draftValueHint": "If every draft were posted as it stands",
+    "builder": {
+      "title": "New sales invoice",
+      "description": "Sell to a customer on invoice. Nothing leaves stock until it is posted.",
+      "editTitle": "Edit draft invoice",
+      "editDescription": "Nothing leaves stock until it is posted.",
+      "customerAndDate": "Customer and date",
+      "customer": "Customer",
+      "choose": "Choose…",
+      "invoiceDate": "Invoice date",
+      "notes": "Notes",
+      "notesPlaceholder": "Delivery terms, references — printed on the invoice",
+      "products": "Products",
+      "productsHint": "Type either the unit price or the line total: the other is calculated, and the one you typed stays fixed if the quantity changes.",
+      "searchPlaceholder": "Add a product — search by Arabic name or SKU",
+      "inStock": "{count} in stock",
+      "cost": "cost {amount}",
+      "noProducts": "No products yet — search above to add the first one.",
+      "overStock": "<b>{name}</b>: only <num>{count}</num> in the warehouse.",
+      "belowCost": "<b>{name}</b> is priced below its inventory cost of <num>{cost}</num>.",
+      "summary": "Summary",
+      "subtotal": "Subtotal · {items}",
+      "discount": "Discount",
+      "total": "Total",
+      "profit": "Gross profit",
+      "profitHint": "Total minus today’s inventory cost of the products. <num>{margin}</num> of the total.",
+      "profitUnknown": "Some products have no inventory cost yet.",
+      "saveDraft": "Save draft",
+      "draftSaved": "Draft saved",
+      "draftUpdated": "Draft updated",
+      "missing": {
+        "customer": "Choose a customer.",
+        "product": "Add at least one product.",
+        "quantity": "Every product needs a quantity of at least 1.",
+        "price": "Every product needs a price.",
+        "discount": "The discount can’t be more than the subtotal."
+      }
+    },
+    "detail": {
+      "back": "Sales invoices",
+      "titleDraft": "Draft sales invoice",
+      "title": "Invoice {number}",
+      "description": "<strong>{customer}</strong> · {date}",
+      "lines": "Products",
+      "totals": "Totals",
+      "editDraft": "Edit draft",
+      "deleteDraft": "Delete draft",
+      "deleteDraftTitle": "Delete this draft?",
+      "deleteDraftDescription": "Nothing was recorded from a draft, so deleting it changes no stock or money. This can’t be undone.",
+      "draftDeleted": "Draft deleted",
+      "draftNote": "A draft is a plan: nothing has left stock and nothing is in the books yet.",
+      "columns": {
+        "product": "Product",
+        "qty": "Qty",
+        "unitPrice": "Unit price",
+        "lineTotal": "Line total",
+        "cost": "Cost",
+        "profit": "Profit"
+      },
+      "stockNow": "{count} in stock now",
+      "profitHintPosted": "Total minus the inventory cost when it was posted. <num>{margin}</num> of the total."
+    },
+    "postedCount": "{count, plural, =0 {None posted yet} other {# posted}}",
+    "post": {
+      "post": "Post invoice",
+      "saveAndPost": "Save and post…",
+      "title": "Post this invoice?",
+      "description": "<num>{items}</num> leave the warehouse and <num>{total}</num> is recorded as sold to <b>{customer}</b>. A posted invoice can’t be edited — it can only be voided, while nothing has been collected.",
+      "paidNow": "Paid now",
+      "paidNowHint": "Cash received at the time of sale. The rest stays owed by the customer.",
+      "nothing": "Nothing yet",
+      "inFull": "In full",
+      "owedAfter": "Still owed after posting",
+      "tooMuch": "The amount paid can’t be more than the invoice total, {total}.",
+      "confirm": "Post invoice",
+      "posted": "Invoice posted",
+      "savedNotPosted": "Saved as a draft, but not posted: {reason}",
+      "shortHint": "Some products are short in the warehouse — reduce their quantities to post.",
+      "draftHint": "Posting takes the goods out of the warehouse and records the sale."
+    },
+    "payments": {
+      "title": "Payments",
+      "empty": "Nothing collected yet.",
+      "record": "Record payment",
+      "recordTitle": "Record a payment",
+      "recordHint": "Money received from <b>{customer}</b> for this invoice.",
+      "left": "Left on this invoice: <num>{amount}</num>",
+      "memoPlaceholder": "Cash, transfer, cheque number…",
+      "recorded": "Payment recorded",
+      "reverse": "Reverse",
+      "reverseTitle": "Reverse this payment?",
+      "reverseDescription": "For a payment recorded by mistake: {amount} leaves the cash and the customer owes it again. The payment stays in the history, marked as reversed.",
+      "reversed": "Payment reversed",
+      "reversedBadge": "Reversed",
+      "paid": "Paid",
+      "remaining": "Remaining",
+      "settled": "Fully paid",
+      "atPosting": "Paid at posting",
+      "payment": "Payment"
+    },
+    "void": {
+      "action": "Void invoice",
+      "title": "Void invoice {number}?",
+      "description": "For an invoice entered by mistake. Every piece returns to the warehouse and the sale is taken out of the books. The invoice stays visible, marked void. This can’t be undone.",
+      "reason": "Why is it voided?",
+      "reasonPlaceholder": "Wrong customer, entered twice…",
+      "confirm": "Void invoice",
+      "done": "Invoice voided",
+      "paidFirst": "<num>{amount}</num> has been collected on this invoice. Reverse those payments first, then void it.",
+      "banner": "Voided on {date} — {reason}. The goods went back to the warehouse and the sale was taken out of the books.",
+      "keep": "Keep invoice"
+    },
+    "owed": "Owed by customers",
+    "owedHint": "The unpaid part of posted invoices"
+  },
+  "customers": {
+    "title": "Customers",
+    "description": "Businesses you sell to on invoice, and what each still owes.",
+    "add": "Add customer",
+    "addHint": "Name, phone and a note. You can add their invoices after.",
+    "addedToast": "Customer added",
+    "edit": "Edit",
+    "editTitle": "Edit customer",
+    "editHint": "Name, phone and note. Their invoices are not affected.",
+    "updated": "Customer updated",
+    "name": "Name",
+    "namePlaceholder": "Business or person",
+    "phone": "Phone",
+    "notePlaceholder": "Area, contact person, terms…",
+    "empty": "No customers yet",
+    "emptyHint": "Add the businesses you sell to wholesale.",
+    "showArchived": "Archived customers",
+    "showActive": "Active customers",
+    "archivedEmpty": "No archived customers.",
+    "columns": {
+      "customer": "Customer",
+      "phone": "Phone",
+      "balance": "Owes",
+      "added": "Added"
+    },
+    "settled": "Settled",
+    "total": "Customers",
+    "owedTotal": "Owed to you",
+    "nobodyOwes": "Nobody owes you",
+    "across": "Across {customers}",
+    "detail": {
+      "back": "Customers",
+      "fallback": "No phone or note",
+      "owed": "Owes you",
+      "invoices": "Invoices",
+      "noInvoices": "No invoices for this customer yet.",
+      "archive": "Archive",
+      "archiveTitle": "Archive “<bdi>{name}</bdi>”?",
+      "archiveDescription": "They leave the customer lists and can’t be chosen on new invoices. Their invoices stay as they are, and you can restore them at any time.",
+      "archiveConfirm": "Archive customer",
+      "archived": "Customer archived",
+      "restore": "Restore",
+      "restored": "Customer restored",
+      "archivedBanner": "This customer is archived. They can’t be chosen on new invoices.",
+      "delete": "Delete",
+      "deleteTitle": "Delete “<bdi>{name}</bdi>”?",
+      "deleteDescription": "This customer has no invoices, so they can be removed completely. This can’t be undone.",
+      "deleteConfirm": "Delete customer",
+      "deleted": "Customer deleted",
+      "newInvoice": "New invoice"
+    },
+    "activeHint": "Active — archived ones are listed separately"
+  },
+  "search": {
+    "title": "Search",
+    "trigger": "Search or jump to…",
+    "shortcut": "Ctrl K",
+    "shortcutMac": "⌘K",
+    "placeholder": "Search orders, products, customers — or type a screen",
+    "nothing": "Nothing matches “{term}”.",
+    "orders": "Orders",
+    "products": "Products",
+    "customers": "Customers",
+    "inStock": "{count} in stock",
+    "owes": "owes",
+    "createHeading": "Create",
+    "create": {
+      "order": "New order",
+      "sale": "New sales invoice",
+      "purchase": "New purchase invoice",
+      "product": "New product"
+    },
+    "goTo": "Go to",
+    "hintMove": "↑↓ to move",
+    "hintOpen": "Enter to open",
+    "hintClose": "Esc to close"
   }
 }

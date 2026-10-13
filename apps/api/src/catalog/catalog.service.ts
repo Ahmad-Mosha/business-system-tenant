@@ -23,6 +23,8 @@ export interface CreateProductInput {
 }
 
 export interface ProductFilters {
+  /** The archived products instead of the working list. */
+  archived?: boolean;
   search?: string;
   channel?: string;
   category?: string;
@@ -43,6 +45,36 @@ export function removalError(onHand: number, quantity: number): string | null {
     ? `only ${onHand} on hand — you can remove up to ${onHand}`
     : 'nothing on hand to remove';
 }
+
+/**
+ * What the supplier charged per piece — before shipping and customs, which are
+ * inventory cost, not price — from posted invoices only (drafts are plans).
+ * `bought` is the quantity-weighted average over every posted purchase;
+ * `last_buy` the latest posted invoice by invoice date, weighted within it if
+ * the product appears on more than one line. Per product: callers show these
+ * only for single-variant products, where they are one variant's figures.
+ */
+const PURCHASE_PRICES = `
+  LEFT JOIN LATERAL (
+    SELECT round(SUM(l.line_total) / NULLIF(SUM(l.quantity), 0), 4) AS price,
+           SUM(l.quantity) AS units, count(DISTINCT l.invoice_id) AS invoices
+    FROM purchase_invoice_line l
+    JOIN purchase_invoice i ON i.id = l.invoice_id AND i.status = 'POSTED'
+    JOIN product_variant v ON v.id = l.variant_id
+    WHERE v.product_id = p.id
+  ) bought ON TRUE
+  LEFT JOIN LATERAL (
+    SELECT round(SUM(l.line_total) / NULLIF(SUM(l.quantity), 0), 4) AS price,
+           i.invoice_date, s.name AS supplier
+    FROM purchase_invoice_line l
+    JOIN purchase_invoice i ON i.id = l.invoice_id AND i.status = 'POSTED'
+    JOIN supplier s ON s.id = i.supplier_id
+    JOIN product_variant v ON v.id = l.variant_id
+    WHERE v.product_id = p.id
+    GROUP BY i.id, i.invoice_date, i.posted_at, s.name
+    ORDER BY i.invoice_date DESC, i.posted_at DESC, i.id
+    LIMIT 1
+  ) last_buy ON TRUE`;
 
 @Injectable()
 export class CatalogService {
@@ -72,10 +104,16 @@ export class CatalogService {
       return `$${params.length}`;
     };
 
-    // Archived products are gone from the working list entirely — there is no
-    // "show archived" view yet because nothing has asked for one.
-    const whereClauses: string[] = ['p.active'];
-    if (f.search) whereClauses.push(`p.name ILIKE ${bind(`%${f.search}%`)}`);
+    // Archived products leave the working list; `archived` shows only them.
+    const whereClauses: string[] = [f.archived ? 'NOT p.active' : 'p.active'];
+    if (f.search) {
+      // By name, our SKU, or a channel's SKU — whatever is on the label in hand.
+      const term = bind(`%${f.search}%`);
+      whereClauses.push(`(p.name ILIKE ${term}
+        OR EXISTS (SELECT 1 FROM product_variant sv WHERE sv.product_id = p.id AND sv.sku ILIKE ${term})
+        OR EXISTS (SELECT 1 FROM channel_listing sl JOIN product_variant lv ON lv.id = sl.variant_id
+                   WHERE lv.product_id = p.id AND sl.external_id ILIKE ${term}))`);
+    }
     if (f.category) {
       whereClauses.push(
         f.category.toLowerCase() === 'uncategorised'
@@ -123,6 +161,10 @@ export class CatalogService {
               stock.selling_price                               AS "sellingPrice",
               COALESCE(held.open, 0)::int                       AS "inOrders",
               COALESCE(ch.channels, '{}')                       AS channels,
+              bought.price AS "avgPurchasePrice", bought.units::int AS "purchasedUnits",
+              bought.invoices::int AS "purchaseInvoices",
+              last_buy.price AS "lastPurchasePrice", last_buy.invoice_date::text AS "lastPurchaseDate",
+              last_buy.supplier AS "lastPurchaseSupplier",
               count(*) OVER()::int                              AS "totalCount"
        FROM product p
        -- Aggregated separately on purpose. Joining stock_movement and
@@ -157,6 +199,7 @@ export class CatalogService {
          JOIN product_variant v ON v.id = l.variant_id
          WHERE v.product_id = p.id
        ) ch ON TRUE
+       ${PURCHASE_PRICES}
        ${whereSql}
        ORDER BY p.name
        LIMIT ${limit} OFFSET ${offset}`,
@@ -250,7 +293,72 @@ export class CatalogService {
       [id],
     );
 
-    return { ...product, variants, listings, draftPurchases };
+    // The latest posted purchases of this product, newest first — price as the
+    // supplier charged it, landed cost as it entered inventory.
+    const purchases = await this.db.query(
+      `SELECT i.id AS "invoiceId", i.invoice_no AS "invoiceNo", i.invoice_date::text AS "invoiceDate",
+              s.name AS supplier, l.variant_id AS "variantId", l.quantity,
+              l.unit_cost AS "unitCost", l.landed_unit_cost AS "landedUnitCost", l.line_total AS "lineTotal"
+       FROM purchase_invoice_line l
+       JOIN purchase_invoice i ON i.id = l.invoice_id AND i.status = 'POSTED'
+       JOIN supplier s ON s.id = i.supplier_id
+       JOIN product_variant v ON v.id = l.variant_id
+       WHERE v.product_id = $1
+       ORDER BY i.invoice_date DESC, i.posted_at DESC, l.id
+       LIMIT 20`,
+      [id],
+    );
+    const [prices] = await this.db.query(
+      `SELECT bought.price AS "avgPurchasePrice", bought.units::int AS "purchasedUnits",
+              bought.invoices::int AS "purchaseInvoices", last_buy.price AS "lastPurchasePrice",
+              last_buy.invoice_date::text AS "lastPurchaseDate", last_buy.supplier AS "lastPurchaseSupplier"
+       FROM product p ${PURCHASE_PRICES}
+       WHERE p.id = $1`,
+      [id],
+    );
+
+    return { ...product, variants, listings, draftPurchases, purchases, ...prices, deletable: await this.isUnused(this.db.manager, id) };
+  }
+
+  /** Nothing anywhere refers to it: no stock history, channel link, order line or purchase line. */
+  private async isUnused(tx: EntityManager, productId: string): Promise<boolean> {
+    const [row] = await tx.query(
+      `SELECT NOT EXISTS (SELECT 1 FROM stock_movement m JOIN product_variant v ON v.id = m.variant_id WHERE v.product_id = $1)
+          AND NOT EXISTS (SELECT 1 FROM channel_listing l JOIN product_variant v ON v.id = l.variant_id WHERE v.product_id = $1)
+          AND NOT EXISTS (SELECT 1 FROM order_item i JOIN product_variant v ON v.id = i.variant_id WHERE v.product_id = $1)
+          AND NOT EXISTS (SELECT 1 FROM purchase_invoice_line l JOIN product_variant v ON v.id = l.variant_id WHERE v.product_id = $1)
+          AS unused`,
+      [productId],
+    );
+    return row.unused;
+  }
+
+  /** Brings an archived product back to the working list, variants included. */
+  async restoreProduct(id: string) {
+    await this.db.transaction(async (tx) => {
+      const product = await tx.findOne(Product, { where: { id }, lock: { mode: 'pessimistic_write' } });
+      if (!product) throw new NotFoundException(problem('notFound', 'product not found'));
+      await tx.update(Product, { id }, { active: true });
+      await tx.update(ProductVariant, { productId: id }, { active: true });
+    });
+  }
+
+  /**
+   * Removes a product entered by mistake. Only one with no history at all —
+   * anything that has moved stock, sold, been bought or been linked to a
+   * channel is archived instead, so no record ever loses what it points at.
+   */
+  async deleteProduct(id: string) {
+    await this.db.transaction(async (tx) => {
+      const variants = await tx.find(ProductVariant, { where: { productId: id }, select: { id: true } });
+      await lockStock(tx, variants.map((v) => v.id));
+      const product = await tx.findOne(Product, { where: { id }, lock: { mode: 'pessimistic_write' } });
+      if (!product) throw new NotFoundException(problem('notFound', 'product not found'));
+      if (!(await this.isUnused(tx, id))) {
+        throw new BadRequestException(problem('product.inUse', 'this product has history — archive it instead'));
+      }
+      await tx.delete(Product, { id }); // variants cascade
+    });
   }
 
   /**
@@ -816,10 +924,20 @@ export class CatalogService {
     return { created, skipped, failed };
   }
 
-  /** Variants an order line can be attached to, for the manual order form. */
-  searchVariants(term: string) {
+  /**
+   * Variants an order line can be attached to, for the manual order form. The
+   * cost goes to admins only: moderators sell, and costs are financial data.
+   */
+  searchVariants(term: string, withCost = false) {
     return this.db.query(
-      `SELECT v.id, v.sku, v.selling_price AS "sellingPrice", v.unit_cost AS "unitCost",
+      `SELECT v.id, v.sku, v.selling_price AS "sellingPrice",
+              ${withCost ? 'v.unit_cost' : 'NULL'} AS "unitCost",
+              ${withCost ? `(SELECT round(SUM(l.line_total) / NULLIF(SUM(l.quantity), 0), 4)
+                 FROM purchase_invoice_line l
+                 WHERE l.variant_id = v.id AND l.invoice_id = (
+                   SELECT i.id FROM purchase_invoice i JOIN purchase_invoice_line il ON il.invoice_id = i.id
+                   WHERE il.variant_id = v.id AND i.status = 'POSTED'
+                   ORDER BY i.invoice_date DESC, i.posted_at DESC, i.id LIMIT 1))` : 'NULL'} AS "lastPurchasePrice",
               CASE WHEN v.name = 'Default' THEN p.name ELSE p.name || ' — ' || v.name END AS label,
               COALESCE((SELECT SUM(quantity) FROM stock_movement m WHERE m.variant_id = v.id AND m.location = 'WAREHOUSE'), 0)::int AS "onHand"
        FROM product_variant v

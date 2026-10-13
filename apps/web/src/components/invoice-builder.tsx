@@ -5,11 +5,13 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
-import { saveInvoice, type InvoicePayload } from '@/app/(app)/money/actions';
+import { postInvoice, saveInvoice, updateInvoiceDraft, type InvoicePayload } from '@/app/(app)/money/actions';
 import { SupplierForm } from '@/components/supplier-form';
 import { AddProductDialog } from '@/components/add-product-dialog';
 import { Amount } from '@/components/amount';
 import { DatePicker, todayISO } from '@/components/date-picker';
+import { DraftNotice } from '@/components/draft-notice';
+import { useDraft } from '@/hooks/use-draft';
 import { Page, PageHeader } from '@/components/page';
 import { VariantSearch } from '@/components/variant-search';
 import {
@@ -35,6 +37,7 @@ import {
   FieldTitle,
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { NumberField } from '@/components/number-field';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Select,
@@ -52,28 +55,63 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import type { SupplierRow } from '@/lib/api';
+import type { PurchaseInvoiceDetail, SupplierRow } from '@/lib/api';
 import { money } from '@/lib/format';
+import { lineTotalFor, priceLine, trimZeros } from '@/lib/purchase-line';
+import { cn } from '@/lib/utils';
 import { b, num, strong } from '@/i18n/rich';
 
 interface Line {
   key: string;
   variantId: string;
   label: string;
-  quantity: number;
+  /** As typed; a whole number of at least 1 before the invoice can be saved. */
+  quantity: string;
+  /** What was typed — `source` says which one; the other is derived (lib/purchase-line). */
   unitCost: string;
+  lineTotal?: string;
+  source?: 'unit' | 'total';
   onHand: number | null;
 }
 
 const cellInput =
-  'h-8 border-transparent bg-transparent px-2 text-end shadow-none hover:border-input focus-visible:border-ring';
+  'h-8 border-transparent bg-muted/60 px-2 shadow-none hover:border-input focus-visible:border-ring focus-visible:bg-background dark:bg-muted/60 dark:focus-visible:bg-input/20';
+
+/** Saves a draft's edits, then posts it when asked — a failed post leaves the edits saved on the draft. */
+async function saveDraftEdits(id: string, payload: InvoicePayload, asDraft: boolean) {
+  const saved = await updateInvoiceDraft(id, payload);
+  if (!saved.ok || asDraft) return saved;
+  const form = new FormData();
+  form.set('id', id);
+  const posted = await postInvoice({ status: 'idle' }, form);
+  return posted.status === 'error' ? { ok: false as const, message: posted.message } : saved;
+}
+
+interface InvoiceForm {
+  /** One id per invoice being entered: a resend can never record it twice. */
+  requestId: string;
+  supplierId: string;
+  invoiceNo: string;
+  invoiceDate: string;
+  payment: 'CASH' | 'CREDIT';
+  allocation: 'BY_VALUE' | 'PER_UNIT';
+  extraCosts: string;
+  separateCosts: boolean;
+  lines: Line[];
+}
 
 export function InvoiceBuilder({
   suppliers,
   cashBalance,
+  draftKey,
+  invoice,
 }: {
   suppliers: SupplierRow[];
   cashBalance: string;
+  /** Identifies this user's unfinished invoice in the browser. */
+  draftKey: string;
+  /** A saved draft being edited; absent for a new invoice. */
+  invoice?: PurchaseInvoiceDetail;
 }) {
   const t = useTranslations('money');
   const tr = useTranslations();
@@ -83,30 +121,74 @@ export function InvoiceBuilder({
 
   const [newSuppliers, setNewSuppliers] = useState<SupplierRow[]>([]);
   const supplierOptions = [...suppliers, ...newSuppliers.filter((s) => !suppliers.some((existing) => existing.id === s.id))];
-  const [extraCosts, setExtraCosts] = useState('0');
-  const [allocation, setAllocation] = useState<'BY_VALUE' | 'PER_UNIT'>('BY_VALUE');
-  const [separateCosts, setSeparateCosts] = useState(true);
-  const [supplierId, setSupplierId] = useState('');
-  const [invoiceNo, setInvoiceNo] = useState('');
-  const [invoiceDate, setInvoiceDate] = useState(todayISO());
-  const [payment, setPayment] = useState<'CASH' | 'CREDIT'>('CREDIT');
-  const [lines, setLines] = useState<Line[]>([]);
+  // Everything typed lives in one object so it can be kept as a draft.
+  const [form, setForm] = useState<InvoiceForm>(() =>
+    invoice
+      ? {
+          requestId: crypto.randomUUID(),
+          supplierId: invoice.supplierId,
+          invoiceNo: invoice.invoiceNo ?? '',
+          invoiceDate: invoice.invoiceDate,
+          payment: invoice.payment,
+          allocation: invoice.allocation,
+          extraCosts: invoice.extraCosts,
+          separateCosts: invoice.extraCostsPaidSeparately,
+          // Reopened on the unit cost when that reproduces the saved total
+          // exactly, otherwise on the total — a saved amount never moves.
+          lines: invoice.lines.map((l) => ({
+            key: l.id,
+            variantId: l.variantId,
+            label: l.label,
+            quantity: String(l.quantity),
+            unitCost: trimZeros(l.unitCost),
+            lineTotal: l.lineTotal,
+            source: lineTotalFor(l.unitCost, l.quantity) === l.lineTotal ? ('unit' as const) : ('total' as const),
+            onHand: null,
+          })),
+        }
+      : {
+          requestId: crypto.randomUUID(),
+          supplierId: '',
+          invoiceNo: '',
+          invoiceDate: todayISO(),
+          payment: 'CREDIT',
+          allocation: 'BY_VALUE',
+          extraCosts: '0',
+          separateCosts: true,
+          lines: [],
+        },
+  );
+  const [initialForm] = useState(form);
+  const draft = useDraft({ key: draftKey, value: form, initial: initialForm, apply: setForm, version: invoice?.updatedAt });
+  const { supplierId, invoiceNo, invoiceDate, payment, allocation, extraCosts, separateCosts, lines } = form;
+  const set = <K extends keyof InvoiceForm>(key: K) => (value: InvoiceForm[K]) => setForm((f) => ({ ...f, [key]: value }));
+  const setSupplierId = set('supplierId');
+  const setInvoiceNo = set('invoiceNo');
+  const setInvoiceDate = set('invoiceDate');
+  const setPayment = set('payment');
+  const setAllocation = set('allocation');
+  const setExtraCosts = set('extraCosts');
+  const setSeparateCosts = set('separateCosts');
+  const setLines = (update: (lines: Line[]) => Line[]) => setForm((f) => ({ ...f, lines: update(f.lines) }));
   const [creating, setCreating] = useState<string | null>(null);
 
   const supplier = supplierOptions.find((s) => s.id === supplierId);
-  const goodsTotal = lines.reduce((s, l) => s + l.quantity * (Number(l.unitCost) || 0), 0);
+  const qty = (l: Line) => Number(l.quantity) || 0;
+  const priced = new Map(lines.map((l) => [l.key, priceLine(l)]));
+  const price = (l: Line) => priced.get(l.key)!;
+  const goodsTotal = lines.reduce((s, l) => s + (Number(price(l).lineTotal) || 0), 0);
   const extraValue = Number(extraCosts) || 0;
   const total = goodsTotal + extraValue;
-  const totalUnits = lines.reduce((sum, l) => sum + l.quantity, 0);
-  const missing = !/^\d+(\.\d{1,2})?$/.test(extraCosts)
+  const totalUnits = lines.reduce((sum, l) => sum + qty(l), 0);
+  const missing = !/^\d+(\.\d{1,2})?$/.test(extraCosts || '0')
     ? tr('validation.extraCosts')
-    : lines.some((l) => !Number.isInteger(l.quantity) || l.quantity < 1)
+    : lines.some((l) => !Number.isInteger(qty(l)) || qty(l) < 1)
       ? tr('validation.lineQuantity')
       : !supplierId
     ? tr('validation.chooseSupplier')
     : !lines.length
       ? tr('validation.addProduct')
-      : lines.some((l) => !(Number(l.unitCost) > 0))
+      : lines.some((l) => !(Number(price(l).lineTotal) > 0))
         ? tr('validation.lineCost')
         : null;
 
@@ -116,28 +198,34 @@ export function InvoiceBuilder({
     setLines((ls) =>
       ls.some((l) => l.variantId === variantId)
         ? ls
-        : [...ls, { key: crypto.randomUUID(), variantId, label, quantity: 1, unitCost, onHand }],
+        : [...ls, { key: crypto.randomUUID(), variantId, label, quantity: '1', unitCost, onHand }],
     );
 
   const submit = (asDraft: boolean) => {
     const payload: InvoicePayload = {
+      requestId: form.requestId,
       supplierId,
       invoiceNo: invoiceNo.trim() || undefined,
       invoiceDate,
       payment,
       allocation,
-      extraCosts,
+      extraCosts: extraCosts || '0',
       extraCostsPaidSeparately: separateCosts,
-      lines: lines.map((l) => ({ variantId: l.variantId, quantity: l.quantity, unitCost: l.unitCost })),
+      lines: lines.map((l) => ({
+        variantId: l.variantId,
+        quantity: qty(l),
+        ...(l.source === 'total' ? { lineTotal: price(l).lineTotal } : { unitCost: l.unitCost }),
+      })),
     };
     start(async () => {
-      const res = await saveInvoice(payload, asDraft);
+      const res = invoice ? await saveDraftEdits(invoice.id, payload, asDraft) : await saveInvoice(payload, asDraft);
       if (!res.ok) {
         toast.error(res.message);
         setConfirming(false);
         return;
       }
-      toast.success(t(asDraft ? 'newInvoice.draftSaved' : 'newInvoice.posted'));
+      draft.clear();
+      toast.success(t(asDraft ? (invoice ? 'invoice.draftUpdated' : 'newInvoice.draftSaved') : 'newInvoice.posted'));
       router.push(`/money/purchases/${res.id}`);
     });
   };
@@ -156,10 +244,12 @@ export function InvoiceBuilder({
   return (
     <Page>
       <PageHeader
-        back={{ href: '/money/purchases', label: t('invoice.back') }}
-        title={t('newInvoice.title')}
-        description={t('newInvoice.description')}
+        back={invoice ? { href: `/money/purchases/${invoice.id}`, label: t('invoice.back') } : { href: '/money/purchases', label: t('invoice.back') }}
+        title={invoice ? t('invoice.editTitle') : t('newInvoice.title')}
+        description={invoice ? t('invoice.editDescription') : t('newInvoice.description')}
       />
+
+      <DraftNotice draft={draft} onUndo={setForm} />
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="grid min-w-0 gap-6">
@@ -243,7 +333,8 @@ export function InvoiceBuilder({
                 placeholder={t('newInvoice.searchPlaceholder')}
                 disabledReason={(h) => (lines.some((l) => l.variantId === h.id) ? t('newInvoice.added') : null)}
                 meta={(h) => t('newInvoice.onHand', { count: h.onHand })}
-                onPick={(h) => addLine(h.id, h.label, h.onHand, h.unitCost ? Number(h.unitCost).toFixed(2) : '')}
+                // The supplier's price on the latest posted invoice — never the inventory cost, which includes shipping.
+                onPick={(h) => addLine(h.id, h.label, h.onHand, h.lastPurchasePrice ? trimZeros(h.lastPurchasePrice) : '')}
                 onCreate={setCreating}
               />
             </CardContent>
@@ -263,8 +354,8 @@ export function InvoiceBuilder({
                   <TableBody>
                     {lines.map((l) => (
                       <TableRow key={l.key}>
-                        <TableCell className="max-w-0">
-                          <p className="truncate font-medium">
+                        <TableCell className="min-w-40 whitespace-normal">
+                          <p className="line-clamp-2 leading-snug font-medium" title={l.label}>
                             <bdi>{l.label}</bdi>
                           </p>
                           {l.onHand !== null ? (
@@ -274,36 +365,44 @@ export function InvoiceBuilder({
                           ) : null}
                         </TableCell>
                         <TableCell className="py-1.5">
-                          <Input
-                            type="number"
-                            min={1}
+                          <NumberField
                             value={l.quantity}
-                            onFocus={(e) => e.currentTarget.select()}
-                            onChange={(e) =>
-                              patchLine(l.key, { quantity: Math.max(1, Number(e.target.value) || 1) })
-                            }
+                            onValueChange={(v) => patchLine(l.key, { quantity: v })}
+                            decimals={0}
+                            min={1}
                             aria-label={tr('product.stock.quantity')}
+                            aria-invalid={qty(l) < 1}
                             disabled={pending}
-                            className={`num ${cellInput}`}
+                            className={cellInput}
                           />
                         </TableCell>
                         <TableCell className="py-1.5">
-                          <Input
-                            inputMode="decimal"
-                            value={l.unitCost}
-                            onFocus={(e) => e.currentTarget.select()}
-                            onChange={(e) => patchLine(l.key, { unitCost: e.target.value })}
+                          <NumberField
+                            value={price(l).unitCost}
+                            onValueChange={(v) => patchLine(l.key, { unitCost: v, source: 'unit' })}
+                            decimals={4}
+                            group
                             placeholder="0.00"
                             aria-label={t('invoice.columns.unitCost')}
-                            aria-invalid={!(Number(l.unitCost) > 0)}
+                            aria-invalid={!(Number(price(l).lineTotal) > 0)}
+                            title={l.source === 'total' ? t('newInvoice.calculated') : undefined}
                             disabled={pending}
-                            className={`num ${cellInput}`}
+                            className={cn(cellInput, l.source === 'total' && 'text-muted-foreground')}
                           />
                         </TableCell>
-                        <TableCell className="num text-end font-medium">
-                          {money(l.quantity * (Number(l.unitCost) || 0))}
+                        <TableCell className="py-1.5">
+                          <NumberField
+                            value={price(l).lineTotal}
+                            onValueChange={(v) => patchLine(l.key, { lineTotal: v, source: 'total' })}
+                            group
+                            placeholder="0.00"
+                            aria-label={t('invoice.columns.lineTotal')}
+                            title={l.source !== 'total' ? t('newInvoice.calculated') : undefined}
+                            disabled={pending}
+                            className={cn(cellInput, 'font-medium', l.source !== 'total' && 'text-muted-foreground')}
+                          />
                         </TableCell>
-                        {extraValue > 0 ? <TableCell className="num text-end text-muted-foreground">{money(Number(l.unitCost || 0) + (allocation === 'BY_VALUE' ? (goodsTotal > 0 ? extraValue * Number(l.unitCost || 0) / goodsTotal : 0) : extraValue / totalUnits))}</TableCell> : null}
+                        {extraValue > 0 ? <TableCell className="num text-end text-muted-foreground">{money(Number(price(l).unitCost || 0) + (allocation === 'BY_VALUE' ? (goodsTotal > 0 ? extraValue * Number(price(l).unitCost || 0) / goodsTotal : 0) : extraValue / totalUnits))}</TableCell> : null}
                         <TableCell className="pe-2">
                           <Button
                             variant="ghost"
@@ -334,7 +433,7 @@ export function InvoiceBuilder({
           </Card>
           <Card><CardHeader><CardTitle>{t('landed.title')}</CardTitle><CardDescription>{t('landed.description')}</CardDescription></CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
-              <Field><FieldLabel htmlFor="extra-costs">{t('landed.amount')}</FieldLabel><Input id="extra-costs" inputMode="decimal" value={extraCosts} onChange={(e) => setExtraCosts(e.target.value)} disabled={pending} className="num" /></Field>
+              <Field><FieldLabel htmlFor="extra-costs">{t('landed.amount')}</FieldLabel><NumberField id="extra-costs" value={extraCosts} onValueChange={setExtraCosts} group disabled={pending} suffix={tr('common.egp')} /></Field>
               <Field><FieldLabel htmlFor="allocation">{t('landed.allocation')}</FieldLabel><Select value={allocation} onValueChange={(v) => setAllocation(v as typeof allocation)} disabled={pending}><SelectTrigger id="allocation"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="BY_VALUE">{t('landed.byValue')}</SelectItem><SelectItem value="PER_UNIT">{t('landed.perUnit')}</SelectItem></SelectContent></Select></Field>
               <label className="flex items-start gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={separateCosts} onChange={(e) => setSeparateCosts(e.target.checked)} disabled={pending} className="mt-1" />{t('landed.paidSeparately')}</label>
               {extraValue > 0 ? <p className="text-xs text-muted-foreground sm:col-span-2">{t('landed.paymentHint', { cash: money(payment === 'CASH' ? total : separateCosts ? extraValue : 0), supplier: money(payment === 'CREDIT' ? total - (separateCosts ? extraValue : 0) : 0) })}</p> : null}
@@ -401,6 +500,7 @@ export function InvoiceBuilder({
               {missing && !pending ? (
                 <p className="text-center text-xs text-muted-foreground">{missing}</p>
               ) : null}
+              <p className="text-center text-xs text-muted-foreground">{tr('drafts.autosaved')}</p>
             </CardContent>
           </Card>
         </aside>

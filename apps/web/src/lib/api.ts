@@ -152,6 +152,8 @@ export interface OrderDetail extends Omit<OrderRow, 'assignedToName' | 'itemCoun
   shippingCost: string;
   externalId: string | null;
   externalStatus: string | null;
+  /** Changes on every save — an unsaved edit draft remembers which version it began from. */
+  updatedAt: string;
   assignedTo: { id: string; name: string } | null;
   items: Array<{
     id: string;
@@ -284,9 +286,17 @@ export interface ProductRow {
   /** Units already off on-hand but sitting in an order that hasn't shipped,
    *  delivered or reversed — context, not a second pool of stock. */
   inOrders: number;
+  /** Inventory (valuation) cost per piece: moving average incl. shipping/customs — not a purchase price. */
   unitCost: string | null;
   sellingPrice: string | null;
   channels: string[];
+  /** What the supplier charged per piece on posted invoices (before shipping). Null with no purchase history. */
+  lastPurchasePrice: string | null;
+  lastPurchaseDate: string | null;
+  lastPurchaseSupplier: string | null;
+  avgPurchasePrice: string | null;
+  purchasedUnits: number | null;
+  purchaseInvoices: number | null;
   /** Count across every product matching the current filters, not just this page. */
   totalCount: number;
 }
@@ -305,7 +315,29 @@ export interface ProductDetail {
   name: string;
   category: string | null;
   discovered: boolean;
+  /** False once archived. */
+  active: boolean;
   draftPurchases: number;
+  /** Nothing anywhere refers to it, so it can be deleted rather than archived. */
+  deletable: boolean;
+  lastPurchasePrice: string | null;
+  lastPurchaseDate: string | null;
+  lastPurchaseSupplier: string | null;
+  avgPurchasePrice: string | null;
+  purchasedUnits: number | null;
+  purchaseInvoices: number | null;
+  /** The latest posted purchases, newest first. */
+  purchases: Array<{
+    invoiceId: string;
+    invoiceNo: string | null;
+    invoiceDate: string;
+    supplier: string;
+    variantId: string;
+    quantity: number;
+    unitCost: string;
+    landedUnitCost: string | null;
+    lineTotal: string;
+  }>;
   variants: Array<{
     id: string;
     name: string;
@@ -480,6 +512,8 @@ export interface PurchaseInvoiceDetail {
   payableTotal: string;
   paidStatus: PaidStatus;
   postedAt: string | null;
+  /** Changes on every save — a local edit draft remembers which version it began from. */
+  updatedAt: string;
   lines: PurchaseInvoiceLine[];
 }
 
@@ -515,7 +549,8 @@ export interface CashFlow {
 export const getCashFlow = (from: string, to: string, bucket: 'day' | 'week' | 'month') =>
   get<CashFlow>(`/finance/cash-flow?from=${from}&to=${to}&bucket=${bucket}`);
 
-export const getSuppliers = () => get<SupplierRow[]>('/suppliers');
+export const getSuppliers = (archived = false) =>
+  get<SupplierRow[]>(archived ? '/suppliers?status=archived' : '/suppliers');
 export const getSupplier = (id: string) => get<SupplierDetail>(`/suppliers/${id}`);
 export const getPurchases = () => get<PurchaseInvoiceRow[]>('/purchases');
 export const getPurchase = (id: string) => get<PurchaseInvoiceDetail>(`/purchases/${id}`);
@@ -526,3 +561,88 @@ export const getExpenses = (query: string) => get<{
   expenses: Array<{ id: string; amount: string; spentOn: string; note: string | null; category: string; voidedAt: string | null; voidReason: string | null }>;
   total: number; totalAmount: string; page: number;
 }>(`/expenses?${query}`);
+
+// ── Sales ────────────────────────────────────────────────────────────────
+
+export interface CustomerRow {
+  id: string;
+  name: string;
+  phone: string | null;
+  note: string | null;
+  active: boolean;
+  /** Unpaid remainder of their posted invoices. */
+  balance: string;
+  createdAt: string;
+}
+
+export type SalesInvoiceStatus = 'DRAFT' | 'POSTED' | 'VOID';
+
+export interface SalesInvoiceRow {
+  id: string;
+  /** Given when posted; null for a draft. */
+  invoiceNumber: string | null;
+  invoiceDate: string;
+  status: SalesInvoiceStatus;
+  goodsTotal: string;
+  discount: string;
+  total: string;
+  paidAmount: string;
+  customerId: string;
+  customerName: string;
+  updatedAt: string;
+  lineCount: number;
+}
+
+export interface CustomerDetail extends CustomerRow {
+  invoices: SalesInvoiceRow[];
+}
+
+export interface SalesInvoiceLine {
+  id: string;
+  variantId: string;
+  label: string;
+  quantity: number;
+  unitPrice: string;
+  lineTotal: string;
+  /** Inventory cost per piece frozen when posted; null on a draft. */
+  unitCost: string | null;
+  /** Today's inventory cost — what a draft would book. */
+  currentCost: string | null;
+  /** Warehouse stock now. */
+  onHand: number;
+}
+
+export interface SalesInvoiceDetail {
+  id: string;
+  invoiceNumber: string | null;
+  invoiceDate: string;
+  status: SalesInvoiceStatus;
+  customerId: string;
+  customer: { id: string; name: string; phone: string | null };
+  goodsTotal: string;
+  discount: string;
+  total: string;
+  paidAmount: string;
+  notes: string | null;
+  postedAt: string | null;
+  voidReason: string | null;
+  voidedAt: string | null;
+  updatedAt: string;
+  lines: SalesInvoiceLine[];
+  /** Money received against it; a reversed one stays listed, marked. */
+  payments: SalesPayment[];
+}
+
+export interface SalesPayment {
+  id: string;
+  amount: string;
+  occurredAt: string;
+  memo: string | null;
+  reversed: boolean;
+}
+
+export const getCustomers = (archived = false) =>
+  get<CustomerRow[]>(archived ? '/customers?status=archived' : '/customers');
+export const getCustomer = (id: string) => get<CustomerDetail>(`/customers/${id}`);
+export const getSalesInvoices = () => get<SalesInvoiceRow[]>('/sales-invoices');
+export const getSalesInvoice = (id: string) => get<SalesInvoiceDetail>(`/sales-invoices/${id}`);

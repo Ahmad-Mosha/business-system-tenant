@@ -1,5 +1,8 @@
-import { CheckCircle2, Info } from 'lucide-react';
+import { CheckCircle2, Info, Pencil, Trash2 } from 'lucide-react';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { deleteDraftInvoice } from '@/app/(app)/money/actions';
+import { ConfirmAction } from '@/components/confirm-action';
 import type { ReactNode } from 'react';
 import { Amount } from '@/components/amount';
 import { Page, PageHeader } from '@/components/page';
@@ -18,7 +21,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { getPurchase, getSupplier } from '@/lib/api';
-import { money } from '@/lib/format';
+import { money, unitMoney } from '@/lib/format';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
 import { getTranslations } from 'next-intl/server';
@@ -55,7 +58,28 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
         })}
         actions={
           draft ? (
-            <PostInvoiceButton id={invoice.id} total={invoice.landedTotal} />
+            <>
+              <ConfirmAction
+                trigger={
+                  <Button variant="outline" className="text-destructive hover:bg-destructive-subtle hover:text-destructive">
+                    <Trash2 />
+                    {t('deleteDraft')}
+                  </Button>
+                }
+                title={t('deleteDraftTitle')}
+                description={t('deleteDraftDescription')}
+                confirmLabel={t('deleteDraft')}
+                destructive
+                action={deleteDraftInvoice.bind(null, invoice.id)}
+              />
+              <Button variant="outline" asChild>
+                <Link href={`/money/purchases/${invoice.id}/edit`}>
+                  <Pencil />
+                  {t('editDraft')}
+                </Link>
+              </Button>
+              <PostInvoiceButton id={invoice.id} total={invoice.landedTotal} />
+            </>
           ) : canPay && supplier ? (
             <PaySupplier
               supplierId={invoice.supplierId}
@@ -87,14 +111,16 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
             <TableBody>
               {invoice.lines.map((l) => (
                 <TableRow key={l.id}>
-                  <TableCell className="max-w-0 truncate font-medium">
-                    <bdi>{l.label}</bdi>
+                  <TableCell className="min-w-40 whitespace-normal">
+                    <p className="line-clamp-2 leading-snug font-medium" title={l.label}>
+                      <bdi>{l.label}</bdi>
+                    </p>
                   </TableCell>
                   <TableCell className="num text-end">{l.quantity}</TableCell>
-                  <TableCell className="num text-end">{money(l.unitCost)}</TableCell>
+                  <TableCell className="num text-end">{unitMoney(l.unitCost)}</TableCell>
                   {hasExtras ? (
                     <TableCell className="num text-end text-muted-foreground">
-                      {l.landedUnitCost ? money(l.landedUnitCost) : '—'}
+                      {l.landedUnitCost ? unitMoney(l.landedUnitCost) : '—'}
                     </TableCell>
                   ) : null}
                   <TableCell className="num text-end font-medium">{money(l.lineTotal)}</TableCell>
