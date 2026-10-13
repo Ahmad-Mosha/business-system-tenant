@@ -48,7 +48,7 @@ export function MetricCard({
   return (
     // A cell of MetricGrid's strip: it draws its top and left hairlines, and
     // the strip clips the outer ones, so the dividers stay 1px at any count.
-    <div className={cn('@container/metric flex min-w-0 flex-col border-t border-s px-4 py-3', className)}>
+    <div className={cn('@container/metric flex min-w-0 flex-col border-t border-s px-5 py-4', className)}>
       <div className="flex min-h-5 items-start justify-between gap-2">
         <p className="text-xs font-medium text-muted-foreground">{label}</p>
         {link ? (
@@ -66,15 +66,15 @@ export function MetricCard({
       </div>
       {/* Never truncated — a clipped amount is a wrong amount. The size steps
           down with the card instead. */}
-      <div className="num mt-1 text-base leading-none font-semibold tracking-tight whitespace-nowrap @[10rem]/metric:text-lg @[13rem]/metric:text-xl">
+      <div className="num mt-2 text-lg leading-none font-semibold tracking-[-0.02em] whitespace-nowrap @[10rem]/metric:text-xl @[13rem]/metric:text-[22px]">
         {value}
       </div>
       {children ? <div className="mt-2">{children}</div> : null}
       {hint || badge ? (
-        <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+        <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
           {badge}
           {tone !== 'default' && !badge ? (
-            <span aria-hidden className={cn('size-1.5 shrink-0', TONE_MARK[tone])} />
+            <span aria-hidden className={cn('size-1.5 shrink-0 rounded-full', TONE_MARK[tone])} />
           ) : null}
           <span className="line-clamp-2">{hint}</span>
         </div>
@@ -121,6 +121,9 @@ export function MetricGrid({ children }: { children: ReactNode }) {
   const cols =
     count >= 5
       ? '@2xl:grid-cols-3 @5xl:grid-cols-5'
+        // Five never leave a hole: the lead figure takes a full row on a phone
+        // and a double-height column at three across.
+        + (count === 5 ? ' [&>:first-child]:col-span-2 @2xl:[&>:first-child]:col-span-1 @2xl:[&>:first-child]:row-span-2 @5xl:[&>:first-child]:row-span-1' : '')
       : count === 4
         ? '@3xl:grid-cols-4'
         : count === 3
@@ -130,7 +133,7 @@ export function MetricGrid({ children }: { children: ReactNode }) {
     <div className="@container">
       <div
         className={cn(
-          'overflow-hidden bg-card ring-1 ring-foreground/10',
+          'overflow-hidden rounded-xl bg-card shadow-xs ring-1 ring-foreground/8',
           // Two figures across the whole row would be mostly empty frame.
           count <= 2 && '@3xl:w-1/2',
         )}

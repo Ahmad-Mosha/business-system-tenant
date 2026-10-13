@@ -38,7 +38,7 @@ export function ToneBadge({
         className,
       )}
     >
-      <span aria-hidden className={cn('size-1.5 shrink-0', DOT[tone])} />
+      <span aria-hidden className={cn('size-1.5 shrink-0 rounded-full', DOT[tone])} />
       {children}
     </span>
   );

@@ -22,6 +22,7 @@ import {
 import { problem } from '../problem';
 import { lockStock } from '../inventory/stock-lock';
 import { User } from '../auth/user.entity';
+import { isUniqueViolation } from '../database/unique-violation';
 
 /** Egyptian mobile: 01[0125] + 8 digits, with or without a +20/0020/20 prefix. */
 const EGYPT_PHONE = /^(?:\+?20|0)?1[0125]\d{8}$/;
@@ -29,6 +30,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 const GOVERNORATES = new Set<string>(EGYPT_GOVERNORATES);
 
 export interface CreateOrderInput {
+  /** The form's submission id; the same id never creates a second order. */
+  requestId?: string;
   customerName: string;
   customerPhone: string;
   governorate?: string;
@@ -178,6 +181,16 @@ export class OrdersService {
       }
     }
 
+    const requestId = input.requestId || null;
+    if (requestId !== null && !UUID.test(requestId)) throw new BadRequestException('requestId must be a UUID');
+    const mine = (order: Order | null) => {
+      if (order && order.createdById !== user.id) throw new BadRequestException('requestId already used');
+      return order;
+    };
+    const earlier = mine(requestId ? await this.db.getRepository(Order).findOneBy({ requestId }) : null);
+    if (earlier) return earlier;
+
+    // A concurrent resend of the same request waits on the unique key, then gets the first order.
     return this.db.transaction(async (tx) => {
       const variantIds = input.items.map((i) => i.variantId).filter(Boolean) as string[];
       const titles = await this.titlesFor(tx, variantIds);
@@ -200,6 +213,7 @@ export class OrdersService {
         orderNumber: await nextOrderNumber(tx),
         source: 'SOCIAL' as const,
         externalId: null,
+        requestId,
         // A moderator creating an order already owns it.
         status: user.role === 'MODERATOR' ? ('ASSIGNED' as const) : ('NEW' as const),
         assignedToId: user.role === 'MODERATOR' ? user.id : null,
@@ -219,6 +233,12 @@ export class OrdersService {
       await OrdersService.debitStockForOrder(tx, items, order.id);
       await this.record(tx, order.id, 'CREATED', null, 'SOCIAL', user);
       return order;
+    }).catch(async (error: unknown) => {
+      const first = mine(requestId && isUniqueViolation(error, 'uq_order_request')
+        ? await this.db.getRepository(Order).findOneBy({ requestId })
+        : null);
+      if (!first) throw error;
+      return first;
     });
   }
 

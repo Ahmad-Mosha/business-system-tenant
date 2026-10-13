@@ -1,14 +1,11 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
-import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from '@/components/ui/input-group';
-import { groupDigits } from '@/lib/format';
+import { NumberField } from '@/components/number-field';
 
 /**
- * An amount field that groups thousands as you type — `1250000` reads back as
- * `1,250,000`, so the decimal point is visible coming instead of counted in
- * zeros. The form still receives the plain number, under `name`.
+ * An amount field for a form: grouped as you type (`1,250,000`), the plain
+ * number submitted under `name`.
  */
 export function MoneyInput({
   name,
@@ -17,6 +14,7 @@ export function MoneyInput({
   placeholder = '0.00',
   autoFocus,
   disabled,
+  negative,
 }: {
   name: string;
   id?: string;
@@ -24,28 +22,20 @@ export function MoneyInput({
   placeholder?: string;
   autoFocus?: boolean;
   disabled?: boolean;
+  negative?: boolean;
 }) {
   const t = useTranslations('common');
-  const [display, setDisplay] = useState(() => (defaultValue ? groupDigits(defaultValue) : ''));
-
   return (
-    <InputGroup>
-      <InputGroupInput
-        id={id}
-        type="text"
-        inputMode="decimal"
-        value={display}
-        onChange={(e) => setDisplay(groupDigits(e.target.value))}
-        placeholder={placeholder}
-        autoFocus={autoFocus}
-        disabled={disabled}
-        className="num text-end"
-      />
-      <InputGroupAddon align="inline-end">
-        <InputGroupText>{t('egp')}</InputGroupText>
-      </InputGroupAddon>
-      {/* The unformatted value the server action reads. */}
-      <input type="hidden" name={name} value={display.replace(/,/g, '')} />
-    </InputGroup>
+    <NumberField
+      id={id}
+      name={name}
+      defaultValue={defaultValue}
+      placeholder={placeholder}
+      autoFocus={autoFocus}
+      disabled={disabled}
+      negative={negative}
+      group
+      suffix={t('egp')}
+    />
   );
 }

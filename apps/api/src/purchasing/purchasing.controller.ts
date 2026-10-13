@@ -9,6 +9,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   Req,
 } from '@nestjs/common';
 import type { Request } from 'express';
@@ -22,8 +23,8 @@ export class SuppliersController {
   constructor(private readonly purchasing: PurchasingService) {}
 
   @Get()
-  list() {
-    return this.purchasing.listSuppliers();
+  list(@Query('status') status?: string) {
+    return this.purchasing.listSuppliers(status === 'archived');
   }
 
   @Get(':id')
@@ -42,6 +43,12 @@ export class SuppliersController {
     @Body() body: { name?: string; phone?: string | null; note?: string | null; active?: boolean },
   ) {
     return this.purchasing.updateSupplier(id, body);
+  }
+
+  @Delete(':id')
+  @HttpCode(204)
+  async remove(@Param('id', ParseUUIDPipe) id: string) {
+    await this.purchasing.deleteSupplier(id);
   }
 
   @Post(':id/payments')
@@ -80,6 +87,7 @@ export class PurchasesController {
     @Req() req: Request,
     @Body()
     body: {
+      requestId?: string;
       supplierId?: string;
       invoiceNo?: string;
       invoiceDate?: string;
@@ -94,6 +102,7 @@ export class PurchasesController {
     if (!Array.isArray(body?.lines)) throw new BadRequestException('lines are required');
     return this.purchasing.createInvoice(
       {
+        requestId: body.requestId,
         supplierId: body.supplierId ?? '',
         invoiceNo: body.invoiceNo,
         invoiceDate: body.invoiceDate ?? '',
@@ -106,6 +115,35 @@ export class PurchasesController {
       req.user!.id,
       body.postImmediately === true,
     );
+  }
+
+  /** Rewrites a draft; refused once posted. */
+  @Patch(':id')
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body()
+    body: {
+      supplierId?: string;
+      invoiceNo?: string;
+      invoiceDate?: string;
+      payment?: PurchasePayment;
+      allocation?: CostAllocation;
+      extraCosts?: string;
+      extraCostsPaidSeparately?: boolean;
+      lines?: InvoiceLineInput[];
+    },
+  ) {
+    if (!Array.isArray(body?.lines)) throw new BadRequestException('lines are required');
+    return this.purchasing.updateDraft(id, {
+      supplierId: body.supplierId ?? '',
+      invoiceNo: body.invoiceNo,
+      invoiceDate: body.invoiceDate ?? '',
+      payment: body.payment ?? 'CREDIT',
+      allocation: body.allocation,
+      extraCosts: body.extraCosts,
+      extraCostsPaidSeparately: body.extraCostsPaidSeparately,
+      lines: body.lines,
+    });
   }
 
   @Post(':id/post')

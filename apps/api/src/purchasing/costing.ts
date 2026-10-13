@@ -60,3 +60,32 @@ export function allocateExtraCosts(
   for (let i = 0; i < remaining; i++) shares[ranked[i].index] += 1n;
   return shares.map((share) => Number(share) / 100);
 }
+
+/** A non-negative decimal string as an integer count of 10^-places, e.g. `12.5` at 2 places → 1250n. */
+function toUnits(value: string, places: number): bigint {
+  const [whole, fraction = ''] = value.split('.');
+  return BigInt(whole + fraction.padEnd(places, '0').slice(0, places));
+}
+
+function fromUnits(units: bigint, places: number): string {
+  const digits = units.toString().padStart(places + 1, '0');
+  return `${digits.slice(0, -places)}.${digits.slice(-places)}`;
+}
+
+/**
+ * A purchase line typed as quantity × unit cost (up to 4 decimals): the line
+ * total to the cent, half up, in exact integer arithmetic. 3 × 33.3333 = 100.00.
+ */
+export function lineTotalFor(unitCost: string, quantity: number): string {
+  return fromUnits((toUnits(unitCost, 4) * BigInt(quantity) + 50n) / 100n, 2);
+}
+
+/**
+ * A purchase line typed as quantity + line total: the unit cost to 4 decimals,
+ * half up. The typed total stays the line's amount — 3 pieces for 100.00 cost
+ * 100.00, never 3 × 33.33 = 99.99.
+ */
+export function unitCostFor(lineTotal: string, quantity: number): string {
+  const q = BigInt(quantity);
+  return fromUnits((toUnits(lineTotal, 2) * 200n + q) / (2n * q), 4);
+}

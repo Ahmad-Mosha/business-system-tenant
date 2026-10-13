@@ -26,7 +26,7 @@ export function Page({
     <div className={cn('flex min-h-0 flex-1 flex-col overflow-y-auto', fill && 'lg:overflow-hidden')}>
       <div
         className={cn(
-          'mx-auto flex w-full flex-1 flex-col gap-6 p-4 md:px-6 md:py-6',
+          'mx-auto flex w-full flex-1 flex-col gap-6 p-4 md:px-8 md:py-7',
           width === 'wide' ? 'max-w-[1600px]' : 'max-w-3xl',
           fill && 'lg:min-h-0',
         )}
@@ -67,11 +67,11 @@ export function PageHeader({
         ) : null}
         <div className="min-w-0">
           <div className="flex min-h-8 flex-wrap items-center gap-x-3 gap-y-1">
-            <h1 className="min-w-0 text-2xl leading-8 font-semibold tracking-tight">{title}</h1>
+            <h1 className="min-w-0 text-[22px] leading-8 font-semibold tracking-[-0.02em]">{title}</h1>
             {meta}
           </div>
           {description ? (
-            <p className="mt-1 text-[13px] text-muted-foreground">{description}</p>
+            <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-muted-foreground">{description}</p>
           ) : null}
         </div>
       </div>

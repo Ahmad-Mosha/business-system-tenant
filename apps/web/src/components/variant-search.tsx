@@ -47,7 +47,8 @@ export function VariantSearch({
   const [open, setOpen] = useState(false);
   const [term, setTerm] = useState('');
   const [hits, setHits] = useState<VariantHit[]>([]);
-  const [loading, setLoading] = useState(false);
+  /** The term `hits` answer — until the current one is answered, nothing is offered to pick. */
+  const [answered, setAnswered] = useState('');
   const seq = useRef(0);
   const q = term.trim();
 
@@ -55,16 +56,18 @@ export function VariantSearch({
     if (!q) return;
     const id = ++seq.current;
     const timer = setTimeout(async () => {
-      setLoading(true);
       const result = await searchVariants(q);
       if (id !== seq.current) return;
       setHits(result);
-      setLoading(false);
+      setAnswered(q);
     }, 250);
     return () => clearTimeout(timer);
   }, [q]);
 
-  const shown = q ? hits : [];
+  // Results of an earlier term are never pickable: Enter while typing must not
+  // add the wrong product, or offer "create" before the search has answered.
+  const current = !!q && answered === q;
+  const shown = current ? hits : [];
   const close = () => {
     setOpen(false);
     setTerm('');
@@ -91,7 +94,7 @@ export function VariantSearch({
               <p className="px-3 py-6 text-center text-xs text-muted-foreground">
                 {t('startTyping')}
               </p>
-            ) : loading && !shown.length ? (
+            ) : !current ? (
               <div className="flex justify-center py-6">
                 <Spinner className="text-muted-foreground" />
               </div>
@@ -123,7 +126,7 @@ export function VariantSearch({
                 })}
               </CommandGroup>
             ) : null}
-            {onCreate && q ? (
+            {onCreate && current ? (
               <CommandGroup>
                 <CommandItem
                   value="__create__"

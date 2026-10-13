@@ -7,6 +7,7 @@ import { FormDialog, type DialogFormState } from '@/components/form-dialog';
 import { Button } from '@/components/ui/button';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { MoneyInput } from '@/components/money-input';
 
 export function ExpenseForm({ categories }: { categories: Array<{ id: string; name: string }> }) {
   const t = useTranslations('expenses');
@@ -22,7 +23,7 @@ export function ExpenseForm({ categories }: { categories: Array<{ id: string; na
     }}>
     <Field><FieldLabel htmlFor={`${id}-category`}>{t('category')}</FieldLabel><Input id={`${id}-category`} name="category" list={`${id}-categories`} required maxLength={100} dir="auto" placeholder={t('categoryHint')} /><datalist id={`${id}-categories`}>{categories.map((c) => <option key={c.id} value={c.name} />)}</datalist><p className="text-xs text-muted-foreground">{t('categoryHelp')}</p></Field>
     <div className="grid grid-cols-2 gap-3">
-      <Field><FieldLabel htmlFor={`${id}-amount`}>{t('amount')}</FieldLabel><Input id={`${id}-amount`} name="amount" inputMode="decimal" pattern="[0-9]+(\.[0-9]{1,2})?" required placeholder="0.00" className="num" /></Field>
+      <Field><FieldLabel htmlFor={`${id}-amount`}>{t('amount')}</FieldLabel><MoneyInput id={`${id}-amount`} name="amount" /></Field>
       <Field><FieldLabel htmlFor={`${id}-date`}>{t('date')}</FieldLabel><DatePicker id={`${id}-date`} name="spentOn" defaultValue={todayISO()} /></Field>
     </div>
     <Field><FieldLabel htmlFor={`${id}-note`}>{t('note')}</FieldLabel><Input id={`${id}-note`} name="note" maxLength={2000} dir="auto" /></Field>

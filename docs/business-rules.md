@@ -113,6 +113,18 @@ not added to supplier debt.
 inline supplier creation and traceable supplier payments. Supplier returns and
 supplier-direct-to-customer shipping remain undefined.
 
+**[Confirmed 2026-10-13] Sales invoices (wholesale / direct sales).** Admin
+only, outside the order workflow. A draft moves nothing. Posting, in one step:
+the goods leave the WAREHOUSE (refused when stock is short — no overselling),
+each line freezes the item's average cost so the invoice's profit never moves,
+the invoice gets its `SI-` number, the whole total is booked as revenue owed by
+the customer (`CUSTOMER_RECEIVABLE` ← `SALES`), and any "paid now" amount moves
+it to cash. Later payments are recorded per invoice and can never exceed what
+is left; a mistaken payment is reversed, never edited. A posted invoice is not
+edited; one entered by mistake is voided with a reason — only while nothing is
+collected on it — which returns every piece and reverses the revenue entry.
+No cost-of-goods entry is posted yet, the same as orders, until the COGS phase.
+
 ---
 
 ## 4. Orders
@@ -239,6 +251,7 @@ be entered again as operating expenses.
 | Cancel an order | ✅ | ❌ |
 | See money, profit, financials | ✅ | ❌ |
 | Adjust stock | ✅ | ❌ |
+| Sales invoices and customers | ✅ | ❌ |
 
 **[Open]** Who may change prices. Detailed permissions on individual inventory
 operations still need to be pinned down.

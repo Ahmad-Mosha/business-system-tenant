@@ -1,10 +1,9 @@
-import { Package, Plus } from 'lucide-react';
+import { Archive, Package, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Amount } from '@/components/amount';
 import { FilterBar } from '@/components/filter-bar';
 import { MetricCard, MetricGrid } from '@/components/metric-card';
-import { ChannelBadge } from '@/components/order-status';
 import { Page, PageHeader } from '@/components/page';
 import { SyncWebsiteButton } from '@/components/sync-website-button';
 import { TableEmpty, TablePagination, TablePanel } from '@/components/table-panel';
@@ -18,7 +17,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { getProductsCatalog, getProductsSummary } from '@/lib/api';
+import { unitMoney } from '@/lib/format';
 import { CATEGORIES, categoryIcon } from '@/lib/categories';
 import { requireAdmin } from '@/lib/session';
 import { LOW_STOCK, stockState } from '@/lib/stock';
@@ -36,6 +37,18 @@ const STOCK_LEVELS = [
 ] as const;
 
 const CHANNELS = ['noon', 'easyorders', 'amazon', 'social', 'unlisted'] as const;
+
+/** A column heading whose meaning needs saying — the figures beside each other are easy to confuse. */
+function HelpHead({ label, help, className }: { label: string; help: string; className?: string }) {
+  return (
+    <TableHead className={cn('text-end', className)}>
+      <Tooltip>
+        <TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-4">{label}</TooltipTrigger>
+        <TooltipContent className="max-w-64 text-start">{help}</TooltipContent>
+      </Tooltip>
+    </TableHead>
+  );
+}
 
 export default async function InventoryPage({
   searchParams,
@@ -57,8 +70,9 @@ export default async function InventoryPage({
 
   // Everything but the stock level: the figures and the stock-level counts
   // describe this set, so choosing a level never zeroes the others.
+  const archived = params.status === 'archived';
   const scope = new URLSearchParams();
-  for (const key of ['search', 'channel', 'category'] as const) {
+  for (const key of ['search', 'channel', 'category', 'status'] as const) {
     if (params[key]) scope.set(key, params[key]);
   }
   const stock = STOCK_LEVELS.find((s) => s.value === params.stock)?.value;
@@ -94,25 +108,35 @@ export default async function InventoryPage({
   return (
     <Page fill>
       <PageHeader
-        title={t('title')}
-        description={t('description')}
+        title={archived ? t('archivedTitle') : t('title')}
+        description={archived ? t('archivedDescription') : t('description')}
+        back={archived ? { href: '/inventory', label: t('backToInventory') } : undefined}
         actions={
-          <>
-            <SyncWebsiteButton />
-            <Button asChild>
-              <Link href="/inventory/new">
-                <Plus />
-                {t('add')}
-              </Link>
-            </Button>
-          </>
+          archived ? undefined : (
+            <>
+              <Button variant="ghost" asChild>
+                <Link href="/inventory?status=archived">
+                  <Archive />
+                  {t('showArchived')}
+                </Link>
+              </Button>
+              <SyncWebsiteButton />
+              <Button asChild>
+                <Link href="/inventory/new">
+                  <Plus />
+                  {t('add')}
+                </Link>
+              </Button>
+            </>
+          )
         }
       />
 
+      {archived ? null : (
       <MetricGrid>
         <MetricCard
           label={t('stockValue')}
-          value={<Amount value={summary.stockValue} />}
+          value={<span data-sensitive><Amount value={summary.stockValue} /></span>}
           tone={summary.missingCost > 0 ? 'warning' : 'default'}
           hint={summary.missingCost > 0 ? t('missingCost', { count: summary.missingCost }) : t('atCost')}
         />
@@ -138,6 +162,7 @@ export default async function InventoryPage({
           hint={t('outHint')}
         />
       </MetricGrid>
+      )}
 
       <FilterBar
         search={{ param: 'search', placeholder: t('search') }}
@@ -169,7 +194,7 @@ export default async function InventoryPage({
       />
 
       <TablePanel
-        minWidth="62rem"
+        minWidth="68rem"
         footer={
           <TablePagination
             page={page}
@@ -206,20 +231,23 @@ export default async function InventoryPage({
             <TableHeader>
               <TableRow>
                 <TableHead>{t('columns.product')}</TableHead>
-                <TableHead className="w-[120px]">{t('columns.stock')}</TableHead>
-                <TableHead className="w-[84px] text-end">{te('stockLocation.WAREHOUSE')}</TableHead>
-                <TableHead className="w-[84px] text-end">{te('stockLocation.NOON')}</TableHead>
-                <TableHead className="w-[84px] text-end">{t('columns.onHand')}</TableHead>
+                <TableHead className="w-[104px]">{t('columns.stock')}</TableHead>
+                <TableHead className="w-[76px] text-end">{te('stockLocation.WAREHOUSE')}</TableHead>
+                <TableHead className="w-[76px] text-end">{te('stockLocation.NOON')}</TableHead>
+                <TableHead className="w-[76px] text-end">{t('columns.onHand')}</TableHead>
                 <TableHead className="w-[84px] text-end">{t('columns.inOrders')}</TableHead>
-                <TableHead className="w-[110px] text-end">{t('columns.unitCost')}</TableHead>
-                <TableHead className="w-[130px] text-end">{t('columns.stockValue')}</TableHead>
-                <TableHead className="w-[210px] ps-6">{t('columns.channels')}</TableHead>
+                <HelpHead label={t('columns.lastPurchase')} help={t('help.lastPurchase')} className="w-[120px]" />
+                <HelpHead label={t('columns.avgPurchase')} help={t('help.avgPurchase')} className="w-[112px]" />
+                <HelpHead label={t('columns.unitCost')} help={t('help.unitCost')} className="w-[112px]" />
+                <TableHead className="w-[124px] text-end">{t('columns.stockValue')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {products.map((p) => {
                 const state = stockState(p.onHand);
                 const Icon = categoryIcon(p.category);
+                // Purchase prices are one variant's figures; a product with several shows them on its page.
+                const several = p.variantCount > 1;
                 return (
                   <TableRow key={p.id} className="relative">
                     <TableCell className="h-14 max-w-0">
@@ -239,13 +267,13 @@ export default async function InventoryPage({
                             <bdi>{p.name}</bdi>
                           </Link>
                           <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                            {categoryName(p.category)}
-                            {p.variantCount > 1 ? (
-                              <>
-                                {' · '}
-                                {tn('variants', { count: p.variantCount })}
-                              </>
-                            ) : null}
+                            {[
+                              categoryName(p.category),
+                              several ? tn('variants', { count: p.variantCount }) : null,
+                              ...p.channels.map((c) => (isOneOf(CHANNELS, c) ? te(`channel.${c}`) : c)),
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
                           </p>
                         </div>
                       </div>
@@ -263,27 +291,44 @@ export default async function InventoryPage({
                     <TableCell className="num text-end text-muted-foreground">
                       {p.inOrders > 0 ? f.count(p.inOrders) : '—'}
                     </TableCell>
-                    <TableCell className="text-end">
-                      {p.unitCost ? (
-                        <Amount value={p.unitCost} />
+                    <TableCell className="text-end" data-sensitive>
+                      {several ? (
+                        <span className="text-xs text-muted-foreground">{t('varies')}</span>
+                      ) : p.lastPurchasePrice ? (
+                        <div title={p.lastPurchaseSupplier ? t('boughtFrom', { supplier: p.lastPurchaseSupplier }) : undefined}>
+                          <p className="num">{unitMoney(p.lastPurchasePrice)}</p>
+                          <p className="text-[11px] text-muted-foreground">{p.lastPurchaseDate ? f.date(p.lastPurchaseDate) : null}</p>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground" title={t('noPurchases')}>—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-end" data-sensitive>
+                      {several ? (
+                        <span className="text-xs text-muted-foreground">{t('varies')}</span>
+                      ) : p.avgPurchasePrice ? (
+                        <span
+                          className="num"
+                          title={t('purchaseBasis', { units: f.count(p.purchasedUnits ?? 0), invoices: f.count(p.purchaseInvoices ?? 0) })}
+                        >
+                          {unitMoney(p.avgPurchasePrice)}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground" title={t('noPurchases')}>—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-end" data-sensitive>
+                      {several ? (
+                        <span className="text-xs text-muted-foreground">{t('varies')}</span>
+                      ) : p.unitCost ? (
+                        <span className="num">{unitMoney(p.unitCost)}</span>
                       ) : (
                         <span className="text-xs text-warning">{tc('notSet')}</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-end">
+                    <TableCell className="text-end" data-sensitive>
                       {p.unitCost && p.onHand > 0 ? (
                         <Amount value={p.stockValue} className="font-medium" />
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="ps-6">
-                      {p.channels.length ? (
-                        <div className="flex flex-wrap gap-1">
-                          {p.channels.map((c) => (
-                            <ChannelBadge key={c} channel={c} />
-                          ))}
-                        </div>
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}

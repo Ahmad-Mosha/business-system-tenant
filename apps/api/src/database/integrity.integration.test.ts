@@ -11,6 +11,9 @@ import { OrdersService } from '../orders/orders.service';
 import { Order } from '../orders/order.entity';
 import { PurchasingService } from '../purchasing/purchasing.service';
 import { CatalogService } from '../catalog/catalog.service';
+import { CatalogController } from '../catalog/catalog.controller';
+import { SalesService } from '../sales/sales.service';
+import type { Request } from 'express';
 import { Product } from '../catalog/product.entity';
 import { ProductVariant } from '../catalog/product-variant.entity';
 import { StockMovement } from '../inventory/stock-movement.entity';
@@ -523,5 +526,227 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     assert.equal(paid.filter((r) => r.status === 'fulfilled').length, 1);
     assert.equal((await purchasing.supplierDetail(supplier.id)).balance, '0.00');
     assert.equal(await ledger.balanceOf('SUPPLIER_PAYABLE', { supplierId: supplier.id }), '0.00');
+  });
+  await t.test('a resent purchase submission creates one invoice, one receipt and one entry', async () => {
+    const id = await stock(0);
+    const supplier = await purchasing.createSupplier({ name: `Resend supplier ${randomUUID()}` });
+    const requestId = randomUUID();
+    const body = { requestId, supplierId: supplier.id, invoiceDate: '2026-10-12', payment: 'CASH' as const,
+      lines: [{ variantId: id, quantity: 4, unitCost: '25.00' }] };
+    const sent = await Promise.all([purchasing.createInvoice(body, user.id, true), purchasing.createInvoice(body, user.id, true)]);
+    assert.equal(sent[0].id, sent[1].id);
+    assert.equal((await purchasing.createInvoice(body, user.id, true)).id, sent[0].id);
+    assert.equal(await balance(id), 4);
+    const [{ n }] = await db.query("SELECT count(*)::int AS n FROM ledger_entry WHERE source_type = 'purchase_invoice' AND source_id = $1", [sent[0].id]);
+    assert.equal(n, 1);
+  });
+  await t.test('a resent order submission creates one order and moves stock once', async () => {
+    const id = await stock(5);
+    const requestId = randomUUID();
+    const body = { ...input(id, 2), requestId };
+    const sent = await Promise.all([orders.create(actor, body), orders.create(actor, body)]);
+    assert.equal(sent[0].id, sent[1].id);
+    assert.equal(await balance(id), 3);
+    const other = await db.getRepository(User).save({ email: `other-${Date.now()}@example.invalid`, name: 'Other', passwordHash: 'unused', role: 'MODERATOR' });
+    await assert.rejects(orders.create({ id: other.id, name: other.name, role: 'MODERATOR', email: other.email }, body));
+    assert.equal(await balance(id), 3);
+  });
+  await t.test('a typed line total is the amount owed, received and booked exactly', async () => {
+    const id = await stock(0);
+    const supplier = await purchasing.createSupplier({ name: `Total supplier ${randomUUID()}` });
+    const invoice = await purchasing.createInvoice({ supplierId: supplier.id, invoiceDate: '2026-10-12', payment: 'CREDIT',
+      lines: [{ variantId: id, quantity: 3, lineTotal: '100' }] }, user.id, true);
+    assert.equal(invoice.goodsTotal, '100.00');
+    assert.equal(invoice.lines[0].unitCost, '33.3333');
+    assert.equal(invoice.lines[0].lineTotal, '100.00');
+    assert.equal((await purchasing.supplierDetail(supplier.id)).balance, '100.00');
+    assert.equal(await ledger.balanceOf('SUPPLIER_PAYABLE', { supplierId: supplier.id }), '100.00');
+    assert.equal(await balance(id), 3);
+    const [variant] = await db.query('SELECT unit_cost FROM product_variant WHERE id = $1', [id]);
+    assert.equal(variant.unit_cost, '33.3333');
+    // A typed unit cost with four decimals rounds the line, never the other way round.
+    const byUnit = await purchasing.createInvoice({ supplierId: supplier.id, invoiceDate: '2026-10-12', payment: 'CREDIT',
+      lines: [{ variantId: id, quantity: 3, unitCost: '33.3333' }] }, user.id);
+    assert.equal(byUnit.lines[0].lineTotal, '100.00');
+    await assert.rejects(purchasing.createInvoice({ supplierId: supplier.id, invoiceDate: '2026-10-12', payment: 'CREDIT',
+      lines: [{ variantId: id, quantity: 3, lineTotal: '100.001' }] }, user.id));
+  });
+  await t.test('moderators searching products never receive their cost', async () => {
+    const { product } = await emptyProduct();
+    const controller = new CatalogController(new CatalogService(db, finance));
+    const as = (role: 'ADMIN' | 'MODERATOR') => ({ user: { ...actor, role } }) as unknown as Request;
+    const [forModerator] = await controller.searchVariants(as('MODERATOR'), product.name);
+    const [forAdmin] = await controller.searchVariants(as('ADMIN'), product.name);
+    assert.equal(forModerator.unitCost, null);
+    assert.equal(forModerator.lastPurchasePrice, null);
+    assert.equal(forAdmin.unitCost, '10.0000');
+  });
+  await t.test('suppliers archive only when settled, and delete only when never used', async () => {
+    const id = await stock(0);
+    const owing = await purchasing.createSupplier({ name: `Owing ${randomUUID()}` });
+    await purchasing.createInvoice({ supplierId: owing.id, invoiceDate: '2026-10-12', payment: 'CREDIT',
+      lines: [{ variantId: id, quantity: 1, unitCost: '50' }] }, user.id, true);
+    await assert.rejects(purchasing.updateSupplier(owing.id, { active: false }), /settle what is owed/);
+    await assert.rejects(purchasing.deleteSupplier(owing.id), /archive it instead/);
+    await purchasing.recordSupplierPayment(owing.id, '50', undefined, user.id);
+    await purchasing.updateSupplier(owing.id, { active: false });
+    assert.ok((await purchasing.listSuppliers(true)).some((sup) => sup.id === owing.id));
+    assert.ok(!(await purchasing.listSuppliers()).some((sup) => sup.id === owing.id));
+    await purchasing.updateSupplier(owing.id, { active: true });
+
+    const drafting = await purchasing.createSupplier({ name: `Drafting ${randomUUID()}` });
+    await purchasing.createInvoice({ supplierId: drafting.id, invoiceDate: '2026-10-12', payment: 'CREDIT',
+      lines: [{ variantId: id, quantity: 1, unitCost: '5' }] }, user.id);
+    await assert.rejects(purchasing.updateSupplier(drafting.id, { active: false }), /draft invoices/);
+
+    const mistake = await purchasing.createSupplier({ name: `Mistake ${randomUUID()}` });
+    await purchasing.updateSupplier(mistake.id, { name: 'Corrected name', phone: '01000000000' });
+    await purchasing.deleteSupplier(mistake.id);
+    await assert.rejects(purchasing.supplierDetail(mistake.id));
+  });
+  await t.test('a product is restored from the archive, and deleted only with no history', async () => {
+    const catalog = new CatalogService(db, finance);
+    const unused = await catalog.createProduct({ name: `Unused ${randomUUID()}` }, user.id);
+    assert.equal((await catalog.getProduct(unused.id)).deletable, true);
+    await catalog.archiveProduct(unused.id);
+    assert.ok((await catalog.listProducts({ archived: true, search: 'Unused' })).some((p: { id: string }) => p.id === unused.id));
+    await catalog.restoreProduct(unused.id);
+    assert.equal((await catalog.getProduct(unused.id)).active, true);
+    await catalog.deleteProduct(unused.id);
+    await assert.rejects(catalog.getProduct(unused.id));
+
+    const stocked = await catalog.createProduct({ name: `Stocked ${randomUUID()}`, openingStock: 2, unitCost: '10' }, user.id);
+    assert.equal((await catalog.getProduct(stocked.id)).deletable, false);
+    await assert.rejects(catalog.deleteProduct(stocked.id), /archive it instead/);
+  });
+  await t.test('a draft invoice is edited freely and posts what was last saved; a posted one is locked', async () => {
+    const id = await stock(0);
+    const supplier = await purchasing.createSupplier({ name: `Editing ${randomUUID()}` });
+    const draft = await purchasing.createInvoice({ supplierId: supplier.id, invoiceDate: '2026-10-12', payment: 'CREDIT',
+      lines: [{ variantId: id, quantity: 10, unitCost: '1' }] }, user.id);
+    const edited = await purchasing.updateDraft(draft.id, { supplierId: supplier.id, invoiceNo: 'S-9', invoiceDate: '2026-10-11', payment: 'CREDIT',
+      lines: [{ variantId: id, quantity: 3, lineTotal: '100' }] });
+    assert.equal(edited.goodsTotal, '100.00');
+    assert.equal(edited.lines.length, 1);
+    assert.equal(await balance(id), 0); // a draft moves nothing
+    await purchasing.postInvoice(draft.id, user.id);
+    assert.equal(await balance(id), 3);
+    assert.equal(await ledger.balanceOf('SUPPLIER_PAYABLE', { supplierId: supplier.id }), '100.00');
+    await assert.rejects(purchasing.updateDraft(draft.id, { supplierId: supplier.id, invoiceDate: '2026-10-11', payment: 'CREDIT',
+      lines: [{ variantId: id, quantity: 1, unitCost: '1' }] }), /cannot be edited/);
+  });
+  await t.test('last and average purchase prices come from posted invoices at the supplier price', async () => {
+    const catalog = new CatalogService(db, finance);
+    const name = `Priced ${randomUUID()}`;
+    const created = await catalog.createProduct({ name, sku: `SKU-${randomUUID().slice(0, 8)}` }, user.id);
+    const variantId = created.variantId;
+    const supplier = await purchasing.createSupplier({ name: `Price supplier ${randomUUID()}` });
+    const row = async () => (await catalog.listProducts({ search: name }))[0];
+    assert.equal((await row()).lastPurchasePrice, null); // no history: nothing invented
+    assert.equal((await row()).avgPurchasePrice, null);
+    const buy = (invoiceDate: string, lines: Array<{ quantity: number; unitCost: string }>, post = true, extraCosts = '0') =>
+      purchasing.createInvoice({ supplierId: supplier.id, invoiceDate, payment: 'CREDIT', extraCosts,
+        lines: lines.map((l) => ({ variantId, ...l })) }, user.id, post);
+    await buy('2026-10-01', [{ quantity: 10, unitCost: '100' }]);
+    await buy('2026-10-05', [{ quantity: 10, unitCost: '130' }], true, '500'); // shipping is landed cost, not price
+    assert.equal((await row()).lastPurchasePrice, '130.0000');
+    assert.equal((await row()).avgPurchasePrice, '115.0000');
+    await buy('2026-10-20', [{ quantity: 5, unitCost: '999' }], false); // a draft is a plan, not a purchase
+    assert.equal((await row()).lastPurchasePrice, '130.0000');
+    await buy('2026-09-01', [{ quantity: 10, unitCost: '50' }]); // back-dated: averaged, but not "last"
+    assert.equal((await row()).lastPurchasePrice, '130.0000');
+    assert.equal((await row()).avgPurchasePrice, '93.3333');
+    await buy('2026-10-10', [{ quantity: 2, unitCost: '100' }, { quantity: 3, unitCost: '110' }]);
+    const latest = await row();
+    assert.equal(latest.lastPurchasePrice, '106.0000');
+    assert.equal(latest.lastPurchaseDate, '2026-10-10');
+    assert.equal(latest.purchasedUnits, 35);
+    const detail = await catalog.getProduct(created.id);
+    assert.equal(detail.purchases.length, 5);
+    assert.equal(detail.lastPurchasePrice, '106.0000');
+    assert.equal((await catalog.listProducts({ search: detail.variants[0].sku }))[0].id, created.id); // search by SKU
+  });
+  await t.test('sales invoice drafts price exactly, never duplicate, and move nothing', async () => {
+    const sales = new SalesService(db, ledger);
+    const a = await stock(10);
+    const b = await stock(5);
+    const customer = await sales.createCustomer({ name: `Wholesale ${randomUUID()}` });
+    const requestId = randomUUID();
+    const body = { requestId, customerId: customer.id, invoiceDate: '2026-10-12', discount: '20',
+      lines: [{ variantId: a, quantity: 3, lineTotal: '100' }, { variantId: b, quantity: 2, unitPrice: '45.5' }] };
+    const [first, second] = await Promise.all([sales.createDraft(body, user.id), sales.createDraft(body, user.id)]);
+    assert.equal(first.id, second.id);
+    assert.equal(first.goodsTotal, '191.00'); // 100.00 typed + 2 × 45.50
+    assert.equal(first.discount, '20.00');
+    assert.equal(first.total, '171.00');
+    assert.equal(first.lines.find((l: { variantId: string }) => l.variantId === a).unitPrice, '33.3333');
+    assert.equal(await balance(a), 10); // a draft moves no stock
+    const [{ n }] = await db.query("SELECT count(*)::int AS n FROM ledger_entry WHERE source_id = $1", [first.id]);
+    assert.equal(n, 0); // nor money
+
+    const edited = await sales.updateDraft(first.id, { ...body, discount: '0', lines: [{ variantId: a, quantity: 4, unitPrice: '30' }] });
+    assert.equal(edited.total, '120.00');
+    assert.equal(edited.lines.length, 1);
+    await assert.rejects(sales.updateDraft(first.id, { ...body, discount: '500' }), /cannot exceed/);
+
+    await assert.rejects(sales.updateCustomer(customer.id, { active: false }), /draft invoices/);
+    await assert.rejects(sales.deleteCustomer(customer.id), /archive them instead/);
+    await sales.deleteDraft(first.id);
+    await sales.updateCustomer(customer.id, { active: false });
+    assert.ok((await sales.listCustomers(true)).some((c) => c.id === customer.id));
+    await sales.deleteCustomer(customer.id);
+  });
+  await t.test('posting a sales invoice moves stock and books revenue once; void undoes it exactly', async () => {
+    const sales = new SalesService(db, ledger);
+    const a = await stock(5);
+    const customer = await sales.createCustomer({ name: `Credit ${randomUUID()}` });
+    const owed = async () => (await sales.customerDetail(customer.id)).balance;
+    const entries = async (id: string) => db.query(
+      `SELECT debit_code AS debit, credit_code AS credit, amount, kind, reverses_id AS "reversesId"
+       FROM ledger_entry WHERE source_id = $1 ORDER BY created_at`, [id]);
+    const draft = (quantity: number) => sales.createDraft({ customerId: customer.id, invoiceDate: '2026-10-13', discount: '10',
+      lines: [{ variantId: a, quantity, unitPrice: '50' }] }, user.id);
+
+    const tooMany = await draft(6);
+    await assert.rejects(sales.postInvoice(tooMany.id, '0', user.id), /only 5 in stock/);
+    assert.equal(await balance(a), 5);
+    await sales.deleteDraft(tooMany.id);
+
+    const inv = await draft(3); // 150 - 10 = 140
+    await assert.rejects(sales.postInvoice(inv.id, '140.01', user.id), /cannot exceed/);
+    const results = await Promise.allSettled([sales.postInvoice(inv.id, '40', user.id), sales.postInvoice(inv.id, '40', user.id)]);
+    assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1); // a double click posts once
+    const posted = await sales.getInvoice(inv.id);
+    assert.equal(posted.status, 'POSTED');
+    assert.match(posted.invoiceNumber!, /^SI-\d+$/);
+    assert.equal(posted.paidAmount, '40.00');
+    assert.equal(posted.lines[0].unitCost, '10.0000'); // cost frozen on the line
+    assert.equal(await balance(a), 2);
+    assert.equal(await owed(), '100.00');
+    assert.deepEqual((await entries(inv.id)).map((e: { debit: string; credit: string; amount: string }) => `${e.debit}>${e.credit} ${e.amount}`),
+      ['CUSTOMER_RECEIVABLE>SALES 140.00', 'CASH>CUSTOMER_RECEIVABLE 40.00']);
+    await assert.rejects(sales.updateDraft(inv.id, { customerId: customer.id, invoiceDate: '2026-10-13', lines: [{ variantId: a, quantity: 1, unitPrice: '1' }] }), /cannot be edited/);
+    await assert.rejects(sales.deleteDraft(inv.id), /cannot be deleted/);
+
+    await assert.rejects(sales.recordPayment(inv.id, '100.01', undefined, user.id), /cannot exceed/);
+    const paid = await sales.recordPayment(inv.id, '100', 'cash at the shop', user.id);
+    assert.equal(paid.paidAmount, '140.00');
+    assert.equal(await owed(), '0.00');
+    await assert.rejects(sales.voidInvoice(inv.id, 'wrong customer', user.id), /reverse its payments/);
+    for (const p of paid.payments) await sales.reversePayment(inv.id, p.id, user.id);
+    await assert.rejects(sales.reversePayment(inv.id, paid.payments[0].id, user.id), /already reversed/);
+
+    const voided = await sales.voidInvoice(inv.id, 'wrong customer', user.id);
+    assert.equal(voided.status, 'VOID');
+    assert.equal(voided.voidReason, 'wrong customer');
+    assert.equal(voided.paidAmount, '0.00');
+    assert.equal(await balance(a), 5); // every unit back
+    assert.equal(await owed(), '0.00');
+    const net = await db.query(
+      `SELECT code, COALESCE(SUM(CASE WHEN debit_code = code THEN amount ELSE -amount END), 0)::numeric(14,2) AS net
+       FROM ledger_entry, unnest(ARRAY[debit_code, credit_code]) AS code WHERE source_id = $1 GROUP BY code ORDER BY code`, [inv.id]);
+    assert.ok(net.every((r: { net: string }) => r.net === '0.00'), JSON.stringify(net)); // cash, receivable and sales all net to zero
+    await assert.rejects(sales.voidInvoice(inv.id, 'again', user.id), /only a posted invoice/);
+    await assert.rejects(sales.recordPayment(inv.id, '1', undefined, user.id), /only a posted invoice/);
   });
 });

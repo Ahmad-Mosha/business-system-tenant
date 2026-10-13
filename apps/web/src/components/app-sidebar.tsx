@@ -7,6 +7,8 @@ import { useTranslations } from 'next-intl';
 import { useTheme } from 'next-themes';
 import { useState, useTransition } from 'react';
 import { signOut } from '@/app/login/actions';
+import { clearAllDrafts } from '@/hooks/use-draft';
+import { BrandMark } from '@/components/brand-mark';
 import { LanguageMenuGroup } from '@/components/language-switcher';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -62,12 +64,10 @@ export function AppSidebar({ user }: { user: SessionUser }) {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild tooltip={t('app.name')}>
               <Link href={user.role === 'ADMIN' ? '/' : '/orders'}>
-                <span className="flex aspect-square size-8 items-center justify-center bg-primary font-heading text-sm font-bold text-primary-foreground">
-                  {t('app.name').charAt(0)}
-                </span>
+                <BrandMark />
                 <span className="grid flex-1 leading-tight">
-                  <span className="truncate font-heading text-sm font-semibold">{t('app.name')}</span>
-                  <span className="truncate text-[11px] text-muted-foreground">{t('app.tagline')}</span>
+                  <span className="truncate font-heading text-[14px] font-semibold tracking-[-0.01em]">{t('app.name')}</span>
+                  <span className="truncate text-[11.5px] text-muted-foreground">{t('app.tagline')}</span>
                 </span>
               </Link>
             </SidebarMenuButton>
@@ -214,7 +214,7 @@ function NavUser({ user }: { user: SessionUser }) {
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="size-8">
-                <AvatarFallback className="bg-sidebar-accent font-heading text-xs font-semibold">
+                <AvatarFallback className="bg-sidebar-accent font-heading text-xs font-semibold text-sidebar-accent-foreground">
                   {user.name.slice(0, 1).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
@@ -247,7 +247,7 @@ function NavUser({ user }: { user: SessionUser }) {
             <DropdownMenuSeparator />
             <LanguageMenuGroup />
             <DropdownMenuSeparator />
-            <DropdownMenuItem disabled={signingOut} onSelect={() => startSignOut(() => signOut())}>
+            <DropdownMenuItem disabled={signingOut} onSelect={() => startSignOut(() => { clearAllDrafts(); return signOut(); })}>
               <LogOut className="rtl:-scale-x-100" />
               {t('user.signOut')}
             </DropdownMenuItem>

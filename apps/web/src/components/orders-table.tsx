@@ -33,6 +33,11 @@ const NOBODY = 'unassigned';
  * The live orders grid. Selection is intentionally page-scoped: the header
  * checkbox selects exactly the rows the operator can see, so a filter or page
  * change can never apply work to hidden orders.
+ *
+ * On a phone the same orders read as cards — number, customer and total on
+ * top, status and payment (still changeable) underneath — instead of a table
+ * that hides everything past the customer off to the side. Bulk assignment
+ * needs the table's checkboxes, so it waits for a wider screen.
  */
 export function OrdersTable({
   orders,
@@ -115,8 +120,45 @@ export function OrdersTable({
   ) : undefined;
 
   return (
-    <TablePanel minWidth={isAdmin ? '72rem' : '64rem'} toolbar={toolbar} footer={footer}>
-      <Table>
+    <TablePanel minWidth={isAdmin ? '72rem' : '64rem'} toolbar={toolbar} toolbarClassName="hidden md:block" footer={footer}>
+      <ul className="divide-y md:hidden">
+        {orders.map((order) => (
+          <li key={order.id} className="relative px-4 py-3.5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <Link href={`/orders/${order.id}`} className="num text-[13px] font-semibold after:absolute after:inset-0">
+                    {order.orderNumber}
+                  </Link>
+                  {order.unmappedCount > 0 ? (
+                    <AlertTriangle aria-label={t('unmapped', { count: order.unmappedCount })} className="size-3.5 text-warning" />
+                  ) : null}
+                </div>
+                <p className="mt-0.5 truncate text-[13px]">
+                  <bdi>{order.customerName}</bdi>
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  <bdi className="num">{order.customerPhone}</bdi> · {f.date(order.placedAt)}
+                </p>
+              </div>
+              <span className="num shrink-0 text-[15px] font-semibold">{money(order.total)}</span>
+            </div>
+            <div className="relative z-10 mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px]">
+              <OrderStatusMenu orderId={order.id} status={order.status} canRevert={isAdmin} />
+              <PaymentStatusMenu orderId={order.id} status={order.paymentStatus} orderStatus={order.status} />
+              {isAdmin ? (
+                <AssignMenu
+                  orderId={order.id}
+                  assignedToId={order.assignedToId}
+                  assignedToName={order.assignedToName}
+                  assignees={assignees}
+                />
+              ) : null}
+            </div>
+          </li>
+        ))}
+      </ul>
+      <Table className="hidden md:table">
         <TableHeader>
           <TableRow>
             {isAdmin ? (

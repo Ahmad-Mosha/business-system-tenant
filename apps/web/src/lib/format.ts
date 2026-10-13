@@ -19,6 +19,14 @@ export function money(v: string | number | null | undefined): string {
   return keepSign(EGP.format(Number(v)));
 }
 
+const EGP_UNIT = new Intl.NumberFormat('en-EG', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+
+/** A per-unit cost, which can carry 4 decimals (100 ÷ 3 = `33.3333`): `120.00`, `33.3333`. */
+export function unitMoney(v: string | number | null | undefined): string {
+  if (v === null || v === undefined || v === '') return '—';
+  return keepSign(EGP_UNIT.format(Number(v)));
+}
+
 /** Compact form for dense table cells, where the piastres are noise. */
 export function moneyWhole(v: string | number | null | undefined): string {
   if (v === null || v === undefined || v === '') return '—';
@@ -59,14 +67,4 @@ export function moneyParts(v: string | number | null | undefined): {
     whole: EGP_WHOLE.format(Math.trunc(abs)),
     frac: (abs - Math.trunc(abs)).toFixed(2).slice(1),
   };
-}
-
-/** Groups the integer part of a partial amount as the user types: `1250000` → `1,250,000`. */
-export function groupDigits(raw: string): string {
-  const cleaned = raw.replace(/[^\d.]/g, '');
-  const dot = cleaned.indexOf('.');
-  const intPart = (dot === -1 ? cleaned : cleaned.slice(0, dot)).replace(/^0+(?=\d)/, '');
-  const decPart = dot === -1 ? '' : '.' + cleaned.slice(dot + 1).replace(/\./g, '').slice(0, 2);
-  const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return (grouped || (dot !== -1 ? '0' : '')) + decPart;
 }

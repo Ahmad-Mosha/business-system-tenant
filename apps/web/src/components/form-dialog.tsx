@@ -2,7 +2,7 @@
 
 import { AlertTriangle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useActionState, useState, type ReactNode } from 'react';
+import { useActionState, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -88,20 +88,34 @@ function FormBody<S extends DialogFormState>({
   children: ReactNode;
 }) {
   const t = useTranslations('common');
+  // React queues every submit, so a fast double click would record a payment
+  // twice. A second submit is refused until the first one has answered.
+  const sending = useRef(false);
   const [state, submit, pending] = useActionState<DialogFormState, FormData>(
     async (prev, form) => {
-      const next = await action(prev as S, form);
-      if (next.status === 'saved') {
-        toast.success(typeof success === 'function' ? success(next) : success);
-        onDone();
+      try {
+        const next = await action(prev as S, form);
+        if (next.status === 'saved') {
+          toast.success(typeof success === 'function' ? success(next) : success);
+          onDone();
+        }
+        return next;
+      } finally {
+        sending.current = false;
       }
-      return next;
     },
     { status: 'idle' },
   );
 
   return (
-    <form action={submit} className="grid gap-4">
+    <form
+      action={submit}
+      onSubmit={(e) => {
+        if (sending.current) e.preventDefault();
+        else sending.current = true;
+      }}
+      className="grid gap-4"
+    >
       {/* A disabled fieldset freezes every control inside while saving. */}
       <fieldset disabled={pending} className="grid gap-4">
         {children}

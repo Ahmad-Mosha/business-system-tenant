@@ -4,7 +4,11 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { apiRequest } from '@/lib/api-request';
 
-export type CreateProductState = { status: 'idle' } | { status: 'error'; message: string };
+export type CreateProductState =
+  | { status: 'idle' }
+  | { status: 'error'; message: string }
+  /** The form clears its draft, then opens the product. */
+  | { status: 'saved'; id: string };
 
 type Result = { ok: true } | { ok: false; message: string };
 
@@ -41,7 +45,7 @@ export async function addProduct(
   });
   if (!created.ok) return { status: 'error', message: created.message };
   revalidatePath('/inventory');
-  redirect(`/inventory/${created.data.id}`);
+  return { status: 'saved', id: created.data.id };
 }
 
 export async function updateProduct(productId: string, patch: { name?: string; category?: string | null }) {
@@ -51,6 +55,18 @@ export async function updateProduct(productId: string, patch: { name?: string; c
 /** Archives (soft-deletes) a product, then sends the caller back to the list. */
 export async function archiveProduct(productId: string) {
   const r = await write(`/catalog/products/${productId}`, 'DELETE', undefined, '/inventory');
+  if (!r.ok) return r;
+  redirect('/inventory');
+}
+
+/** Brings an archived product back to the working list. */
+export async function restoreProduct(productId: string) {
+  return write(`/catalog/products/${productId}/restore`, 'POST', undefined, `/inventory/${productId}`);
+}
+
+/** Removes a product that has no history at all; the API refuses anything else. */
+export async function deleteProduct(productId: string) {
+  const r = await write(`/catalog/products/${productId}/permanently`, 'DELETE', undefined);
   if (!r.ok) return r;
   redirect('/inventory');
 }

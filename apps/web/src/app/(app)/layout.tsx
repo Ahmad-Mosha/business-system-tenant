@@ -14,7 +14,9 @@ import { requireSession } from '@/lib/session';
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireSession();
   // Read on the server so a collapsed sidebar doesn't flash open on load.
-  const open = (await cookies()).get('sidebar_state')?.value !== 'false';
+  const jar = await cookies();
+  const open = jar.get('sidebar_state')?.value !== 'false';
+  const privacy = jar.get('pm_privacy')?.value === 'hidden';
 
   return (
     <SidebarProvider
@@ -25,7 +27,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     >
       <AppSidebar user={user} />
       <SidebarInset className="min-h-0 min-w-0 overflow-hidden">
-        <SiteHeader />
+        <SiteHeader role={user.role} privacy={user.role === 'ADMIN' ? privacy : undefined} />
         {children}
       </SidebarInset>
     </SidebarProvider>
