@@ -18,6 +18,8 @@ export function CancelAction({
   success,
   action,
   children,
+  reasonLabel,
+  dismissLabel,
 }: {
   trigger: ReactNode;
   title: string;
@@ -27,12 +29,15 @@ export function CancelAction({
   action: (prev: DialogFormState, form: FormData) => Promise<DialogFormState>;
   /** Anything to say before the reason — what this will and won't change. */
   children?: ReactNode;
+  reasonLabel?: string;
+  /** "Keep it" by default — the way out of a cancellation. */
+  dismissLabel?: string;
 }) {
   const t = useTranslations('corrections');
   return (
-    <FormDialog trigger={trigger} title={title} description={description} action={action} submitLabel={confirmLabel} success={success} dismissLabel={t('keep')}>
+    <FormDialog trigger={trigger} title={title} description={description} action={action} submitLabel={confirmLabel} success={success} dismissLabel={dismissLabel ?? t('keep')}>
       {children}
-      <ReasonField />
+      <ReasonField label={reasonLabel} />
     </FormDialog>
   );
 }

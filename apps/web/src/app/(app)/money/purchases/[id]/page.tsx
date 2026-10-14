@@ -30,7 +30,7 @@ import { num, strong } from '@/i18n/rich';
 import { getFormat } from '@/i18n/get-format';
 
 export default async function PurchaseDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const [f, t, tc] = await Promise.all([getFormat(), getTranslations('money.invoice'), getTranslations('corrections.invoice')]);
+  const [f, t, tc, tr] = await Promise.all([getFormat(), getTranslations('money.invoice'), getTranslations('corrections.invoice'), getTranslations()]);
   await requireAdmin();
   const { id } = await params;
   const invoice = await getPurchase(id).catch(() => null);
@@ -109,7 +109,15 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
                 confirmLabel={tc('editConfirm')}
                 success={tc('cancelledToast')}
                 action={cancelPurchase.bind(null, invoice.id, true)}
-              />
+                reasonLabel={tc('editReason')}
+                dismissLabel={tr('common.cancel')}
+              >
+                <ol className="grid list-decimal gap-1 ps-5 text-[13px] text-muted-foreground marker:text-foreground">
+                  <li>{tc('editStep1')}</li>
+                  <li>{tc('editStep2')}</li>
+                  <li>{tc('editStep3')}</li>
+                </ol>
+              </CancelAction>
               {canPay && supplier ? (
                 <PaySupplier
                   supplierId={invoice.supplierId}

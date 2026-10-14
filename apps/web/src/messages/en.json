@@ -1636,9 +1636,9 @@
     },
     "invoice": {
       "edit": "Edit invoice",
-      "editTitle": "Edit a posted invoice",
-      "editHint": "A posted invoice isn’t changed in place. It is cancelled — its goods leave stock and its amount leaves the books — and re-entered as a draft with the same lines, for you to fix and post again.",
-      "editConfirm": "Cancel and edit",
+      "editTitle": "Edit this invoice",
+      "editHint": "A posted invoice can’t be changed in place — its goods are already in stock and its amount in the books. Editing works in three steps:",
+      "editConfirm": "Continue to edit",
       "cancel": "Cancel invoice",
       "cancelTitle": "Cancel this invoice?",
       "cancelHintCredit": "For an invoice entered by mistake. Its goods leave stock, the cost average goes back to what it was, and the supplier is no longer owed it. It stays visible, marked cancelled.",
@@ -1649,7 +1649,11 @@
       "reentered": "Re-entered as a new invoice:",
       "openCorrection": "open it",
       "correctionOf": "This draft re-enters a cancelled invoice — fix it and post it to take its place.",
-      "openCancelled": "Open the cancelled invoice"
+      "openCancelled": "Open the cancelled invoice",
+      "editStep1": "This invoice is cancelled: its goods leave stock and its amount leaves the books.",
+      "editStep2": "A new draft opens with the same supplier and lines.",
+      "editStep3": "You fix what’s wrong and post it — it takes this invoice’s place.",
+      "editReason": "What needs correcting?"
     }
   }
 }
