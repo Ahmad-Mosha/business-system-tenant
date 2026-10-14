@@ -1354,7 +1354,8 @@
     "emptyHint": "Record an expense or change the filters.",
     "status": "Status",
     "recorded": "Recorded",
-    "trace": "Ledger"
+    "trace": "Ledger",
+    "voidedBecause": "Cancelled:"
   },
   "drafts": {
     "restored": "Unsaved work from {when} was restored.",

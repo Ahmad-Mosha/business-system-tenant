@@ -1354,7 +1354,8 @@
     "emptyHint": "سجّل مصروفاً أو غيّر الفلاتر.",
     "status": "الحالة",
     "recorded": "مسجّل",
-    "trace": "السجل"
+    "trace": "السجل",
+    "voidedBecause": "أُلغي:"
   },
   "drafts": {
     "restored": "استُعيدت بيانات غير محفوظة من {when}.",
