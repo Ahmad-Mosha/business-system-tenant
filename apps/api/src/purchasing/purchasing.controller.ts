@@ -28,8 +28,8 @@ export class SuppliersController {
   }
 
   @Get(':id')
-  detail(@Param('id', ParseUUIDPipe) id: string) {
-    return this.purchasing.supplierDetail(id);
+  detail(@Param('id', ParseUUIDPipe) id: string, @Query('cancelled') cancelled?: string) {
+    return this.purchasing.supplierDetail(id, cancelled === '1');
   }
 
   @Post()
@@ -65,6 +65,16 @@ export class SuppliersController {
       body?.invoiceId,
     );
   }
+
+  @Post(':id/payments/:entryId/reverse')
+  reversePayment(
+    @Req() req: Request,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('entryId', ParseUUIDPipe) entryId: string,
+    @Body() body: { reason?: string },
+  ) {
+    return this.purchasing.reverseSupplierPayment(id, entryId, body?.reason ?? '', req.user!.id);
+  }
 }
 
 @Roles('ADMIN')
@@ -73,8 +83,8 @@ export class PurchasesController {
   constructor(private readonly purchasing: PurchasingService) {}
 
   @Get()
-  list() {
-    return this.purchasing.listInvoices();
+  list(@Query('cancelled') cancelled?: string) {
+    return this.purchasing.listInvoices(cancelled === '1');
   }
 
   @Get(':id')
@@ -155,5 +165,11 @@ export class PurchasesController {
   @HttpCode(204)
   async remove(@Param('id', ParseUUIDPipe) id: string) {
     await this.purchasing.deleteDraft(id);
+  }
+
+  /** Cancel a posted invoice entered by mistake; `correct` re-enters it as a draft to fix. */
+  @Post(':id/void')
+  void(@Req() req: Request, @Param('id', ParseUUIDPipe) id: string, @Body() body: { reason?: string; correct?: boolean }) {
+    return this.purchasing.voidInvoice(id, body?.reason ?? '', req.user!.id, body?.correct === true);
   }
 }

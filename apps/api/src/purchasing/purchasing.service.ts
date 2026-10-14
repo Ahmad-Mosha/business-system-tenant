@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, EntityManager, In } from 'typeorm';
+import { DataSource, EntityManager, In, Not } from 'typeorm';
 import { ProductVariant } from '../catalog/product-variant.entity';
+import { LedgerEntry } from '../finance/ledger-entry.entity';
 import { LedgerService } from '../finance/ledger.service';
 import { StockMovement } from '../inventory/stock-movement.entity';
 import { allocateExtraCosts, allocateOldestFirst, lineTotalFor, movingAverage, round2, unitCostFor } from './costing';
@@ -143,16 +144,17 @@ export class PurchasingService {
     });
   }
 
-  async supplierDetail(id: string) {
+  /** A supplier with its invoices and payments — live ones, or with `cancelled` the cancelled too. */
+  async supplierDetail(id: string, cancelled = false) {
     const supplier = await this.db.getRepository(Supplier).findOneBy({ id });
     if (!supplier) throw new NotFoundException(problem('notFound', 'supplier not found'));
     const invoices = await this.db.getRepository(PurchaseInvoice).find({
-      where: { supplierId: id },
+      where: { supplierId: id, ...(cancelled ? {} : { status: Not('VOID' as const) }) },
       order: { invoiceDate: 'DESC', createdAt: 'DESC' },
       take: 100,
     });
     const balance = ((await this.owedBySupplier()).get(id) ?? 0).toFixed(2);
-    const payments = await this.ledger.entries({ kind: 'SUPPLIER_PAYMENT', supplierId: id, limit: 100 });
+    const payments = await this.ledger.entries({ kind: 'SUPPLIER_PAYMENT', supplierId: id, limit: 100, cancelled });
     return {
       ...supplier,
       balance,
@@ -229,7 +231,7 @@ export class PurchasingService {
         }
       }
 
-      return this.ledger.post(
+      const entry = await this.ledger.post(
         {
           amount: money(value),
           debit: 'SUPPLIER_PAYABLE',
@@ -243,12 +245,90 @@ export class PurchasingService {
         },
         tx,
       );
+      // Which invoices this payment settled, so reversing it un-settles exactly those.
+      for (const [i, inv] of targets.entries()) {
+        if (applied[i] > 0) {
+          await tx.query(
+            'INSERT INTO supplier_payment_allocation (ledger_entry_id, invoice_id, amount) VALUES ($1, $2, $3)',
+            [entry.id, inv.id, money(applied[i])],
+          );
+        }
+      }
+      return entry;
     });
+  }
+
+  /**
+   * Reverses a supplier payment recorded by mistake: the cash comes back, the
+   * invoices it settled are owed again, and the reason and who did it are kept
+   * on the reversal. Serialized with new payments by the supplier lock;
+   * reversing it again changes nothing.
+   *
+   * ponytail: a payment recorded before allocations were kept un-settles the
+   * invoice it named first, then the newest settled invoices — the supplier's
+   * total is exact either way, but which invoice reads as unpaid may differ
+   * from the day it was paid.
+   */
+  async reverseSupplierPayment(supplierId: string, entryId: string, reason: string, userId: string) {
+    if (!reason?.trim() || reason.trim().length > 1000) {
+      throw new BadRequestException(problem('payment.reason', 'write why this payment is reversed'));
+    }
+    return this.db.transaction(async (tx) => {
+      const supplier = await tx.findOne(Supplier, { where: { id: supplierId }, lock: { mode: 'pessimistic_write' } });
+      if (!supplier) throw new NotFoundException(problem('notFound', 'supplier not found'));
+      const entry = await tx.findOne(LedgerEntry, { where: { id: entryId }, lock: { mode: 'pessimistic_write' } });
+      if (!entry || entry.kind !== 'SUPPLIER_PAYMENT' || entry.supplierId !== supplierId || entry.reversesId) {
+        throw new NotFoundException(problem('notFound', 'payment not found'));
+      }
+      const earlier = await tx.findOneBy(LedgerEntry, { reversesId: entryId });
+      if (earlier) return earlier;
+
+      const allocated: Array<{ invoiceId: string; amount: string }> = await tx.query(
+        'SELECT invoice_id AS "invoiceId", amount FROM supplier_payment_allocation WHERE ledger_entry_id = $1',
+        [entryId],
+      );
+      const undo = allocated.length
+        ? allocated.map((a) => ({ invoiceId: a.invoiceId, amount: Number(a.amount) }))
+        : await this.legacyAllocation(tx, entry);
+      for (const u of undo) {
+        const invoice = await tx.findOne(PurchaseInvoice, { where: { id: u.invoiceId }, lock: { mode: 'pessimistic_write' } });
+        const left = round2(Number(invoice?.settledAmount ?? 0) - u.amount);
+        if (!invoice || left < -0.005) {
+          throw new BadRequestException(problem('payment.cannotReverse', 'this payment no longer matches its invoices and cannot be reversed automatically'));
+        }
+        await tx.update(PurchaseInvoice, { id: u.invoiceId }, { settledAmount: money(Math.max(left, 0)) });
+      }
+      return this.ledger.reverse(entryId, userId, tx, reason);
+    });
+  }
+
+  /** For a payment recorded before allocations were kept: the invoice it named, then the newest settled ones. */
+  private async legacyAllocation(tx: EntityManager, entry: LedgerEntry) {
+    const invoices = await tx.find(PurchaseInvoice, {
+      where: { supplierId: entry.supplierId!, status: 'POSTED', payment: 'CREDIT' },
+      order: { invoiceDate: 'DESC', createdAt: 'DESC' },
+    });
+    if (entry.sourceType === 'purchase_invoice') {
+      invoices.sort((a, b) => Number(b.id === entry.sourceId) - Number(a.id === entry.sourceId));
+    }
+    let left = Number(entry.amount);
+    const undo: Array<{ invoiceId: string; amount: number }> = [];
+    for (const inv of invoices) {
+      const take = round2(Math.min(Number(inv.settledAmount), left));
+      if (take > 0) undo.push({ invoiceId: inv.id, amount: take });
+      left = round2(left - take);
+      if (left <= 0.005) break;
+    }
+    if (left > 0.005) {
+      throw new BadRequestException(problem('payment.cannotReverse', 'this payment no longer matches its invoices and cannot be reversed automatically'));
+    }
+    return undo;
   }
 
   // ── Purchase invoices ──────────────────────────────────────────────────
 
-  async listInvoices() {
+  /** Live invoices; `cancelled` brings the cancelled ones back. */
+  async listInvoices(cancelled = false) {
     const rows = await this.db.query(
       `SELECT i.id, i.invoice_no AS "invoiceNo", i.invoice_date AS "invoiceDate",
               i.status, i.payment, i.goods_total AS "goodsTotal",
@@ -259,6 +339,7 @@ export class PurchasingService {
               (SELECT count(*)::int FROM purchase_invoice_line l WHERE l.invoice_id = i.id) AS "lineCount"
        FROM purchase_invoice i
        JOIN supplier s ON s.id = i.supplier_id
+       ${cancelled ? '' : "WHERE i.status <> 'VOID'"}
        ORDER BY i.invoice_date DESC, i.created_at DESC
        LIMIT 100`,
     );
@@ -286,8 +367,14 @@ export class PurchasingService {
        ORDER BY p.name`,
       [id],
     );
+    const [audit] = await this.db.query(
+      `SELECT (SELECT name FROM app_user WHERE id = $2) AS "voidedBy",
+              (SELECT id FROM purchase_invoice WHERE replaces_id = $1 LIMIT 1) AS "replacedById"`,
+      [id, invoice.voidedById],
+    );
     return {
       ...invoice,
+      ...audit,
       payableTotal: payableTotalOf(invoice).toFixed(2),
       paidStatus: paidStatusOf(invoice),
       lines,
@@ -504,6 +591,148 @@ export class PurchasingService {
         },
       );
       this.log.log(`purchase invoice ${id} posted: ${invoice.lines.length} lines, ${invoice.landedTotal}`);
+  }
+
+  /**
+   * Cancels a posted invoice entered by mistake, as if it had never been
+   * posted — and only when that is exactly possible:
+   *   - nothing is paid on it (a credit invoice's payments are reversed first;
+   *     a cash invoice's cash simply comes back with it);
+   *   - none of its products has moved since it was posted — no sale, count,
+   *     transfer, cost correction or later purchase — so taking its goods out
+   *     restores the stock and the average cost they had. Enough stock on hand
+   *     is not enough: goods that moved since were costed with this invoice in
+   *     the average, and cancelling would leave that wrong;
+   *   - its goods are still in the warehouse.
+   * A refusal names what blocks it. `correct` re-enters the invoice as a new
+   * draft (`replacesId`) to fix and post again. A resend returns the same result.
+   */
+  async voidInvoice(id: string, reason: string, userId: string, correct = false) {
+    if (!reason?.trim() || reason.trim().length > 1000) {
+      throw new BadRequestException(problem('invoice.cancelReason', 'write why this invoice is cancelled'));
+    }
+    return this.db.transaction(async (tx) => {
+      const found = await tx.findOneBy(PurchaseInvoice, { id });
+      if (!found) throw new NotFoundException(problem('notFound', 'invoice not found'));
+      // The supplier lock serializes this with payments, which settle its invoices.
+      await tx.findOne(Supplier, { where: { id: found.supplierId }, lock: { mode: 'pessimistic_write' } });
+      const invoice = await tx.findOne(PurchaseInvoice, { where: { id }, lock: { mode: 'pessimistic_write' } });
+      if (!invoice) throw new NotFoundException(problem('notFound', 'invoice not found'));
+      if (invoice.status === 'VOID') {
+        const draft = await tx.findOneBy(PurchaseInvoice, { replacesId: id });
+        return { id, draftId: draft?.id ?? (correct ? await this.reenter(tx, invoice, userId) : null) };
+      }
+      if (invoice.status !== 'POSTED') {
+        throw new BadRequestException(problem('invoice.notPosted', 'only a posted invoice can be cancelled'));
+      }
+      if (invoice.payment === 'CREDIT' && Number(invoice.settledAmount) > 0.005) {
+        throw new BadRequestException(problem('invoice.cancelPaid', 'reverse the payments on this invoice first', {
+          paid: money(Number(invoice.settledAmount)),
+        }));
+      }
+
+      const ours: Array<{ variantId: string; quantity: number; unitCost: string; seq: string; name: string }> =
+        await tx.query(
+          `SELECT m.variant_id AS "variantId", m.quantity, m.unit_cost AS "unitCost", m.seq,
+                  CASE WHEN v.name = 'Default' THEN p.name ELSE p.name || ' — ' || v.name END AS name
+           FROM stock_movement m JOIN product_variant v ON v.id = m.variant_id JOIN product p ON p.id = v.product_id
+           WHERE m.source_type = 'purchase_invoice' AND m.source_id = $1 AND m.quantity > 0
+           ORDER BY m.seq`,
+          [id],
+        );
+      const variantIds = [...new Set(ours.map((m) => m.variantId))];
+      await lockStock(tx, variantIds);
+      const firstSeq = ours[0]?.seq ?? '0';
+
+      // Anything written for these products after this invoice's own rows.
+      const moved: Array<{ name: string; reason: string }> = await tx.query(
+        `SELECT DISTINCT ON (m.variant_id)
+                CASE WHEN v.name = 'Default' THEN p.name ELSE p.name || ' — ' || v.name END AS name, m.reason
+         FROM stock_movement m JOIN product_variant v ON v.id = m.variant_id JOIN product p ON p.id = v.product_id
+         WHERE m.variant_id = ANY($1::uuid[]) AND m.seq > $2::bigint
+           AND NOT (m.source_type IS NOT DISTINCT FROM 'purchase_invoice' AND m.source_id IS NOT DISTINCT FROM $3)
+         ORDER BY m.variant_id, m.seq`,
+        [variantIds, firstSeq, id],
+      );
+      if (moved.length) {
+        throw new BadRequestException(problem('invoice.cancelMoved',
+          `stock of ${moved.map((m) => m.name).join(', ')} has moved since this invoice was posted`,
+          { products: moved.map((m) => m.name).join('، ') }));
+      }
+
+      const byVariant = new Map<string, { quantity: number; value: number; name: string }>();
+      for (const m of ours) {
+        const v = byVariant.get(m.variantId) ?? { quantity: 0, value: 0, name: m.name };
+        v.quantity += m.quantity;
+        v.value += m.quantity * Number(m.unitCost);
+        byVariant.set(m.variantId, v);
+      }
+      const label = `Purchase invoice${invoice.invoiceNo ? ` ${invoice.invoiceNo}` : ''} cancelled — ${reason.trim()}`;
+      for (const [variantId, v] of byVariant) {
+        const [{ onHand, warehouse, avg }] = await tx.query(
+          `SELECT COALESCE(SUM(m.quantity), 0)::int AS "onHand",
+                  COALESCE(SUM(m.quantity) FILTER (WHERE m.location = 'WAREHOUSE'), 0)::int AS warehouse,
+                  (SELECT unit_cost FROM product_variant WHERE id = $1) AS avg
+           FROM stock_movement m WHERE m.variant_id = $1`,
+          [variantId],
+        );
+        if (warehouse < v.quantity) {
+          throw new BadRequestException(problem('invoice.cancelStock', `${v.name}: only ${warehouse} in the warehouse`, {
+            name: v.name, onHand: warehouse, requested: v.quantity,
+          }));
+        }
+        // The average before this invoice: exact by arithmetic while stock remains;
+        // with none left, the last average recorded before it.
+        const before = onHand - v.quantity;
+        let cost: string | null;
+        if (before > 0) {
+          cost = Math.max((onHand * Number(avg) - v.value) / before, 0).toFixed(4);
+        } else {
+          const [prev] = await tx.query(
+            `SELECT avg_cost_after AS cost FROM stock_movement
+             WHERE variant_id = $1 AND avg_cost_after IS NOT NULL AND seq < $2::bigint
+             ORDER BY seq DESC LIMIT 1`,
+            [variantId, firstSeq],
+          );
+          cost = prev?.cost ?? avg;
+        }
+        await tx.insert(StockMovement, {
+          variantId, location: 'WAREHOUSE', quantity: -v.quantity, reason: 'ADJUSTMENT',
+          unitCost: (v.value / v.quantity).toFixed(4), avgCostAfter: cost,
+          sourceType: 'purchase_invoice', sourceId: id, createdById: userId, note: label,
+        });
+        await tx.update(ProductVariant, { id: variantId }, { unitCost: cost });
+      }
+
+      const entries: Array<{ id: string }> = await tx.query(
+        `SELECT e.id FROM ledger_entry e
+         WHERE e.source_type = 'purchase_invoice' AND e.source_id = $1 AND e.kind = 'PURCHASE' AND e.reverses_id IS NULL
+           AND NOT EXISTS (SELECT 1 FROM ledger_entry r WHERE r.reverses_id = e.id)`,
+        [id],
+      );
+      for (const e of entries) await this.ledger.reverse(e.id, userId, tx, reason);
+
+      await tx.update(PurchaseInvoice, { id }, {
+        status: 'VOID', voidedAt: new Date(), voidedById: userId, voidReason: reason.trim(), settledAmount: '0',
+      });
+      this.log.log(`purchase invoice ${id} cancelled`);
+      return { id, draftId: correct ? await this.reenter(tx, invoice, userId) : null };
+    });
+  }
+
+  /** The cancelled invoice again, as a draft to fix and post — pointing back at the one it replaces. */
+  private async reenter(tx: EntityManager, invoice: PurchaseInvoice, userId: string) {
+    const lines = await tx.find(PurchaseInvoiceLine, { where: { invoiceId: invoice.id }, order: { id: 'ASC' } });
+    const draft = await tx.save(PurchaseInvoice, {
+      supplierId: invoice.supplierId, invoiceNo: invoice.invoiceNo, invoiceDate: invoice.invoiceDate,
+      status: 'DRAFT' as const, payment: invoice.payment, goodsTotal: invoice.goodsTotal, extraCosts: invoice.extraCosts,
+      extraCostsPaidSeparately: invoice.extraCostsPaidSeparately, allocation: invoice.allocation,
+      landedTotal: invoice.landedTotal, settledAmount: '0', replacesId: invoice.id, createdById: userId,
+    });
+    await tx.insert(PurchaseInvoiceLine, lines.map((l) => ({
+      invoiceId: draft.id, variantId: l.variantId, quantity: l.quantity, unitCost: l.unitCost, lineTotal: l.lineTotal,
+    })));
+    return draft.id;
   }
 
   private validateInvoiceInput(input: CreateInvoiceInput) {

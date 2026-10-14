@@ -81,6 +81,9 @@ export class SalesInvoice {
   @Column({ type: 'timestamptz', nullable: true })
   voidedAt: Date | null;
 
+  @Column({ type: 'uuid', nullable: true })
+  voidedById: string | null;
+
   @Column({ name: 'created_by_id', type: 'uuid', nullable: true })
   createdById: string | null;
 

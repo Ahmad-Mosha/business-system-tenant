@@ -1,9 +1,10 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
 import { Cheque, type ChequeStatus } from './cheque.entity';
 import type { LedgerAccountCode } from './ledger-account.entity';
-import { LedgerService } from './ledger.service';
+import { LedgerEntry } from './ledger-entry.entity';
+import { LedgerService, type PostEntry } from './ledger.service';
 import { problem } from '../problem';
 
 const MONEY = /^\d+(\.\d{1,2})?$/;
@@ -109,15 +110,56 @@ export class FinanceService {
    * moving cash against one permitted counter-account. إيداع نقدي is just this
    * with the counter set to owner capital.
    */
-  async recordVoucher(input: {
-    direction: 'IN' | 'OUT';
-    counter: LedgerAccountCode;
-    amount: string;
-    memo?: string;
-    occurredAt?: string;
-    userId: string;
-  }) {
-    if (!MONEY.test(input.amount)) throw new BadRequestException('amount must be like 1000.00');
+  async recordVoucher(input: VoucherInput) {
+    return this.ledger.post(this.voucherEntry(input));
+  }
+
+  /**
+   * Cancels a voucher entered by mistake: its entry is reversed, keeping the
+   * reason and who did it. Cancelling it again changes nothing.
+   */
+  async cancelVoucher(entryId: string, reason: string, userId: string) {
+    requireReason(reason);
+    return this.db.transaction(async (tx) => {
+      await this.lockVoucher(tx, entryId);
+      return this.ledger.reverse(entryId, userId, tx, reason);
+    });
+  }
+
+  /**
+   * Edits a voucher: the original is reversed and the corrected one posted in
+   * the same transaction, pointing back at it. A resend returns that same
+   * correction; correcting a voucher that was already cancelled is refused.
+   */
+  async correctVoucher(entryId: string, input: VoucherInput & { reason: string }) {
+    requireReason(input.reason);
+    const corrected = this.voucherEntry(input);
+    return this.db.transaction(async (tx) => {
+      await this.lockVoucher(tx, entryId);
+      const earlier = await tx.findOneBy(LedgerEntry, { replacesId: entryId });
+      if (earlier) return earlier;
+      if (await tx.exists(LedgerEntry, { where: { reversesId: entryId } })) {
+        throw new BadRequestException(problem('voucher.alreadyCancelled', 'this voucher is already cancelled'));
+      }
+      await this.ledger.reverse(entryId, input.userId, tx, input.reason);
+      return this.ledger.post({ ...corrected, replacesId: entryId }, tx);
+    });
+  }
+
+  /** Only hand-entered vouchers are cancelled here — every other entry is corrected where it was made. */
+  private async lockVoucher(tx: EntityManager, entryId: string) {
+    const entry = await tx.findOne(LedgerEntry, { where: { id: entryId }, lock: { mode: 'pessimistic_write' } });
+    if (!entry || entry.sourceType !== 'voucher' || entry.reversesId) {
+      throw new NotFoundException(problem('notFound', 'voucher not found'));
+    }
+    return entry;
+  }
+
+  private voucherEntry(input: VoucherInput): PostEntry {
+    if (input.direction !== 'IN' && input.direction !== 'OUT') throw new BadRequestException('direction must be IN or OUT');
+    if (!MONEY.test(input.amount ?? '') || Number(input.amount) <= 0) {
+      throw new BadRequestException(problem('voucher.amount', 'enter an amount like 1000.00'));
+    }
     if (!VOUCHER_ACCOUNTS.includes(input.counter)) {
       throw new BadRequestException(`counter must be one of: ${VOUCHER_ACCOUNTS.join(', ')}`);
     }
@@ -126,7 +168,7 @@ export class FinanceService {
     }
 
     const capital = input.counter === 'OWNER_CAPITAL';
-    return this.ledger.post({
+    return {
       amount: input.amount,
       debit: input.direction === 'IN' ? 'CASH' : input.counter,
       credit: input.direction === 'IN' ? input.counter : 'CASH',
@@ -141,7 +183,12 @@ export class FinanceService {
       occurredAt: input.occurredAt ? new Date(`${input.occurredAt}T00:00:00Z`) : undefined,
       sourceType: 'voucher',
       actorId: input.userId,
-    });
+    };
+  }
+
+  /** Reverses one entry inside a caller's transaction, keeping why. */
+  reverseEntry(tx: EntityManager, entryId: string, actorId: string, reason: string) {
+    return this.ledger.reverse(entryId, actorId, tx, reason);
   }
 
   /** A stock purchase converts cash into inventory. */
@@ -378,5 +425,20 @@ export class FinanceService {
       [orderId],
     );
     if (entry) await this.ledger.reverse(entry.id, actorId ?? null, tx);
+  }
+}
+
+export interface VoucherInput {
+  direction: 'IN' | 'OUT';
+  counter: LedgerAccountCode;
+  amount: string;
+  memo?: string;
+  occurredAt?: string;
+  userId: string;
+}
+
+function requireReason(reason: string | undefined) {
+  if (!reason?.trim() || reason.trim().length > 1000) {
+    throw new BadRequestException(problem('voucher.reason', 'write why it is cancelled'));
   }
 }

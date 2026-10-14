@@ -119,8 +119,8 @@ export class CatalogController {
   @Roles('ADMIN')
   @Delete('products/:id/permanently')
   @HttpCode(204)
-  async deleteProduct(@Param('id', ParseUUIDPipe) id: string) {
-    await this.catalog.deleteProduct(id);
+  async deleteProduct(@Req() req: Request, @Param('id', ParseUUIDPipe) id: string) {
+    await this.catalog.deleteProduct(id, req.user!.id);
   }
 
   /** Link a channel's SKU to this product so a sale there moves its stock. */

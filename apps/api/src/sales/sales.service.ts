@@ -139,8 +139,9 @@ export class SalesService {
     );
   }
 
-  listInvoices() {
-    return this.invoiceRows();
+  /** Live invoices; `cancelled` brings the voided ones back. */
+  listInvoices(cancelled = false) {
+    return this.invoiceRows(cancelled ? 'TRUE' : "i.status <> 'VOID'");
   }
 
   async getInvoice(id: string) {
@@ -164,14 +165,18 @@ export class SalesService {
     );
     const payments = await this.db.query(
       `SELECT e.id, e.amount, e.occurred_at AS "occurredAt", e.memo,
-              EXISTS (SELECT 1 FROM ledger_entry r WHERE r.reverses_id = e.id) AS reversed
+              EXISTS (SELECT 1 FROM ledger_entry r WHERE r.reverses_id = e.id) AS reversed,
+              (SELECT r.reason FROM ledger_entry r WHERE r.reverses_id = e.id LIMIT 1) AS "reversedReason"
        FROM ledger_entry e
        WHERE e.source_type = 'sales_invoice' AND e.source_id = $1 AND e.kind = 'CUSTOMER_PAYMENT'
          AND e.reverses_id IS NULL
        ORDER BY e.occurred_at, e.created_at`,
       [id],
     );
-    return { ...invoice, lines, payments };
+    const [voider] = invoice.voidedById
+      ? await this.db.query('SELECT name FROM app_user WHERE id = $1', [invoice.voidedById])
+      : [];
+    return { ...invoice, voidedBy: voider?.name ?? null, lines, payments };
   }
 
   /** Creates a DRAFT invoice — nothing leaves stock or reaches the books until it is posted. */
@@ -318,7 +323,7 @@ export class SalesService {
   }
 
   /** Undoes a payment recorded by mistake: the cash entry is reversed and the invoice is owed again. */
-  async reversePayment(id: string, entryId: string, userId: string) {
+  async reversePayment(id: string, entryId: string, userId: string, reason?: string) {
     await this.db.transaction(async (tx) => {
       const invoice = await tx.findOne(SalesInvoice, { where: { id }, lock: { mode: 'pessimistic_write' } });
       if (!invoice) throw new NotFoundException(problem('notFound', 'invoice not found'));
@@ -327,7 +332,7 @@ export class SalesService {
       if (await tx.exists(LedgerEntry, { where: { reversesId: entryId } })) {
         throw new BadRequestException(problem('sales.paymentReversed', 'this payment is already reversed'));
       }
-      await this.ledger.reverse(entryId, userId, tx);
+      await this.ledger.reverse(entryId, userId, tx, reason);
       await tx.update(SalesInvoice, { id }, { paidAmount: money(round2(Number(invoice.paidAmount) - Number(entry.amount))) });
     });
     return this.getInvoice(id);
@@ -364,8 +369,8 @@ export class SalesService {
            AND reverses_id IS NULL AND NOT EXISTS (SELECT 1 FROM ledger_entry r WHERE r.reverses_id = ledger_entry.id)`,
         [id],
       );
-      if (revenue) await this.ledger.reverse(revenue.id, userId, tx);
-      await tx.update(SalesInvoice, { id }, { status: 'VOID', voidReason: reason.trim(), voidedAt: new Date() });
+      if (revenue) await this.ledger.reverse(revenue.id, userId, tx, reason);
+      await tx.update(SalesInvoice, { id }, { status: 'VOID', voidReason: reason.trim(), voidedAt: new Date(), voidedById: userId });
     });
     return this.getInvoice(id);
   }

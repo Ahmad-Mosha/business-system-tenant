@@ -604,7 +604,7 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     await purchasing.deleteSupplier(mistake.id);
     await assert.rejects(purchasing.supplierDetail(mistake.id));
   });
-  await t.test('a product is restored from the archive, and deleted only with no history', async () => {
+  await t.test('a product is restored from the archive, and deleted while it was never traded', async () => {
     const catalog = new CatalogService(db, finance);
     const unused = await catalog.createProduct({ name: `Unused ${randomUUID()}` }, user.id);
     assert.equal((await catalog.getProduct(unused.id)).deletable, true);
@@ -612,12 +612,29 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     assert.ok((await catalog.listProducts({ archived: true, search: 'Unused' })).some((p: { id: string }) => p.id === unused.id));
     await catalog.restoreProduct(unused.id);
     assert.equal((await catalog.getProduct(unused.id)).active, true);
-    await catalog.deleteProduct(unused.id);
+    await catalog.deleteProduct(unused.id, user.id);
     await assert.rejects(catalog.getProduct(unused.id));
 
-    const stocked = await catalog.createProduct({ name: `Stocked ${randomUUID()}`, openingStock: 2, unitCost: '10' }, user.id);
-    assert.equal((await catalog.getProduct(stocked.id)).deletable, false);
-    await assert.rejects(catalog.deleteProduct(stocked.id), /archive it instead/);
+    // Counted by hand but never bought, sold or listed: a mistake, deletable —
+    // and the stock value its corrections booked is reversed, not lost.
+    const counted = await catalog.createProduct({ name: `Counted ${randomUUID()}`, openingStock: 2, unitCost: '10' }, user.id);
+    await catalog.recordStock(counted.variantId, 3, 'COUNT', user.id, 'recount');
+    const movementIds = (await db.query('SELECT id FROM stock_movement WHERE variant_id = $1', [counted.variantId])).map((m: { id: string }) => m.id);
+    assert.equal((await catalog.getProduct(counted.id)).deletable, true);
+    await catalog.deleteProduct(counted.id, user.id);
+    await assert.rejects(catalog.getProduct(counted.id));
+    const [{ net, n }] = await db.query(
+      `SELECT COALESCE(SUM(CASE WHEN debit_code = 'INVENTORY' THEN amount ELSE -amount END), 0)::numeric(14,2) AS net, count(*)::int AS n
+       FROM ledger_entry WHERE source_type = 'stock_movement' AND source_id = ANY($1::text[])`, [movementIds]);
+    assert.equal(n, 2); // the 30.00 correction and its reversal
+    assert.equal(net, '0.00');
+
+    // Sold once: part of the trading history, archive only.
+    const sold = await stock(2);
+    await orders.create(actor, input(sold));
+    const soldProduct = (await db.query('SELECT product_id AS id FROM product_variant WHERE id = $1', [sold]))[0].id;
+    assert.equal((await catalog.getProduct(soldProduct)).deletable, false);
+    await assert.rejects(catalog.deleteProduct(soldProduct, user.id), /archive it instead/);
   });
   await t.test('a draft invoice is edited freely and posts what was last saved; a posted one is locked', async () => {
     const id = await stock(0);
@@ -704,9 +721,9 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     const draft = await sales.createDraft({ customerId: customer.id, invoiceDate: '2026-10-14',
       lines: [{ variantId: created.variantId, quantity: 1, unitPrice: '10' }] }, user.id);
     assert.equal((await catalog.getProduct(created.id)).deletable, false);
-    await assert.rejects(catalog.deleteProduct(created.id), /archive it instead/);
+    await assert.rejects(catalog.deleteProduct(created.id, user.id), /archive it instead/);
     await sales.deleteDraft(draft.id);
-    await catalog.deleteProduct(created.id);
+    await catalog.deleteProduct(created.id, user.id);
   });
   await t.test('posting a sales invoice moves stock and books revenue once; void undoes it exactly', async () => {
     const sales = new SalesService(db, ledger);
@@ -760,5 +777,157 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     assert.ok(net.every((r: { net: string }) => r.net === '0.00'), JSON.stringify(net)); // cash, receivable and sales all net to zero
     await assert.rejects(sales.voidInvoice(inv.id, 'again', user.id), /only a posted invoice/);
     await assert.rejects(sales.recordPayment(inv.id, '1', undefined, user.id), /only a posted invoice/);
+  });
+
+  // ── Corrections: nothing posted is edited or deleted; it is cancelled and re-entered ──
+  const entriesOf = (sourceType: string, sourceId: string) => db.query(
+    'SELECT id, debit_code AS debit, credit_code AS credit, amount, reverses_id AS "reversesId", reason, actor_id AS "actorId" FROM ledger_entry WHERE source_type = $1 AND source_id = $2 ORDER BY created_at',
+    [sourceType, sourceId]);
+  /** What a set of entries did to one account, net. */
+  const netOn = (rows: Array<{ debit: string; credit: string; amount: string }>, code: string) =>
+    Math.round(rows.reduce((n, e) => n + (e.debit === code ? Number(e.amount) : e.credit === code ? -Number(e.amount) : 0), 0) * 100) / 100;
+
+  await t.test('an expense is corrected by voiding it and booking the right one, once', async () => {
+    const expenses = new ExpensesService(db, ledger);
+    const wrong = await expenses.create({ requestId: randomUUID(), category: 'rent', amount: '15000', spentOn: '2026-10-14' }, user.id);
+    const correction = { requestId: randomUUID(), category: 'rent', amount: '1500', spentOn: '2026-10-14', reason: 'typed an extra zero' };
+    await assert.rejects(expenses.create(correction, user.id, { id: wrong.id, reason: ' ' }), /correction reason/);
+    // A double click and a resend: one void, one replacement.
+    const [first, second] = await Promise.all([
+      expenses.create(correction, user.id, { id: wrong.id, reason: correction.reason }),
+      expenses.create(correction, user.id, { id: wrong.id, reason: correction.reason }),
+    ]);
+    assert.equal(first.id, second.id);
+    assert.equal(first.replacesId, wrong.id);
+    const old = (await db.query('SELECT voided_at, voided_by_id AS "by", void_reason AS reason FROM expense WHERE id = $1', [wrong.id]))[0];
+    assert.ok(old.voided_at);
+    assert.equal(old.by, user.id);
+    assert.equal(old.reason, 'typed an extra zero');
+    const cash = [...await entriesOf('expense', wrong.id), ...await entriesOf('expense', first.id)];
+    assert.equal(cash.length, 3); // the wrong one, its reversal (with the reason), the right one
+    assert.equal(cash.find((e: { reversesId: string | null }) => e.reversesId)!.reason, 'typed an extra zero');
+    assert.equal(netOn(cash, 'CASH'), -1500);
+    // Correcting what is already voided would book a second replacement.
+    await assert.rejects(expenses.create({ ...correction, requestId: randomUUID() }, user.id, { id: wrong.id, reason: 'again' }), /already cancelled/);
+    // Lists show live expenses unless asked for the cancelled ones too.
+    const live = await expenses.list({ search: 'rent' });
+    assert.ok(!live.expenses.some((e: { id: string }) => e.id === wrong.id));
+    assert.ok((await expenses.list({ search: 'rent', cancelled: true })).expenses.some((e: { id: string; voidedBy: string }) => e.id === wrong.id && e.voidedBy === user.name));
+  });
+
+  await t.test('a cash voucher is cancelled or corrected through a reversal, never edited', async () => {
+    const wrong = await finance.recordVoucher({ direction: 'OUT', counter: 'SHIPPING', amount: '15000.00', userId: user.id });
+    const fix = { direction: 'OUT' as const, counter: 'SHIPPING' as const, amount: '1500.00', reason: 'extra zero', userId: user.id };
+    const [a, b] = await Promise.all([finance.correctVoucher(wrong.id, fix), finance.correctVoucher(wrong.id, fix)]);
+    assert.equal(a.id, b.id); // one replacement, however many times it is sent
+    assert.equal(a.replacesId, wrong.id);
+    const rows = await db.query(
+      'SELECT debit_code AS debit, credit_code AS credit, amount, reverses_id AS "reversesId", reason FROM ledger_entry WHERE id = $1 OR reverses_id = $1 OR replaces_id = $1',
+      [wrong.id]);
+    assert.equal(rows.length, 3);
+    assert.equal(netOn(rows, 'CASH'), -1500);
+    // The correction can itself be cancelled; cancelling twice changes nothing.
+    const [c1, c2] = await Promise.all([finance.cancelVoucher(a.id, 'not paid after all', user.id), finance.cancelVoucher(a.id, 'retry', user.id)]);
+    assert.equal(c1.id, c2.id);
+    await assert.rejects(finance.correctVoucher(a.id, fix), /already cancelled/);
+    await assert.rejects(finance.cancelVoucher(c1.id, 'a reversal is not a voucher', user.id), /voucher not found/);
+    await assert.rejects(finance.cancelVoucher(wrong.id, '', user.id), /why it is cancelled/);
+    // Only vouchers are cancelled here: an expense's entry is corrected from the expense.
+    const expense = await new ExpensesService(db, ledger).create({ requestId: randomUUID(), category: 'fuel', amount: '10', spentOn: '2026-10-14' }, user.id);
+    await assert.rejects(finance.cancelVoucher(expense.ledgerEntryId, 'nope', user.id), /voucher not found/);
+    // Hidden from the treasury by default, with the running balance still continuous.
+    const shown = await ledger.accountLedger('CASH', 500);
+    const hidden = await ledger.accountLedger('CASH', 500, undefined, false);
+    assert.ok(shown.some((m: { id: string }) => m.id === wrong.id));
+    assert.ok(!hidden.some((m: { id: string }) => m.id === wrong.id || m.id === a.id));
+    assert.equal(hidden[0].runningBalance, shown[0].runningBalance);
+    const cancelledRow = shown.find((m: { id: string }) => m.id === a.id);
+    assert.equal(cancelledRow.cancelledBy, user.name);
+    assert.equal(cancelledRow.cancelReason, 'not paid after all');
+  });
+
+  await t.test('a supplier payment is reversed exactly: its invoices are owed again, once', async () => {
+    const supplier = await purchasing.createSupplier({ name: `Reversal ${randomUUID()}` });
+    const id = await stock(0);
+    const buy = (date: string, total: string) => purchasing.createInvoice({ supplierId: supplier.id, invoiceDate: date, payment: 'CREDIT',
+      lines: [{ variantId: id, quantity: 1, unitCost: total }] }, user.id, true);
+    const older = await buy('2026-10-01', '100');
+    const newer = await buy('2026-10-02', '50');
+    const owed = async () => (await purchasing.supplierDetail(supplier.id)).balance;
+    const settled = async (invoiceId: string) => (await purchasing.getInvoice(invoiceId)).settledAmount;
+    const payment = await purchasing.recordSupplierPayment(supplier.id, '120', undefined, user.id);
+    assert.equal(await owed(), '30.00');
+    await assert.rejects(purchasing.reverseSupplierPayment(supplier.id, payment.id, '', user.id), /why this payment/);
+    const [r1, r2] = await Promise.all([
+      purchasing.reverseSupplierPayment(supplier.id, payment.id, 'paid the wrong supplier', user.id),
+      purchasing.reverseSupplierPayment(supplier.id, payment.id, 'retry', user.id),
+    ]);
+    assert.equal(r1.id, r2.id);
+    assert.equal(await owed(), '150.00');
+    assert.equal(await settled(older.id), '0.00');
+    assert.equal(await settled(newer.id), '0.00');
+    // Live payments only by default; the reversed one comes back on request.
+    assert.equal((await purchasing.supplierDetail(supplier.id)).payments.length, 0);
+    assert.equal((await purchasing.supplierDetail(supplier.id, true)).payments.length, 2);
+
+    // A payment from before allocations were kept: the invoice it named first, then the newest.
+    const legacy = await purchasing.recordSupplierPayment(supplier.id, '40', undefined, user.id, older.id);
+    await db.query('DELETE FROM supplier_payment_allocation WHERE ledger_entry_id = $1', [legacy.id]);
+    await purchasing.reverseSupplierPayment(supplier.id, legacy.id, 'legacy', user.id);
+    assert.equal(await settled(older.id), '0.00');
+    assert.equal(await owed(), '150.00');
+  });
+
+  await t.test('a posted purchase invoice is cancelled only when that undoes it exactly', async () => {
+    const supplier = await purchasing.createSupplier({ name: `Cancel ${randomUUID()}` });
+    const id = await stock(0);
+    const buy = (quantity: number, unitCost: string, payment: 'CASH' | 'CREDIT' = 'CREDIT') => purchasing.createInvoice({
+      supplierId: supplier.id, invoiceDate: '2026-10-14', payment, lines: [{ variantId: id, quantity, unitCost }] }, user.id, true);
+    const cost = async () => (await db.query('SELECT unit_cost AS c FROM product_variant WHERE id = $1', [id]))[0].c;
+    await buy(10, '100'); // 10 @ 100
+    const mistake = await buy(10, '130'); // average now 115
+    assert.equal(await cost(), '115.0000');
+
+    // Paid on: its payment is reversed first.
+    const paid = await purchasing.recordSupplierPayment(supplier.id, '100', undefined, user.id, mistake.id);
+    await assert.rejects(purchasing.voidInvoice(mistake.id, 'wrong price', user.id), /reverse the payments/);
+    await purchasing.reverseSupplierPayment(supplier.id, paid.id, 'to cancel the invoice', user.id);
+
+    // Cancelled twice at once, with a correction draft: one cancellation, one draft.
+    const [a, b] = await Promise.all([
+      purchasing.voidInvoice(mistake.id, 'wrong price', user.id, true),
+      purchasing.voidInvoice(mistake.id, 'wrong price', user.id, true),
+    ]);
+    assert.equal(a.draftId, b.draftId);
+    assert.equal(await balance(id), 10); // its 10 left again
+    assert.equal(await cost(), '100.0000'); // and the average is what it was before it
+    const voided = await purchasing.getInvoice(mistake.id);
+    assert.equal(voided.status, 'VOID');
+    assert.equal(voided.voidedBy, user.name);
+    assert.equal(voided.replacedById, a.draftId);
+    const books = await entriesOf('purchase_invoice', mistake.id);
+    assert.equal(netOn(books, 'INVENTORY'), 0);
+    assert.equal(netOn(books, 'SUPPLIER_PAYABLE'), 0);
+    const draft = await purchasing.getInvoice(a.draftId!);
+    assert.equal(draft.status, 'DRAFT');
+    assert.equal(draft.replacesId, mistake.id);
+    assert.equal(draft.lines.length, 1);
+    assert.ok(!(await purchasing.listInvoices()).some((i: { id: string }) => i.id === mistake.id));
+    assert.ok((await purchasing.listInvoices(true)).some((i: { id: string }) => i.id === mistake.id));
+
+    // Goods that moved since were costed with it in the average: refused, naming the product.
+    const sold = await buy(5, '200');
+    await orders.create(actor, input(id));
+    await assert.rejects(purchasing.voidInvoice(sold.id, 'late', user.id), /has moved since/);
+    assert.equal((await purchasing.getInvoice(sold.id)).status, 'POSTED');
+
+    // A cash invoice's cash comes back with it.
+    const cashId = await stock(0);
+    const cashBuy = await purchasing.createInvoice({ supplierId: supplier.id, invoiceDate: '2026-10-14', payment: 'CASH',
+      lines: [{ variantId: cashId, quantity: 2, unitCost: '30' }] }, user.id, true);
+    await purchasing.voidInvoice(cashBuy.id, 'never bought', user.id);
+    assert.equal(netOn(await entriesOf('purchase_invoice', cashBuy.id), 'CASH'), 0);
+    assert.equal(await balance(cashId), 0);
+    await assert.rejects(purchasing.voidInvoice(cashBuy.id, '', user.id), /why this invoice/);
   });
 });
