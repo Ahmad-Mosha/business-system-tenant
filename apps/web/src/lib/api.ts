@@ -146,6 +146,8 @@ export interface OrderRow {
 }
 
 export interface OrderDetail extends Omit<OrderRow, 'assignedToName' | 'itemCount' | 'unmappedCount'> {
+  /** Why its items and prices can't be edited right now, from the API's own rule. */
+  blocked?: { edit: import('@/lib/problem').Reason[] };
   address: string | null;
   notes: string | null;
   subtotal: string;
@@ -320,6 +322,8 @@ export interface ProductDetail {
   draftPurchases: number;
   /** Nothing anywhere refers to it, so it can be deleted rather than archived. */
   deletable: boolean;
+  /** What stands in the way of deleting or archiving it, from the API's own rules. */
+  blocked?: { delete: import('@/lib/problem').Reason[]; archive: import('@/lib/problem').Reason[] };
   lastPurchasePrice: string | null;
   lastPurchaseDate: string | null;
   lastPurchaseSupplier: string | null;
@@ -487,6 +491,8 @@ export interface PurchaseInvoiceRow {
 }
 
 export interface SupplierDetail extends SupplierRow {
+  /** What stands in the way of deleting or archiving it, from the API's own rules. */
+  blocked?: { delete: import('@/lib/problem').Reason[]; archive: import('@/lib/problem').Reason[] };
   invoices: PurchaseInvoiceRow[];
   payments: LedgerRow[];
 }
@@ -528,6 +534,8 @@ export interface PurchaseInvoiceDetail {
   replacedById: string | null;
   /** On a correction draft: the cancelled invoice it re-enters. */
   replacesId: string | null;
+  /** What stands in the way of cancelling or editing it, from the API's own rules. */
+  blocked?: { cancel: import('@/lib/problem').Reason[] };
 }
 
 export interface PeriodSummary {
@@ -615,6 +623,7 @@ export interface SalesInvoiceRow {
 }
 
 export interface CustomerDetail extends CustomerRow {
+  blocked?: { delete: import('@/lib/problem').Reason[]; archive: import('@/lib/problem').Reason[] };
   invoices: SalesInvoiceRow[];
 }
 
@@ -653,6 +662,8 @@ export interface SalesInvoiceDetail {
   lines: SalesInvoiceLine[];
   /** Money received against it; a reversed one stays listed, marked. */
   payments: SalesPayment[];
+  /** What stands in the way of posting or voiding it, from the API's own rules. */
+  blocked?: { post: import('@/lib/problem').Reason[]; void: import('@/lib/problem').Reason[] };
 }
 
 export interface SalesPayment {

@@ -54,7 +54,7 @@ export async function bulkAssignOrders(
 
 export type CreateOrderState =
   | { status: 'idle' }
-  | { status: 'error'; message: string }
+  | { status: 'error'; message: string; problem?: import('@/lib/problem').Problem }
   /** The form clears its draft, then opens the order. */
   | { status: 'saved'; id: string };
 

@@ -3,7 +3,9 @@
 import { useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
 import { FormDialog, type DialogFormState } from '@/components/form-dialog';
+import { BlockedDialog } from '@/components/blocked-dialog';
 import { ReasonField } from '@/components/reason-field';
+import type { Problem } from '@/lib/problem';
 
 /**
  * Cancels or reverses one posted record, asking why. `action` is a server
@@ -20,6 +22,7 @@ export function CancelAction({
   children,
   reasonLabel,
   dismissLabel,
+  blocked,
 }: {
   trigger: ReactNode;
   title: string;
@@ -32,8 +35,15 @@ export function CancelAction({
   reasonLabel?: string;
   /** "Keep it" by default — the way out of a cancellation. */
   dismissLabel?: string;
+  /**
+   * What already stands in the way (the screen's own data): the dialog then
+   * explains it — every record, linked — instead of offering a form that
+   * could only be refused. The action still checks again when submitted.
+   */
+  blocked?: Problem | null;
 }) {
   const t = useTranslations('corrections');
+  if (blocked) return <BlockedDialog trigger={trigger} title={title} problem={blocked} />;
   return (
     <FormDialog trigger={trigger} title={title} description={description} action={action} submitLabel={confirmLabel} success={success} dismissLabel={dismissLabel ?? t('keep')}>
       {children}

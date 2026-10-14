@@ -184,7 +184,7 @@
       "notFound": "This record no longer exists — reload the page.",
       "auth": {
         "required": "Your session has ended — sign in again.",
-        "forbidden": "Your role can’t do this.",
+        "forbidden": "This is for admins only — your account can’t do it. Ask an admin to do it for you.",
         "name": "Enter a name.",
         "email": "Enter a valid email address.",
         "password": "The password needs at least 6 characters.",
@@ -197,64 +197,96 @@
         "noItems": "An order needs at least one item.",
         "itemQuantity": "Every item needs a whole quantity of at least 1.",
         "itemPrice": "Every item needs a price greater than 0.",
-        "stockShort": "{name}: only {onHand} in stock, {requested} requested.",
-        "locked": "This order can no longer be edited — it has left the warehouse.",
-        "transition": "That status change isn’t allowed from the order’s current status.",
-        "paidEdit": "Reverse the payment before editing a paid or refunded order.",
-        "returnFinal": "This received return or refunded order cannot be reopened.",
-        "useReturn": "This order has shipped. Receive a return instead of cancelling it.",
+        "stockShort": "{name}: only {onHand} in the warehouse, {requested} on the order. Lower the quantity, or receive more stock first.",
+        "locked": "{status, select, CANCELLED {This order is cancelled, so it can’t be edited. Reopen it first if it was cancelled by mistake.} RETURNED {This order was returned, so it can’t be edited anymore.} other {This order has {status, select, SHIPPED {shipped} DELIVERED {been delivered} other {left}} — it’s out of the warehouse, so its items and prices can’t change. If the customer sends goods back, record a return from its status.}}",
+        "transition": "An order can’t go from {from, select, NEW {New} ASSIGNED {Assigned} CONFIRMED {Confirmed} SHIPPED {Shipped} DELIVERED {Delivered} CANCELLED {Cancelled} RETURNED {Returned} other {{from}}} to {to, select, NEW {New} ASSIGNED {Assigned} CONFIRMED {Confirmed} SHIPPED {Shipped} DELIVERED {Delivered} CANCELLED {Cancelled} RETURNED {Returned} other {{to}}} directly. {allowed, plural, =0 {Its current status is final.} other {Move it one step at a time — the status menu shows the steps it can take now.}}",
+        "paidEdit": "This order is marked {payment, select, REFUNDED {refunded} REFUND_DUE {refund due} other {paid}}, so its amount is already in the treasury. Set its payment back to Unpaid first (that reverses the cash entry), edit it, then mark it paid again.",
+        "returnFinal": "A received return is final — the goods are back and the books are updated. If something new happened, create a new order.",
+        "useReturn": "This order has shipped, so it can’t be cancelled — the goods are with the courier or the customer. When they come back, record a return from its status.",
         "returnDetails": "Enter a reason and choose the condition of the received goods.",
         "paymentTransition": "This payment change is not available for this order.",
         "missingPayment": "Reconcile the original payment before returning this paid order.",
         "noRefundDue": "No customer refund is due.",
         "assignee": "Choose an active moderator.",
         "bulkSelection": "Select between 1 and 200 valid orders.",
-        "bulkMissing": "One or more selected orders no longer exist. Refresh the list and try again."
+        "bulkMissing": "One or more selected orders no longer exist. Refresh the list and try again.",
+        "stockBlocked": "This order can’t be saved with these quantities:",
+        "reopenPaid": "This cancelled order is marked {payment, select, REFUNDED {refunded} REFUND_DUE {refund due} other {paid}} — reopening it would leave that money unexplained, so it stays closed. Create a new order instead.",
+        "adminAssign": "Only an admin assigns orders. Ask an admin to assign this one.",
+        "adminCancel": "Only an admin can cancel an order — cancelling returns its stock and can affect money. Ask an admin to cancel it.",
+        "refundedFinal": "This order was refunded — that’s final, so its payment can’t change anymore.",
+        "refundDueAuto": "“Refund due” is set by the system when a paid order is cancelled or returned — it can’t be chosen by hand.",
+        "refundPending": "A refund is due to the customer on this order. Once you’ve paid them back, mark it Refunded.",
+        "paidInactive": "This order is {status, select, CANCELLED {cancelled} other {returned}} — nothing was sold, so it can’t be marked paid.",
+        "refundUnpaid": "Only a paid order can be refunded — this one is {payment, select, UNPAID {unpaid} other {not paid}}."
       },
       "cheque": {
-        "settled": "{status, select, CLEARED {This cheque has already cleared.} BOUNCED {This cheque has already bounced.} other {This cheque is no longer pending.}}"
+        "settled": "{status, select, CLEARED {This cheque has already cleared.} BOUNCED {This cheque has already bounced.} other {This cheque is no longer pending.}}",
+        "from": "Enter who the cheque is from.",
+        "received": "Enter the date the cheque was received."
       },
       "payment": {
-        "invoiceClosed": "This invoice can’t take a payment.",
+        "invoiceClosed": "{state, select, DRAFT {This invoice is still a draft — post it before paying it.} VOID {This invoice is cancelled, so nothing is owed on it.} CASH {This invoice was paid in cash when it was bought, so nothing is owed on it.} other {This invoice no longer exists — reload the page.}}",
         "nothingOwed": "{scope, select, invoice {Nothing is left to pay on this invoice.} other {Nothing is owed to {supplier}.}}",
         "overpay": "{scope, select, invoice {Only {owed} is left on this invoice} other {Only {owed} is owed to {supplier}}} — you tried to pay {paid}.",
         "reason": "Write why this payment is reversed.",
-        "cannotReverse": "This payment no longer matches its invoices, so it can’t be reversed automatically."
+        "cannotReverse": "This older payment was recorded before the system tracked which invoices it paid, and those invoices have changed since. Reversing it automatically could leave a wrong balance, so nothing was changed — it needs a manual correction by your accountant.",
+        "amount": "Enter an amount greater than 0."
       },
       "invoice": {
-        "productsGone": "Choose active products for every invoice line.",
-        "postedDelete": "A posted invoice can’t be deleted — reverse it instead.",
+        "productsGone": "{count, plural, one {A product on it is archived} other {# products on it are archived}}, so stock can’t move for {count, plural, one {it} other {them}}. Restore {count, plural, one {it} other {them}} from the product page, or remove the line.",
+        "postedDelete": "A posted invoice can’t be deleted — its goods and its amount are in the books. Use “Cancel invoice” instead; it stays visible, marked cancelled.",
         "posted": "This invoice is already posted.",
         "noLines": "Add at least one line before posting.",
         "allocation": "Choose allocation by goods value or units.",
-        "supplierGone": "Choose an active supplier.",
-        "postedEdit": "A posted invoice can't be edited.",
+        "supplierGone": "The supplier is archived. Restore the supplier from their page, or choose another one.",
+        "postedEdit": "A posted invoice isn’t changed in place — its goods are in stock and its amount in the books. Use “Edit invoice”: it cancels this one and reopens it as a draft to fix.",
         "cancelReason": "Write why this invoice is cancelled.",
         "notPosted": "Only a posted invoice can be cancelled.",
-        "cancelPaid": "{paid} has been paid on this invoice. Reverse those payments on the supplier’s page first, then cancel it.",
-        "cancelMoved": "Stock of {products} has moved since this invoice was posted — sold, counted or bought again — so cancelling it would change the cost of goods already used. Fix a wrong quantity with a stock correction on the product instead. A wrong price needs a supplier credit note, which isn’t in the system yet.",
-        "cancelStock": "{name}: only {onHand} in the warehouse, {requested} on the invoice."
+        "cancelPaid": "{paid} has been paid on it. Reverse those payments on the supplier’s page first — the money returns to the treasury and the invoice is owed again — then cancel it.",
+        "cancelMoved": "{count, plural, one {A product on it has} other {# products on it have}} moved since it was posted — sold, counted, transferred or bought again. Those movements were costed with this invoice in the average, so cancelling it now would leave the stock value wrong. Cancelling can’t fix this: correct a wrong quantity with a physical count on the product; a wrong price needs a supplier credit note, which the system doesn’t have yet.",
+        "cancelStock": "{name}: only {onHand} left in the warehouse, but this invoice brought in {requested}. Cancelling would take out stock you no longer have.",
+        "cancelBlocked": "This invoice can’t be cancelled or edited right now:",
+        "cancelDraft": "It’s still a draft — it never moved stock or money. Edit or delete the draft instead.",
+        "chooseSupplier": "Choose a supplier.",
+        "lineProduct": "Every line needs a product.",
+        "lineQuantity": "Every line needs a whole quantity of at least 1.",
+        "lineCost": "Every line needs a cost greater than 0.",
+        "extraCosts": "Enter extra costs like 5000.00."
       },
       "sku": {
         "taken": "SKU “{sku}” is already in use."
       },
       "listing": {
-        "taken": "{channel, select, noon {noon} amazon {Amazon} easyorders {Website} other {{channel}}} SKU “{externalId}” is already linked to another product."
+        "taken": "{channel, select, noon {noon} amazon {Amazon} easyorders {Website} other {{channel}}} SKU “{externalId}” is already linked to another product.",
+        "required": "Enter the channel’s SKU."
       },
       "stock": {
         "remove": "{available, plural, =0 {Nothing on hand to remove.} other {Only # on hand — you can remove up to #.}}",
         "direction": "Choose a reason that matches adding or removing stock.",
         "transfer": "Choose different warehouses and a positive whole quantity.",
         "costReason": "Enter a reason for this unit-cost correction.",
-        "usePurchaseInvoice": "Record bought stock with a purchase invoice."
+        "usePurchaseInvoice": "Record bought stock with a purchase invoice.",
+        "quantity": "Enter a whole quantity other than 0."
       },
       "product": {
-        "archived": "This product is archived.",
-        "archiveStock": "Reconcile its {count} remaining stock units before archiving.",
-        "archiveOrders": "Finish open orders containing {count} units before archiving.",
-        "archiveListings": "Unlink its {count} sales-channel listings before archiving.",
-        "archiveDrafts": "Finish or delete its {count} draft purchase invoices before archiving.",
-        "inUse": "This product has history (stock, sales, purchases or channel links), so it can't be deleted. Archive it instead."
+        "archived": "This product is archived, so its stock and details can’t change. Restore it from its page first.",
+        "archiveStock": "{count, plural, one {It still has # unit in stock} other {It still has # units in stock}} — archiving would hide stock you own. Sell or transfer it first; if the count is wrong, correct it with a physical count on the product page.",
+        "archiveOrders": "{count, plural, one {It’s on # open order that hasn’t been delivered, cancelled or returned. Finish or cancel it first.} other {It’s on # open orders that haven’t been delivered, cancelled or returned. Finish or cancel them first.}}",
+        "archiveListings": "{count, plural, one {It’s linked to a sales-channel SKU} other {It’s linked to # sales-channel SKUs}}, so channel sales would still arrive for it. Unlink {count, plural, one {it} other {them}} on the product’s Channels card.",
+        "archiveDrafts": "{count, plural, one {It’s on # draft purchase invoice. Post or delete it first.} other {It’s on # draft purchase invoices. Post or delete them first.}}",
+        "inUse": "This product has history (stock, sales, purchases or channel links), so it can't be deleted. Archive it instead.",
+        "deleteBlocked": "This product can’t be deleted — it’s part of your trading history:",
+        "deleteBlockedNext": "Deleting it would erase that history, so this is permanent. Archive it instead: it leaves your product lists and can’t be picked for new orders or invoices, its history stays, and you can restore it any time.",
+        "usedInOrders": "{count, plural, one {It’s on # order.} other {It’s on # orders.}}",
+        "usedInPurchases": "{count, plural, one {It’s on # purchase invoice.} other {It’s on # purchase invoices.}}",
+        "usedInSales": "{count, plural, one {It’s on # sales invoice.} other {It’s on # sales invoices.}}",
+        "usedInChannels": "{count, plural, one {It’s linked to a sales-channel SKU.} other {It’s linked to # sales-channel SKUs.}}",
+        "stockTraded": "{count, plural, one {It has # older stock entry from a sale or purchase.} other {It has # older stock entries from sales or purchases.}}",
+        "archiveBlocked": "This product can’t be archived yet. Archiving hides it from daily work, so first clear what still depends on it:",
+        "archiveSalesDrafts": "{count, plural, one {It’s on # draft sales invoice. Post or delete it first.} other {It’s on # draft sales invoices. Post or delete them first.}}",
+        "name": "Enter the product name.",
+        "openingStock": "Opening stock must be a whole number, 0 or more."
       },
       "sync": {
         "notConfigured": "The Easy Orders connection isn’t set up.",
@@ -272,42 +304,103 @@
         "amount": "Enter a positive amount with at most two decimals.",
         "reason": "Enter a correction reason.",
         "retryChanged": "This submission was already recorded with different details.",
-        "alreadyVoided": "This expense is already cancelled."
+        "alreadyVoided": "This expense is already cancelled. Turn on “Show cancelled” to see it.",
+        "note": "The note is too long — keep it under 2,000 characters."
       },
       "supplier": {
-        "archiveOwed": "{owed} is still owed to this supplier. Settle it before archiving.",
-        "archiveDrafts": "This supplier has draft invoices. Post or delete them before archiving.",
-        "inUse": "This supplier has invoices or payments, so it can't be deleted. Archive it instead."
+        "archiveOwed": "{owed} is still owed to it. Record the payments on this page — or, if an invoice was entered by mistake, cancel that invoice.",
+        "archiveDrafts": "{count, plural, one {It has # draft invoice. Post or delete it first.} other {It has # draft invoices. Post or delete them first.}}",
+        "inUse": "This supplier has invoices or payments, so it can't be deleted. Archive it instead.",
+        "deleteBlocked": "This supplier can’t be deleted — it’s part of your books:",
+        "deleteBlockedNext": "That record has to stay, so this is permanent. Archive the supplier instead: it leaves the supplier list and new invoices, its history stays, and you can restore it any time.",
+        "hasInvoices": "{count, plural, one {It has # purchase invoice.} other {It has # purchase invoices.}}",
+        "hasPayments": "{count, plural, one {It has # payment or entry in the books.} other {It has # payments or entries in the books.}}",
+        "archiveBlocked": "This supplier can’t be archived yet:",
+        "name": "Enter the supplier name."
       },
       "customer": {
         "name": "Enter the customer’s name.",
-        "archiveOwed": "This customer still owes {owed}. Collect it before archiving.",
-        "archiveDrafts": "This customer has draft invoices. Post or delete them before archiving.",
-        "inUse": "This customer has invoices, so they can’t be deleted. Archive them instead."
+        "archiveOwed": "They still owe {owed}. Record their payments on these invoices first — or void an invoice entered by mistake.",
+        "archiveDrafts": "{count, plural, one {They have # draft invoice. Post or delete it first.} other {They have # draft invoices. Post or delete them first.}}",
+        "inUse": "This customer has invoices, so they can’t be deleted. Archive them instead.",
+        "deleteBlocked": "This customer can’t be deleted — they’re part of your sales history:",
+        "deleteBlockedNext": "That history has to stay, so this is permanent. Archive the customer instead: they leave the customer list and new invoices, their history stays, and you can restore them any time.",
+        "hasInvoices": "{count, plural, one {They have # invoice.} other {They have # invoices.}}",
+        "archiveBlocked": "This customer can’t be archived yet:"
       },
       "sales": {
-        "postedEdit": "A posted invoice can’t be edited.",
-        "postedDelete": "A posted invoice can’t be deleted.",
+        "postedEdit": "A posted invoice can’t be edited — its goods left stock and the sale is in the books. Void it (while nothing is collected) and create a new one.",
+        "postedDelete": "A posted invoice can’t be deleted. Void it instead — it stays visible, marked void, and its effects are reversed.",
         "discountTooLarge": "The discount can’t be more than the invoice subtotal.",
-        "customerGone": "Choose an active customer.",
+        "customerGone": "The customer is archived. Restore them from their page, or choose another customer.",
         "discount": "Enter a discount like 250.00.",
         "noLines": "Add at least one product.",
         "linePrice": "Every product needs a price greater than 0.",
         "paidNow": "Enter the amount paid now like 300.00.",
         "overpaid": "The amount can’t be more than {total}.",
-        "stockShort": "{name}: only {onHand} in the warehouse, {requested} on the invoice.",
+        "stockShort": "{name}: only {onHand} in the warehouse, {requested} on the invoice. Lower the quantity, or receive more stock first.",
         "posted": "This invoice is already posted.",
         "notPosted": "Only a posted invoice can do that.",
         "paymentAmount": "Enter an amount like 300.00.",
         "paymentReversed": "This payment is already reversed.",
         "voidReason": "Write why this invoice is voided.",
-        "voidPaid": "Reverse this invoice’s payments before voiding it."
+        "voidPaid": "{paid} has been collected on it. Reverse those payments in the Payments card first — so cash is never left without its invoice — then void it.",
+        "postBlocked": "This invoice can’t be posted yet:",
+        "voidBlocked": "This invoice can’t be voided yet:",
+        "lineQuantity": "Every product needs a whole quantity of at least 1."
       },
       "voucher": {
         "reason": "Write why it’s cancelled.",
         "amount": "Enter an amount like 1000.00.",
-        "alreadyCancelled": "This voucher is already cancelled."
+        "alreadyCancelled": "This voucher is already cancelled. Turn on “Show cancelled” in the treasury to see it."
       }
+    },
+    "status": {
+      "invalid": "Some of the details weren’t accepted. Check what you entered and try again — nothing was saved.",
+      "conflict": "This record changed while you were working on it. Reload the page to see the latest, then try again.",
+      "server": "Something went wrong on our side and nothing was saved. Try again in a moment; if it keeps happening, tell your admin what you were doing.",
+      "unknown": "That didn’t go through and nothing was saved. Try again."
+    },
+    "blockers": {
+      "kind": {
+        "order": "Order",
+        "purchase_invoice": "Purchase invoice",
+        "sales_invoice": "Sales invoice",
+        "supplier": "Supplier",
+        "supplier_payment": "Payment",
+        "customer": "Customer",
+        "customer_payment": "Payment",
+        "product": "Product",
+        "listing": "Channel SKU",
+        "stock": "Stock",
+        "stock_movement": "Stock movement"
+      },
+      "detail": {
+        "NEW": "New",
+        "ASSIGNED": "Assigned",
+        "CONFIRMED": "Confirmed",
+        "SHIPPED": "Shipped",
+        "DELIVERED": "Delivered",
+        "CANCELLED": "Cancelled",
+        "RETURNED": "Returned",
+        "DRAFT": "Draft",
+        "POSTED": "Posted",
+        "VOID": "Cancelled",
+        "PURCHASE": "Bought",
+        "SALE": "Sold",
+        "RETURN": "Returned by a customer",
+        "DAMAGE": "Damaged or lost",
+        "COUNT": "Counted",
+        "ADJUSTMENT": "Corrected",
+        "TRANSFER": "Transferred",
+        "WAREHOUSE": "Our warehouse",
+        "NOON": "noon warehouse",
+        "noon": "noon",
+        "amazon": "Amazon",
+        "easyorders": "Website"
+      },
+      "units": "{count, plural, one {# unit} other {# units}}",
+      "next": "What you can do"
     }
   },
   "orders": {

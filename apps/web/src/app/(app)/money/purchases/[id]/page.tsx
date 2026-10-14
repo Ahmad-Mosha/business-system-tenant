@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/table';
 import { getPurchase, getSupplier } from '@/lib/api';
 import { money, unitMoney } from '@/lib/format';
+import { blockedBy } from '@/lib/problem';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
 import { getTranslations } from 'next-intl/server';
@@ -96,6 +97,7 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
                 confirmLabel={tc('cancelConfirm')}
                 success={tc('cancelledToast')}
                 action={cancelPurchase.bind(null, invoice.id, false)}
+                blocked={blockedBy('invoice.cancelBlocked', invoice.blocked?.cancel)}
               />
               <CancelAction
                 trigger={
@@ -109,6 +111,7 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
                 confirmLabel={tc('editConfirm')}
                 success={tc('cancelledToast')}
                 action={cancelPurchase.bind(null, invoice.id, true)}
+                blocked={blockedBy('invoice.cancelBlocked', invoice.blocked?.cancel)}
                 reasonLabel={tc('editReason')}
                 dismissLabel={tr('common.cancel')}
               >

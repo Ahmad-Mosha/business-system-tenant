@@ -62,7 +62,7 @@ export class ExpensesService {
     if (!/^\d{1,12}(\.\d{1,2})?$/.test(input.amount ?? '') || Number(input.amount) <= 0) throw new BadRequestException(problem('expense.amount', 'enter a positive amount'));
     if (!validDate(input.spentOn)) throw new BadRequestException(problem('expense.date', 'enter a valid date'));
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.requestId ?? '')) throw new BadRequestException('requestId must be a UUID');
-    if (input.note && (typeof input.note !== 'string' || input.note.length > 2000)) throw new BadRequestException('note is too long');
+    if (input.note && (typeof input.note !== 'string' || input.note.length > 2000)) throw new BadRequestException(problem('expense.note', 'the note is too long'));
     if (replaces && (!replaces.reason?.trim() || replaces.reason.length > 1000)) {
       throw new BadRequestException(problem('expense.reason', 'enter a correction reason'));
     }

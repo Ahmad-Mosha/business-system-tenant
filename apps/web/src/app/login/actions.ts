@@ -30,10 +30,11 @@ export async function signIn(_previous: LoginState, formData: FormData): Promise
   }
 
   // The API's one sign-in refusal is 401 "Incorrect email or password" — said
-  // here in the reader's language; anything else keeps the API's own words.
+  // here in the reader's language. Anything else is a fault on our side, not
+  // the person's: said calmly, never in the API's own words.
   if (!res.ok) {
-    const detail = await res.json().catch(() => null);
-    return { status: 'error', message: res.status === 401 ? t('wrong') : (detail?.message ?? t('wrong')) };
+    if (res.status === 401) return { status: 'error', message: t('wrong') };
+    return { status: 'error', message: (await getTranslations('errors'))('status.server') };
   }
 
   const data = await res.json().catch(() => null);

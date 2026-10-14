@@ -34,7 +34,7 @@ export async function createCustomer(_prev: DialogFormState, form: FormData): Pr
   const body = customerBody(form);
   if (!body.name) return needName();
   const r = await apiRequest('/customers', 'POST', body);
-  if (!r.ok) return { status: 'error', message: r.message };
+  if (!r.ok) return { status: 'error', message: r.message, problem: r.problem };
   revalidateSales();
   return { status: 'saved' };
 }
@@ -52,7 +52,7 @@ export async function updateCustomer(id: string, _prev: DialogFormState, form: F
   const body = customerBody(form);
   if (!body.name) return needName();
   const r = await apiRequest(`/customers/${id}`, 'PATCH', body);
-  if (!r.ok) return { status: 'error', message: r.message };
+  if (!r.ok) return { status: 'error', message: r.message, problem: r.problem };
   revalidateSales(`/customers/${id}`);
   return { status: 'saved' };
 }
@@ -144,7 +144,7 @@ export async function recordSalesPayment(id: string, _prev: DialogFormState, for
     return { status: 'error', message: (await getTranslations('errors.api.sales'))('paymentAmount') };
   }
   const r = await apiRequest(`/sales-invoices/${id}/payments`, 'POST', { amount, memo: String(form.get('memo') ?? '').trim() || undefined });
-  if (!r.ok) return { status: 'error', message: r.message };
+  if (!r.ok) return { status: 'error', message: r.message, problem: r.problem };
   revalidateSales(`/sales/${id}`);
   return { status: 'saved' };
 }
