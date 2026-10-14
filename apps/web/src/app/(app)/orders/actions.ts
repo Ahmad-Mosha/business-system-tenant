@@ -92,7 +92,7 @@ export async function createOrder(
   if (!body.items.length) return noItems();
 
   const created = await apiRequest<{ id: string }>('/orders', 'POST', body);
-  if (!created.ok) return { status: 'error', message: created.message };
+  if (!created.ok) return { status: 'error', message: created.message, problem: created.problem };
 
   // Prepaid orders — wallet and InstaPay are usually settled before dispatch.
   // Creation already succeeded, so a failure here leaves a real order that is
@@ -115,7 +115,7 @@ export async function updateOrder(
   if (!body.items.length) return noItems();
 
   const saved = await apiRequest(`/orders/${orderId}`, 'PATCH', body);
-  if (!saved.ok) return { status: 'error', message: saved.message };
+  if (!saved.ok) return { status: 'error', message: saved.message, problem: saved.problem };
 
   revalidateOrder(orderId);
   return { status: 'saved', id: orderId };

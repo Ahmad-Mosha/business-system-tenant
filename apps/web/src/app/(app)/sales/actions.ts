@@ -91,7 +91,7 @@ export interface SalesInvoicePayload {
   lines: SalesLinePayload[];
 }
 
-export type SalesResult = { ok: true; id: string } | { ok: false; message: string };
+export type SalesResult = { ok: true; id: string } | { ok: false; message: string; problem?: import('@/lib/problem').Problem };
 
 /** The form's own checks, in the reader's language — null when it may be sent. */
 async function check(input: SalesInvoicePayload): Promise<string | null> {

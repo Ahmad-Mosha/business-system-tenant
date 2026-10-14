@@ -189,7 +189,7 @@ export interface InvoicePayload {
   lines: InvoiceLinePayload[];
 }
 
-export type InvoiceResult = { ok: true; id: string } | { ok: false; message: string };
+export type InvoiceResult = { ok: true; id: string } | { ok: false; message: string; problem?: import('@/lib/problem').Problem };
 
 /**
  * Creates a product + its default variant so an invoice can receive stock for

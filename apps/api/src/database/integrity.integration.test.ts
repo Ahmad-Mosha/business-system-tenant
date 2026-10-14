@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { DataSource } from 'typeorm';
 import { ormOptions } from './orm-options';
+import { checkMigrations } from './migration-guard';
 import { LedgerService } from '../finance/ledger.service';
 import { FinanceService } from '../finance/finance.service';
 import { OrdersService } from '../orders/orders.service';
@@ -797,6 +798,16 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     await assert.rejects(sales.recordPayment(inv.id, '1', undefined, user.id), /only a posted invoice/);
   });
 
+  await t.test('a migration edited after it ran is caught by name', async () => {
+    const first = await checkMigrations(db);
+    assert.deepEqual(first, { edited: [], pending: [] });
+    const [{ name }] = await db.query('SELECT name FROM migration_fingerprint ORDER BY name LIMIT 1');
+    const [{ fingerprint }] = await db.query('SELECT fingerprint FROM migration_fingerprint WHERE name = $1', [name]);
+    await db.query("UPDATE migration_fingerprint SET fingerprint = 'from an earlier text' WHERE name = $1", [name]);
+    assert.deepEqual((await checkMigrations(db)).edited, [name]);
+    await db.query('UPDATE migration_fingerprint SET fingerprint = $2 WHERE name = $1', [name, fingerprint]);
+    assert.deepEqual((await checkMigrations(db)).edited, []);
+  });
   await t.test('a blocked action names every blocker at once, and the screen says it before the click', async () => {
     const catalog = new CatalogService(db, finance);
     const product = await catalog.createProduct({ name: `Busy ${randomUUID()}`, openingStock: 3, unitCost: '10' }, user.id);

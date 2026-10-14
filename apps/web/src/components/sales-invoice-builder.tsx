@@ -12,6 +12,8 @@ import { DatePicker, todayISO } from '@/components/date-picker';
 import { DraftNotice } from '@/components/draft-notice';
 import { NumberField } from '@/components/number-field';
 import { PostSalesDialog } from '@/components/sales-invoice-actions';
+import { ProblemNotice } from '@/components/problem-notice';
+import type { Problem } from '@/lib/problem';
 import { Page, PageHeader } from '@/components/page';
 import { VariantSearch } from '@/components/variant-search';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -78,6 +80,8 @@ export function SalesInvoiceBuilder({
   const router = useRouter();
   const [pending, start] = useTransition();
   const [added, setAdded] = useState<CustomerRow[]>([]);
+  // The last refusal, shown beside the buttons with what's in the way — not a toast that vanishes.
+  const [refusal, setRefusal] = useState<{ message: string; problem?: Problem } | null>(null);
   const options = [...customers, ...added.filter((c) => !customers.some((x) => x.id === c.id))];
 
   const [form, setForm] = useState<SalesForm>(() => ({
@@ -173,8 +177,9 @@ export function SalesInvoiceBuilder({
 
   const save = () =>
     start(async () => {
+      setRefusal(null);
       const res = await persist();
-      if (!res.ok) return void toast.error(res.message);
+      if (!res.ok) return void setRefusal({ message: res.message, problem: res.problem });
       draft.clear();
       toast.success(t(invoice ? 'draftUpdated' : 'draftSaved'));
       router.push(`/sales/${res.id}`);
@@ -182,6 +187,7 @@ export function SalesInvoiceBuilder({
 
   // Saved first, so a refusal (stock taken meanwhile) leaves a draft to fix, not lost typing.
   const saveAndPost = async (paidNow: string) => {
+    setRefusal(null);
     const saved = await persist();
     if (!saved.ok) return saved;
     draft.clear();
@@ -436,6 +442,7 @@ export function SalesInvoiceBuilder({
                 {t('saveDraft')}
               </Button>
               {missing && !pending ? <p className="text-center text-xs text-muted-foreground">{missing}</p> : null}
+              {refusal ? <ProblemNotice problem={refusal.problem} message={refusal.message} /> : null}
               <p className="text-center text-xs text-muted-foreground">{tr('sales.post.draftHint')} {tr('drafts.autosaved')}</p>
 
               {over.map((l) => (

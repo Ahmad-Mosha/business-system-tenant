@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test 'src/**/*.test.ts'",
     "migration:generate": "typeorm-ts-node-commonjs migration:generate -d src/database/data-source.ts",
+    "migrate": "node --env-file-if-exists=../../.env --import tsx src/database/migrate.ts",
     "migration:run": "typeorm-ts-node-commonjs migration:run -d src/database/data-source.ts",
     "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/database/data-source.ts"
   },

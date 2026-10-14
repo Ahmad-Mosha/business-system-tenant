@@ -38,6 +38,8 @@ import {
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { NumberField } from '@/components/number-field';
+import { ProblemNotice } from '@/components/problem-notice';
+import type { Problem } from '@/lib/problem';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Select,
@@ -118,6 +120,8 @@ export function InvoiceBuilder({
   const router = useRouter();
   const [pending, start] = useTransition();
   const [confirming, setConfirming] = useState(false);
+  // The last refusal, shown beside the buttons with what's in the way — not a toast that vanishes.
+  const [refusal, setRefusal] = useState<{ message: string; problem?: Problem } | null>(null);
 
   const [newSuppliers, setNewSuppliers] = useState<SupplierRow[]>([]);
   const supplierOptions = [...suppliers, ...newSuppliers.filter((s) => !suppliers.some((existing) => existing.id === s.id))];
@@ -218,9 +222,10 @@ export function InvoiceBuilder({
       })),
     };
     start(async () => {
+      setRefusal(null);
       const res = invoice ? await saveDraftEdits(invoice.id, payload, asDraft) : await saveInvoice(payload, asDraft);
       if (!res.ok) {
-        toast.error(res.message);
+        setRefusal({ message: res.message, problem: res.problem });
         setConfirming(false);
         return;
       }
@@ -500,6 +505,7 @@ export function InvoiceBuilder({
               {missing && !pending ? (
                 <p className="text-center text-xs text-muted-foreground">{missing}</p>
               ) : null}
+              {refusal ? <ProblemNotice problem={refusal.problem} message={refusal.message} /> : null}
               <p className="text-center text-xs text-muted-foreground">{tr('drafts.autosaved')}</p>
             </CardContent>
           </Card>
