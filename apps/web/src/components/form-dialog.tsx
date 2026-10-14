@@ -1,10 +1,9 @@
 'use client';
 
-import { AlertTriangle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useActionState, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ProblemNotice } from '@/components/problem-notice';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -17,12 +16,13 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Spinner } from '@/components/ui/spinner';
+import type { Problem } from '@/lib/problem';
 
 /** The shape every server action behind a dialog returns. */
 export type DialogFormState =
   | { status: 'idle' }
   | { status: 'saved'; message?: string }
-  | { status: 'error'; message: string };
+  | { status: 'error'; message: string; problem?: Problem };
 
 type Action<S extends DialogFormState> = (prev: S, form: FormData) => Promise<S>;
 
@@ -126,12 +126,7 @@ function FormBody<S extends DialogFormState>({
       <fieldset disabled={pending} className="grid gap-4">
         {children}
       </fieldset>
-      {state.status === 'error' ? (
-        <Alert variant="destructive">
-          <AlertTriangle />
-          <AlertDescription>{state.message}</AlertDescription>
-        </Alert>
-      ) : null}
+      {state.status === 'error' ? <ProblemNotice problem={state.problem} message={state.message} /> : null}
       <DialogFooter>
         <DialogClose asChild>
           <Button type="button" variant="ghost" disabled={pending}>

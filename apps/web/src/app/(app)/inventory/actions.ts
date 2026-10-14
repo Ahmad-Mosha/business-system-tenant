@@ -6,11 +6,11 @@ import { apiRequest } from '@/lib/api-request';
 
 export type CreateProductState =
   | { status: 'idle' }
-  | { status: 'error'; message: string }
+  | { status: 'error'; message: string; problem?: import('@/lib/problem').Problem }
   /** The form clears its draft, then opens the product. */
   | { status: 'saved'; id: string };
 
-type Result = { ok: true } | { ok: false; message: string };
+type Result = { ok: true } | { ok: false; message: string; problem?: import('@/lib/problem').Problem };
 
 /** A write to the catalogue; the given pages refresh when it lands. */
 async function write(path: string, method: 'POST' | 'PATCH' | 'DELETE', body: unknown, ...paths: string[]): Promise<Result> {

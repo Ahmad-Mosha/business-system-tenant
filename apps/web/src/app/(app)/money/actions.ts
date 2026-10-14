@@ -9,7 +9,7 @@ import type messages from '@/messages/en.json';
 const MONEY = /^\d+(\.\d{1,2})?$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-export type FormState = { status: 'idle' } | { status: 'saved' } | { status: 'error'; message: string };
+export type FormState = { status: 'idle' } | { status: 'saved' } | { status: 'error'; message: string; problem?: import('@/lib/problem').Problem };
 
 /** Refreshes every money screen after a write — balances feed all of them. */
 function revalidateMoney() {
@@ -20,7 +20,7 @@ function revalidateMoney() {
 
 async function send(path: string, method: 'POST' | 'PATCH', body: unknown): Promise<FormState> {
   const r = await apiRequest(path, method, body);
-  if (!r.ok) return { status: 'error', message: r.message };
+  if (!r.ok) return { status: 'error', message: r.message, problem: r.problem };
   revalidateMoney();
   return { status: 'saved' };
 }
@@ -343,7 +343,7 @@ export async function cancelPurchase(id: string, correct: boolean, _prev: FormSt
   const reason = reasonOf(form);
   if (!reason) return invalid('reason');
   const r = await apiRequest<{ id: string; draftId: string | null }>(`/purchases/${id}/void`, 'POST', { reason, correct });
-  if (!r.ok) return { status: 'error', message: r.message };
+  if (!r.ok) return { status: 'error', message: r.message, problem: r.problem };
   revalidateMoney();
   revalidatePurchasing();
   revalidatePath(`/money/purchases/${id}`);

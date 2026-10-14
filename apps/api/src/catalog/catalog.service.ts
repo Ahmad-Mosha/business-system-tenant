@@ -9,7 +9,8 @@ import { ChannelListing } from './channel-listing.entity';
 import { PRODUCT_CATEGORIES, type ProductCategory } from './product.entity';
 import { ProductVariant } from './product-variant.entity';
 import { Product } from './product.entity';
-import { problem } from '../problem';
+import { problem, refuse } from '../problem';
+import { productBlockers } from './product-blockers';
 
 export interface CreateProductInput {
   name: string;
@@ -317,26 +318,13 @@ export class CatalogService {
       [id],
     );
 
-    return { ...product, variants, listings, draftPurchases, purchases, ...prices, deletable: !(await this.isTraded(this.db.manager, id)) };
+    return { ...product, variants, listings, draftPurchases, purchases, ...prices, ...(await this.blockedFor(id)) };
   }
 
-  /**
-   * Whether it was ever traded: on an order, a purchase or sales invoice, a
-   * channel link, or stock bought, sold or returned. A product that only ever
-   * had stock counted or corrected by hand was entered by mistake at worst.
-   */
-  private async isTraded(tx: EntityManager, productId: string): Promise<boolean> {
-    const [row] = await tx.query(
-      `SELECT EXISTS (SELECT 1 FROM channel_listing l JOIN product_variant v ON v.id = l.variant_id WHERE v.product_id = $1)
-           OR EXISTS (SELECT 1 FROM order_item i JOIN product_variant v ON v.id = i.variant_id WHERE v.product_id = $1)
-           OR EXISTS (SELECT 1 FROM purchase_invoice_line l JOIN product_variant v ON v.id = l.variant_id WHERE v.product_id = $1)
-           OR EXISTS (SELECT 1 FROM sales_invoice_line l JOIN product_variant v ON v.id = l.variant_id WHERE v.product_id = $1)
-           OR EXISTS (SELECT 1 FROM stock_movement m JOIN product_variant v ON v.id = m.variant_id
-                      WHERE v.product_id = $1 AND m.reason IN ('PURCHASE', 'SALE', 'RETURN'))
-          AS traded`,
-      [productId],
-    );
-    return row.traded;
+  /** What the product screen needs to say before anyone clicks Delete or Archive. */
+  private async blockedFor(productId: string) {
+    const blocked = await productBlockers(this.db.manager, productId);
+    return { deletable: blocked.delete.length === 0, blocked };
   }
 
   /** Brings an archived product back to the working list, variants included. */
@@ -360,9 +348,8 @@ export class CatalogService {
       await lockStock(tx, variants.map((v) => v.id));
       const product = await tx.findOne(Product, { where: { id }, lock: { mode: 'pessimistic_write' } });
       if (!product) throw new NotFoundException(problem('notFound', 'product not found'));
-      if (await this.isTraded(tx, id)) {
-        throw new BadRequestException(problem('product.inUse', 'this product has history — archive it instead'));
-      }
+      const blocked = (await productBlockers(tx, id)).delete;
+      if (blocked.length) refuse('product.deleteBlocked', 'this product is part of the trading history — archive it instead', blocked);
       // Its hand-entered counts and corrections go with it; their stock value
       // entries are reversed, so the books net to zero instead of losing a side.
       const movements: Array<{ id: string }> = await tx.query(
@@ -387,7 +374,7 @@ export class CatalogService {
    * has to be reconciled into the model later.
    */
   async createProduct(input: CreateProductInput, userId: string) {
-    if (!input.name?.trim()) throw new BadRequestException('name is required');
+    if (!input.name?.trim()) throw new BadRequestException(problem('product.name', 'enter the product name'));
     if (input.category && !PRODUCT_CATEGORIES.includes(input.category)) {
       throw new BadRequestException(`category must be one of: ${PRODUCT_CATEGORIES.join(', ')}`);
     }
@@ -401,10 +388,10 @@ export class CatalogService {
     }
     if (input.openingStock !== undefined) {
       if (!Number.isInteger(input.openingStock)) {
-        throw new BadRequestException('opening stock must be a whole number');
+        throw new BadRequestException(problem('product.openingStock', 'opening stock must be a whole number of 0 or more'));
       }
       if (input.openingStock < 0) {
-        throw new BadRequestException('opening stock cannot be negative');
+        throw new BadRequestException(problem('product.openingStock', 'opening stock must be a whole number of 0 or more'));
       }
     }
     const sku = input.sku?.trim();
@@ -465,7 +452,7 @@ export class CatalogService {
       throw new BadRequestException(`category must be one of: ${PRODUCT_CATEGORIES.join(', ')}`);
     }
     if (patch.name !== undefined) {
-      if (!patch.name.trim()) throw new BadRequestException('name cannot be empty');
+      if (!patch.name.trim()) throw new BadRequestException(problem('product.name', 'enter the product name'));
       product.name = patch.name.trim();
     }
     if (patch.category !== undefined) product.category = patch.category;
@@ -490,57 +477,8 @@ export class CatalogService {
       if (!product) throw new NotFoundException(problem('notFound', 'product not found'));
       if (!product.active) return;
 
-      const [blockers] = await tx.query(
-        `SELECT
-           COALESCE((SELECT SUM(m.quantity)
-             FROM stock_movement m
-             JOIN product_variant v ON v.id = m.variant_id
-             WHERE v.product_id = $1), 0)::int AS stock,
-           COALESCE((SELECT SUM(i.quantity)
-             FROM order_item i
-             JOIN product_variant v ON v.id = i.variant_id
-             JOIN customer_order o ON o.id = i.order_id
-             WHERE v.product_id = $1
-               AND o.status NOT IN ('CANCELLED', 'RETURNED', 'DELIVERED')), 0)::int AS "openUnits",
-           (SELECT count(*)::int
-             FROM channel_listing l
-             JOIN product_variant v ON v.id = l.variant_id
-             WHERE v.product_id = $1) AS listings,
-           (SELECT count(DISTINCT i.id)::int
-             FROM purchase_invoice i
-             JOIN purchase_invoice_line l ON l.invoice_id = i.id
-             JOIN product_variant v ON v.id = l.variant_id
-             WHERE v.product_id = $1 AND i.status = 'DRAFT') AS drafts`,
-        [id],
-      );
-      if (blockers.stock !== 0) {
-        throw new BadRequestException(
-          problem('product.archiveStock', 'reconcile all stock before archiving this product', {
-            count: Math.abs(Number(blockers.stock)),
-          }),
-        );
-      }
-      if (blockers.openUnits > 0) {
-        throw new BadRequestException(
-          problem('product.archiveOrders', 'finish its open orders before archiving this product', {
-            count: Number(blockers.openUnits),
-          }),
-        );
-      }
-      if (blockers.listings > 0) {
-        throw new BadRequestException(
-          problem('product.archiveListings', 'unlink its sales channels before archiving this product', {
-            count: Number(blockers.listings),
-          }),
-        );
-      }
-      if (blockers.drafts > 0) {
-        throw new BadRequestException(
-          problem('product.archiveDrafts', 'finish or delete its draft purchase invoices before archiving', {
-            count: Number(blockers.drafts),
-          }),
-        );
-      }
+      const blocked = (await productBlockers(tx, id)).archive;
+      if (blocked.length) refuse('product.archiveBlocked', 'clear what still depends on this product before archiving it', blocked);
       await tx.update(Product, { id }, { active: false });
       await tx.update(ProductVariant, { productId: id }, { active: false });
     });
@@ -688,7 +626,7 @@ export class CatalogService {
       );
     }
     const externalId = externalIdRaw.trim();
-    if (!externalId) throw new BadRequestException('the channel SKU is required');
+    if (!externalId) throw new BadRequestException(problem('listing.required', 'enter the channel SKU'));
 
     const clash = await tx.findOne(ChannelListing, {
       where: { channel: channel as ChannelListing['channel'], externalId, externalVariantId: '' },
@@ -720,7 +658,7 @@ export class CatalogService {
     if (!listing) throw new NotFoundException(problem('notFound', 'listing not found'));
 
     const externalId = (patch.externalId ?? '').trim();
-    if (!externalId) throw new BadRequestException('the channel SKU is required');
+    if (!externalId) throw new BadRequestException(problem('listing.required', 'enter the channel SKU'));
 
     if (externalId !== listing.externalId) {
       const clash = await repo.findOne({
@@ -797,7 +735,7 @@ export class CatalogService {
       );
     }
     if (!Number.isInteger(quantity) || quantity === 0) {
-      throw new BadRequestException('quantity must be a non-zero whole number');
+      throw new BadRequestException(problem('stock.quantity', 'enter a whole quantity other than 0'));
     }
     return this.db.transaction(async (tx) => {
       const variant = await tx.findOne(ProductVariant, { where: { id: variantId }, lock: { mode: 'pessimistic_write' } });

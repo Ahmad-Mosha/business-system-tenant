@@ -51,6 +51,18 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
   const input = (variantId: string, quantity = 1) => ({ customerName: 'Test', customerPhone: '01012345678', governorate: 'القاهرة', items: [{ variantId, quantity, unitPrice: '20.00' }] });
   const balance = async (id: string) => Number((await db.query('SELECT SUM(quantity) AS n FROM stock_movement WHERE variant_id = $1', [id]))[0].n);
 
+  /** A refusal with this code — the headline or one of its reasons — as the screen reads it. */
+  const refusedWith = (code: string, check?: (body: Refusal) => void) => (error: unknown) => {
+    const body = (error as { getResponse?: () => Refusal }).getResponse?.() ?? ({} as Refusal);
+    const codes = [body.code, ...(body.reasons ?? []).map((r) => r.code)];
+    assert.ok(codes.includes(code), `expected ${code}, got ${JSON.stringify(body)}`);
+    check?.(body);
+    return true;
+  };
+  type Refusal = { code?: string; params?: Record<string, unknown>; blockers?: Array<{ kind: string; label?: string; id?: string }>;
+    reasons?: Array<{ code: string; params?: Record<string, unknown>; blockers?: Array<{ kind: string; label?: string; id?: string }> }> };
+  const reasonOf = (body: Refusal, code: string) => body.reasons?.find((r) => r.code === code) ?? (body.code === code ? body : undefined);
+
   await t.test('only one concurrent order can take the last unit', async () => {
     const id = await stock(1);
     const results = await Promise.allSettled([orders.create(actor, input(id)), orders.create(actor, input(id))]);
@@ -586,8 +598,8 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     const owing = await purchasing.createSupplier({ name: `Owing ${randomUUID()}` });
     await purchasing.createInvoice({ supplierId: owing.id, invoiceDate: '2026-10-12', payment: 'CREDIT',
       lines: [{ variantId: id, quantity: 1, unitCost: '50' }] }, user.id, true);
-    await assert.rejects(purchasing.updateSupplier(owing.id, { active: false }), /settle what is owed/);
-    await assert.rejects(purchasing.deleteSupplier(owing.id), /archive it instead/);
+    await assert.rejects(purchasing.updateSupplier(owing.id, { active: false }), refusedWith('supplier.archiveOwed'));
+    await assert.rejects(purchasing.deleteSupplier(owing.id), refusedWith('supplier.hasInvoices'));
     await purchasing.recordSupplierPayment(owing.id, '50', undefined, user.id);
     await purchasing.updateSupplier(owing.id, { active: false });
     assert.ok((await purchasing.listSuppliers(true)).some((sup) => sup.id === owing.id));
@@ -597,7 +609,7 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     const drafting = await purchasing.createSupplier({ name: `Drafting ${randomUUID()}` });
     await purchasing.createInvoice({ supplierId: drafting.id, invoiceDate: '2026-10-12', payment: 'CREDIT',
       lines: [{ variantId: id, quantity: 1, unitCost: '5' }] }, user.id);
-    await assert.rejects(purchasing.updateSupplier(drafting.id, { active: false }), /draft invoices/);
+    await assert.rejects(purchasing.updateSupplier(drafting.id, { active: false }), refusedWith('supplier.archiveDrafts'));
 
     const mistake = await purchasing.createSupplier({ name: `Mistake ${randomUUID()}` });
     await purchasing.updateSupplier(mistake.id, { name: 'Corrected name', phone: '01000000000' });
@@ -634,7 +646,9 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     await orders.create(actor, input(sold));
     const soldProduct = (await db.query('SELECT product_id AS id FROM product_variant WHERE id = $1', [sold]))[0].id;
     assert.equal((await catalog.getProduct(soldProduct)).deletable, false);
-    await assert.rejects(catalog.deleteProduct(soldProduct, user.id), /archive it instead/);
+    await assert.rejects(catalog.deleteProduct(soldProduct, user.id), refusedWith('product.usedInOrders', (b) => {
+      assert.match(reasonOf(b, 'product.usedInOrders')!.blockers![0].label!, /^PM-\d+$/); // names the order, to open it
+    }));
   });
   await t.test('a draft invoice is edited freely and posts what was last saved; a posted one is locked', async () => {
     const id = await stock(0);
@@ -706,8 +720,8 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     assert.equal(edited.lines.length, 1);
     await assert.rejects(sales.updateDraft(first.id, { ...body, discount: '500' }), /cannot exceed/);
 
-    await assert.rejects(sales.updateCustomer(customer.id, { active: false }), /draft invoices/);
-    await assert.rejects(sales.deleteCustomer(customer.id), /archive them instead/);
+    await assert.rejects(sales.updateCustomer(customer.id, { active: false }), refusedWith('customer.archiveDrafts'));
+    await assert.rejects(sales.deleteCustomer(customer.id), refusedWith('customer.hasInvoices'));
     await sales.deleteDraft(first.id);
     await sales.updateCustomer(customer.id, { active: false });
     assert.ok((await sales.listCustomers(true)).some((c) => c.id === customer.id));
@@ -721,7 +735,7 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     const draft = await sales.createDraft({ customerId: customer.id, invoiceDate: '2026-10-14',
       lines: [{ variantId: created.variantId, quantity: 1, unitPrice: '10' }] }, user.id);
     assert.equal((await catalog.getProduct(created.id)).deletable, false);
-    await assert.rejects(catalog.deleteProduct(created.id, user.id), /archive it instead/);
+    await assert.rejects(catalog.deleteProduct(created.id, user.id), refusedWith('product.usedInSales'));
     await sales.deleteDraft(draft.id);
     await catalog.deleteProduct(created.id, user.id);
   });
@@ -737,7 +751,9 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
       lines: [{ variantId: a, quantity, unitPrice: '50' }] }, user.id);
 
     const tooMany = await draft(6);
-    await assert.rejects(sales.postInvoice(tooMany.id, '0', user.id), /only 5 in stock/);
+    await assert.rejects(sales.postInvoice(tooMany.id, '0', user.id), refusedWith('sales.stockShort', (b) => {
+      assert.equal(reasonOf(b, 'sales.stockShort')!.params!.onHand, 5);
+    }));
     assert.equal(await balance(a), 5);
     await sales.deleteDraft(tooMany.id);
 
@@ -761,7 +777,9 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     const paid = await sales.recordPayment(inv.id, '100', 'cash at the shop', user.id);
     assert.equal(paid.paidAmount, '140.00');
     assert.equal(await owed(), '0.00');
-    await assert.rejects(sales.voidInvoice(inv.id, 'wrong customer', user.id), /reverse its payments/);
+    await assert.rejects(sales.voidInvoice(inv.id, 'wrong customer', user.id), refusedWith('sales.voidPaid', (b) => {
+      assert.equal(reasonOf(b, 'sales.voidPaid')!.blockers!.length, 2); // both payments, each to reverse
+    }));
     for (const p of paid.payments) await sales.reversePayment(inv.id, p.id, user.id);
     await assert.rejects(sales.reversePayment(inv.id, paid.payments[0].id, user.id), /already reversed/);
 
@@ -777,6 +795,26 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     assert.ok(net.every((r: { net: string }) => r.net === '0.00'), JSON.stringify(net)); // cash, receivable and sales all net to zero
     await assert.rejects(sales.voidInvoice(inv.id, 'again', user.id), /only a posted invoice/);
     await assert.rejects(sales.recordPayment(inv.id, '1', undefined, user.id), /only a posted invoice/);
+  });
+
+  await t.test('a blocked action names every blocker at once, and the screen says it before the click', async () => {
+    const catalog = new CatalogService(db, finance);
+    const product = await catalog.createProduct({ name: `Busy ${randomUUID()}`, openingStock: 3, unitCost: '10' }, user.id);
+    await orders.create(actor, input(product.variantId));
+    const supplier = await purchasing.createSupplier({ name: `Busy supplier ${randomUUID()}` });
+    await purchasing.createInvoice({ supplierId: supplier.id, invoiceDate: '2026-10-14', payment: 'CREDIT',
+      lines: [{ variantId: product.variantId, quantity: 1, unitCost: '10' }] }, user.id);
+    const expected = ['product.archiveStock', 'product.archiveOrders', 'product.archiveDrafts'];
+    const onScreen = (await catalog.getProduct(product.id)).blocked.archive.map((r: { code: string }) => r.code);
+    assert.deepEqual(onScreen, expected);
+    await assert.rejects(catalog.archiveProduct(product.id), (error: unknown) => {
+      const body = (error as { getResponse: () => Refusal }).getResponse();
+      assert.equal(body.code, 'product.archiveBlocked');
+      assert.deepEqual(body.reasons!.map((r) => r.code), expected); // all three, not the first
+      assert.equal(reasonOf(body, 'product.archiveStock')!.params!.count, 2); // 3 counted − 1 ordered
+      assert.match(reasonOf(body, 'product.archiveOrders')!.blockers![0].label!, /^PM-\d+$/);
+      return true;
+    });
   });
 
   // ── Corrections: nothing posted is edited or deleted; it is cancelled and re-entered ──
@@ -890,7 +928,11 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
 
     // Paid on: its payment is reversed first.
     const paid = await purchasing.recordSupplierPayment(supplier.id, '100', undefined, user.id, mistake.id);
-    await assert.rejects(purchasing.voidInvoice(mistake.id, 'wrong price', user.id), /reverse the payments/);
+    await assert.rejects(purchasing.voidInvoice(mistake.id, 'wrong price', user.id), refusedWith('invoice.cancelPaid', (b) => {
+      assert.equal(reasonOf(b, 'invoice.cancelPaid')!.blockers![0].kind, 'supplier_payment');
+    }));
+    // The screen says the same thing before anyone clicks.
+    assert.deepEqual((await purchasing.getInvoice(mistake.id)).blocked.cancel.map((r: { code: string }) => r.code), ['invoice.cancelPaid']);
     await purchasing.reverseSupplierPayment(supplier.id, paid.id, 'to cancel the invoice', user.id);
 
     // Cancelled twice at once, with a correction draft: one cancellation, one draft.
@@ -918,7 +960,10 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     // Goods that moved since were costed with it in the average: refused, naming the product.
     const sold = await buy(5, '200');
     await orders.create(actor, input(id));
-    await assert.rejects(purchasing.voidInvoice(sold.id, 'late', user.id), /has moved since/);
+    await assert.rejects(purchasing.voidInvoice(sold.id, 'late', user.id), refusedWith('invoice.cancelMoved', (b) => {
+      const kinds = reasonOf(b, 'invoice.cancelMoved')!.blockers!.map((x) => x.kind);
+      assert.ok(kinds.includes('product') && kinds.includes('order')); // what moved, and the order that moved it
+    }));
     assert.equal((await purchasing.getInvoice(sold.id)).status, 'POSTED');
 
     // A cash invoice's cash comes back with it.

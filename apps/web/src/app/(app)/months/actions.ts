@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { getTranslations } from 'next-intl/server';
 import { apiRequest } from '@/lib/api-request';
 
-export type AnchorState = { status: 'idle' } | { status: 'saved' } | { status: 'error'; message: string };
+export type AnchorState = { status: 'idle' } | { status: 'saved' } | { status: 'error'; message: string; problem?: import('@/lib/problem').Problem };
 
 /** Stores the balance every later month is measured from. */
 export async function setOpeningBalance(
@@ -21,7 +21,7 @@ export async function setOpeningBalance(
   if (!/^\d{4}-\d{2}-\d{2}$/.test(openingAsOf)) return { status: 'error', message: t('date') };
 
   const r = await apiRequest('/noon/account', 'PATCH', { openingBalance, openingAsOf });
-  if (!r.ok) return { status: 'error', message: r.message };
+  if (!r.ok) return { status: 'error', message: r.message, problem: r.problem };
 
   revalidatePath('/');
   revalidatePath('/months');

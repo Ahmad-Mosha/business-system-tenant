@@ -273,11 +273,11 @@ export class FinanceService {
     userId: string,
   ) {
     if (!MONEY.test(input.amount)) throw new BadRequestException('amount must be like 1000.00');
-    if (!input.fromParty?.trim()) throw new BadRequestException('who the cheque is from is required');
+    if (!input.fromParty?.trim()) throw new BadRequestException(problem('cheque.from', 'enter who the cheque is from'));
     for (const [name, v] of [['receivedDate', input.receivedDate], ['dueDate', input.dueDate]] as const) {
       if (v && !ISO_DATE.test(v)) throw new BadRequestException(`${name} must be YYYY-MM-DD`);
     }
-    if (!input.receivedDate) throw new BadRequestException('receivedDate is required');
+    if (!input.receivedDate) throw new BadRequestException(problem('cheque.received', 'enter the date the cheque was received'));
 
     return this.db.transaction(async (tx) => {
       const cheque = await tx.save(Cheque, {

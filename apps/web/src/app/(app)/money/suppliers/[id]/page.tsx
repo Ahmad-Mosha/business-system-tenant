@@ -26,6 +26,7 @@ import {
 import { getSupplier } from '@/lib/api';
 import { money } from '@/lib/format';
 import { isSystemMemo } from '@/lib/money';
+import { blockedBy } from '@/lib/problem';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
 import { getTranslations } from 'next-intl/server';
@@ -52,8 +53,6 @@ export default async function SupplierDetailPage({
   const livePayments = supplier.payments.filter((p) => !p.reversesId && !p.cancelledAt);
   const paid = livePayments.reduce((n, p) => n + Number(p.amount), 0);
   const owed = Number(supplier.balance);
-  // Never used: nothing in the books points at it, so it can be deleted outright.
-  const unused = supplier.invoices.length === 0 && supplier.payments.length === 0;
 
   return (
     <Page>
@@ -83,6 +82,8 @@ export default async function SupplierDetailPage({
                 confirmLabel={t('archiveConfirm')}
                 success={t('archived')}
                 action={setSupplierActive.bind(null, supplier.id, false)}
+                blocked={blockedBy('supplier.archiveBlocked', supplier.blocked?.archive)}
+                blockedTitle={<bdi>{supplier.name}</bdi>}
               />
             ) : (
               <ConfirmAction
@@ -99,7 +100,7 @@ export default async function SupplierDetailPage({
                 action={setSupplierActive.bind(null, supplier.id, true)}
               />
             )}
-            {unused ? (
+            {(
               <ConfirmAction
                 trigger={
                   <Button variant="outline" className="text-destructive hover:bg-destructive-subtle hover:text-destructive">
@@ -112,8 +113,10 @@ export default async function SupplierDetailPage({
                 confirmLabel={t('deleteConfirm')}
                 destructive
                 action={deleteSupplier.bind(null, supplier.id)}
+                blocked={blockedBy('supplier.deleteBlocked', supplier.blocked?.delete)}
+                blockedTitle={<bdi>{supplier.name}</bdi>}
               />
-            ) : null}
+            )}
             {supplier.active ? <PaySupplier supplierId={supplier.id} owed={supplier.balance} /> : null}
           </>
         }

@@ -1,6 +1,5 @@
 import { notFound, redirect } from 'next/navigation';
 import { OrderForm } from '@/components/order-form';
-import { EDITABLE_STATUSES } from '@/components/order-status';
 import { getOrder } from '@/lib/api';
 import { requireSession } from '@/lib/session';
 
@@ -10,7 +9,8 @@ export default async function EditOrderPage({ params }: { params: Promise<{ id: 
 
   const order = await getOrder(id).catch(() => null);
   if (!order) notFound();
-  if (!EDITABLE_STATUSES.includes(order.status)) redirect(`/orders/${id}`);
+  // Opened from an old link after it stopped being editable: the order page explains why.
+  if (order.blocked?.edit?.length) redirect(`/orders/${id}`);
 
   return <OrderForm order={order} draftKey={`${user.id}:order:${id}`} />;
 }

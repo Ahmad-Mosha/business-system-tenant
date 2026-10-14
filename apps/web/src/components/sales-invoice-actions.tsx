@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, Ban, Banknote } from 'lucide-react';
+import { Ban, Banknote } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useRef, useState, useTransition, type ReactNode } from 'react';
 import { toast } from 'sonner';
@@ -8,7 +8,6 @@ import { recordSalesPayment, voidSalesInvoice } from '@/app/(app)/sales/actions'
 import { FormDialog } from '@/components/form-dialog';
 import { MoneyInput } from '@/components/money-input';
 import { NumberField } from '@/components/number-field';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
@@ -18,8 +17,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { b, num } from '@/i18n/rich';
 import { money } from '@/lib/format';
 import { trimZeros } from '@/lib/purchase-line';
+import type { Problem } from '@/lib/problem';
+import { ProblemNotice } from '@/components/problem-notice';
 
-type Result = { ok: true } | { ok: false; message: string };
+type Result = { ok: true } | { ok: false; message: string; problem?: Problem };
+type Refusal = { message: string; problem?: Problem };
 
 /**
  * Asks before posting — the step that takes the goods out of the warehouse
@@ -32,6 +34,7 @@ export function PostSalesDialog({
   customer,
   items,
   onPost,
+  blocked,
 }: {
   trigger: ReactNode;
   total: number;
@@ -39,12 +42,14 @@ export function PostSalesDialog({
   /** "12 items", already worded. */
   items: string;
   onPost: (paidNow: string) => Promise<Result | void>;
+  /** What already stands in the way of posting — explained instead of the form. */
+  blocked?: Problem | null;
 }) {
   const t = useTranslations('sales.post');
   const tc = useTranslations('common');
   const [open, setOpen] = useState(false);
   const [paid, setPaid] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Refusal | null>(null);
   const [pending, start] = useTransition();
   const sending = useRef(false);
   const over = Number(paid || 0) > total + 0.005;
@@ -57,7 +62,7 @@ export function PostSalesDialog({
       try {
         setError(null);
         const r = await onPost(paid);
-        if (r && !r.ok) return void setError(r.message);
+        if (r && !r.ok) return void setError({ message: r.message, problem: r.problem });
         toast.success(t('posted'));
         setOpen(false);
       } finally {
@@ -80,8 +85,18 @@ export function PostSalesDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-base">{t('title')}</DialogTitle>
-          <DialogDescription>{t.rich('description', { items, total: money(total), customer, b, num })}</DialogDescription>
+          {blocked ? null : <DialogDescription>{t.rich('description', { items, total: money(total), customer, b, num })}</DialogDescription>}
         </DialogHeader>
+        {blocked ? (
+          <>
+            <ProblemNotice problem={blocked} />
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+                {tc('close')}
+              </Button>
+            </DialogFooter>
+          </>
+        ) : (
         <form
           className="grid gap-4"
           onSubmit={(e) => {
@@ -116,12 +131,7 @@ export function PostSalesDialog({
             <span className="text-muted-foreground">{t('owedAfter')}</span>
             <span className={over ? 'num font-semibold text-destructive' : 'num font-semibold'}>{over ? '—' : money(owed)}</span>
           </div>
-          {error || over ? (
-            <Alert variant="destructive">
-              <AlertTriangle />
-              <AlertDescription>{error ?? t('tooMuch', { total: money(total) })}</AlertDescription>
-            </Alert>
-          ) : null}
+          {error ? <ProblemNotice problem={error.problem} message={error.message} /> : over ? <ProblemNotice message={t('tooMuch', { total: money(total) })} /> : null}
           <DialogFooter>
             <Button type="button" variant="ghost" disabled={pending} onClick={() => setOpen(false)}>
               {tc('cancel')}
@@ -132,6 +142,7 @@ export function PostSalesDialog({
             </Button>
           </DialogFooter>
         </form>
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -175,13 +186,12 @@ export function RecordSalesPayment({ id, remaining, customer }: { id: string; re
  * been collected on it the dialog only explains that those payments are
  * reversed first — cash is never left without its invoice.
  */
-export function VoidSalesInvoice({ id, number, paid }: { id: string; number: string; paid: string }) {
+export function VoidSalesInvoice({ id, number, blocked }: { id: string; number: string; blocked?: Problem | null }) {
   const t = useTranslations('sales.void');
   const tc = useTranslations('common');
   const [open, setOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Refusal | null>(null);
   const [pending, start] = useTransition();
-  const collected = Number(paid) > 0.005;
   return (
     <Dialog
       open={open}
@@ -200,14 +210,11 @@ export function VoidSalesInvoice({ id, number, paid }: { id: string; number: str
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-base">{t('title', { number })}</DialogTitle>
-          <DialogDescription>{t('description')}</DialogDescription>
+          {blocked ? null : <DialogDescription>{t('description')}</DialogDescription>}
         </DialogHeader>
-        {collected ? (
+        {blocked ? (
           <>
-            <Alert variant="warning">
-              <AlertTriangle />
-              <AlertDescription>{t.rich('paidFirst', { amount: money(paid), num })}</AlertDescription>
-            </Alert>
+            <ProblemNotice problem={blocked} />
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
                 {tc('close')}
@@ -224,7 +231,7 @@ export function VoidSalesInvoice({ id, number, paid }: { id: string; number: str
               start(async () => {
                 setError(null);
                 const r = await voidSalesInvoice(id, reason);
-                if (!r.ok) return void setError(r.message);
+                if (!r.ok) return void setError({ message: r.message, problem: r.problem });
                 toast.success(t('done'));
                 setOpen(false);
               });
@@ -234,12 +241,7 @@ export function VoidSalesInvoice({ id, number, paid }: { id: string; number: str
               <FieldLabel htmlFor="si-void-reason">{t('reason')}</FieldLabel>
               <Textarea id="si-void-reason" name="reason" required maxLength={1000} dir="auto" placeholder={t('reasonPlaceholder')} disabled={pending} />
             </Field>
-            {error ? (
-              <Alert variant="destructive">
-                <AlertTriangle />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            ) : null}
+            {error ? <ProblemNotice problem={error.problem} message={error.message} /> : null}
             <DialogFooter>
               <Button type="button" variant="ghost" disabled={pending} onClick={() => setOpen(false)}>
                 {t('keep')}
