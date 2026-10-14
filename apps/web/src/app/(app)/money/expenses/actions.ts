@@ -19,3 +19,14 @@ export async function voidExpense(id: string, form: FormData): Promise<DialogFor
   revalidatePath('/money', 'layout');
   return { status: 'saved' };
 }
+
+/** Edit an expense: the original is voided and the corrected one recorded, in one step. */
+export async function correctExpense(id: string, requestId: string, form: FormData): Promise<DialogFormState> {
+  const r = await apiRequest(`/expenses/${id}/correct`, 'POST', {
+    requestId, amount: String(form.get('amount') ?? ''), category: String(form.get('category') ?? ''),
+    spentOn: String(form.get('spentOn') ?? ''), note: String(form.get('note') ?? ''), reason: String(form.get('reason') ?? ''),
+  });
+  if (!r.ok) return { status: 'error', message: r.message };
+  revalidatePath('/money', 'layout');
+  return { status: 'saved' };
+}

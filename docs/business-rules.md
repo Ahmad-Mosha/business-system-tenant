@@ -239,6 +239,26 @@ be entered again as operating expenses.
 **[Open]** Which additional free-form cash voucher types are permitted.
 **[Open]** Whether a bank account is tracked in the system at all.
 
+**[Confirmed 2026-10-14] Correcting records: every record is correctable, not
+every record is editable.**
+
+| Record | Change it | Remove it | Correct a posted one |
+|---|---|---|---|
+| Product, customer, supplier details | any time | only if never used (a product: never bought, sold or listed — its hand counts are cancelled with it) | archive |
+| Draft purchase / sales invoice | freely | delete | — |
+| Expense, cash voucher | — | — | **Edit** = cancel + record the corrected one, in one step; or **Cancel** |
+| Supplier / customer payment | — | — | **Reverse**: cash back, the invoices it settled owed again |
+| Posted purchase invoice | — | — | **Cancel**, or **Edit** = cancel + re-enter as a draft — only while nothing is paid on it and none of its products has moved since it posted |
+| Posted sales invoice | — | — | **Void**, only while nothing is collected |
+
+A cancellation never edits or deletes a posted entry: the books get a reversing
+entry, and the record stays, marked cancelled, with the reason, who and when.
+Lists hide cancelled records unless "Show cancelled" is on. A purchase invoice
+whose goods have moved since it posted (sold, counted, bought again) is not
+cancelled — its stock was already costed with it in the average — and the
+correction is a stock correction for a wrong quantity; a wrong price needs a
+supplier credit note, which does not exist yet.
+
 ---
 
 ## 8. Roles and permissions

@@ -118,6 +118,7 @@ export const PAID_TONE: Record<string, Tone> = {
   UNPAID: 'warning',
   PARTIAL: 'warning',
   PAID: 'success',
+  VOID: 'muted',
 };
 
 /** The counter-accounts a hand-entered voucher can move cash against (`enums.voucherCounter`). */

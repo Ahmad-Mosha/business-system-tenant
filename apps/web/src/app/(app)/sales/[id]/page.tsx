@@ -112,7 +112,7 @@ export default async function SalesInvoicePage({ params }: { params: Promise<{ i
         <Alert>
           <Ban />
           <AlertDescription>
-            {tr('sales.void.banner', { date: f.date(invoice.voidedAt ?? invoice.updatedAt), reason: invoice.voidReason ?? '' })}
+            {tr('sales.void.banner', { date: f.date(invoice.voidedAt ?? invoice.updatedAt), name: invoice.voidedBy ?? '—', reason: invoice.voidReason ?? '' })}
           </AlertDescription>
         </Alert>
       ) : null}
