@@ -9,6 +9,7 @@ import {
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { Badge } from '@/components/ui/badge';
+import { useFormat } from '@/i18n/use-format';
 import { TableCell, TableRow } from '@/components/ui/table';
 import type { LedgerRow } from '@/lib/api';
 import { entryMemo, isEntryKind, sourceHref } from '@/lib/money';
@@ -57,9 +58,13 @@ export const BALANCE: Record<Direction, Mark> = {
 /**
  * The first cell of a ledger row: which way it went, what it was — linked to
  * the order or invoice behind it when there is one — then when, and any note.
+ * A cancelled entry reads as cancelled — struck through, with who cancelled it,
+ * when and why — and a correction says it is one.
  */
 export function EntryCell({ entry, mark, when }: { entry: LedgerRow; mark: Mark; when?: string }) {
   const t = useTranslations();
+  const f = useFormat();
+  const cancelled = !!entry.cancelledAt;
   const href = sourceHref(entry);
   const memo = entryMemo(entry);
   const label = isEntryKind(entry.kind) ? t(`enums.entryKind.${entry.kind}`) : entry.kind;
@@ -74,19 +79,34 @@ export function EntryCell({ entry, mark, when }: { entry: LedgerRow; mark: Mark;
       <div className="min-w-0">
         <div className="flex min-w-0 items-center gap-2">
           {href ? (
-            <Link href={href} className="truncate font-medium underline-offset-2 hover:underline">
+            <Link href={href} className={cn('truncate font-medium underline-offset-2 hover:underline', cancelled && 'text-muted-foreground line-through')}>
               {label}
             </Link>
           ) : (
-            <span className="truncate font-medium">{label}</span>
+            <span className={cn('truncate font-medium', cancelled && 'text-muted-foreground line-through')}>{label}</span>
           )}
           {entry.reversesId ? <Badge variant="outline">{t('ledger.reversal')}</Badge> : null}
+          {cancelled ? <Badge variant="outline" className="text-destructive">{t('corrections.cancelled')}</Badge> : null}
+          {entry.replacesId ? <Badge variant="outline">{t('corrections.correction')}</Badge> : null}
         </div>
         {when || memo ? (
           <p className="mt-0.5 truncate text-xs text-muted-foreground">
             {when ? <span className="num">{when}</span> : null}
             {when && memo ? ' · ' : null}
             {memo ? <bdi>{memo}</bdi> : null}
+          </p>
+        ) : null}
+        {cancelled ? (
+          <p className="mt-0.5 truncate text-xs text-destructive/80">
+            {entry.cancelledBy
+              ? t('corrections.cancelledBy', { name: entry.cancelledBy, date: f.date(entry.cancelledAt!) })
+              : t('corrections.cancelledOn', { date: f.date(entry.cancelledAt!) })}
+            {entry.cancelReason ? (
+              <>
+                {' — '}
+                <bdi>{entry.cancelReason}</bdi>
+              </>
+            ) : null}
           </p>
         ) : null}
       </div>

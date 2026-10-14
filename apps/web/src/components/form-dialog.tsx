@@ -41,6 +41,7 @@ export function FormDialog<S extends DialogFormState>({
   success,
   children,
   wide = false,
+  dismissLabel,
 }: {
   trigger: ReactNode;
   title: ReactNode;
@@ -51,6 +52,8 @@ export function FormDialog<S extends DialogFormState>({
   success: string | ((state: S) => string);
   children: ReactNode;
   wide?: boolean;
+  /** The way out, when "Cancel" would read like the action itself ("Cancel voucher"). */
+  dismissLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -65,6 +68,7 @@ export function FormDialog<S extends DialogFormState>({
           action={action}
           submitLabel={submitLabel}
           success={success}
+          dismissLabel={dismissLabel}
           onDone={() => setOpen(false)}
         >
           {children}
@@ -80,12 +84,14 @@ function FormBody<S extends DialogFormState>({
   success,
   onDone,
   children,
+  dismissLabel,
 }: {
   action: Action<S>;
   submitLabel: string;
   success: string | ((state: S) => string);
   onDone: () => void;
   children: ReactNode;
+  dismissLabel?: string;
 }) {
   const t = useTranslations('common');
   // React queues every submit, so a fast double click would record a payment
@@ -129,7 +135,7 @@ function FormBody<S extends DialogFormState>({
       <DialogFooter>
         <DialogClose asChild>
           <Button type="button" variant="ghost" disabled={pending}>
-            {t('cancel')}
+            {dismissLabel ?? t('cancel')}
           </Button>
         </DialogClose>
         <Button type="submit" disabled={pending} className="min-w-24">

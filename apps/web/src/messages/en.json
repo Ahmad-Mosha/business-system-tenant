@@ -217,7 +217,9 @@
       "payment": {
         "invoiceClosed": "This invoice can’t take a payment.",
         "nothingOwed": "{scope, select, invoice {Nothing is left to pay on this invoice.} other {Nothing is owed to {supplier}.}}",
-        "overpay": "{scope, select, invoice {Only {owed} is left on this invoice} other {Only {owed} is owed to {supplier}}} — you tried to pay {paid}."
+        "overpay": "{scope, select, invoice {Only {owed} is left on this invoice} other {Only {owed} is owed to {supplier}}} — you tried to pay {paid}.",
+        "reason": "Write why this payment is reversed.",
+        "cannotReverse": "This payment no longer matches its invoices, so it can’t be reversed automatically."
       },
       "invoice": {
         "productsGone": "Choose active products for every invoice line.",
@@ -226,7 +228,12 @@
         "noLines": "Add at least one line before posting.",
         "allocation": "Choose allocation by goods value or units.",
         "supplierGone": "Choose an active supplier.",
-        "postedEdit": "A posted invoice can't be edited."
+        "postedEdit": "A posted invoice can't be edited.",
+        "cancelReason": "Write why this invoice is cancelled.",
+        "notPosted": "Only a posted invoice can be cancelled.",
+        "cancelPaid": "{paid} has been paid on this invoice. Reverse those payments on the supplier’s page first, then cancel it.",
+        "cancelMoved": "Stock of {products} has moved since this invoice was posted — sold, counted or bought again — so cancelling it would change the cost of goods already used. Fix a wrong quantity with a stock correction on the product instead. A wrong price needs a supplier credit note, which isn’t in the system yet.",
+        "cancelStock": "{name}: only {onHand} in the warehouse, {requested} on the invoice."
       },
       "sku": {
         "taken": "SKU “{sku}” is already in use."
@@ -264,7 +271,8 @@
         "category": "Enter a category up to 100 characters.",
         "amount": "Enter a positive amount with at most two decimals.",
         "reason": "Enter a correction reason.",
-        "retryChanged": "This submission was already recorded with different details."
+        "retryChanged": "This submission was already recorded with different details.",
+        "alreadyVoided": "This expense is already cancelled."
       },
       "supplier": {
         "archiveOwed": "{owed} is still owed to this supplier. Settle it before archiving.",
@@ -294,6 +302,11 @@
         "paymentReversed": "This payment is already reversed.",
         "voidReason": "Write why this invoice is voided.",
         "voidPaid": "Reverse this invoice’s payments before voiding it."
+      },
+      "voucher": {
+        "reason": "Write why it’s cancelled.",
+        "amount": "Enter an amount like 1000.00.",
+        "alreadyCancelled": "This voucher is already cancelled."
       }
     }
   },
@@ -709,7 +722,7 @@
     "restored": "Product restored",
     "delete": "Delete",
     "deleteTitle": "Delete “<bdi>{name}</bdi>”?",
-    "deleteDescription": "This product has never moved stock, sold, been bought or been linked to a channel, so it can be removed completely. This can't be undone.",
+    "deleteDescription": "This product was never bought, sold or linked to a channel, so it can be removed completely. Any stock counted on it is cancelled too, and its value leaves the books. This can't be undone.",
     "deleteConfirm": "Delete product",
     "deleted": "Product deleted",
     "archivedBanner": "This product is archived. It's hidden from inventory, orders and purchases until you restore it.",
@@ -740,7 +753,8 @@
     "lineQuantity": "Every line needs a whole quantity.",
     "lineCost": "Every line needs a unit cost.",
     "extraCosts": "Extra costs must be an amount like 5000.00",
-    "csvFile": "Choose a CSV file to upload."
+    "csvFile": "Choose a CSV file to upload.",
+    "reason": "Write why."
   },
   "money": {
     "title": "Money",
@@ -1267,7 +1281,8 @@
       "DRAFT": "Draft",
       "UNPAID": "Unpaid",
       "PARTIAL": "Partly paid",
-      "PAID": "Paid"
+      "PAID": "Paid",
+      "VOID": "Cancelled"
     },
     "cashIn": {
       "SALES": "Sales",
@@ -1503,7 +1518,7 @@
       "confirm": "Void invoice",
       "done": "Invoice voided",
       "paidFirst": "<num>{amount}</num> has been collected on this invoice. Reverse those payments first, then void it.",
-      "banner": "Voided on {date} — {reason}. The goods went back to the warehouse and the sale was taken out of the books.",
+      "banner": "Voided on {date} by {name} — {reason}. The goods went back to the warehouse and the sale was taken out of the books.",
       "keep": "Keep invoice"
     },
     "owed": "Owed by customers",
@@ -1585,5 +1600,56 @@
     "hintMove": "↑↓ to move",
     "hintOpen": "Enter to open",
     "hintClose": "Esc to close"
+  },
+  "corrections": {
+    "reason": "Why?",
+    "reasonPlaceholder": "e.g. typed an extra zero, wrong supplier…",
+    "reasonHint": "Kept with the record, with your name and the time.",
+    "showCancelled": "Show cancelled",
+    "hideCancelled": "Hide cancelled",
+    "cancelled": "Cancelled",
+    "corrected": "Corrected",
+    "correction": "Correction",
+    "cancelledBy": "Cancelled by {name} · {date}",
+    "cancelledOn": "Cancelled · {date}",
+    "keep": "Keep it",
+    "voucher": {
+      "edit": "Edit voucher",
+      "editHint": "Saving cancels the original and records this corrected one. Both stay in the treasury history.",
+      "save": "Save correction",
+      "corrected": "Voucher corrected",
+      "cancel": "Cancel voucher",
+      "cancelHint": "For a voucher entered by mistake. Its amount is reversed in the treasury; the voucher stays in the history, marked cancelled.",
+      "cancelledToast": "Voucher cancelled"
+    },
+    "expense": {
+      "edit": "Edit expense",
+      "editHint": "Saving cancels the original and records this corrected one. Both stay in the expense history.",
+      "save": "Save correction",
+      "corrected": "Expense corrected"
+    },
+    "payment": {
+      "reverse": "Reverse",
+      "reverseTitle": "Reverse this payment?",
+      "reverseHint": "For a payment recorded by mistake: {amount} comes back to the treasury and the supplier is owed it again. The payment stays in the history, marked reversed.",
+      "reversed": "Payment reversed"
+    },
+    "invoice": {
+      "edit": "Edit invoice",
+      "editTitle": "Edit a posted invoice",
+      "editHint": "A posted invoice isn’t changed in place. It is cancelled — its goods leave stock and its amount leaves the books — and re-entered as a draft with the same lines, for you to fix and post again.",
+      "editConfirm": "Cancel and edit",
+      "cancel": "Cancel invoice",
+      "cancelTitle": "Cancel this invoice?",
+      "cancelHintCredit": "For an invoice entered by mistake. Its goods leave stock, the cost average goes back to what it was, and the supplier is no longer owed it. It stays visible, marked cancelled.",
+      "cancelHintCash": "For an invoice entered by mistake. Its goods leave stock, the cost average goes back to what it was, and the cash paid returns to the treasury. It stays visible, marked cancelled.",
+      "cancelConfirm": "Cancel invoice",
+      "cancelledToast": "Invoice cancelled",
+      "banner": "Cancelled on {date} by {name} — {reason}. Its goods left stock and its amount left the books.",
+      "reentered": "Re-entered as a new invoice:",
+      "openCorrection": "open it",
+      "correctionOf": "This draft re-enters a cancelled invoice — fix it and post it to take its place.",
+      "openCancelled": "Open the cancelled invoice"
+    }
   }
 }
