@@ -109,6 +109,14 @@ export class LedgerEntry {
   @Column({ name: 'reverses_id', type: 'uuid', nullable: true })
   reversesId: string | null;
 
+  /** On a reversal: why the original was cancelled, in the words of whoever did it. */
+  @Column({ type: 'text', nullable: true })
+  reason: string | null;
+
+  /** On a corrected voucher: the entry it replaces (which is reversed in the same step). */
+  @Column({ name: 'replaces_id', type: 'uuid', nullable: true })
+  replacesId: string | null;
+
   /** Null for automatic entries (an import, an order flow); set for hand-entered ones. */
   @Column({ name: 'actor_id', type: 'uuid', nullable: true })
   actorId: string | null;

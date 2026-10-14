@@ -1,4 +1,4 @@
-import { AlertTriangle, Ban, Info, Pencil, Send, Trash2, Undo2 } from 'lucide-react';
+import { Ban, Info, Pencil, Send, Trash2, Undo2 } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
@@ -7,6 +7,7 @@ import { Amount } from '@/components/amount';
 import { ConfirmAction } from '@/components/confirm-action';
 import { Page, PageHeader } from '@/components/page';
 import { PaidChip } from '@/components/paid-chip';
+import { ProblemNotice } from '@/components/problem-notice';
 import { PostSalesDialog, RecordSalesPayment, VoidSalesInvoice } from '@/components/sales-invoice-actions';
 import { ToneBadge } from '@/components/tone-badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -19,6 +20,7 @@ import { isSystemMemo } from '@/lib/money';
 import { getSalesInvoice } from '@/lib/api';
 import { money, unitMoney } from '@/lib/format';
 import { SALES_TONE, salesPaidStatus } from '@/lib/sales';
+import { blockedBy } from '@/lib/problem';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
 
@@ -34,7 +36,8 @@ export default async function SalesInvoicePage({ params }: { params: Promise<{ i
   const paidStatus = salesPaidStatus(invoice);
   const remaining = Number(invoice.total) - Number(invoice.paidAmount);
   const units = invoice.lines.reduce((n, l) => n + l.quantity, 0);
-  const short = draft && invoice.lines.some((l) => l.quantity > l.onHand);
+  // What would stop posting it right now, from the API's own rules.
+  const postBlocked = draft ? blockedBy('sales.postBlocked', invoice.blocked?.post) : null;
   // A draft is valued at today's cost; a posted invoice at the cost frozen when it was posted.
   const costOf = (l: (typeof invoice.lines)[number]) => (draft ? l.currentCost : l.unitCost);
   const costKnown = invoice.lines.every((l) => costOf(l) !== null);
@@ -77,7 +80,7 @@ export default async function SalesInvoicePage({ params }: { params: Promise<{ i
               </Button>
               <PostSalesDialog
                 trigger={
-                  <Button disabled={short}>
+                  <Button>
                     <Send />
                     {tr('sales.post.post')}
                   </Button>
@@ -86,22 +89,20 @@ export default async function SalesInvoicePage({ params }: { params: Promise<{ i
                 customer={invoice.customer.name}
                 items={tr('nouns.units', { count: units })}
                 onPost={postSalesInvoice.bind(null, invoice.id)}
+                blocked={postBlocked}
               />
             </>
           ) : posted ? (
             <>
-              <VoidSalesInvoice id={invoice.id} number={invoice.invoiceNumber ?? ''} paid={invoice.paidAmount} />
+              <VoidSalesInvoice id={invoice.id} number={invoice.invoiceNumber ?? ''} blocked={blockedBy('sales.voidBlocked', invoice.blocked?.void)} />
               {remaining > 0.005 ? <RecordSalesPayment id={invoice.id} remaining={remaining.toFixed(2)} customer={invoice.customer.name} /> : null}
             </>
           ) : undefined
         }
       />
 
-      {short ? (
-        <Alert variant="destructive">
-          <AlertTriangle />
-          <AlertDescription>{tr('sales.post.shortHint')}</AlertDescription>
-        </Alert>
+      {postBlocked ? (
+        <ProblemNotice problem={postBlocked} />
       ) : draft ? (
         <Alert>
           <Info />
@@ -112,7 +113,7 @@ export default async function SalesInvoicePage({ params }: { params: Promise<{ i
         <Alert>
           <Ban />
           <AlertDescription>
-            {tr('sales.void.banner', { date: f.date(invoice.voidedAt ?? invoice.updatedAt), reason: invoice.voidReason ?? '' })}
+            {tr('sales.void.banner', { date: f.date(invoice.voidedAt ?? invoice.updatedAt), name: invoice.voidedBy ?? '—', reason: invoice.voidReason ?? '' })}
           </AlertDescription>
         </Alert>
       ) : null}

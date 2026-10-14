@@ -37,9 +37,9 @@ export class FinanceController {
 
   /** One account's recent movements with a running balance — drives the Treasury screen. */
   @Get('accounts/:code/ledger')
-  accountLedger(@Param('code') code: string, @Query('limit') limit?: string) {
+  accountLedger(@Param('code') code: string, @Query('limit') limit?: string, @Query('cancelled') cancelled?: string) {
     if (!/^[A-Z_]+$/.test(code)) throw new BadRequestException('unknown account');
-    return this.ledger.accountLedger(code as LedgerAccountCode, limit ? Number(limit) : undefined);
+    return this.ledger.accountLedger(code as LedgerAccountCode, limit ? Number(limit) : undefined, undefined, cancelled === '1');
   }
 
   /** Daily cash balance for the overview chart. `days` back from today, max 365. */
@@ -97,6 +97,7 @@ export class FinanceController {
     @Query('to') to?: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
+    @Query('cancelled') cancelled?: string,
   ) {
     for (const [name, value] of [['from', from], ['to', to]] as const) {
       if (value && !ISO_DATE.test(value)) throw new BadRequestException(`${name} must be YYYY-MM-DD`);
@@ -109,6 +110,8 @@ export class FinanceController {
       to,
       limit: limit ? Number(limit) : undefined,
       offset: offset ? Number(offset) : undefined,
+      // Tracing one record shows everything that happened to it, cancelled or not.
+      cancelled: cancelled === '1' || !!sourceId,
     });
   }
 
@@ -144,6 +147,30 @@ export class FinanceController {
       amount: body.amount ?? '',
       memo: body.memo,
       occurredAt: body.occurredAt,
+      userId: req.user!.id,
+    });
+  }
+
+  /** A voucher entered by mistake: reversed, with the reason. */
+  @Post('vouchers/:id/cancel')
+  cancelVoucher(@Req() req: Request, @Param('id', ParseUUIDPipe) id: string, @Body() body: { reason?: string }) {
+    return this.finance.cancelVoucher(id, body?.reason ?? '', req.user!.id);
+  }
+
+  /** Edit a voucher: the original is reversed and the corrected one recorded, together. */
+  @Post('vouchers/:id/correct')
+  correctVoucher(
+    @Req() req: Request,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { direction?: 'IN' | 'OUT'; counter?: LedgerAccountCode; amount?: string; memo?: string; occurredAt?: string; reason?: string },
+  ) {
+    return this.finance.correctVoucher(id, {
+      direction: body?.direction as 'IN' | 'OUT',
+      counter: body?.counter as LedgerAccountCode,
+      amount: body?.amount ?? '',
+      memo: body?.memo,
+      occurredAt: body?.occurredAt,
+      reason: body?.reason ?? '',
       userId: req.user!.id,
     });
   }

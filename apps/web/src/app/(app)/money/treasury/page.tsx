@@ -6,7 +6,8 @@ import { MetricCard, MetricGrid } from '@/components/metric-card';
 import { Page, PageHeader } from '@/components/page';
 import { PendingCheques } from '@/components/pending-cheques';
 import { TableCount, TableEmpty, TablePanel } from '@/components/table-panel';
-import { TreasuryActions } from '@/components/treasury-actions';
+import { CancelledToggle, toggleCancelledHref } from '@/components/cancelled-toggle';
+import { TreasuryActions, VoucherRowActions } from '@/components/treasury-actions';
 import {
   Table,
   TableBody,
@@ -25,7 +26,7 @@ import { getFormat } from '@/i18n/get-format';
 
 const LIMIT = 150;
 
-export default async function TreasuryPage() {
+export default async function TreasuryPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const [f, t, tr, locale] = await Promise.all([
     getFormat(),
     getTranslations('money.treasury'),
@@ -33,10 +34,12 @@ export default async function TreasuryPage() {
     getLocale(),
   ]);
   await requireAdmin();
+  const params = await searchParams;
+  const showCancelled = params.cancelled === '1';
   const since = monthStart();
   const [accounts, movements, cheques, month] = await Promise.all([
     getMoneyAccounts(),
-    getAccountLedger('CASH', LIMIT),
+    getAccountLedger('CASH', LIMIT, showCancelled),
     getCheques('PENDING'),
     // Totals from the API, not from the rows below — those stop at LIMIT.
     getCashFlow(since, today(), 'month'),
@@ -90,11 +93,14 @@ export default async function TreasuryPage() {
       <TablePanel
         minWidth="22rem"
         footer={
-          <TableCount>
-            {movements.length >= LIMIT
-              ? t('recent', { limit: LIMIT })
-              : tr('nouns.movements', { count: movements.length })}
-          </TableCount>
+          <>
+            <TableCount>
+              {movements.length >= LIMIT
+                ? t('recent', { limit: LIMIT })
+                : tr('nouns.movements', { count: movements.length })}
+            </TableCount>
+            <CancelledToggle shown={showCancelled} href={toggleCancelledHref('/money/treasury', params, showCancelled)} />
+          </>
         }
       >
         {movements.length === 0 ? (
@@ -111,12 +117,13 @@ export default async function TreasuryPage() {
                 <TableHead className="hidden w-[240px] md:table-cell">{t('columns.fromOrTo')}</TableHead>
                 <TableHead className="w-[150px] text-end">{t('columns.amount')}</TableHead>
                 <TableHead className="hidden w-[150px] text-end sm:table-cell">{t('columns.balance')}</TableHead>
+                <TableHead className="w-[76px]" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {f.byDay(movements).map((day) => (
                 <Fragment key={day.key}>
-                  <DayRow label={day.label} span={4} />
+                  <DayRow label={day.label} span={5} />
                   {day.rows.map((m) => {
                     const effect = Number(m.effect);
                     const mark = MONEY[directionOf(effect)];
@@ -138,13 +145,31 @@ export default async function TreasuryPage() {
                           </span>
                         </TableCell>
                         <TableCell className="text-end">
-                          <Amount value={effect} signed className={cn('text-sm font-semibold', mark.tone)} />
+                          <Amount
+                            value={effect}
+                            signed
+                            className={cn('text-sm font-semibold', m.cancelledAt ? 'text-muted-foreground line-through' : mark.tone)}
+                          />
                         </TableCell>
                         <TableCell className="hidden text-end sm:table-cell">
                           <Amount
                             value={m.runningBalance}
                             className={cn('font-medium', Number(m.runningBalance) < 0 && 'text-destructive')}
                           />
+                        </TableCell>
+                        <TableCell className="pe-3">
+                          {/* Only a live hand-entered voucher is edited or cancelled here; every
+                              other movement is corrected where it was made. */}
+                          {m.sourceType === 'voucher' && !m.reversesId && !m.cancelledAt ? (
+                            <VoucherRowActions
+                              entryId={m.id}
+                              effect={effect}
+                              counter={other}
+                              amount={m.amount}
+                              occurredAt={m.occurredAt}
+                              memo={m.memo}
+                            />
+                          ) : null}
                         </TableCell>
                       </TableRow>
                     );

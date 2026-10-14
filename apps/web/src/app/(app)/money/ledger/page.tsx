@@ -17,6 +17,7 @@ import {
   type Mark,
 } from '@/components/ledger-entry';
 import { Page, PageHeader } from '@/components/page';
+import { CancelledToggle, toggleCancelledHref } from '@/components/cancelled-toggle';
 import { TableEmpty, TablePagination, TablePanel } from '@/components/table-panel';
 import { Button } from '@/components/ui/button';
 import {
@@ -65,6 +66,8 @@ export default async function LedgerPage({
   if (code) keep.set('code', code);
   if (from) keep.set('from', from);
   if (to) keep.set('to', to);
+  const showCancelled = params.cancelled === '1';
+  if (showCancelled) keep.set('cancelled', '1');
 
   const query = new URLSearchParams(keep);
   query.set('limit', String(PAGE_SIZE));
@@ -124,14 +127,20 @@ export default async function LedgerPage({
         minWidth="22rem"
         toolbar={lens ? <Lens account={lens} marks={marks} all={!account} /> : undefined}
         footer={
-          <TablePagination
-            page={page}
-            pageSize={PAGE_SIZE}
-            total={total}
-            count={entries.length}
-            noun="entries"
-            href={pageHref}
-          />
+          <>
+            <TablePagination
+              page={page}
+              pageSize={PAGE_SIZE}
+              total={total}
+              count={entries.length}
+              noun="entries"
+              href={pageHref}
+            />
+            {/* Tracing one record already shows all that happened to it. */}
+            {params.sourceId ? null : (
+              <CancelledToggle shown={showCancelled} href={toggleCancelledHref('/money/ledger', params, showCancelled)} />
+            )}
+          </>
         }
       >
         {entries.length === 0 ? (

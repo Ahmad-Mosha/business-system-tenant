@@ -1,11 +1,12 @@
 'use client';
 
-import { ArrowDownLeft, ArrowUpRight, Banknote, FileText } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Ban, Banknote, FileText, Pencil } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { recordCheque, recordVoucher } from '@/app/(app)/money/actions';
+import { cancelVoucher, correctVoucher, recordCheque, recordVoucher } from '@/app/(app)/money/actions';
 import { DatePicker, todayISO } from '@/components/date-picker';
 import { FormDialog } from '@/components/form-dialog';
 import { MoneyInput } from '@/components/money-input';
+import { ReasonField } from '@/components/reason-field';
 import { Button } from '@/components/ui/button';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -74,18 +75,28 @@ function Optional() {
   return <span className="font-normal text-muted-foreground">{t('optional')}</span>;
 }
 
-function VoucherDialog({ kind, trigger }: { kind: keyof typeof VOUCHERS; trigger: React.ReactNode }) {
+/** A voucher as recorded, to correct: the form opens filled with it. */
+interface VoucherDraft {
+  entryId: string;
+  amount: string;
+  date: string;
+  counter: string;
+  memo: string | null;
+}
+
+function VoucherDialog({ kind, trigger, edit }: { kind: keyof typeof VOUCHERS; trigger: React.ReactNode; edit?: VoucherDraft }) {
   const t = useTranslations('money.vouchers');
+  const tc = useTranslations('corrections.voucher');
   const tr = useTranslations();
   const v = VOUCHERS[kind];
   return (
     <FormDialog
       trigger={trigger}
-      title={t(v.title)}
-      description={t(v.hint)}
-      action={recordVoucher}
-      submitLabel={t('record')}
-      success={t('recorded')}
+      title={edit ? tc('edit') : t(v.title)}
+      description={edit ? tc('editHint') : t(v.hint)}
+      action={edit ? correctVoucher.bind(null, edit.entryId) : recordVoucher}
+      submitLabel={edit ? tc('save') : t('record')}
+      success={edit ? tc('corrected') : t('recorded')}
     >
       <input type="hidden" name="direction" value={v.direction} />
       {v.fixedCounter ? <input type="hidden" name="counter" value={v.fixedCounter} /> : null}
@@ -93,11 +104,11 @@ function VoucherDialog({ kind, trigger }: { kind: keyof typeof VOUCHERS; trigger
       <div className="grid grid-cols-2 gap-3">
         <Field>
           <FieldLabel htmlFor={`${kind}-amount`}>{t('amount')}</FieldLabel>
-          <MoneyInput id={`${kind}-amount`} name="amount" autoFocus />
+          <MoneyInput id={`${kind}-amount`} name="amount" defaultValue={edit?.amount} autoFocus />
         </Field>
         <Field>
           <FieldLabel htmlFor={`${kind}-date`}>{t('date')}</FieldLabel>
-          <DatePicker id={`${kind}-date`} name="occurredAt" defaultValue={todayISO()} />
+          <DatePicker id={`${kind}-date`} name="occurredAt" defaultValue={edit?.date ?? todayISO()} />
         </Field>
       </div>
 
@@ -106,7 +117,7 @@ function VoucherDialog({ kind, trigger }: { kind: keyof typeof VOUCHERS; trigger
           <FieldLabel htmlFor={`${kind}-counter`}>
             {v.direction === 'OUT' ? t('whatFor') : t('source')}
           </FieldLabel>
-          <Select name="counter">
+          <Select name="counter" defaultValue={edit?.counter}>
             <SelectTrigger id={`${kind}-counter`} className="w-full">
               <SelectValue placeholder={tr('common.choose')} />
             </SelectTrigger>
@@ -125,9 +136,64 @@ function VoucherDialog({ kind, trigger }: { kind: keyof typeof VOUCHERS; trigger
         <FieldLabel htmlFor={`${kind}-memo`}>
           {t('note')} <Optional />
         </FieldLabel>
-        <Input id={`${kind}-memo`} name="memo" dir="auto" placeholder={t('memoPlaceholder')} />
+        <Input id={`${kind}-memo`} name="memo" dir="auto" defaultValue={edit?.memo ?? undefined} placeholder={t('memoPlaceholder')} />
       </Field>
+      {edit ? <ReasonField /> : null}
     </FormDialog>
+  );
+}
+
+/**
+ * Edit and Cancel for one hand-entered voucher in the treasury. Neither
+ * changes the voucher itself: cancelling reverses it, editing reverses it and
+ * records the corrected one — both stay in the history.
+ */
+export function VoucherRowActions({
+  entryId,
+  effect,
+  counter,
+  amount,
+  occurredAt,
+  memo,
+}: {
+  entryId: string;
+  /** Its signed effect on the treasury: positive came in. */
+  effect: number;
+  /** The account on the other side. */
+  counter: string;
+  amount: string;
+  occurredAt: string;
+  memo: string | null;
+}) {
+  const t = useTranslations('corrections');
+  const kind = effect > 0 ? (counter === 'OWNER_CAPITAL' ? 'deposit' : 'in') : 'out';
+  return (
+    <span className="flex items-center justify-end gap-1">
+      <VoucherDialog
+        kind={kind}
+        edit={{ entryId, amount, date: occurredAt.slice(0, 10), counter, memo }}
+        trigger={
+          <Button variant="outline" size="icon-sm" aria-label={t('voucher.edit')} title={t('voucher.edit')}>
+            <Pencil />
+          </Button>
+        }
+      />
+      <FormDialog
+        trigger={
+          <Button variant="outline" size="icon-sm" aria-label={t('voucher.cancel')} title={t('voucher.cancel')} className="text-destructive hover:bg-destructive-subtle hover:text-destructive">
+            <Ban />
+          </Button>
+        }
+        title={t('voucher.cancel')}
+        description={t('voucher.cancelHint')}
+        action={cancelVoucher.bind(null, entryId)}
+        submitLabel={t('voucher.cancel')}
+        success={t('voucher.cancelledToast')}
+        dismissLabel={t('keep')}
+      >
+        <ReasonField />
+      </FormDialog>
+    </span>
   );
 }
 

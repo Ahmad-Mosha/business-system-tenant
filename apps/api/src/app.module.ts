@@ -12,6 +12,7 @@ import { resolveJwtSecret } from './auth/bootstrap-config';
 import { CatalogController } from './catalog/catalog.controller';
 import { CatalogService } from './catalog/catalog.service';
 import { ENTITIES } from './database/entities';
+import { MigrationGuardService } from './database/migration-guard.service';
 import { ormOptions } from './database/orm-options';
 import { FinanceController } from './finance/finance.controller';
 import { FinanceService } from './finance/finance.service';
@@ -52,9 +53,11 @@ import { SalesService } from './sales/sales.service';
       type: 'postgres',
       url: process.env.DATABASE_URL,
       ...ormOptions,
-      // Schema now comes from src/database/migrations, run automatically on
-      // boot — see src/database/data-source.ts for the CLI that generates them.
-      migrationsRun: true,
+      // Schema comes from src/database/migrations, run on boot in production.
+      // `npm run dev` sets MIGRATIONS=manual: a hot reload must never apply a
+      // migration file that is still being written — `npm run db:migrate` does,
+      // on purpose (src/database/migrate.ts).
+      migrationsRun: process.env.MIGRATIONS !== 'manual',
       synchronize: false,
     }),
     TypeOrmModule.forFeature(ENTITIES),
@@ -74,6 +77,7 @@ import { SalesService } from './sales/sales.service';
     SalesInvoicesController,
   ],
   providers: [
+    MigrationGuardService,
     ExpensesService,
     // Every endpoint requires a session unless it opts out with @Public(),
     // so a new controller is protected by default rather than by remembering.

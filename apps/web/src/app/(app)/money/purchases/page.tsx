@@ -4,6 +4,7 @@ import { Amount } from '@/components/amount';
 import { MetricCard, MetricGrid } from '@/components/metric-card';
 import { Page, PageHeader } from '@/components/page';
 import { PaidChip } from '@/components/paid-chip';
+import { CancelledToggle, toggleCancelledHref } from '@/components/cancelled-toggle';
 import { TableCount, TableEmpty, TablePanel } from '@/components/table-panel';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,13 +18,16 @@ import {
 import { getPurchases } from '@/lib/api';
 import { money, monthStart } from '@/lib/format';
 import { requireAdmin } from '@/lib/session';
+import { cn } from '@/lib/utils';
 import { getTranslations } from 'next-intl/server';
 import { getFormat } from '@/i18n/get-format';
 
-export default async function PurchasesPage() {
+export default async function PurchasesPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const [f, t, tr] = await Promise.all([getFormat(), getTranslations('money.purchases'), getTranslations()]);
   await requireAdmin();
-  const invoices = await getPurchases();
+  const params = await searchParams;
+  const showCancelled = params.cancelled === '1';
+  const invoices = await getPurchases(showCancelled);
 
   const since = monthStart();
   const posted = invoices.filter((i) => i.status === 'POSTED');
@@ -74,9 +78,10 @@ export default async function PurchasesPage() {
       <TablePanel
         minWidth="52rem"
         footer={
-          <TableCount>
-            {tr('nouns.invoices', { count: invoices.length })}
-          </TableCount>
+          <>
+            <TableCount>{tr('nouns.invoices', { count: invoices.length })}</TableCount>
+            <CancelledToggle shown={showCancelled} href={toggleCancelledHref('/money/purchases', params, showCancelled)} />
+          </>
         }
       >
         {invoices.length === 0 ? (
@@ -100,7 +105,7 @@ export default async function PurchasesPage() {
             </TableHeader>
             <TableBody>
               {invoices.map((i) => (
-                <TableRow key={i.id} className="relative">
+                <TableRow key={i.id} className={cn('relative', i.status === 'VOID' && 'text-muted-foreground')}>
                   <TableCell>
                     <Link
                       href={`/money/purchases/${i.id}`}
@@ -122,7 +127,7 @@ export default async function PurchasesPage() {
                   <TableCell>
                     <PaidChip status={i.paidStatus} />
                   </TableCell>
-                  <TableCell className="num text-end font-medium">{money(i.landedTotal)}</TableCell>
+                  <TableCell className={cn('num text-end font-medium', i.status === 'VOID' && 'font-normal line-through')}>{money(i.landedTotal)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

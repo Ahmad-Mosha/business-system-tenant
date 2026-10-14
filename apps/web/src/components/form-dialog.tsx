@@ -1,10 +1,9 @@
 'use client';
 
-import { AlertTriangle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useActionState, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ProblemNotice } from '@/components/problem-notice';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -17,12 +16,13 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Spinner } from '@/components/ui/spinner';
+import type { Problem } from '@/lib/problem';
 
 /** The shape every server action behind a dialog returns. */
 export type DialogFormState =
   | { status: 'idle' }
   | { status: 'saved'; message?: string }
-  | { status: 'error'; message: string };
+  | { status: 'error'; message: string; problem?: Problem };
 
 type Action<S extends DialogFormState> = (prev: S, form: FormData) => Promise<S>;
 
@@ -41,6 +41,7 @@ export function FormDialog<S extends DialogFormState>({
   success,
   children,
   wide = false,
+  dismissLabel,
 }: {
   trigger: ReactNode;
   title: ReactNode;
@@ -51,6 +52,8 @@ export function FormDialog<S extends DialogFormState>({
   success: string | ((state: S) => string);
   children: ReactNode;
   wide?: boolean;
+  /** The way out, when "Cancel" would read like the action itself ("Cancel voucher"). */
+  dismissLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -65,6 +68,7 @@ export function FormDialog<S extends DialogFormState>({
           action={action}
           submitLabel={submitLabel}
           success={success}
+          dismissLabel={dismissLabel}
           onDone={() => setOpen(false)}
         >
           {children}
@@ -80,12 +84,14 @@ function FormBody<S extends DialogFormState>({
   success,
   onDone,
   children,
+  dismissLabel,
 }: {
   action: Action<S>;
   submitLabel: string;
   success: string | ((state: S) => string);
   onDone: () => void;
   children: ReactNode;
+  dismissLabel?: string;
 }) {
   const t = useTranslations('common');
   // React queues every submit, so a fast double click would record a payment
@@ -120,16 +126,11 @@ function FormBody<S extends DialogFormState>({
       <fieldset disabled={pending} className="grid gap-4">
         {children}
       </fieldset>
-      {state.status === 'error' ? (
-        <Alert variant="destructive">
-          <AlertTriangle />
-          <AlertDescription>{state.message}</AlertDescription>
-        </Alert>
-      ) : null}
+      {state.status === 'error' ? <ProblemNotice problem={state.problem} message={state.message} /> : null}
       <DialogFooter>
         <DialogClose asChild>
           <Button type="button" variant="ghost" disabled={pending}>
-            {t('cancel')}
+            {dismissLabel ?? t('cancel')}
           </Button>
         </DialogClose>
         <Button type="submit" disabled={pending} className="min-w-24">

@@ -18,7 +18,7 @@ export interface ImportOutcome {
 export type UploadState =
   | { status: 'idle' }
   | { status: 'done'; result: ImportOutcome; filename: string }
-  | { status: 'error'; message: string };
+  | { status: 'error'; message: string; problem?: import('@/lib/problem').Problem };
 
 /**
  * Forwards the upload to the API. Going through the server keeps the API
@@ -38,7 +38,7 @@ export async function uploadReport(
 
   // The API returns a readable reason for a malformed file; surface it.
   const r = await apiRequest<ImportOutcome>('/noon/imports', 'POST', body);
-  if (!r.ok) return { status: 'error', message: r.message };
+  if (!r.ok) return { status: 'error', message: r.message, problem: r.problem };
 
   revalidatePath('/');
   revalidatePath('/products');

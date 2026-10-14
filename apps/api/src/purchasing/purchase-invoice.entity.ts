@@ -13,10 +13,10 @@ import {
 import { ProductVariant } from '../catalog/product-variant.entity';
 import { Supplier } from './supplier.entity';
 
-export type PurchaseStatus = 'DRAFT' | 'POSTED';
+export type PurchaseStatus = 'DRAFT' | 'POSTED' | 'VOID';
 export type PurchasePayment = 'CASH' | 'CREDIT';
 export type CostAllocation = 'BY_VALUE' | 'PER_UNIT';
-export type PaidStatus = 'DRAFT' | 'UNPAID' | 'PARTIAL' | 'PAID';
+export type PaidStatus = 'DRAFT' | 'UNPAID' | 'PARTIAL' | 'PAID' | 'VOID';
 
 export interface PurchaseSettlement {
   status: PurchaseStatus;
@@ -35,6 +35,7 @@ export function payableTotalOf(i: Pick<PurchaseSettlement, 'goodsTotal' | 'extra
 /** Where an invoice sits on the paid axis, derived from `settledAmount`. */
 export function paidStatusOf(i: PurchaseSettlement): PaidStatus {
   if (i.status === 'DRAFT') return 'DRAFT';
+  if (i.status === 'VOID') return 'VOID';
   if (i.payment === 'CASH') return 'PAID'; // paid the moment it posts
   const settled = Number(i.settledAmount);
   const total = payableTotalOf(i);
@@ -47,7 +48,8 @@ export function paidStatusOf(i: PurchaseSettlement): PaidStatus {
  * A purchase invoice — فاتورة شراء. While `DRAFT` it is just a plan; posting it
  * is the single event that brings the goods into stock at their landed cost,
  * updates each variant's moving-average cost, and books the money side.
- * A posted invoice is immutable; a mistake is a new reversing invoice.
+ * A posted invoice is immutable; a mistake is cancelled (`VOID`, every effect
+ * reversed) and, to correct it, re-entered as a new draft that `replacesId` it.
  */
 @Entity('purchase_invoice')
 @Unique('uq_purchase_invoice_request', ['requestId'])
@@ -110,6 +112,20 @@ export class PurchaseInvoice {
 
   @Column({ type: 'timestamptz', nullable: true })
   postedAt: Date | null;
+
+  /** Why, when and by whom a posted invoice was cancelled. */
+  @Column({ type: 'text', nullable: true })
+  voidReason: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  voidedAt: Date | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  voidedById: string | null;
+
+  /** On a correction draft: the cancelled invoice it re-enters. */
+  @Column({ type: 'uuid', nullable: true })
+  replacesId: string | null;
 
   @Column({ name: 'created_by_id', type: 'uuid', nullable: true })
   createdById: string | null;

@@ -19,6 +19,7 @@ import { bdi } from '@/i18n/rich';
 import { getCustomer } from '@/lib/api';
 import { money } from '@/lib/format';
 import { SALES_TONE, salesPaidStatus } from '@/lib/sales';
+import { blockedBy } from '@/lib/problem';
 import { requireAdmin } from '@/lib/session';
 
 export default async function CustomerPage({ params }: { params: Promise<{ id: string }> }) {
@@ -53,6 +54,8 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                 confirmLabel={t('archiveConfirm')}
                 success={t('archived')}
                 action={setCustomerActive.bind(null, customer.id, false)}
+                blocked={blockedBy('customer.archiveBlocked', customer.blocked?.archive)}
+                blockedTitle={<bdi>{customer.name}</bdi>}
               />
             ) : (
               <ConfirmAction
@@ -69,7 +72,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                 action={setCustomerActive.bind(null, customer.id, true)}
               />
             )}
-            {customer.invoices.length === 0 ? (
+            {(
               <ConfirmAction
                 trigger={
                   <Button variant="outline" className="text-destructive hover:bg-destructive-subtle hover:text-destructive">
@@ -82,8 +85,10 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                 confirmLabel={t('deleteConfirm')}
                 destructive
                 action={deleteCustomer.bind(null, customer.id)}
+                blocked={blockedBy('customer.deleteBlocked', customer.blocked?.delete)}
+                blockedTitle={<bdi>{customer.name}</bdi>}
               />
-            ) : null}
+            )}
             {customer.active ? (
               <Button asChild>
                 <Link href="/sales/new">

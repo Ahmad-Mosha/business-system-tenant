@@ -1,9 +1,20 @@
 import { getTranslations } from 'next-intl/server';
+import type { Problem } from './problem';
 import { authHeaders } from './session';
 
 const API = process.env.API_URL ?? 'http://localhost:3001';
 
-export type ApiResult<T> = { ok: true; data: T } | { ok: false; message: string };
+/** A refusal keeps its `problem` — the screen can then name and link what's in the way. */
+export type ApiResult<T> = { ok: true; data: T } | { ok: false; message: string; problem?: Problem };
+
+/** A bare HTTP status, in words a person can act on — never the API's own text. */
+const STATUS: Record<number, string> = {
+  400: 'status.invalid',
+  401: 'api.auth.required',
+  403: 'api.auth.forbidden',
+  404: 'api.notFound',
+  409: 'status.conflict',
+};
 
 /**
  * Every server action's call to the API. A failure is an answer, not an
@@ -34,14 +45,20 @@ export async function apiRequest<T = unknown>(
   if (res.ok) return { ok: true, data: data as T };
 
   const t = await getTranslations('errors');
-  // A problem the API names (apps/api/src/problem.ts) reads in the reader's language.
+  // A problem the API names (apps/api/src/problem.ts) reads in the reader's
+  // language: its headline, then each reason, so even a toast says it all.
   if (typeof data?.code === 'string') {
-    const key = `api.${data.code}` as Parameters<typeof t>[0];
-    if (t.has(key)) return { ok: false, message: t(key, data.params ?? {}) };
+    const problem: Problem = { code: data.code, params: data.params, blockers: data.blockers, reasons: data.reasons };
+    const say = (code: string, params?: Record<string, string | number>) => {
+      const key = `api.${code}` as Parameters<typeof t>[0];
+      return t.has(key) ? t(key, params ?? {}) : null;
+    };
+    const words = [say(problem.code, problem.params), ...(problem.reasons ?? []).map((r) => say(r.code, r.params))].filter(Boolean);
+    if (words.length) return { ok: false, message: words.join(' '), problem };
   }
-  // Otherwise the API's own reason — one, or a list of them from validation.
-  const reason: unknown = data?.message;
-  if (typeof reason === 'string' && reason) return { ok: false, message: reason };
-  if (Array.isArray(reason) && reason.length) return { ok: false, message: reason.join(' · ') };
-  return { ok: false, message: t('requestFailed', { status: res.status }) };
+  // Anything else is for the logs, not for a person: an English validation
+  // line or "Internal server error" says nothing they can act on.
+  console.warn(`API ${method} ${path} → ${res.status}`, data?.message ?? '');
+  const key = (STATUS[res.status] ?? (res.status >= 500 ? 'status.server' : 'status.unknown')) as Parameters<typeof t>[0];
+  return { ok: false, message: t(key) };
 }

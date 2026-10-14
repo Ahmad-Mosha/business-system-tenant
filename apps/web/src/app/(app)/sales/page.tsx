@@ -5,6 +5,7 @@ import { Amount } from '@/components/amount';
 import { MetricCard, MetricGrid } from '@/components/metric-card';
 import { Page, PageHeader } from '@/components/page';
 import { PaidChip } from '@/components/paid-chip';
+import { CancelledToggle, toggleCancelledHref } from '@/components/cancelled-toggle';
 import { TableCount, TableEmpty, TablePanel } from '@/components/table-panel';
 import { ToneBadge } from '@/components/tone-badge';
 import { Button } from '@/components/ui/button';
@@ -14,11 +15,14 @@ import { getSalesInvoices } from '@/lib/api';
 import { money } from '@/lib/format';
 import { SALES_TONE, salesPaidStatus } from '@/lib/sales';
 import { requireAdmin } from '@/lib/session';
+import { cn } from '@/lib/utils';
 
-export default async function SalesInvoicesPage() {
+export default async function SalesInvoicesPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const [f, t, tr] = await Promise.all([getFormat(), getTranslations('sales'), getTranslations()]);
   await requireAdmin();
-  const invoices = await getSalesInvoices();
+  const params = await searchParams;
+  const showCancelled = params.cancelled === '1';
+  const invoices = await getSalesInvoices(showCancelled);
   const drafts = invoices.filter((i) => i.status === 'DRAFT');
   const draftValue = drafts.reduce((n, i) => n + Number(i.total), 0);
   const posted = invoices.filter((i) => i.status === 'POSTED');
@@ -44,7 +48,12 @@ export default async function SalesInvoicesPage() {
         <MetricCard label={t('draftValue')} value={<Amount value={draftValue} />} hint={t('draftValueHint')} />
       </MetricGrid>
 
-      <TablePanel minWidth="60rem" footer={<TableCount>{tr('nouns.invoices', { count: invoices.length })}</TableCount>}>
+      <TablePanel minWidth="60rem" footer={
+        <>
+          <TableCount>{tr('nouns.invoices', { count: invoices.length })}</TableCount>
+          <CancelledToggle shown={showCancelled} href={toggleCancelledHref('/sales', params, showCancelled)} />
+        </>
+      }>
         {invoices.length === 0 ? (
           <TableEmpty icon={FileText} title={t('empty')} description={t('emptyHint')} action={newInvoice} />
         ) : (
@@ -63,7 +72,7 @@ export default async function SalesInvoicesPage() {
             </TableHeader>
             <TableBody>
               {invoices.map((i) => (
-                <TableRow key={i.id} className="relative">
+                <TableRow key={i.id} className={cn('relative', i.status === 'VOID' && 'text-muted-foreground')}>
                   <TableCell>
                     <Link
                       href={`/sales/${i.id}`}
@@ -80,7 +89,7 @@ export default async function SalesInvoicesPage() {
                     <ToneBadge tone={SALES_TONE[i.status]}>{tr(`enums.salesStatus.${i.status}`)}</ToneBadge>
                   </TableCell>
                   <TableCell className="num text-end text-muted-foreground">{f.count(i.lineCount)}</TableCell>
-                  <TableCell className="num text-end font-medium">{money(i.total)}</TableCell>
+                  <TableCell className={cn('num text-end font-medium', i.status === 'VOID' && 'font-normal line-through')}>{money(i.total)}</TableCell>
                   <TableCell>{salesPaidStatus(i) ? <PaidChip status={salesPaidStatus(i)!} /> : null}</TableCell>
                   <TableCell className="num text-end text-muted-foreground">
                     {i.status === 'POSTED' && Number(i.total) - Number(i.paidAmount) > 0.005 ? money(Number(i.total) - Number(i.paidAmount)) : '—'}

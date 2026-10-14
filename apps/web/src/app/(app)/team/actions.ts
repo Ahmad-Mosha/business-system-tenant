@@ -6,7 +6,7 @@ import { apiRequest } from '@/lib/api-request';
 
 export type ModeratorFormState =
   | { status: 'idle' }
-  | { status: 'error'; message: string }
+  | { status: 'error'; message: string; problem?: import('@/lib/problem').Problem }
   | { status: 'saved'; message: string };
 
 export async function addModerator(
@@ -18,7 +18,7 @@ export async function addModerator(
     email: formData.get('email'),
     password: formData.get('password'),
   });
-  if (!r.ok) return { status: 'error', message: r.message };
+  if (!r.ok) return { status: 'error', message: r.message, problem: r.problem };
 
   revalidatePath('/team');
   const t = await getTranslations('team');
