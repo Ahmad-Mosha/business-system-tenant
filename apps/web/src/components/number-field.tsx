@@ -46,18 +46,22 @@ export function NumberField({
   className,
   onBlur,
   onKeyDown,
+  onFocus,
+  onMouseUp,
   ...props
 }: Props) {
   const rules = { decimals, negative };
-  // A value the system supplies (a stored `120.0000`) is shown as it is; the
-  // decimal limit governs typing only, so nothing stored is ever blanked.
-  const fromProp = (v: string | undefined) =>
-    cleanNumber(v ?? '', { ...rules, decimals: Number.MAX_SAFE_INTEGER }) ?? '';
+  // A value the system supplies is shown in full — the decimal limit governs
+  // typing only, so nothing stored is ever blanked — but without padding:
+  // `20000.00` reads `20,000`, `120.5000` reads `120.50`.
+  const fromProp = (v: string | undefined) => tidyStored(cleanNumber(v ?? '', { ...rules, decimals: Number.MAX_SAFE_INTEGER }) ?? '');
   const [text, setText] = useState(() => fromProp(value ?? defaultValue));
   const [seen, setSeen] = useState(value);
   const [, rerender] = useState(0);
   const caret = useRef<number | null>(null);
   const ref = useRef<HTMLInputElement>(null);
+  // Set between focusing and the mouse-up that would otherwise drop the selection.
+  const selecting = useRef(false);
   const rtl = useDirection() === 'rtl';
 
   // A parent changing the number (a recalculated total) wins over the text,
@@ -110,7 +114,20 @@ export function NumberField({
       for (let count = 0; pos < display.length && count < kept; pos++) if (display[pos] !== ',') count++;
       commit(next, pos);
     },
+    // Coming into the field selects the whole number, so typing replaces it —
+    // no aiming the caret behind a `1` to change a quantity.
+    onFocus: (e) => {
+      selecting.current = true;
+      e.currentTarget.select();
+      onFocus?.(e);
+    },
+    onMouseUp: (e) => {
+      if (selecting.current) e.preventDefault();
+      selecting.current = false;
+      onMouseUp?.(e);
+    },
     onBlur: (e) => {
+      selecting.current = false;
       const tidy = canonicalNumber(text);
       if (tidy !== text) setText(tidy);
       onBlur?.(e);
@@ -140,4 +157,12 @@ export function NumberField({
       {name ? <input type="hidden" name={name} value={canonicalNumber(text)} /> : null}
     </>
   );
+}
+
+/** A stored figure without its padding: an all-zero fraction goes, others keep at least two places. */
+function tidyStored(n: string): string {
+  const [whole, frac] = n.split('.');
+  if (frac === undefined || /^0*$/.test(frac)) return whole;
+  const trimmed = frac.replace(/0+$/, '');
+  return `${whole}.${trimmed.length < 2 ? trimmed.padEnd(2, '0') : trimmed}`;
 }

@@ -168,19 +168,19 @@ export function VoucherRowActions({
   const t = useTranslations('corrections');
   const kind = effect > 0 ? (counter === 'OWNER_CAPITAL' ? 'deposit' : 'in') : 'out';
   return (
-    <span className="flex items-center justify-end gap-0.5">
+    <span className="flex items-center justify-end gap-1">
       <VoucherDialog
         kind={kind}
         edit={{ entryId, amount, date: occurredAt.slice(0, 10), counter, memo }}
         trigger={
-          <Button variant="ghost" size="icon-sm" aria-label={t('voucher.edit')} title={t('voucher.edit')}>
+          <Button variant="outline" size="icon-sm" aria-label={t('voucher.edit')} title={t('voucher.edit')}>
             <Pencil />
           </Button>
         }
       />
       <FormDialog
         trigger={
-          <Button variant="ghost" size="icon-sm" aria-label={t('voucher.cancel')} title={t('voucher.cancel')} className="hover:text-destructive">
+          <Button variant="outline" size="icon-sm" aria-label={t('voucher.cancel')} title={t('voucher.cancel')} className="text-destructive hover:bg-destructive-subtle hover:text-destructive">
             <Ban />
           </Button>
         }

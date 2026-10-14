@@ -226,7 +226,7 @@ export default async function SupplierDetailPage({
                       {!p.cancelledAt ? (
                         <CancelAction
                           trigger={
-                            <Button variant="ghost" size="icon-sm" aria-label={tc('payment.reverse')} title={tc('payment.reverse')}>
+                            <Button variant="outline" size="icon-sm" aria-label={tc('payment.reverse')} title={tc('payment.reverse')} className="text-destructive hover:bg-destructive-subtle hover:text-destructive">
                               <Undo2 />
                             </Button>
                           }

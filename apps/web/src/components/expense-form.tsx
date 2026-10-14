@@ -1,5 +1,5 @@
 'use client';
-import { Pencil } from 'lucide-react';
+import { Ban, Pencil } from 'lucide-react';
 import { useId, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { correctExpense, recordExpense, voidExpense } from '@/app/(app)/money/expenses/actions';
@@ -31,7 +31,7 @@ export function ExpenseForm({ categories, expense }: { categories: Array<{ id: s
   // One submission id per distinct form content: a resend of the same one records it once.
   const attempt = useRef<{ fingerprint: string; id: string } | null>(null);
   const trigger = expense ? (
-    <Button size="icon-sm" variant="ghost" aria-label={tc('edit')} title={tc('edit')}><Pencil /></Button>
+    <Button size="sm" variant="outline"><Pencil />{tc('edit')}</Button>
   ) : (
     <Button>{t('add')}</Button>
   );
@@ -57,7 +57,7 @@ export function ExpenseForm({ categories, expense }: { categories: Array<{ id: s
 export function VoidExpense({ id }: { id: string }) {
   const t = useTranslations('expenses');
   const tc = useTranslations('corrections');
-  return <FormDialog title={t('void')} description={t('voidHint')} trigger={<Button size="sm" variant="ghost">{t('void')}</Button>} submitLabel={t('void')} success={t('voided')}
+  return <FormDialog title={t('void')} description={t('voidHint')} trigger={<Button size="sm" variant="outline" className="text-destructive hover:bg-destructive-subtle hover:text-destructive"><Ban />{t('void')}</Button>} submitLabel={t('void')} success={t('voided')}
     dismissLabel={tc('keep')} action={(_previous: DialogFormState, form: FormData) => voidExpense(id, form)}>
     <ReasonField />
   </FormDialog>;

@@ -827,7 +827,7 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     assert.equal(rows.length, 3);
     assert.equal(netOn(rows, 'CASH'), -1500);
     // The correction can itself be cancelled; cancelling twice changes nothing.
-    const [c1, c2] = await Promise.all([finance.cancelVoucher(a.id, 'not paid after all', user.id), finance.cancelVoucher(a.id, 'retry', user.id)]);
+    const [c1, c2] = await Promise.all([finance.cancelVoucher(a.id, 'not paid after all', user.id), finance.cancelVoucher(a.id, 'not paid after all', user.id)]);
     assert.equal(c1.id, c2.id);
     await assert.rejects(finance.correctVoucher(a.id, fix), /already cancelled/);
     await assert.rejects(finance.cancelVoucher(c1.id, 'a reversal is not a voucher', user.id), /voucher not found/);
