@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { archiveProduct, deleteProduct, restoreProduct, updateProduct } from '@/app/(app)/inventory/actions';
+import { blockedBy } from '@/lib/problem';
 import { ConfirmAction } from '@/components/confirm-action';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Amount } from '@/components/amount';
@@ -13,17 +14,6 @@ import { ChannelListings } from '@/components/channel-listings';
 import { MetricCard, MetricGrid, type MetricTone } from '@/components/metric-card';
 import { Page, PageHeader } from '@/components/page';
 import type { Tone } from '@/components/tone-badge';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -87,10 +77,12 @@ export function ProductScreen({
       if (r.ok) toast.success(t('restored'));
       else toast.error(r.message);
     });
-  const deleteButton = product.deletable ? (
+  // Both actions are always offered; when one is blocked, its dialog says by
+  // what (from the API — the same rule the action enforces) instead of hiding it.
+  const deleteButton = (
     <ConfirmAction
       trigger={
-        <Button variant="outline" className="text-destructive hover:bg-destructive-subtle hover:text-destructive">
+        <Button variant="ghost" className="text-destructive hover:bg-destructive-subtle hover:text-destructive">
           <Trash2 />
           {t('delete')}
         </Button>
@@ -100,8 +92,10 @@ export function ProductScreen({
       confirmLabel={t('deleteConfirm')}
       destructive
       action={() => deleteProduct(product.id)}
+      blocked={blockedBy('product.deleteBlocked', product.blocked?.delete)}
+      blockedTitle={<bdi>{product.name}</bdi>}
     />
-  ) : null;
+  );
 
   const cancel = () => {
     setName(product.name);
@@ -118,13 +112,6 @@ export function ProductScreen({
     0,
   );
   const state = stockState(onHand);
-  const archiveBlockers = [
-    ...(onHand !== 0 ? [t('archiveStock', { count: Math.abs(onHand) })] : []),
-    ...(inOrders > 0 ? [t('archiveOrders', { count: inOrders })] : []),
-    ...(product.listings.length > 0 ? [t('archiveListings', { count: product.listings.length })] : []),
-    ...(product.draftPurchases > 0 ? [t('archiveDrafts', { count: product.draftPurchases })] : []),
-  ];
-  const canArchive = archiveBlockers.length === 0;
   const categoryName = !product.category
     ? te('category.NONE')
     : isOneOf(CATEGORIES, product.category)
@@ -177,50 +164,22 @@ export function ProductScreen({
                 <Pencil />
                 {t('edit')}
               </Button>
-              {product.deletable ? deleteButton : (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
+              <ConfirmAction
+                trigger={
                   <Button variant="outline" className="text-destructive hover:bg-destructive-subtle hover:text-destructive">
                     <Archive />
                     {t('archive')}
                   </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>
-                      {canArchive
-                        ? t.rich('archiveTitle', { name: product.name, bdi })
-                        : t('archiveBlockedTitle')}
-                    </AlertDialogTitle>
-                    <AlertDialogDescription>
-                      {t(canArchive ? 'archiveDescription' : 'archiveBlockedDescription')}
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  {!canArchive ? (
-                    <ul className="list-disc space-y-1 ps-5 text-xs text-muted-foreground">
-                      {archiveBlockers.map((blocker) => <li key={blocker}>{blocker}</li>)}
-                    </ul>
-                  ) : null}
-                  <AlertDialogFooter>
-                    <AlertDialogCancel disabled={archiving}>{tc('cancel')}</AlertDialogCancel>
-                    <AlertDialogAction
-                      variant="destructive"
-                      disabled={archiving || !canArchive}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        startArchive(async () => {
-                          const r = await archiveProduct(product.id);
-                          if (r && !r.ok) toast.error(r.message);
-                        });
-                      }}
-                    >
-                      {archiving ? <Spinner /> : null}
-                      {t('archiveConfirm')}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-              )}
+                }
+                title={t.rich('archiveTitle', { name: product.name, bdi })}
+                description={t('archiveDescription')}
+                confirmLabel={t('archiveConfirm')}
+                destructive
+                action={() => archiveProduct(product.id)}
+                blocked={blockedBy('product.archiveBlocked', product.blocked?.archive)}
+                blockedTitle={<bdi>{product.name}</bdi>}
+              />
+              {deleteButton}
             </>
           )
         }

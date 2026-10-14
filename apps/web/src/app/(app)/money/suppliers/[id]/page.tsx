@@ -1,6 +1,8 @@
-import { Archive, ArchiveRestore, Trash2 } from 'lucide-react';
+import { Archive, ArchiveRestore, Trash2, Undo2 } from 'lucide-react';
 import Link from 'next/link';
-import { deleteSupplier, setSupplierActive } from '@/app/(app)/money/actions';
+import { deleteSupplier, reverseSupplierPayment, setSupplierActive } from '@/app/(app)/money/actions';
+import { CancelAction } from '@/components/cancel-action';
+import { CancelledToggle, toggleCancelledHref } from '@/components/cancelled-toggle';
 import { ConfirmAction } from '@/components/confirm-action';
 import { SupplierForm } from '@/components/supplier-form';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -24,23 +26,33 @@ import {
 import { getSupplier } from '@/lib/api';
 import { money } from '@/lib/format';
 import { isSystemMemo } from '@/lib/money';
+import { blockedBy } from '@/lib/problem';
 import { requireAdmin } from '@/lib/session';
+import { cn } from '@/lib/utils';
 import { getTranslations } from 'next-intl/server';
 import { getFormat } from '@/i18n/get-format';
 
-export default async function SupplierDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const [f, t, tr] = await Promise.all([getFormat(), getTranslations('money.supplier'), getTranslations()]);
+export default async function SupplierDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
+  const [f, t, tr, tc] = await Promise.all([getFormat(), getTranslations('money.supplier'), getTranslations(), getTranslations('corrections')]);
   await requireAdmin();
   const { id } = await params;
-  const supplier = await getSupplier(id).catch(() => null);
+  const query = await searchParams;
+  const showCancelled = query.cancelled === '1';
+  const supplier = await getSupplier(id, showCancelled).catch(() => null);
   if (!supplier) notFound();
 
   const posted = supplier.invoices.filter((i) => i.status === 'POSTED');
   const purchased = posted.reduce((n, i) => n + Number(i.landedTotal), 0);
-  const paid = supplier.payments.reduce((n, p) => n + Number(p.amount), 0);
+  // Live payments only: a reversed one and its reversal cancel out.
+  const livePayments = supplier.payments.filter((p) => !p.reversesId && !p.cancelledAt);
+  const paid = livePayments.reduce((n, p) => n + Number(p.amount), 0);
   const owed = Number(supplier.balance);
-  // Never used: nothing in the books points at it, so it can be deleted outright.
-  const unused = supplier.invoices.length === 0 && supplier.payments.length === 0;
 
   return (
     <Page>
@@ -70,6 +82,8 @@ export default async function SupplierDetailPage({ params }: { params: Promise<{
                 confirmLabel={t('archiveConfirm')}
                 success={t('archived')}
                 action={setSupplierActive.bind(null, supplier.id, false)}
+                blocked={blockedBy('supplier.archiveBlocked', supplier.blocked?.archive)}
+                blockedTitle={<bdi>{supplier.name}</bdi>}
               />
             ) : (
               <ConfirmAction
@@ -86,7 +100,7 @@ export default async function SupplierDetailPage({ params }: { params: Promise<{
                 action={setSupplierActive.bind(null, supplier.id, true)}
               />
             )}
-            {unused ? (
+            {(
               <ConfirmAction
                 trigger={
                   <Button variant="outline" className="text-destructive hover:bg-destructive-subtle hover:text-destructive">
@@ -99,8 +113,10 @@ export default async function SupplierDetailPage({ params }: { params: Promise<{
                 confirmLabel={t('deleteConfirm')}
                 destructive
                 action={deleteSupplier.bind(null, supplier.id)}
+                blocked={blockedBy('supplier.deleteBlocked', supplier.blocked?.delete)}
+                blockedTitle={<bdi>{supplier.name}</bdi>}
               />
-            ) : null}
+            )}
             {supplier.active ? <PaySupplier supplierId={supplier.id} owed={supplier.balance} /> : null}
           </>
         }
@@ -128,7 +144,7 @@ export default async function SupplierDetailPage({ params }: { params: Promise<{
         <MetricCard
           label={t('paid')}
           value={<Amount value={paid} />}
-          hint={tr('nouns.payments', { count: supplier.payments.length })}
+          hint={tr('nouns.payments', { count: livePayments.length })}
         />
       </MetricGrid>
 
@@ -151,7 +167,7 @@ export default async function SupplierDetailPage({ params }: { params: Promise<{
               </TableHeader>
               <TableBody>
                 {supplier.invoices.map((i) => (
-                  <TableRow key={i.id} className="relative">
+                  <TableRow key={i.id} className={cn('relative', i.status === 'VOID' && 'text-muted-foreground')}>
                     <TableCell>
                       <Link
                         href={`/money/purchases/${i.id}`}
@@ -167,7 +183,9 @@ export default async function SupplierDetailPage({ params }: { params: Promise<{
                     <TableCell>
                       <PaidChip status={i.paidStatus} />
                     </TableCell>
-                    <TableCell className="num text-end font-medium">{money(i.landedTotal)}</TableCell>
+                    <TableCell className={cn('num text-end font-medium', i.status === 'VOID' && 'font-normal line-through')}>
+                      {money(i.landedTotal)}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -185,22 +203,52 @@ export default async function SupplierDetailPage({ params }: { params: Promise<{
           ) : (
             <Table>
               <TableBody>
-                {supplier.payments.map((p) => (
+                {supplier.payments.filter((p) => !p.reversesId).map((p) => (
                   <TableRow key={p.id}>
                     <TableCell className="h-auto max-w-0 py-2.5">
-                      <p className="truncate">
+                      <p className={cn('truncate', p.cancelledAt && 'text-muted-foreground line-through')}>
                         <bdi>{p.memo && !isSystemMemo(p.memo) ? p.memo : t('payment')}</bdi>
                       </p>
                       <p className="text-xs text-muted-foreground">{f.dateTime(p.occurredAt)}</p>
+                      {p.cancelledAt ? (
+                        <p className="truncate text-xs text-destructive/80">
+                          {p.cancelledBy
+                            ? tc('cancelledBy', { name: p.cancelledBy, date: f.date(p.cancelledAt) })
+                            : tc('cancelledOn', { date: f.date(p.cancelledAt) })}
+                          {p.cancelReason ? <> — <bdi>{p.cancelReason}</bdi></> : null}
+                        </p>
+                      ) : null}
                     </TableCell>
                     <TableCell className="w-[130px] text-end">
-                      <Amount value={-Number(p.amount)} className="font-medium text-destructive" />
+                      <Amount
+                        value={-Number(p.amount)}
+                        className={cn('font-medium', p.cancelledAt ? 'text-muted-foreground line-through' : 'text-destructive')}
+                      />
+                    </TableCell>
+                    <TableCell className="w-10 pe-2">
+                      {!p.cancelledAt ? (
+                        <CancelAction
+                          trigger={
+                            <Button variant="outline" size="icon-sm" aria-label={tc('payment.reverse')} title={tc('payment.reverse')} className="text-destructive hover:bg-destructive-subtle hover:text-destructive">
+                              <Undo2 />
+                            </Button>
+                          }
+                          title={tc('payment.reverseTitle')}
+                          description={tc('payment.reverseHint', { amount: money(p.amount) })}
+                          confirmLabel={tc('payment.reverse')}
+                          success={tc('payment.reversed')}
+                          action={reverseSupplierPayment.bind(null, supplier.id, p.id)}
+                        />
+                      ) : null}
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           )}
+          <div className="flex justify-end border-t px-4 py-1.5">
+            <CancelledToggle shown={showCancelled} href={toggleCancelledHref(`/money/suppliers/${supplier.id}`, query, showCancelled)} />
+          </div>
         </Card>
       </div>
     </Page>

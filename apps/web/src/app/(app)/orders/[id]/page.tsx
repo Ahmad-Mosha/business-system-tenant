@@ -7,7 +7,6 @@ import { OrderActions } from '@/components/order-actions';
 import {
   ALL_ORDER_STATUSES,
   ALL_PAYMENT_STATUSES,
-  EDITABLE_STATUSES,
   PaymentBadge,
   StatusBadge,
 } from '@/components/order-status';
@@ -26,6 +25,7 @@ import {
 } from '@/components/ui/table';
 import { getAssignees, getOrder } from '@/lib/api';
 import { money } from '@/lib/format';
+import { BlockedDialog } from '@/components/blocked-dialog';
 import { requireSession } from '@/lib/session';
 import { isOneOf } from '@/lib/utils';
 import { useTranslations } from 'next-intl';
@@ -50,7 +50,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   if (!order) notFound();
 
   const unmapped = order.items.filter((i) => !i.variantId).length;
-  const editable = EDITABLE_STATUSES.includes(order.status);
+  // Why its items and prices can't change right now — the API's own rule (status, then payment).
+  const editBlocked = order.blocked?.edit?.length ? order.blocked.edit[0] : null;
   const units = order.items.reduce((n, i) => n + i.quantity, 0);
 
   return (
@@ -69,14 +70,26 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           date: f.dateTime(order.placedAt),
         })}
         actions={
-          editable ? (
+          editBlocked ? (
+            // Still offered: it explains why the order can't be edited now, instead of vanishing.
+            <BlockedDialog
+              trigger={
+                <Button variant="outline">
+                  <Pencil />
+                  {t('detail.edit')}
+                </Button>
+              }
+              title={<span className="num">{order.orderNumber}</span>}
+              problem={editBlocked}
+            />
+          ) : (
             <Button variant="outline" asChild>
               <Link href={`/orders/${order.id}/edit`}>
                 <Pencil />
                 {t('detail.edit')}
               </Link>
             </Button>
-          ) : null
+          )
         }
       />
 

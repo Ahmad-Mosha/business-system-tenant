@@ -19,7 +19,8 @@ import {
   type OrderStatus,
   type PaymentStatus,
 } from './order.entity';
-import { problem } from '../problem';
+import { problem, refuse, type Reason } from '../problem';
+import { archivedProducts } from '../catalog/product-blockers';
 import { lockStock } from '../inventory/stock-lock';
 import { User } from '../auth/user.entity';
 import { isUniqueViolation } from '../database/unique-violation';
@@ -154,7 +155,19 @@ export class OrdersService {
         ? { id: order.assignedTo.id, name: order.assignedTo.name }
         : null,
       events,
+      blocked: { edit: OrdersService.editBlockers(order) },
     };
+  }
+
+  /**
+   * Why an order's items and prices can't be edited right now — its status
+   * (it has left the warehouse, or was closed) or its payment (the amount is
+   * already in the treasury). Read by the order screen and enforced by `update`.
+   */
+  private static editBlockers(order: Pick<Order, 'status' | 'paymentStatus'>): Reason[] {
+    if (!OrdersService.EDITABLE.includes(order.status)) return [{ code: 'order.locked', params: { status: order.status } }];
+    if (order.paymentStatus !== 'UNPAID') return [{ code: 'order.paidEdit', params: { payment: order.paymentStatus } }];
+    return [];
   }
 
   /** Manual creation, used for orders that arrive through social conversations. */
@@ -262,8 +275,8 @@ export class OrdersService {
       requested.set(id, (requested.get(id) ?? 0) + item.quantity);
     }
 
-    const rows: Array<{ id: string; name: string; onHand: number }> = await tx.query(
-      `SELECT v.id, COALESCE(v.name || ' — ' || p.name, p.name) AS name,
+    const rows: Array<{ id: string; name: string; onHand: number; productId: string }> = await tx.query(
+      `SELECT v.id, v.product_id AS "productId", COALESCE(v.name || ' — ' || p.name, p.name) AS name,
               COALESCE((SELECT SUM(quantity) FROM stock_movement m WHERE m.variant_id = v.id AND m.location = 'WAREHOUSE'), 0)::int AS "onHand"
        FROM product_variant v JOIN product p ON p.id = v.product_id
        WHERE v.id = ANY($1) AND v.active AND p.active`,
@@ -271,23 +284,28 @@ export class OrdersService {
     );
     const onHand = new Map(rows.map((r) => [r.id, r]));
 
+    // Every short product at once, so the order is fixed in one go.
+    const short: Reason[] = [];
+    const gone = [...requested.keys()].filter((id) => !onHand.has(id));
+    if (gone.length) {
+      const archived = await archivedProducts(tx, gone);
+      short.push({ code: 'invoice.productsGone', params: { count: Math.max(archived.length, 1) }, blockers: archived });
+    }
     for (const [id, quantity] of requested) {
       const stock = onHand.get(id);
-      if (!stock) throw new BadRequestException(problem('notFound', 'variant not found'));
-      if (quantity > stock.onHand) {
-        throw new BadRequestException(
-          problem('order.stockShort', `${stock.name}: only ${stock.onHand} in stock, ${quantity} requested`, {
-            name: stock.name,
-            onHand: stock.onHand,
-            requested: quantity,
-          }),
-        );
+      if (stock && quantity > stock.onHand) {
+        short.push({
+          code: 'order.stockShort',
+          params: { name: stock.name, onHand: stock.onHand, requested: quantity },
+          blockers: [{ kind: 'product', id: stock.productId, label: stock.name, count: stock.onHand }],
+        });
       }
     }
+    if (short.length) refuse('order.stockBlocked', 'some items are not in stock in these quantities', short);
   }
 
   async assign(orderId: string, assigneeId: string | null, actor: SessionUser) {
-    if (actor.role !== 'ADMIN') throw new ForbiddenException();
+    if (actor.role !== 'ADMIN') throw new ForbiddenException(problem('order.adminAssign', 'only an admin assigns orders'));
     return this.db.transaction(async (tx) => {
       await this.assertAssignee(tx, assigneeId);
       const order = await tx.findOne(Order, { where: { id: orderId }, lock: { mode: 'pessimistic_write' } });
@@ -309,7 +327,7 @@ export class OrdersService {
    * if any order or moderator is no longer available.
    */
   async bulkAssign(orderIds: string[], assigneeId: string | null, actor: SessionUser) {
-    if (actor.role !== 'ADMIN') throw new ForbiddenException();
+    if (actor.role !== 'ADMIN') throw new ForbiddenException(problem('order.adminAssign', 'only an admin assigns orders'));
     if (!Array.isArray(orderIds) || orderIds.length === 0 || orderIds.length > 200) {
       throw new BadRequestException(problem('order.bulkSelection', 'select between 1 and 200 orders'));
     }
@@ -413,19 +431,8 @@ export class OrdersService {
       });
       if (!order) throw new NotFoundException(problem('notFound', 'order not found'));
 
-      if (!OrdersService.EDITABLE.includes(order.status)) {
-        throw new BadRequestException(
-          problem(
-            'order.locked',
-            `a ${order.status.toLowerCase()} order can no longer be edited — it has left the warehouse`,
-            { status: order.status },
-          ),
-        );
-      }
-
-      if (order.paymentStatus !== 'UNPAID') {
-        throw new BadRequestException(problem('order.paidEdit', 'reverse the payment before editing a paid or refunded order'));
-      }
+      const [blocked] = OrdersService.editBlockers(order);
+      if (blocked) throw new BadRequestException(problem(blocked.code, 'this order cannot be edited now', blocked.params));
       const oldItems = await tx.find(OrderItem, { where: { orderId } });
       await lockStock(tx, [...oldItems, ...input.items].flatMap((i) => i.variantId ? [i.variantId] : []));
 
@@ -486,7 +493,9 @@ export class OrdersService {
       const from = order.status;
       if (from === next) return order;
 
-      if (next === 'CANCELLED' && user.role !== 'ADMIN') throw new ForbiddenException();
+      if (next === 'CANCELLED' && user.role !== 'ADMIN') {
+        throw new ForbiddenException(problem('order.adminCancel', 'only an admin cancels orders'));
+      }
       if (from === 'RETURNED') throw new BadRequestException(problem('order.returnFinal', 'a received return cannot be reopened'));
       if (next === 'CANCELLED' && ['SHIPPED', 'DELIVERED'].includes(from)) {
         throw new BadRequestException(problem('order.useReturn', 'record a received return for an order that has shipped'));
@@ -499,7 +508,7 @@ export class OrdersService {
         order.returnRestock = returned.restock;
       }
       if (from === 'CANCELLED' && order.paymentStatus !== 'UNPAID') {
-        throw new BadRequestException(problem('order.returnFinal', 'a refunded or refund-due order cannot be reopened'));
+        throw new BadRequestException(problem('order.reopenPaid', 'a refunded or refund-due order cannot be reopened', { payment: order.paymentStatus }));
       }
 
       if (user.role !== 'ADMIN') {
@@ -510,7 +519,7 @@ export class OrdersService {
               'order.transition',
               `cannot move an order from ${from} to ${next}` +
                 (allowed.length ? ` — allowed: ${allowed.join(', ')}` : ' — it is final'),
-              { from, to: next },
+              { from, to: next, allowed: allowed.length },
             ),
           );
         }
@@ -571,10 +580,16 @@ export class OrdersService {
       if (from === next) return order;
 
       const inactive = order.status === 'CANCELLED' || order.status === 'RETURNED';
-      if (next === 'REFUND_DUE' || (from === 'REFUND_DUE' && next !== 'REFUNDED') ||
-          (inactive && next === 'PAID') || (next === 'REFUNDED' && !['PAID', 'REFUND_DUE'].includes(from)) ||
-          from === 'REFUNDED') {
-        throw new BadRequestException(problem('order.paymentTransition', 'this payment change is not available'));
+      // Each refused payment change says which rule it hit, in the order's own terms.
+      const refusal =
+        from === 'REFUNDED' ? 'order.refundedFinal'
+        : next === 'REFUND_DUE' ? 'order.refundDueAuto'
+        : from === 'REFUND_DUE' && next !== 'REFUNDED' ? 'order.refundPending'
+        : inactive && next === 'PAID' ? 'order.paidInactive'
+        : next === 'REFUNDED' && !['PAID', 'REFUND_DUE'].includes(from) ? 'order.refundUnpaid'
+        : null;
+      if (refusal) {
+        throw new BadRequestException(problem(refusal, 'this payment change is not available', { status: order.status, payment: from }));
       }
       if (from === 'REFUND_DUE') await this.finance.refundReturnedOrder(tx, orderId, user.id);
       order.paymentStatus = next;

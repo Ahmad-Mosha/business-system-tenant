@@ -7,7 +7,8 @@ import { LedgerService } from '../finance/ledger.service';
 import { StockMovement } from '../inventory/stock-movement.entity';
 import { isUniqueViolation } from '../database/unique-violation';
 import { lockStock } from '../inventory/stock-lock';
-import { problem } from '../problem';
+import { problem, refuse, type Reason } from '../problem';
+import { archivedProducts } from '../catalog/product-blockers';
 import { lineTotalFor, round2, unitCostFor } from '../purchasing/costing';
 import { Customer } from './customer.entity';
 import { SalesInvoice, SalesInvoiceLine } from './sales-invoice.entity';
@@ -80,7 +81,7 @@ export class SalesService {
     if (!customer) throw new NotFoundException(problem('notFound', 'customer not found'));
     const invoices = await this.invoiceRows('i.customer_id = $1', [id]);
     const owed = (await this.owedByCustomer()).get(id) ?? 0;
-    return { ...customer, balance: money(owed), invoices };
+    return { ...customer, balance: money(owed), invoices, blocked: await this.customerBlockers(this.db, id) };
   }
 
   /**
@@ -98,13 +99,8 @@ export class SalesService {
       if (patch.phone !== undefined) customer.phone = patch.phone?.trim() || null;
       if (patch.note !== undefined) customer.note = patch.note?.trim() || null;
       if (patch.active === false && customer.active) {
-        const owed = (await this.owedByCustomer(tx)).get(id) ?? 0;
-        if (owed > 0.005) {
-          throw new BadRequestException(problem('customer.archiveOwed', 'collect what is owed before archiving this customer', { owed: money(owed) }));
-        }
-        if (await tx.exists(SalesInvoice, { where: { customerId: id, status: 'DRAFT' } })) {
-          throw new BadRequestException(problem('customer.archiveDrafts', 'post or delete their draft invoices before archiving'));
-        }
+        const blocked = (await this.customerBlockers(tx, id)).archive;
+        if (blocked.length) refuse('customer.archiveBlocked', 'collect what is owed and finish drafts before archiving this customer', blocked);
       }
       if (patch.active !== undefined) customer.active = patch.active;
       return tx.save(customer);
@@ -116,11 +112,35 @@ export class SalesService {
     await this.db.transaction(async (tx) => {
       const customer = await tx.findOne(Customer, { where: { id }, lock: { mode: 'pessimistic_write' } });
       if (!customer) throw new NotFoundException(problem('notFound', 'customer not found'));
-      if (await tx.exists(SalesInvoice, { where: { customerId: id } })) {
-        throw new BadRequestException(problem('customer.inUse', 'this customer has invoices — archive them instead'));
-      }
+      const blocked = (await this.customerBlockers(tx, id)).delete;
+      if (blocked.length) refuse('customer.deleteBlocked', 'this customer has invoices — archive them instead', blocked);
       await tx.delete(Customer, { id });
     });
+  }
+
+  /**
+   * What stands in the way of deleting or archiving a customer — read by their
+   * screen and enforced by both actions. Delete: any invoice, for good.
+   * Archive: an unpaid posted invoice, or a draft still naming them.
+   */
+  private async customerBlockers(tx: DataSource | EntityManager, id: string): Promise<{ delete: Reason[]; archive: Reason[] }> {
+    const invoices: Array<{ id: string; label: string | null; date: string; detail: string; left: string }> = await tx.query(
+      `SELECT id, invoice_number AS label, invoice_date::text AS date, status AS detail, (total - paid_amount)::text AS "left"
+       FROM sales_invoice WHERE customer_id = $1 ORDER BY invoice_date DESC, created_at DESC`,
+      [id],
+    );
+    const owing = invoices.filter((i) => i.detail === 'POSTED' && Number(i.left) > 0.005);
+    const drafts = invoices.filter((i) => i.detail === 'DRAFT');
+    const owed = owing.reduce((n, i) => n + Number(i.left), 0);
+    const asBlockers = (rows: typeof invoices, withLeft = false) =>
+      rows.slice(0, 5).map((r) => ({ kind: 'sales_invoice' as const, id: r.id, label: r.label ?? undefined, date: r.date, detail: r.detail, amount: withLeft ? r.left : undefined }));
+    return {
+      delete: invoices.length ? [{ code: 'customer.hasInvoices', params: { count: invoices.length }, blockers: asBlockers(invoices) }] : [],
+      archive: [
+        ...(owing.length ? [{ code: 'customer.archiveOwed', params: { owed: money(owed) }, blockers: asBlockers(owing, true) }] : []),
+        ...(drafts.length ? [{ code: 'customer.archiveDrafts', params: { count: drafts.length }, blockers: asBlockers(drafts) }] : []),
+      ],
+    };
   }
 
   // ── Sales invoices ─────────────────────────────────────────────────────
@@ -139,8 +159,9 @@ export class SalesService {
     );
   }
 
-  listInvoices() {
-    return this.invoiceRows();
+  /** Live invoices; `cancelled` brings the voided ones back. */
+  listInvoices(cancelled = false) {
+    return this.invoiceRows(cancelled ? 'TRUE' : "i.status <> 'VOID'");
   }
 
   async getInvoice(id: string) {
@@ -164,14 +185,24 @@ export class SalesService {
     );
     const payments = await this.db.query(
       `SELECT e.id, e.amount, e.occurred_at AS "occurredAt", e.memo,
-              EXISTS (SELECT 1 FROM ledger_entry r WHERE r.reverses_id = e.id) AS reversed
+              EXISTS (SELECT 1 FROM ledger_entry r WHERE r.reverses_id = e.id) AS reversed,
+              (SELECT r.reason FROM ledger_entry r WHERE r.reverses_id = e.id LIMIT 1) AS "reversedReason"
        FROM ledger_entry e
        WHERE e.source_type = 'sales_invoice' AND e.source_id = $1 AND e.kind = 'CUSTOMER_PAYMENT'
          AND e.reverses_id IS NULL
        ORDER BY e.occurred_at, e.created_at`,
       [id],
     );
-    return { ...invoice, lines, payments };
+    const [voider] = invoice.voidedById
+      ? await this.db.query('SELECT name FROM app_user WHERE id = $1', [invoice.voidedById])
+      : [];
+    const blocked = {
+      post: invoice.status === 'DRAFT' && lines.length
+        ? (await this.postBlockers(this.db, invoice.customerId, lines as Array<{ variantId: string; quantity: number }>)).reasons
+        : [],
+      void: invoice.status === 'POSTED' ? await this.voidBlockers(this.db, invoice) : [],
+    };
+    return { ...invoice, voidedBy: voider?.name ?? null, lines, payments, blocked };
   }
 
   /** Creates a DRAFT invoice — nothing leaves stock or reaches the books until it is posted. */
@@ -248,29 +279,10 @@ export class SalesService {
       }
       const lines = await tx.find(SalesInvoiceLine, { where: { invoiceId: id }, order: { id: 'ASC' } });
       if (!lines.length) throw new BadRequestException(problem('sales.noLines', 'add at least one product'));
-      await this.assertUsable(tx, { customerId: invoice.customerId, lines });
-
-      // Repeated lines of one product are checked together, against the warehouse only.
-      const wanted = new Map<string, number>();
-      for (const l of lines) wanted.set(l.variantId, (wanted.get(l.variantId) ?? 0) + l.quantity);
-      const stock: Array<{ id: string; name: string; onHand: number; cost: string | null }> = await tx.query(
-        `SELECT v.id, CASE WHEN v.name = 'Default' THEN p.name ELSE p.name || ' — ' || v.name END AS name,
-                COALESCE((SELECT SUM(m.quantity) FROM stock_movement m
-                          WHERE m.variant_id = v.id AND m.location = 'WAREHOUSE'), 0)::int AS "onHand",
-                v.unit_cost AS cost
-         FROM product_variant v JOIN product p ON p.id = v.product_id
-         WHERE v.id = ANY($1::uuid[])`,
-        [[...wanted.keys()]],
-      );
+      await lockStock(tx, lines.map((l) => l.variantId));
+      const { reasons, stock } = await this.postBlockers(tx, invoice.customerId, lines);
+      if (reasons.length) refuse('sales.postBlocked', 'this invoice cannot be posted as it stands', reasons);
       const byId = new Map(stock.map((r) => [r.id, r]));
-      for (const [variantId, quantity] of wanted) {
-        const s = byId.get(variantId)!;
-        if (quantity > s.onHand) {
-          throw new BadRequestException(problem('sales.stockShort', `${s.name}: only ${s.onHand} in stock, ${quantity} on the invoice`, {
-            name: s.name, onHand: s.onHand, requested: quantity,
-          }));
-        }
-      }
 
       const [{ nextval }] = await tx.query("SELECT nextval('sales_invoice_number_seq')");
       const number = `SI-${nextval}`;
@@ -318,7 +330,7 @@ export class SalesService {
   }
 
   /** Undoes a payment recorded by mistake: the cash entry is reversed and the invoice is owed again. */
-  async reversePayment(id: string, entryId: string, userId: string) {
+  async reversePayment(id: string, entryId: string, userId: string, reason?: string) {
     await this.db.transaction(async (tx) => {
       const invoice = await tx.findOne(SalesInvoice, { where: { id }, lock: { mode: 'pessimistic_write' } });
       if (!invoice) throw new NotFoundException(problem('notFound', 'invoice not found'));
@@ -327,7 +339,7 @@ export class SalesService {
       if (await tx.exists(LedgerEntry, { where: { reversesId: entryId } })) {
         throw new BadRequestException(problem('sales.paymentReversed', 'this payment is already reversed'));
       }
-      await this.ledger.reverse(entryId, userId, tx);
+      await this.ledger.reverse(entryId, userId, tx, reason);
       await tx.update(SalesInvoice, { id }, { paidAmount: money(round2(Number(invoice.paidAmount) - Number(entry.amount))) });
     });
     return this.getInvoice(id);
@@ -347,9 +359,8 @@ export class SalesService {
       const invoice = await tx.findOne(SalesInvoice, { where: { id }, lock: { mode: 'pessimistic_write' } });
       if (!invoice) throw new NotFoundException(problem('notFound', 'invoice not found'));
       if (invoice.status !== 'POSTED') throw new BadRequestException(problem('sales.notPosted', 'only a posted invoice can be voided'));
-      if (Number(invoice.paidAmount) > 0.005) {
-        throw new BadRequestException(problem('sales.voidPaid', 'reverse its payments before voiding this invoice'));
-      }
+      const blocked = await this.voidBlockers(tx, invoice);
+      if (blocked.length) refuse('sales.voidBlocked', 'reverse its payments before voiding this invoice', blocked);
       const lines = await tx.find(SalesInvoiceLine, { where: { invoiceId: id } });
       await lockStock(tx, lines.map((l) => l.variantId));
       // ponytail: returns at the cost it left with without re-averaging, like an
@@ -364,8 +375,8 @@ export class SalesService {
            AND reverses_id IS NULL AND NOT EXISTS (SELECT 1 FROM ledger_entry r WHERE r.reverses_id = ledger_entry.id)`,
         [id],
       );
-      if (revenue) await this.ledger.reverse(revenue.id, userId, tx);
-      await tx.update(SalesInvoice, { id }, { status: 'VOID', voidReason: reason.trim(), voidedAt: new Date() });
+      if (revenue) await this.ledger.reverse(revenue.id, userId, tx, reason);
+      await tx.update(SalesInvoice, { id }, { status: 'VOID', voidReason: reason.trim(), voidedAt: new Date(), voidedById: userId });
     });
     return this.getInvoice(id);
   }
@@ -413,11 +424,73 @@ export class SalesService {
     const wanted = [...new Set(input.lines.map((l) => l.variantId))];
     await lockStock(tx, wanted);
     const variants = await tx.findBy(ProductVariant, { id: In(wanted) });
-    if (variants.length !== wanted.length || variants.some((variant) => !variant.active)) {
-      throw new BadRequestException(problem('invoice.productsGone', 'choose active products for every invoice line'));
+    if (variants.length !== wanted.length) throw new NotFoundException(problem('notFound', 'a product on this invoice no longer exists'));
+    const archived = await archivedProducts(tx, wanted);
+    if (archived.length) {
+      throw new BadRequestException(problem('invoice.productsGone', 'choose active products for every invoice line', { count: archived.length }, archived));
     }
-    const customer = await tx.findOneBy(Customer, { id: input.customerId, active: true });
-    if (!customer) throw new BadRequestException(problem('sales.customerGone', 'choose an active customer'));
+    const customer = await tx.findOneBy(Customer, { id: input.customerId });
+    if (!customer?.active) {
+      throw new BadRequestException(problem('sales.customerGone', 'choose an active customer', undefined,
+        customer ? [{ kind: 'customer', id: customer.id, label: customer.name }] : undefined));
+    }
+  }
+
+  /**
+   * Everything standing in the way of posting a draft — every short product,
+   * every archived one, an archived customer — read by the invoice screen and
+   * by `postInvoice` under its locks. `stock` carries each product's warehouse
+   * count and cost for the posting itself.
+   */
+  private async postBlockers(tx: DataSource | EntityManager, customerId: string, lines: Array<{ variantId: string; quantity: number }>) {
+    const reasons: Reason[] = [];
+    const wanted = new Map<string, number>();
+    for (const l of lines) wanted.set(l.variantId, (wanted.get(l.variantId) ?? 0) + l.quantity);
+    const ids = [...wanted.keys()];
+    const archived = await archivedProducts(tx as EntityManager, ids);
+    if (archived.length) reasons.push({ code: 'invoice.productsGone', params: { count: archived.length }, blockers: archived });
+    const customer = await tx.getRepository(Customer).findOneBy({ id: customerId });
+    if (customer && !customer.active) {
+      reasons.push({ code: 'sales.customerGone', blockers: [{ kind: 'customer', id: customer.id, label: customer.name }] });
+    }
+    // Repeated lines of one product are checked together, against the warehouse only.
+    const stock: Array<{ id: string; productId: string; name: string; onHand: number; cost: string | null }> = await tx.query(
+      `SELECT v.id, v.product_id AS "productId", CASE WHEN v.name = 'Default' THEN p.name ELSE p.name || ' — ' || v.name END AS name,
+              COALESCE((SELECT SUM(m.quantity) FROM stock_movement m
+                        WHERE m.variant_id = v.id AND m.location = 'WAREHOUSE'), 0)::int AS "onHand",
+              v.unit_cost AS cost
+       FROM product_variant v JOIN product p ON p.id = v.product_id
+       WHERE v.id = ANY($1::uuid[])`,
+      [ids],
+    );
+    for (const s of stock) {
+      const quantity = wanted.get(s.id)!;
+      if (quantity > s.onHand) {
+        reasons.push({
+          code: 'sales.stockShort',
+          params: { name: s.name, onHand: s.onHand, requested: quantity },
+          blockers: [{ kind: 'product', id: s.productId, label: s.name, count: s.onHand }],
+        });
+      }
+    }
+    return { reasons, stock };
+  }
+
+  /** A posted invoice is voided only while nothing is collected on it: the payments to reverse first, each linked. */
+  private async voidBlockers(tx: DataSource | EntityManager, invoice: SalesInvoice): Promise<Reason[]> {
+    if (Number(invoice.paidAmount) <= 0.005) return [];
+    const payments: Array<{ id: string; amount: string; date: string }> = await tx.query(
+      `SELECT e.id, e.amount, e.occurred_at AS date FROM ledger_entry e
+       WHERE e.source_type = 'sales_invoice' AND e.source_id = $1 AND e.kind = 'CUSTOMER_PAYMENT' AND e.reverses_id IS NULL
+         AND NOT EXISTS (SELECT 1 FROM ledger_entry r WHERE r.reverses_id = e.id)
+       ORDER BY e.occurred_at`,
+      [invoice.id],
+    );
+    return [{
+      code: 'sales.voidPaid',
+      params: { paid: money(Number(invoice.paidAmount)) },
+      blockers: payments.map((p) => ({ kind: 'customer_payment' as const, id: p.id, parentId: invoice.id, amount: p.amount, date: new Date(p.date).toISOString() })),
+    }];
   }
 
   private validate(input: SalesInvoiceInput) {
@@ -433,7 +506,7 @@ export class SalesService {
     for (const l of input.lines) {
       if (!l?.variantId || !UUID.test(l.variantId)) throw new BadRequestException('every line needs a product');
       if (!Number.isInteger(l.quantity) || l.quantity < 1) {
-        throw new BadRequestException('every line needs a whole quantity of at least 1');
+        throw new BadRequestException(problem('sales.lineQuantity', 'every line needs a whole quantity of at least 1'));
       }
       const typedTotal = l.lineTotal !== undefined && l.lineTotal !== '';
       if (typedTotal ? !MONEY.test(l.lineTotal!) || Number(l.lineTotal) <= 0 : !UNIT_PRICE.test(l.unitPrice ?? '') || Number(l.unitPrice) <= 0) {

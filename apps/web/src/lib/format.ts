@@ -13,18 +13,23 @@ const EGP_WHOLE = new Intl.NumberFormat('en-EG', { maximumFractionDigits: 0 });
  */
 const keepSign = (s: string) => (s.startsWith('-') ? `\u200E${s}` : s);
 
-/** `-1,234.50`. Values arrive as strings from Postgres `numeric`. */
+/** Whole pounds carry no `.00` — `20,000`, not `20,000.00`; piastres show only when there are some. */
+const hasPiastres = (n: number) => Math.round(Math.abs(n) * 100) % 100 !== 0;
+
+/** `20,000`, `-1,234.50`. Values arrive as strings from Postgres `numeric`. */
 export function money(v: string | number | null | undefined): string {
   if (v === null || v === undefined || v === '') return '—';
-  return keepSign(EGP.format(Number(v)));
+  const n = Number(v);
+  return keepSign((hasPiastres(n) ? EGP : EGP_WHOLE).format(n));
 }
 
 const EGP_UNIT = new Intl.NumberFormat('en-EG', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
 
-/** A per-unit cost, which can carry 4 decimals (100 ÷ 3 = `33.3333`): `120.00`, `33.3333`. */
+/** A per-unit cost, which can carry 4 decimals (100 ÷ 3 = `33.3333`): `120`, `2,650.50`, `33.3333`. */
 export function unitMoney(v: string | number | null | undefined): string {
   if (v === null || v === undefined || v === '') return '—';
-  return keepSign(EGP_UNIT.format(Number(v)));
+  const n = Number(v);
+  return keepSign(Number.isInteger(n) ? EGP_WHOLE.format(n) : EGP_UNIT.format(n));
 }
 
 /** Compact form for dense table cells, where the piastres are noise. */
@@ -65,6 +70,6 @@ export function moneyParts(v: string | number | null | undefined): {
   return {
     sign: n < 0 ? '−' : '',
     whole: EGP_WHOLE.format(Math.trunc(abs)),
-    frac: (abs - Math.trunc(abs)).toFixed(2).slice(1),
+    frac: hasPiastres(abs) ? (abs - Math.trunc(abs)).toFixed(2).slice(1) : '',
   };
 }

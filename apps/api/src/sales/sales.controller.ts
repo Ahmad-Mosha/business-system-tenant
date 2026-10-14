@@ -44,8 +44,8 @@ export class SalesInvoicesController {
   constructor(private readonly sales: SalesService) {}
 
   @Get()
-  list() {
-    return this.sales.listInvoices();
+  list(@Query('cancelled') cancelled?: string) {
+    return this.sales.listInvoices(cancelled === '1');
   }
 
   @Get(':id')
@@ -82,8 +82,13 @@ export class SalesInvoicesController {
   }
 
   @Post(':id/payments/:entryId/reverse')
-  reversePayment(@Req() req: Request, @Param('id', ParseUUIDPipe) id: string, @Param('entryId', ParseUUIDPipe) entryId: string) {
-    return this.sales.reversePayment(id, entryId, req.user!.id);
+  reversePayment(
+    @Req() req: Request,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('entryId', ParseUUIDPipe) entryId: string,
+    @Body() body: { reason?: string },
+  ) {
+    return this.sales.reversePayment(id, entryId, req.user!.id, body?.reason);
   }
 
   @Post(':id/void')

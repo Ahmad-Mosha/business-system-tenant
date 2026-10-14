@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { NumberField } from '@/components/number-field';
+import { ProblemNotice } from '@/components/problem-notice';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Select,
@@ -574,12 +575,7 @@ export function OrderForm({
                     </AlertDescription>
                   </Alert>
                 ))}
-                {state.status === 'error' ? (
-                  <Alert variant="destructive">
-                    <AlertTriangle />
-                    <AlertDescription>{state.message}</AlertDescription>
-                  </Alert>
-                ) : null}
+                {state.status === 'error' ? <ProblemNotice problem={state.problem} message={state.message} /> : null}
               </CardContent>
             </Card>
           </aside>

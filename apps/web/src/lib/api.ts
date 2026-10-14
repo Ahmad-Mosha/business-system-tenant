@@ -146,6 +146,8 @@ export interface OrderRow {
 }
 
 export interface OrderDetail extends Omit<OrderRow, 'assignedToName' | 'itemCount' | 'unmappedCount'> {
+  /** Why its items and prices can't be edited right now, from the API's own rule. */
+  blocked?: { edit: import('@/lib/problem').Reason[] };
   address: string | null;
   notes: string | null;
   subtotal: string;
@@ -320,6 +322,8 @@ export interface ProductDetail {
   draftPurchases: number;
   /** Nothing anywhere refers to it, so it can be deleted rather than archived. */
   deletable: boolean;
+  /** What stands in the way of deleting or archiving it, from the API's own rules. */
+  blocked?: { delete: import('@/lib/problem').Reason[]; archive: import('@/lib/problem').Reason[] };
   lastPurchasePrice: string | null;
   lastPurchaseDate: string | null;
   lastPurchaseSupplier: string | null;
@@ -420,6 +424,12 @@ export interface LedgerRow {
   sourceId: string | null;
   reversesId: string | null;
   actorId: string | null;
+  /** Set when the entry was cancelled: when, by whom and why (read off its reversal). */
+  cancelledAt?: string | null;
+  cancelledBy?: string | null;
+  cancelReason?: string | null;
+  /** On a corrected voucher: the entry it replaced. */
+  replacesId?: string | null;
 }
 
 /** A ledger row seen from one account: its signed effect and the balance after. */
@@ -442,8 +452,8 @@ export interface ChequeRow {
 
 export const getFinanceOverview = () => get<FinanceOverview>('/finance/overview');
 export const getMoneyAccounts = () => get<AccountBalance[]>('/finance/accounts');
-export const getAccountLedger = (code: string, limit = 100) =>
-  get<AccountLedgerRow[]>(`/finance/accounts/${code}/ledger?limit=${limit}`);
+export const getAccountLedger = (code: string, limit = 100, cancelled = false) =>
+  get<AccountLedgerRow[]>(`/finance/accounts/${code}/ledger?limit=${limit}${cancelled ? '&cancelled=1' : ''}`);
 export const getLedger = (query = '') =>
   get<{ entries: LedgerRow[]; total: number; limit: number; offset: number }>(
     `/finance/ledger${query ? `?${query}` : ''}`,
@@ -461,13 +471,13 @@ export interface SupplierRow {
   createdAt: string;
 }
 
-export type PaidStatus = 'DRAFT' | 'UNPAID' | 'PARTIAL' | 'PAID';
+export type PaidStatus = 'DRAFT' | 'UNPAID' | 'PARTIAL' | 'PAID' | 'VOID';
 
 export interface PurchaseInvoiceRow {
   id: string;
   invoiceNo: string | null;
   invoiceDate: string;
-  status: 'DRAFT' | 'POSTED';
+  status: 'DRAFT' | 'POSTED' | 'VOID';
   payment: 'CASH' | 'CREDIT';
   goodsTotal: string;
   extraCosts: string;
@@ -481,6 +491,8 @@ export interface PurchaseInvoiceRow {
 }
 
 export interface SupplierDetail extends SupplierRow {
+  /** What stands in the way of deleting or archiving it, from the API's own rules. */
+  blocked?: { delete: import('@/lib/problem').Reason[]; archive: import('@/lib/problem').Reason[] };
   invoices: PurchaseInvoiceRow[];
   payments: LedgerRow[];
 }
@@ -501,7 +513,7 @@ export interface PurchaseInvoiceDetail {
   supplier: { id: string; name: string; phone: string | null };
   invoiceNo: string | null;
   invoiceDate: string;
-  status: 'DRAFT' | 'POSTED';
+  status: 'DRAFT' | 'POSTED' | 'VOID';
   payment: 'CASH' | 'CREDIT';
   allocation: 'BY_VALUE' | 'PER_UNIT';
   extraCostsPaidSeparately: boolean;
@@ -515,6 +527,15 @@ export interface PurchaseInvoiceDetail {
   /** Changes on every save — a local edit draft remembers which version it began from. */
   updatedAt: string;
   lines: PurchaseInvoiceLine[];
+  /** Why, when and by whom it was cancelled; the draft that re-enters it, if any. */
+  voidReason: string | null;
+  voidedAt: string | null;
+  voidedBy: string | null;
+  replacedById: string | null;
+  /** On a correction draft: the cancelled invoice it re-enters. */
+  replacesId: string | null;
+  /** What stands in the way of cancelling or editing it, from the API's own rules. */
+  blocked?: { cancel: import('@/lib/problem').Reason[] };
 }
 
 export interface PeriodSummary {
@@ -551,15 +572,23 @@ export const getCashFlow = (from: string, to: string, bucket: 'day' | 'week' | '
 
 export const getSuppliers = (archived = false) =>
   get<SupplierRow[]>(archived ? '/suppliers?status=archived' : '/suppliers');
-export const getSupplier = (id: string) => get<SupplierDetail>(`/suppliers/${id}`);
-export const getPurchases = () => get<PurchaseInvoiceRow[]>('/purchases');
+export const getSupplier = (id: string, cancelled = false) =>
+  get<SupplierDetail>(`/suppliers/${id}${cancelled ? '?cancelled=1' : ''}`);
+export const getPurchases = (cancelled = false) => get<PurchaseInvoiceRow[]>(`/purchases${cancelled ? '?cancelled=1' : ''}`);
 export const getPurchase = (id: string) => get<PurchaseInvoiceDetail>(`/purchases/${id}`);
 
 
 export const getExpenseCategories = () => get<Array<{ id: string; name: string }>>('/expenses/categories');
 export const getExpenses = (query: string) => get<{
-  expenses: Array<{ id: string; amount: string; spentOn: string; note: string | null; category: string; voidedAt: string | null; voidReason: string | null }>;
+  expenses: Array<{
+    id: string; amount: string; spentOn: string; note: string | null; category: string;
+    voidedAt: string | null; voidReason: string | null; voidedBy: string | null;
+    /** A correction points at what it replaced; a corrected one at its replacement. */
+    replacesId: string | null; replacedById: string | null;
+  }>;
   total: number; totalAmount: string; page: number;
+  /** How many voided expenses the filters hide. */
+  cancelled: number;
 }>(`/expenses?${query}`);
 
 // ── Sales ────────────────────────────────────────────────────────────────
@@ -594,6 +623,7 @@ export interface SalesInvoiceRow {
 }
 
 export interface CustomerDetail extends CustomerRow {
+  blocked?: { delete: import('@/lib/problem').Reason[]; archive: import('@/lib/problem').Reason[] };
   invoices: SalesInvoiceRow[];
 }
 
@@ -627,10 +657,13 @@ export interface SalesInvoiceDetail {
   postedAt: string | null;
   voidReason: string | null;
   voidedAt: string | null;
+  voidedBy: string | null;
   updatedAt: string;
   lines: SalesInvoiceLine[];
   /** Money received against it; a reversed one stays listed, marked. */
   payments: SalesPayment[];
+  /** What stands in the way of posting or voiding it, from the API's own rules. */
+  blocked?: { post: import('@/lib/problem').Reason[]; void: import('@/lib/problem').Reason[] };
 }
 
 export interface SalesPayment {
@@ -644,5 +677,6 @@ export interface SalesPayment {
 export const getCustomers = (archived = false) =>
   get<CustomerRow[]>(archived ? '/customers?status=archived' : '/customers');
 export const getCustomer = (id: string) => get<CustomerDetail>(`/customers/${id}`);
-export const getSalesInvoices = () => get<SalesInvoiceRow[]>('/sales-invoices');
+export const getSalesInvoices = (cancelled = false) =>
+  get<SalesInvoiceRow[]>(`/sales-invoices${cancelled ? '?cancelled=1' : ''}`);
 export const getSalesInvoice = (id: string) => get<SalesInvoiceDetail>(`/sales-invoices/${id}`);

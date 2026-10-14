@@ -26,5 +26,8 @@ export class Expense {
   @Column({ type: 'uuid' }) createdById: string;
   @Column({ type: 'timestamptz', nullable: true }) voidedAt: Date | null;
   @Column({ type: 'text', nullable: true }) voidReason: string | null;
+  @Column({ type: 'uuid', nullable: true }) voidedById: string | null;
+  /** A correction points at the expense it replaced (voided in the same step). */
+  @Column({ type: 'uuid', nullable: true }) replacesId: string | null;
   @CreateDateColumn({ type: 'timestamptz' }) createdAt: Date;
 }

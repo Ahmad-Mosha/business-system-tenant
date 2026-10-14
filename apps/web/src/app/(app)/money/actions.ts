@@ -9,7 +9,7 @@ import type messages from '@/messages/en.json';
 const MONEY = /^\d+(\.\d{1,2})?$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-export type FormState = { status: 'idle' } | { status: 'saved' } | { status: 'error'; message: string };
+export type FormState = { status: 'idle' } | { status: 'saved' } | { status: 'error'; message: string; problem?: import('@/lib/problem').Problem };
 
 /** Refreshes every money screen after a write — balances feed all of them. */
 function revalidateMoney() {
@@ -20,7 +20,7 @@ function revalidateMoney() {
 
 async function send(path: string, method: 'POST' | 'PATCH', body: unknown): Promise<FormState> {
   const r = await apiRequest(path, method, body);
-  if (!r.ok) return { status: 'error', message: r.message };
+  if (!r.ok) return { status: 'error', message: r.message, problem: r.problem };
   revalidateMoney();
   return { status: 'saved' };
 }
@@ -189,7 +189,7 @@ export interface InvoicePayload {
   lines: InvoiceLinePayload[];
 }
 
-export type InvoiceResult = { ok: true; id: string } | { ok: false; message: string };
+export type InvoiceResult = { ok: true; id: string } | { ok: false; message: string; problem?: import('@/lib/problem').Problem };
 
 /**
  * Creates a product + its default variant so an invoice can receive stock for
@@ -290,4 +290,64 @@ export async function createSupplierInline(form: FormData) {
   });
   if (r.ok) revalidatePath('/money/suppliers');
   return r;
+}
+
+// ── Corrections: a posted record is cancelled (reversed) and re-entered, never edited ──
+
+const reasonOf = (form: FormData) => String(form.get('reason') ?? '').trim();
+
+/** Cancel a voucher entered by mistake — reversed in the treasury, kept in the history. */
+export async function cancelVoucher(entryId: string, _prev: FormState, form: FormData): Promise<FormState> {
+  const reason = reasonOf(form);
+  if (!reason) return invalid('reason');
+  return send(`/finance/vouchers/${entryId}/cancel`, 'POST', { reason });
+}
+
+/** Edit a voucher: the original is cancelled and the corrected one recorded, in one step. */
+export async function correctVoucher(entryId: string, _prev: FormState, form: FormData): Promise<FormState> {
+  const counter = String(form.get('counter') ?? '');
+  const amount = String(form.get('amount') ?? '').trim();
+  const occurredAt = String(form.get('occurredAt') ?? '').trim();
+  const reason = reasonOf(form);
+  if (!MONEY.test(amount)) return invalid('amount', '5000.00');
+  if (!counter) return invalid('chooseCounter');
+  if (occurredAt && !ISO_DATE.test(occurredAt)) return invalid('date');
+  if (!reason) return invalid('reason');
+  return send(`/finance/vouchers/${entryId}/correct`, 'POST', {
+    direction: form.get('direction') === 'IN' ? 'IN' : 'OUT',
+    counter,
+    amount,
+    memo: String(form.get('memo') ?? '').trim() || undefined,
+    occurredAt: occurredAt || undefined,
+    reason,
+  });
+}
+
+/** Reverse a supplier payment recorded by mistake: the cash comes back, the supplier is owed it again. */
+export async function reverseSupplierPayment(supplierId: string, entryId: string, _prev: FormState, form: FormData): Promise<FormState> {
+  const reason = reasonOf(form);
+  if (!reason) return invalid('reason');
+  const state = await send(`/suppliers/${supplierId}/payments/${entryId}/reverse`, 'POST', { reason });
+  if (state.status === 'saved') {
+    revalidatePurchasing();
+    revalidatePath(`/money/suppliers/${supplierId}`);
+  }
+  return state;
+}
+
+/**
+ * Cancel a posted purchase invoice. With `correct`, it is re-entered as a draft
+ * with the same lines and the editor opens on it.
+ */
+export async function cancelPurchase(id: string, correct: boolean, _prev: FormState, form: FormData): Promise<FormState> {
+  const reason = reasonOf(form);
+  if (!reason) return invalid('reason');
+  const r = await apiRequest<{ id: string; draftId: string | null }>(`/purchases/${id}/void`, 'POST', { reason, correct });
+  if (!r.ok) return { status: 'error', message: r.message, problem: r.problem };
+  revalidateMoney();
+  revalidatePurchasing();
+  revalidatePath(`/money/purchases/${id}`);
+  revalidatePath('/inventory', 'layout');
+  if (correct && r.data.draftId) redirect(`/money/purchases/${r.data.draftId}/edit`);
+  return { status: 'saved' };
 }

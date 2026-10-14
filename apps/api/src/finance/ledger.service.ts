@@ -24,6 +24,8 @@ export interface PostEntry {
   sourceId?: string | null;
   actorId?: string | null;
   orderShippingCost?: string | number | null;
+  /** A correction: the entry this one replaces. */
+  replacesId?: string | null;
 }
 
 export interface EntryFilter {
@@ -36,7 +38,21 @@ export interface EntryFilter {
   to?: string; // YYYY-MM-DD inclusive
   limit?: number;
   offset?: number;
+  /** `false` leaves out cancelled entries and the reversals that cancel them. */
+  cancelled?: boolean;
 }
+
+/** Neither a reversal nor reversed — what stays when "show cancelled" is off. `t` is the entry's alias. */
+const live = (t: string) =>
+  `${t}.reverses_id IS NULL AND NOT EXISTS (SELECT 1 FROM ledger_entry r WHERE r.reverses_id = ${t}.id)`;
+
+/** When, by whom and why an entry was cancelled — read off its reversal. */
+const cancellation = (t: string) => `LEFT JOIN LATERAL (
+         SELECT r.created_at, r.reason, u.name FROM ledger_entry r LEFT JOIN app_user u ON u.id = r.actor_id
+         WHERE r.reverses_id = ${t}.id LIMIT 1
+       ) cx ON true`;
+const cancellationFields = (t: string) =>
+  `cx.created_at AS "cancelledAt", cx.reason AS "cancelReason", cx.name AS "cancelledBy", ${t}.replaces_id AS "replacesId"`;
 
 /**
  * For an ASSET or EXPENSE account, more debited than credited is a positive
@@ -95,6 +111,7 @@ export class LedgerService {
         sourceType: input.sourceType ?? null,
         sourceId: input.sourceId ?? null,
         actorId: input.actorId ?? null,
+        replacesId: input.replacesId ?? null,
         orderShippingCost:
           input.orderShippingCost === undefined || input.orderShippingCost === null
             ? null
@@ -105,15 +122,17 @@ export class LedgerService {
 
   /**
    * Undoes an entry by posting its mirror image — same amount, accounts
-   * swapped, `reversesId` pointing back. The original stays exactly as it was.
+   * swapped, `reversesId` pointing back. The original stays exactly as it was;
+   * `reason` (who cancelled it is the actor) is kept on the reversal.
    */
   async reverse(
     entryId: string,
     actorId?: string | null,
     tx: EntityManager = this.db.manager,
+    reason?: string | null,
   ): Promise<LedgerEntry> {
     if (!tx.queryRunner?.isTransactionActive) {
-      return this.db.transaction((manager) => this.reverse(entryId, actorId, manager));
+      return this.db.transaction((manager) => this.reverse(entryId, actorId, manager, reason));
     }
     const original = await tx.findOne(LedgerEntry, { where: { id: entryId }, lock: { mode: 'pessimistic_write' } });
     if (!original) throw new NotFoundException(problem('notFound', 'ledger entry not found'));
@@ -140,7 +159,7 @@ export class LedgerService {
       },
       tx,
     ).then(async (rev) => {
-      await tx.update(LedgerEntry, { id: rev.id }, { reversesId: original.id });
+      await tx.update(LedgerEntry, { id: rev.id }, { reversesId: original.id, reason: reason?.trim() || null });
       rev.reversesId = original.id;
       return rev;
     });
@@ -233,6 +252,7 @@ export class LedgerService {
     if (filter.supplierId) where.push(`e.supplier_id = ${bind(filter.supplierId)}`);
     if (filter.from) where.push(`e.occurred_at::date >= ${bind(filter.from)}`);
     if (filter.to) where.push(`e.occurred_at::date <= ${bind(filter.to)}`);
+    if (filter.cancelled === false) where.push(live('e'));
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
     const rows = await tx.query(
@@ -241,11 +261,12 @@ export class LedgerService {
               d.name_ar AS "debitAr", c.name_ar AS "creditAr",
               e.supplier_id AS "supplierId", e.source_type AS "sourceType",
               e.source_id AS "sourceId", e.reverses_id AS "reversesId",
-              e.actor_id AS "actorId",
+              e.actor_id AS "actorId", ${cancellationFields('e')},
               count(*) OVER()::int AS "totalCount"
        FROM ledger_entry e
        JOIN ledger_account d ON d.code = e.debit_code
        JOIN ledger_account c ON c.code = e.credit_code
+       ${cancellation('e')}
        ${whereSql}
        ORDER BY e.occurred_at DESC, e.created_at DESC
        LIMIT ${limit} OFFSET ${offset}`,
@@ -275,8 +296,10 @@ export class LedgerService {
    * ponytail: last `limit` movements only; the running balance is exact for
    * those because the window runs over every entry for the account.
    */
-  async accountLedger(code: LedgerAccountCode, limit = 100, tx: EntityManager = this.db.manager) {
+  async accountLedger(code: LedgerAccountCode, limit = 100, tx: EntityManager = this.db.manager, cancelled = true) {
     const capped = Math.min(Math.max(limit, 1), 500);
+    // Hidden pairs leave the running balance too: a cancelled entry and its
+    // reversal net to zero, so the balance column stays continuous without them.
     return tx.query(
       `WITH moves AS (
          SELECT le.*,
@@ -286,18 +309,21 @@ export class LedgerService {
                 END AS effect
          FROM ledger_entry le
          JOIN ledger_account a ON a.code = $1
-         WHERE le.debit_code = $1 OR le.credit_code = $1
+         WHERE (le.debit_code = $1 OR le.credit_code = $1)
+           ${cancelled ? '' : `AND ${live('le')}`}
        )
        SELECT m.id, m.occurred_at AS "occurredAt", m.amount, m.kind, m.memo,
               m.debit_code AS "debitCode", m.credit_code AS "creditCode",
               d.name_ar AS "debitAr", c.name_ar AS "creditAr",
               m.supplier_id AS "supplierId", m.source_type AS "sourceType",
               m.source_id AS "sourceId", m.reverses_id AS "reversesId", m.actor_id AS "actorId",
+              ${cancellationFields('m')},
               m.effect,
               SUM(m.effect) OVER (ORDER BY m.occurred_at, m.created_at)::text AS "runningBalance"
        FROM moves m
        JOIN ledger_account d ON d.code = m.debit_code
        JOIN ledger_account c ON c.code = m.credit_code
+       ${cancellation('m')}
        ORDER BY m.occurred_at DESC, m.created_at DESC
        LIMIT ${capped}`,
       [code],

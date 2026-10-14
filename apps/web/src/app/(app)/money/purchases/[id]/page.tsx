@@ -1,7 +1,8 @@
-import { CheckCircle2, Info, Pencil, Trash2 } from 'lucide-react';
+import { Ban, CheckCircle2, Info, Pencil, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { deleteDraftInvoice } from '@/app/(app)/money/actions';
+import { cancelPurchase, deleteDraftInvoice } from '@/app/(app)/money/actions';
+import { CancelAction } from '@/components/cancel-action';
 import { ConfirmAction } from '@/components/confirm-action';
 import type { ReactNode } from 'react';
 import { Amount } from '@/components/amount';
@@ -22,6 +23,7 @@ import {
 } from '@/components/ui/table';
 import { getPurchase, getSupplier } from '@/lib/api';
 import { money, unitMoney } from '@/lib/format';
+import { blockedBy } from '@/lib/problem';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
 import { getTranslations } from 'next-intl/server';
@@ -29,7 +31,7 @@ import { num, strong } from '@/i18n/rich';
 import { getFormat } from '@/i18n/get-format';
 
 export default async function PurchaseDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const [f, t] = await Promise.all([getFormat(), getTranslations('money.invoice')]);
+  const [f, t, tc, tr] = await Promise.all([getFormat(), getTranslations('money.invoice'), getTranslations('corrections.invoice'), getTranslations()]);
   await requireAdmin();
   const { id } = await params;
   const invoice = await getPurchase(id).catch(() => null);
@@ -39,6 +41,7 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
   const supplier = isCredit ? await getSupplier(invoice.supplierId).catch(() => null) : null;
 
   const draft = invoice.status === 'DRAFT';
+  const voided = invoice.status === 'VOID';
   const remaining = Number(invoice.payableTotal) - Number(invoice.settledAmount);
   const canPay = isCredit && invoice.paidStatus !== 'PAID' && remaining > 0.005;
   // Landed cost is part of inventory value, distinct from the supplier balance.
@@ -80,18 +83,92 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
               </Button>
               <PostInvoiceButton id={invoice.id} total={invoice.landedTotal} />
             </>
-          ) : canPay && supplier ? (
-            <PaySupplier
-              supplierId={invoice.supplierId}
-              owed={supplier.balance}
-              invoiceId={invoice.id}
-              defaultAmount={remaining.toFixed(2)}
-              hint={t('remainingHint', { amount: money(remaining) })}
-              trigger={<Button>{t('recordPayment')}</Button>}
-            />
+          ) : invoice.status === 'POSTED' ? (
+            <>
+              <CancelAction
+                trigger={
+                  <Button variant="outline" className="text-destructive hover:bg-destructive-subtle hover:text-destructive">
+                    <Ban />
+                    {tc('cancel')}
+                  </Button>
+                }
+                title={tc('cancelTitle')}
+                description={tc(invoice.payment === 'CASH' ? 'cancelHintCash' : 'cancelHintCredit')}
+                confirmLabel={tc('cancelConfirm')}
+                success={tc('cancelledToast')}
+                action={cancelPurchase.bind(null, invoice.id, false)}
+                blocked={blockedBy('invoice.cancelBlocked', invoice.blocked?.cancel)}
+              />
+              <CancelAction
+                trigger={
+                  <Button variant="outline">
+                    <Pencil />
+                    {tc('edit')}
+                  </Button>
+                }
+                title={tc('editTitle')}
+                description={tc('editHint')}
+                confirmLabel={tc('editConfirm')}
+                success={tc('cancelledToast')}
+                action={cancelPurchase.bind(null, invoice.id, true)}
+                blocked={blockedBy('invoice.cancelBlocked', invoice.blocked?.cancel)}
+                reasonLabel={tc('editReason')}
+                dismissLabel={tr('common.cancel')}
+              >
+                <ol className="grid list-decimal gap-1 ps-5 text-[13px] text-muted-foreground marker:text-foreground">
+                  <li>{tc('editStep1')}</li>
+                  <li>{tc('editStep2')}</li>
+                  <li>{tc('editStep3')}</li>
+                </ol>
+              </CancelAction>
+              {canPay && supplier ? (
+                <PaySupplier
+                  supplierId={invoice.supplierId}
+                  owed={supplier.balance}
+                  invoiceId={invoice.id}
+                  defaultAmount={remaining.toFixed(2)}
+                  hint={t('remainingHint', { amount: money(remaining) })}
+                  trigger={<Button>{t('recordPayment')}</Button>}
+                />
+              ) : null}
+            </>
           ) : undefined
         }
       />
+
+      {voided ? (
+        <Alert>
+          <Ban />
+          <AlertDescription>
+            <p>
+              {tc('banner', {
+                date: f.date(invoice.voidedAt ?? invoice.updatedAt),
+                name: invoice.voidedBy ?? '—',
+                reason: invoice.voidReason ?? '',
+              })}
+            </p>
+            {invoice.replacedById ? (
+              <p>
+                {tc('reentered')}{' '}
+                <Link href={`/money/purchases/${invoice.replacedById}`} className="font-medium underline underline-offset-2">
+                  {tc('openCorrection')}
+                </Link>
+              </p>
+            ) : null}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {draft && invoice.replacesId ? (
+        <Alert>
+          <Info />
+          <AlertDescription>
+            <p>{tc('correctionOf')}</p>
+            <Link href={`/money/purchases/${invoice.replacesId}`} className="font-medium underline underline-offset-2">
+              {tc('openCancelled')}
+            </Link>
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <Card className="min-w-0 pb-0">
@@ -145,7 +222,7 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
                 <span className="font-medium">{t('intoStock')}</span>
                 <Amount value={invoice.landedTotal} className="text-2xl font-semibold tracking-tight" />
               </div>
-              {!draft && invoice.payment === 'CREDIT' ? (
+              {!draft && !voided && invoice.payment === 'CREDIT' ? (
                 <>
                   <Row label={t('paidSoFar')} value={money(invoice.settledAmount)} />
                   <Row
@@ -159,7 +236,7 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
             </CardContent>
           </Card>
 
-          <Alert variant={!draft && (invoice.payment === 'CASH' || invoice.paidStatus === 'PAID') ? 'success' : 'default'}>
+          {voided ? null : <Alert variant={!draft && (invoice.payment === 'CASH' || invoice.paidStatus === 'PAID') ? 'success' : 'default'}>
             {!draft && (invoice.payment === 'CASH' || invoice.paidStatus === 'PAID') ? <CheckCircle2 /> : <Info />}
             <AlertDescription>
               {draft
@@ -176,7 +253,7 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
                         strong,
                       })}
             </AlertDescription>
-          </Alert>
+          </Alert>}
         </aside>
       </div>
     </Page>

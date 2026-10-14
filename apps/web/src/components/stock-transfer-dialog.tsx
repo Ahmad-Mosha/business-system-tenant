@@ -18,7 +18,7 @@ export function StockTransferDialog({ variant }: { variant: { id: string; wareho
   return <FormDialog trigger={<Button variant="outline" className="ms-auto">{t('title')}</Button>} title={t('title')} description={t('description')} submitLabel={t('submit')} success={t('saved')}
     action={async (_previous: DialogFormState, data: FormData): Promise<DialogFormState> => {
       const r = await transferStock(variant.id, Number(data.get('quantity')), from, String(data.get('note') ?? ''));
-      return r.ok ? { status: 'saved' } : { status: 'error', message: r.message };
+      return r.ok ? { status: 'saved' } : { status: 'error', message: r.message, problem: r.problem };
     }}>
     <Field><FieldLabel htmlFor={`from-${variant.id}`}>{t('from')}</FieldLabel><Select value={from} onValueChange={(v) => setFrom(v as typeof from)}><SelectTrigger id={`from-${variant.id}`}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="WAREHOUSE">{te('WAREHOUSE')}</SelectItem><SelectItem value="NOON">{te('NOON')}</SelectItem></SelectContent></Select></Field>
     <p className="text-sm">{t('destination', { location: te(from === 'WAREHOUSE' ? 'NOON' : 'WAREHOUSE'), available })}</p>

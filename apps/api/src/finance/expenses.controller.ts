@@ -8,10 +8,14 @@ import { ExpensesService, type ExpenseInput } from './expenses.service';
 export class ExpensesController {
   constructor(private readonly expenses: ExpensesService) {}
   @Get('categories') categories() { return this.expenses.categories(); }
-  @Get() list(@Query() query: { category?: string; search?: string; from?: string; to?: string; page?: string }) {
-    return this.expenses.list({ ...query, page: Number(query.page) || 1 });
+  @Get() list(@Query() query: { category?: string; search?: string; from?: string; to?: string; page?: string; cancelled?: string }) {
+    return this.expenses.list({ ...query, page: Number(query.page) || 1, cancelled: query.cancelled === '1' });
   }
   @Post() create(@Req() req: Request, @Body() body: ExpenseInput) { return this.expenses.create(body, req.user!.id); }
+  /** Edit a recorded expense: the original is voided and the corrected one booked, together. */
+  @Post(':id/correct') correct(@Req() req: Request, @Param('id', ParseUUIDPipe) id: string, @Body() body: ExpenseInput & { reason: string }) {
+    return this.expenses.create(body, req.user!.id, { id, reason: body?.reason });
+  }
   @Post(':id/void') void(@Req() req: Request, @Param('id', ParseUUIDPipe) id: string, @Body() body: { reason: string }) {
     return this.expenses.void(id, body.reason, req.user!.id);
   }
