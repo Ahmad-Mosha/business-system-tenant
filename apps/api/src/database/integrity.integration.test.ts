@@ -696,6 +696,18 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     assert.ok((await sales.listCustomers(true)).some((c) => c.id === customer.id));
     await sales.deleteCustomer(customer.id);
   });
+  await t.test('a product on a sales invoice is refused deletion with a reason, not a database error', async () => {
+    const sales = new SalesService(db, ledger);
+    const catalog = new CatalogService(db, finance);
+    const created = await catalog.createProduct({ name: `On a sale ${randomUUID()}` }, user.id);
+    const customer = await sales.createCustomer({ name: `Buyer ${randomUUID()}` });
+    const draft = await sales.createDraft({ customerId: customer.id, invoiceDate: '2026-10-14',
+      lines: [{ variantId: created.variantId, quantity: 1, unitPrice: '10' }] }, user.id);
+    assert.equal((await catalog.getProduct(created.id)).deletable, false);
+    await assert.rejects(catalog.deleteProduct(created.id), /archive it instead/);
+    await sales.deleteDraft(draft.id);
+    await catalog.deleteProduct(created.id);
+  });
   await t.test('posting a sales invoice moves stock and books revenue once; void undoes it exactly', async () => {
     const sales = new SalesService(db, ledger);
     const a = await stock(5);

@@ -14,6 +14,7 @@ import { getSalesInvoices } from '@/lib/api';
 import { money } from '@/lib/format';
 import { SALES_TONE, salesPaidStatus } from '@/lib/sales';
 import { requireAdmin } from '@/lib/session';
+import { cn } from '@/lib/utils';
 
 export default async function SalesInvoicesPage() {
   const [f, t, tr] = await Promise.all([getFormat(), getTranslations('sales'), getTranslations()]);
@@ -63,7 +64,7 @@ export default async function SalesInvoicesPage() {
             </TableHeader>
             <TableBody>
               {invoices.map((i) => (
-                <TableRow key={i.id} className="relative">
+                <TableRow key={i.id} className={cn('relative', i.status === 'VOID' && 'text-muted-foreground')}>
                   <TableCell>
                     <Link
                       href={`/sales/${i.id}`}
@@ -80,7 +81,7 @@ export default async function SalesInvoicesPage() {
                     <ToneBadge tone={SALES_TONE[i.status]}>{tr(`enums.salesStatus.${i.status}`)}</ToneBadge>
                   </TableCell>
                   <TableCell className="num text-end text-muted-foreground">{f.count(i.lineCount)}</TableCell>
-                  <TableCell className="num text-end font-medium">{money(i.total)}</TableCell>
+                  <TableCell className={cn('num text-end font-medium', i.status === 'VOID' && 'font-normal line-through')}>{money(i.total)}</TableCell>
                   <TableCell>{salesPaidStatus(i) ? <PaidChip status={salesPaidStatus(i)!} /> : null}</TableCell>
                   <TableCell className="num text-end text-muted-foreground">
                     {i.status === 'POSTED' && Number(i.total) - Number(i.paidAmount) > 0.005 ? money(Number(i.total) - Number(i.paidAmount)) : '—'}

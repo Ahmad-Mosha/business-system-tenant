@@ -320,13 +320,14 @@ export class CatalogService {
     return { ...product, variants, listings, draftPurchases, purchases, ...prices, deletable: await this.isUnused(this.db.manager, id) };
   }
 
-  /** Nothing anywhere refers to it: no stock history, channel link, order line or purchase line. */
+  /** Nothing anywhere refers to it: no stock history, channel link, order line, purchase line or sales invoice line. */
   private async isUnused(tx: EntityManager, productId: string): Promise<boolean> {
     const [row] = await tx.query(
       `SELECT NOT EXISTS (SELECT 1 FROM stock_movement m JOIN product_variant v ON v.id = m.variant_id WHERE v.product_id = $1)
           AND NOT EXISTS (SELECT 1 FROM channel_listing l JOIN product_variant v ON v.id = l.variant_id WHERE v.product_id = $1)
           AND NOT EXISTS (SELECT 1 FROM order_item i JOIN product_variant v ON v.id = i.variant_id WHERE v.product_id = $1)
           AND NOT EXISTS (SELECT 1 FROM purchase_invoice_line l JOIN product_variant v ON v.id = l.variant_id WHERE v.product_id = $1)
+          AND NOT EXISTS (SELECT 1 FROM sales_invoice_line l JOIN product_variant v ON v.id = l.variant_id WHERE v.product_id = $1)
           AS unused`,
       [productId],
     );
