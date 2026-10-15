@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronRight, ChevronsUpDown, LogOut, Moon, Sun } from 'lucide-react';
+import { ChevronRight, ChevronsUpDown, ClipboardList, FileText, LogOut, Moon, Package, Plus, ShoppingBag, Sun } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -38,7 +38,7 @@ import {
   SidebarRail,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { isActive, navFor, type NavGroup } from '@/lib/nav';
+import { isActive, navFor, type NavGroup, type NavItem } from '@/lib/nav';
 import type { SessionUser } from '@/lib/session';
 import { cn } from '@/lib/utils';
 
@@ -48,9 +48,12 @@ import { cn } from '@/lib/utils';
  * plus the filled row.
  */
 const SUB_ITEM =
-  'relative text-[13px] text-sidebar-foreground/75 before:absolute before:inset-y-1 before:-start-[11px] before:w-0.5 before:bg-sidebar-primary before:opacity-0 before:transition-opacity data-active:font-medium data-active:text-sidebar-foreground data-active:before:opacity-100';
+  'relative h-8 text-[13.5px] text-sidebar-foreground/75 before:absolute before:inset-y-1 before:-start-[11px] before:w-0.5 before:bg-sidebar-primary before:opacity-0 before:transition-opacity data-active:font-medium data-active:text-sidebar-foreground data-active:before:opacity-100';
 
-export function AppSidebar({ user }: { user: SessionUser }) {
+/** How many records wait on each screen, by its nav key — only screens with a count. */
+type Counts = Partial<Record<NavItem['key'], number>>;
+
+export function AppSidebar({ user, counts = {} }: { user: SessionUser; counts?: Counts }) {
   const t = useTranslations();
   const pathname = usePathname();
   const groups = navFor(user.role);
@@ -72,6 +75,7 @@ export function AppSidebar({ user }: { user: SessionUser }) {
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
+          <QuickCreate role={user.role} />
         </SidebarMenu>
       </SidebarHeader>
 
@@ -80,7 +84,7 @@ export function AppSidebar({ user }: { user: SessionUser }) {
           <SidebarGroupLabel>{t('nav.modules')}</SidebarGroupLabel>
           <SidebarMenu>
             {modules.map((m) => (
-              <NavModule key={m.key} module={m} pathname={pathname} />
+              <NavModule key={m.key} module={m} pathname={pathname} counts={counts} />
             ))}
           </SidebarMenu>
         </SidebarGroup>
@@ -97,7 +101,7 @@ export function AppSidebar({ user }: { user: SessionUser }) {
                       asChild
                       isActive={active}
                       tooltip={t(`nav.items.${item.key}`)}
-                      className="text-[13px] data-active:[&>svg]:text-sidebar-primary"
+                      className="h-9 text-sm data-active:[&>svg]:text-sidebar-primary"
                     >
                       <Link href={item.href}>
                         <item.icon />
@@ -126,7 +130,7 @@ export function AppSidebar({ user }: { user: SessionUser }) {
  * the user's call. Collapsed to icons there's no room to fold open, so the
  * icon opens a menu of the module's screens instead.
  */
-function NavModule({ module: m, pathname }: { module: NavGroup; pathname: string }) {
+function NavModule({ module: m, pathname, counts }: { module: NavGroup; pathname: string; counts: Counts }) {
   const t = useTranslations('nav');
   const rtl = useDirection() === 'rtl';
   const { state, isMobile, setOpenMobile } = useSidebar();
@@ -135,6 +139,7 @@ function NavModule({ module: m, pathname }: { module: NavGroup; pathname: string
   const [chosen, setChosen] = useState<boolean | null>(null);
   const open = chosen ?? current;
   const close = () => isMobile && setOpenMobile(false);
+  const waiting = m.items.reduce((n, i) => n + (counts[i.key] ?? 0), 0);
 
   if (state === 'collapsed' && !isMobile) {
     return (
@@ -143,10 +148,12 @@ function NavModule({ module: m, pathname }: { module: NavGroup; pathname: string
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               aria-label={label}
-              className={cn(current && 'bg-sidebar-accent [&>svg]:text-sidebar-primary')}
+              className={cn('relative', current && 'bg-sidebar-accent [&>svg]:text-sidebar-primary')}
             >
               <m.icon />
               <span>{label}</span>
+              {/* Collapsed to icons, a waiting count shows as a dot. */}
+              {waiting ? <span aria-hidden className="absolute top-1 end-1 size-1.5 rounded-full bg-warning" /> : null}
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           {/* Opens toward the content, whichever side the sidebar is on. */}
@@ -156,6 +163,7 @@ function NavModule({ module: m, pathname }: { module: NavGroup; pathname: string
               <DropdownMenuItem key={item.href} asChild>
                 <Link href={item.href} className={cn(isActive(pathname, item) && 'font-medium')}>
                   {t(`items.${item.key}`)}
+                  {counts[item.key] ? <Count value={counts[item.key]!} label={t('needsWork', { count: counts[item.key]! })} /> : null}
                 </Link>
               </DropdownMenuItem>
             ))}
@@ -171,11 +179,13 @@ function NavModule({ module: m, pathname }: { module: NavGroup; pathname: string
         <CollapsibleTrigger asChild>
           <SidebarMenuButton
             tooltip={label}
-            className={cn('text-[13px]', current && 'font-medium [&>svg:first-child]:text-sidebar-primary')}
+            className={cn('h-9 text-sm', current && 'font-medium [&>svg:first-child]:text-sidebar-primary')}
           >
             <m.icon />
             <span>{label}</span>
-            <ChevronRight className="ms-auto text-muted-foreground rtl:rotate-180 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+            {/* Folded shut, the module still says something inside it is waiting. */}
+            {waiting && !open ? <Count value={waiting} label={t('needsWork', { count: waiting })} /> : null}
+            <ChevronRight className={cn('text-muted-foreground rtl:rotate-180 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90', !(waiting && !open) && 'ms-auto')} />
           </SidebarMenuButton>
         </CollapsibleTrigger>
         <CollapsibleContent>
@@ -184,7 +194,8 @@ function NavModule({ module: m, pathname }: { module: NavGroup; pathname: string
               <SidebarMenuSubItem key={item.href}>
                 <SidebarMenuSubButton asChild isActive={isActive(pathname, item)} className={SUB_ITEM}>
                   <Link href={item.href} onClick={close}>
-                    <span>{t(`items.${item.key}`)}</span>
+                    <span className="truncate">{t(`items.${item.key}`)}</span>
+                    {counts[item.key] ? <Count value={counts[item.key]!} label={t('needsWork', { count: counts[item.key]! })} /> : null}
                   </Link>
                 </SidebarMenuSubButton>
               </SidebarMenuSubItem>
@@ -255,5 +266,73 @@ function NavUser({ user }: { user: SessionUser }) {
         </DropdownMenu>
       </SidebarMenuItem>
     </SidebarMenu>
+  );
+}
+
+/** A count of records waiting on a screen — amber, because each one needs someone. */
+function Count({ value, label }: { value: number; label: string }) {
+  return (
+    <span
+      title={label}
+      aria-label={label}
+      className="num ms-auto shrink-0 rounded-full bg-warning/15 px-1.5 py-px text-[11px] font-semibold text-warning"
+    >
+      {value}
+    </span>
+  );
+}
+
+/**
+ * The everyday "new" moves, one click from anywhere: a moderator only ever
+ * creates orders, so they get that button; an admin gets a short menu.
+ */
+function QuickCreate({ role }: { role: SessionUser['role'] }) {
+  const t = useTranslations('nav.create');
+  const rtl = useDirection() === 'rtl';
+  const { isMobile, setOpenMobile } = useSidebar();
+  const close = () => isMobile && setOpenMobile(false);
+  const button = 'mt-1 h-9 justify-center bg-sidebar-primary font-medium text-sidebar-primary-foreground shadow-xs hover:bg-sidebar-primary/90 hover:text-sidebar-primary-foreground active:bg-sidebar-primary/90 active:text-sidebar-primary-foreground [&>svg]:opacity-100';
+
+  if (role !== 'ADMIN') {
+    return (
+      <SidebarMenuItem>
+        <SidebarMenuButton asChild tooltip={t('order')} className={button}>
+          <Link href="/orders/new" onClick={close}>
+            <Plus />
+            <span>{t('order')}</span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    );
+  }
+
+  const items = [
+    { href: '/orders/new', label: t('order'), icon: ShoppingBag },
+    { href: '/sales/new', label: t('salesInvoice'), icon: FileText },
+    { href: '/money/purchases/new', label: t('purchase'), icon: ClipboardList },
+    { href: '/inventory/new', label: t('product'), icon: Package },
+  ];
+  return (
+    <SidebarMenuItem>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <SidebarMenuButton tooltip={t('label')} className={button}>
+            <Plus />
+            <span>{t('label')}</span>
+          </SidebarMenuButton>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent side={isMobile ? 'bottom' : rtl ? 'left' : 'right'} align="start" className="min-w-48">
+          <DropdownMenuLabel>{t('label')}</DropdownMenuLabel>
+          {items.map((item) => (
+            <DropdownMenuItem key={item.href} asChild>
+              <Link href={item.href} onClick={close}>
+                <item.icon />
+                {item.label}
+              </Link>
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </SidebarMenuItem>
   );
 }

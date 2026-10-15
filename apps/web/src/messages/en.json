@@ -81,7 +81,15 @@
       "details": "Details"
     },
     "breadcrumb": "Breadcrumb",
-    "skipToContent": "Skip to content"
+    "skipToContent": "Skip to content",
+    "create": {
+      "label": "Create",
+      "order": "Order",
+      "salesInvoice": "Sales invoice",
+      "purchase": "Purchase invoice",
+      "product": "Product"
+    },
+    "needsWork": "{count, plural, one {# order needs work} other {# orders need work}}"
   },
   "user": {
     "lightTheme": "Light theme",
@@ -1554,13 +1562,16 @@
     }
   },
   "drafts": {
-    "restored": "Unsaved work from {when} was restored.",
-    "stale": "You have unsaved changes from {when}, made before this record was last updated.",
     "restore": "Restore them",
     "discard": "Discard draft",
     "discarded": "Draft discarded",
     "undo": "Undo",
-    "autosaved": "Saved on this device as you type. Nothing is recorded until you submit."
+    "autosaved": "Saved on this device as you type. Nothing is recorded until you submit.",
+    "restoredTitle": "Your unsaved work is back",
+    "restoredDetail": "Last edited {when}. It is kept on this device only — nothing is recorded until you submit.",
+    "staleTitle": "You have older unsaved changes",
+    "staleDetail": "Made {when}, before this record was last updated. Restoring them replaces what is shown now.",
+    "keepEditing": "Keep editing"
   },
   "privacy": {
     "hide": "Hide costs",
