@@ -395,7 +395,7 @@ export function SalesInvoiceBuilder({
             </CardHeader>
             <CardContent className="grid gap-3 text-[13px]">
               <div className="flex items-baseline justify-between gap-3">
-                <span className="text-muted-foreground">{t('subtotal', { items: tr('nouns.units', { count: units }) })}</span>
+                <span className="text-muted-foreground">{units ? t('subtotal', { items: tr('nouns.units', { count: units }) }) : tr('orders.detail.subtotal')}</span>
                 <span className="num">{money(subtotal)}</span>
               </div>
               <div className="flex items-center justify-between gap-3">

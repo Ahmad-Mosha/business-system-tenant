@@ -21,7 +21,7 @@ import { num, strong } from '@/i18n/rich';
 import { isSystemMemo } from '@/lib/money';
 import { getSalesInvoice } from '@/lib/api';
 import { money, unitMoney } from '@/lib/format';
-import { SALES_TONE, salesPaidStatus } from '@/lib/sales';
+import { salesState } from '@/lib/sales';
 import { blockedBy } from '@/lib/problem';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
@@ -35,7 +35,6 @@ export default async function SalesInvoicePage({ params }: { params: Promise<{ i
 
   const draft = invoice.status === 'DRAFT';
   const posted = invoice.status === 'POSTED';
-  const paidStatus = salesPaidStatus(invoice);
   const remaining = Number(invoice.total) - Number(invoice.paidAmount);
   const units = invoice.lines.reduce((n, l) => n + l.quantity, 0);
   // What would stop posting it right now, from the API's own rules.
@@ -51,12 +50,7 @@ export default async function SalesInvoicePage({ params }: { params: Promise<{ i
       <PageHeader
         back={{ href: '/sales', label: t('back') }}
         title={invoice.invoiceNumber ? t('title', { number: invoice.invoiceNumber }) : t('titleDraft')}
-        meta={
-          <>
-            <ToneBadge tone={SALES_TONE[invoice.status]}>{tr(`enums.salesStatus.${invoice.status}`)}</ToneBadge>
-            {paidStatus ? <PaidChip status={paidStatus} /> : null}
-          </>
-        }
+        meta={<PaidChip status={salesState(invoice)} />}
         description={t.rich('description', { customer: invoice.customer.name, date: f.date(invoice.invoiceDate), strong })}
         actions={
           draft ? (
