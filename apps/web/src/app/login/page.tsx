@@ -12,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function LoginPage() {
-  if (await getSession()) redirect('/');
+  if (await getSession()) redirect('/orders');
   const t = await getTranslations();
 
   return (
