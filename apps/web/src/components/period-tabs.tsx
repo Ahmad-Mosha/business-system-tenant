@@ -17,7 +17,7 @@ export function PeriodTabs({
 }) {
   const t = useTranslations('period');
   return (
-    <nav aria-label={t('label')} className="inline-flex max-w-full overflow-x-auto border border-input">
+    <nav aria-label={t('label')} className="inline-flex max-w-full gap-1 overflow-x-auto rounded-lg border bg-card p-1">
       {options.map((o) => {
         const active = o.value === value;
         return (
@@ -27,7 +27,7 @@ export function PeriodTabs({
             scroll={false}
             aria-current={active ? 'true' : undefined}
             className={cn(
-              'inline-flex h-8 shrink-0 items-center border-s border-input px-3 text-xs font-medium whitespace-nowrap transition-colors first:border-s-0',
+              'inline-flex h-7 shrink-0 items-center rounded-md px-3 text-xs font-medium whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
               active ? 'bg-highlight/10 text-highlight' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
             )}
           >

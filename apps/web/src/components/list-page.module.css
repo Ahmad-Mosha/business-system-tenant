@@ -17,11 +17,13 @@
   min-width: 0;
   padding: 22px 24px;
   border-inline-start: 1px solid var(--border);
+  /* The figure sizes itself to its own cell, so a long amount never runs out of it. */
+  container-type: inline-size;
 }
 .metric:first-child { border-inline-start: 0; background: color-mix(in srgb, var(--primary) 6%, var(--card)); }
 .metricLabel { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 500; color: var(--muted-foreground); }
 .metricLabel svg { width: 18px; height: 18px; flex-shrink: 0; }
-.metricValue { font-size: clamp(25px, 2.1vw, 34px); font-weight: 650; line-height: 1.15; }
+.metricValue { font-size: min(clamp(25px, 2.1vw, 34px), 13cqi); font-weight: 650; line-height: 1.15; white-space: nowrap; }
 .metricHint { font-size: 12px; color: var(--muted-foreground); line-height: 1.7; }
 .metricHint svg { display: inline; width: 14px; height: 14px; margin-inline-start: 8px; }
 .metricLink { color: var(--foreground); transition: background 150ms; }
@@ -48,7 +50,7 @@
   .metric:nth-child(n+3) { border-top: 1px solid var(--border); }
   /* An odd one out takes the whole last row instead of half of it. */
   .metric:last-child:nth-child(odd) { grid-column: span 2; }
-  .metricValue { font-size: 27px; }
+  .metricValue { font-size: min(27px, 13cqi); }
   .metricLabel { font-size: 12px; }
   .metricHint { font-size: 11px; }
   .view { min-height: 42px; padding-inline: 10px; }
