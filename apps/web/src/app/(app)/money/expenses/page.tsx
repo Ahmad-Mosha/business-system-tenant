@@ -120,7 +120,36 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
         {!data.expenses.length ? (
           <TableEmpty icon={Receipt} title={t('empty')} description={t('emptyHint')} />
         ) : (
-          <Table className="[&_td]:h-16">
+          <>
+          <ul className="divide-y md:hidden">
+            {data.expenses.map((e) => {
+              const voided = !!e.voidedAt;
+              return (
+                <li key={e.id} className={cn('grid gap-2 px-5 py-4', voided && 'text-muted-foreground')}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className={cn('font-medium', voided && 'line-through')}><bdi>{e.category}</bdi></p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">{f.date(e.spentOn)}</p>
+                    </div>
+                    <span className="shrink-0" data-sensitive><Amount value={e.amount} className={cn('font-semibold', voided && 'font-normal line-through')} /></span>
+                  </div>
+                  {e.note ? <p className={cn('text-sm', voided && 'line-through')}><bdi>{e.note}</bdi></p> : null}
+                  {voided ? (
+                    <p className="text-xs text-destructive/80">
+                      {e.voidedBy ? tc('cancelledBy', { name: e.voidedBy, date: f.date(e.voidedAt!) }) : tc('cancelledOn', { date: f.date(e.voidedAt!) })}
+                      {e.voidReason ? <> — <bdi>{e.voidReason}</bdi></> : null}
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <ExpenseForm categories={categories} expense={{ id: e.id, category: e.category, amount: e.amount, spentOn: e.spentOn, note: e.note }} />
+                      <VoidExpense id={e.id} />
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          <Table className="hidden md:table [&_td]:h-16">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[15%]">{t('date')}</TableHead>
@@ -175,6 +204,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
               })}
             </TableBody>
           </Table>
+          </>
         )}
       </TablePanel>
     </Page>

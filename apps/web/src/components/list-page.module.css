@@ -46,6 +46,8 @@
   .metric { gap: 9px; padding: 16px; }
   .metric:nth-child(odd) { border-inline-start: 0; }
   .metric:nth-child(n+3) { border-top: 1px solid var(--border); }
+  /* An odd one out takes the whole last row instead of half of it. */
+  .metric:last-child:nth-child(odd) { grid-column: span 2; }
   .metricValue { font-size: 27px; }
   .metricLabel { font-size: 12px; }
   .metricHint { font-size: 11px; }
