@@ -37,9 +37,6 @@ export async function signIn(_previous: LoginState, formData: FormData): Promise
     return { status: 'error', message: (await getTranslations('errors'))('status.server') };
   }
 
-  const data = await res.json().catch(() => null);
-  const isModerator = data?.user?.role === 'MODERATOR';
-
   // The API issues the token on its own origin; re-set it on this one so the
   // browser never needs to talk to the API directly.
   const setCookie = res.headers.get('set-cookie') ?? '';
@@ -54,7 +51,8 @@ export async function signIn(_previous: LoginState, formData: FormData): Promise
     path: '/',
   });
 
-  redirect(isModerator ? '/orders' : '/');
+  // Everyone starts where the day's work is: the orders.
+  redirect('/orders');
 }
 
 export async function signOut() {

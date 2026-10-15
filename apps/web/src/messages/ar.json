@@ -94,7 +94,8 @@
   "user": {
     "lightTheme": "الوضع الفاتح",
     "darkTheme": "الوضع الداكن",
-    "signOut": "تسجيل الخروج"
+    "signOut": "تسجيل الخروج",
+    "theme": "تبديل الوضع الفاتح / الداكن"
   },
   "table": {
     "showing": "عرض <b>{from} إلى {to}</b> من {items}",

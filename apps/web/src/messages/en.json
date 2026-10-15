@@ -94,7 +94,8 @@
   "user": {
     "lightTheme": "Light theme",
     "darkTheme": "Dark theme",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "theme": "Switch light / dark"
   },
   "table": {
     "showing": "Showing <b>{from}–{to}</b> of {items}",

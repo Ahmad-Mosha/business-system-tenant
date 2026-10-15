@@ -92,9 +92,9 @@ export function CommandMenu({ role }: { role: Role }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex h-8 w-full max-w-72 items-center gap-2 rounded-md border bg-background px-2.5 text-[13px] text-muted-foreground shadow-xs transition-colors hover:bg-muted/60 hover:text-foreground dark:bg-input/20"
+        className="flex h-9 w-full items-center gap-2.5 rounded-lg border bg-muted/40 px-3 text-[13px] text-muted-foreground transition-colors hover:border-ring/40 hover:bg-background hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none dark:bg-input/20"
       >
-        <Search className="size-3.5 shrink-0" />
+        <Search className="size-4 shrink-0" />
         <span className="flex-1 truncate text-start">{t('trigger')}</span>
         <kbd
           suppressHydrationWarning

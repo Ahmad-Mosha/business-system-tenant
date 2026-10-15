@@ -66,7 +66,7 @@ export function AppSidebar({ user, counts = {} }: { user: SessionUser; counts?: 
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild tooltip={t('app.name')}>
-              <Link href={user.role === 'ADMIN' ? '/' : '/orders'}>
+              <Link href="/orders">
                 <BrandMark />
                 <span className="grid flex-1 leading-tight">
                   <span className="truncate font-heading text-[14px] font-semibold tracking-[-0.01em]">{t('app.name')}</span>
@@ -291,7 +291,9 @@ function QuickCreate({ role }: { role: SessionUser['role'] }) {
   const rtl = useDirection() === 'rtl';
   const { isMobile, setOpenMobile } = useSidebar();
   const close = () => isMobile && setOpenMobile(false);
-  const button = 'mt-1 h-9 justify-center bg-sidebar-primary font-medium text-sidebar-primary-foreground shadow-xs hover:bg-sidebar-primary/90 hover:text-sidebar-primary-foreground active:bg-sidebar-primary/90 active:text-sidebar-primary-foreground [&>svg]:opacity-100';
+  // Collapsed to icons the label is dropped, not just clipped — clipped, it
+  // still takes room and pushes the + off-centre.
+  const button = 'mt-1 h-9 justify-center group-data-[collapsible=icon]:[&>span]:hidden bg-sidebar-primary font-medium text-sidebar-primary-foreground shadow-xs hover:bg-sidebar-primary/90 hover:text-sidebar-primary-foreground active:bg-sidebar-primary/90 active:text-sidebar-primary-foreground [&>svg]:opacity-100';
 
   if (role !== 'ADMIN') {
     return (
