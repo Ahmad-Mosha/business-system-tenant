@@ -252,6 +252,9 @@ export interface OrderSummary {
   unassigned: number;
   needsWork: number;
   deliveredUnpaid: number;
+  /** What those delivered, unpaid orders still owe. */
+  deliveredUnpaidAmount: string;
+  byStatus: Record<OrderStatus, number>;
 }
 
 export interface Assignee {
@@ -374,7 +377,7 @@ export const getOrders = (query = '') =>
   );
 
 export const getOrder = (id: string) => get<OrderDetail>(`/orders/${id}`);
-export const getOrderSummary = () => get<OrderSummary>('/orders/summary');
+export const getOrderSummary = (query = '') => get<OrderSummary>(`/orders/summary${query ? `?${query}` : ''}`);
 export const getAssignees = () => get<Assignee[]>('/auth/users');
 export const getTeam = () => get<TeamMember[]>('/auth/team');
 export const getProductsCatalog = (query?: string) =>

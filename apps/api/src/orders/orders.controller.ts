@@ -18,7 +18,25 @@ import { OrdersService, type CreateOrderInput } from './orders.service';
 
 const STATUSES = Object.keys(ALLOWED_TRANSITIONS) as OrderStatus[];
 const PAYMENT_STATUSES: PaymentStatus[] = ['UNPAID', 'PAID', 'REFUNDED'];
+const ALL_PAYMENT_STATUSES: PaymentStatus[] = [...PAYMENT_STATUSES, 'REFUND_DUE'];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** `status` takes one status or several, comma-separated: `NEW,ASSIGNED`. */
+function filtersOf(q: Record<string, string | undefined>) {
+  const status = q.status ? (q.status.split(',') as OrderStatus[]) : undefined;
+  if (status?.some((s) => !STATUSES.includes(s))) throw new BadRequestException('unknown status');
+  const paymentStatus = q.paymentStatus as PaymentStatus | undefined;
+  if (paymentStatus && !ALL_PAYMENT_STATUSES.includes(paymentStatus)) throw new BadRequestException('unknown payment status');
+  if (q.assignedToId && !UUID.test(q.assignedToId)) throw new BadRequestException('unknown assignee');
+  return {
+    status,
+    paymentStatus,
+    source: q.source || undefined,
+    assignedToId: q.assignedToId,
+    unassigned: q.unassigned === 'true',
+    search: q.search?.trim() || undefined,
+  };
+}
 
 @Controller('orders')
 export class OrdersController {
@@ -30,32 +48,18 @@ export class OrdersController {
   }
 
   @Get()
-  list(
-    @Req() req: Request,
-    @Query('status') status?: OrderStatus,
-    @Query('source') source?: string,
-    @Query('assignedToId') assignedToId?: string,
-    @Query('unassigned') unassigned?: string,
-    @Query('search') search?: string,
-    @Query('limit') limit?: string,
-    @Query('offset') offset?: string,
-  ) {
-    if (status && !STATUSES.includes(status)) throw new BadRequestException('unknown status');
-    if (assignedToId && !UUID.test(assignedToId)) throw new BadRequestException('unknown assignee');
+  list(@Req() req: Request, @Query() query: Record<string, string | undefined>) {
     return this.orders.list(this.user(req), {
-      status,
-      source,
-      assignedToId,
-      unassigned: unassigned === 'true',
-      search: search?.trim() || undefined,
-      limit: limit ? Number(limit) : undefined,
-      offset: offset ? Number(offset) : undefined,
+      ...filtersOf(query),
+      limit: query.limit ? Number(query.limit) : undefined,
+      offset: query.offset ? Number(query.offset) : undefined,
     });
   }
 
+  /** The header figures and per-status counts, for the same filters as the list. */
   @Get('summary')
-  summary(@Req() req: Request) {
-    return this.orders.summary(this.user(req));
+  summary(@Req() req: Request, @Query() query: Record<string, string | undefined>) {
+    return this.orders.summary(this.user(req), filtersOf(query));
   }
 
   @Get(':id')

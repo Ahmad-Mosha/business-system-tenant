@@ -37,7 +37,6 @@ export function AssignMenu({
     <InlineMenu
       label={t('changeAssignee', { name: assignedToName ?? t('unassigned') })}
       pending={pending}
-      className="px-1.5 py-1 hover:bg-muted"
       trigger={
         <span className={cn('truncate', !assignedToName && 'text-muted-foreground')}>
           {assignedToName ?? t('unassigned')}

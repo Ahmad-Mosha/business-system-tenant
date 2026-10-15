@@ -80,7 +80,8 @@
       "edit": "Edit",
       "details": "Details"
     },
-    "breadcrumb": "Breadcrumb"
+    "breadcrumb": "Breadcrumb",
+    "skipToContent": "Skip to content"
   },
   "user": {
     "lightTheme": "Light theme",
@@ -404,6 +405,11 @@
     }
   },
   "orders": {
+    "detailPreview": {
+      "controls": "Manage order",
+      "controlsHint": "Status, payment and assignment in one place.",
+      "historyHint": "Latest update first."
+    },
     "title": "Orders",
     "descriptionAdmin": "Every order from social and the website, in one list.",
     "descriptionMine": "The orders assigned to you.",
@@ -421,6 +427,10 @@
     "deliveredUnpaid": "Delivered, unpaid",
     "deliveredUnpaidSome": "Cash not yet collected",
     "deliveredUnpaidNone": "All delivered orders paid",
+    "inTransitHint": "Shipped, waiting for delivery",
+    "toCollect": "{amount} EGP still to collect",
+    "anyPayment": "Any payment",
+    "unlinked": "{count} not in inventory",
     "search": "Search orders, customers, phones…",
     "allChannels": "All channels",
     "anyStatus": "Any status",
@@ -543,6 +553,25 @@
       "refundHint": "A paid order becomes refund due. Record the cash refund separately when it is actually paid.",
       "submit": "Receive return",
       "saved": "Return received; stock and finances updated"
+    },
+    "preview": {
+      "eyebrow": "OPERATIONS WORKSPACE",
+      "description": "Track your orders, share the workload, and keep every order moving.",
+      "overview": "All orders at a glance",
+      "worklist": "Order workspace",
+      "worklistHint": "Open an order for details, or update it directly in the list.",
+      "views": "Order views",
+      "newOrders": "New",
+      "assignedOrders": "Assigned",
+      "confirmedOrders": "Confirmed",
+      "shippedOrders": "In transit",
+      "deliveredOrders": "Delivered",
+      "currency": "EGP",
+      "open": "Open order",
+      "selectionHint": "Select one or more orders to assign a team member.",
+      "clearSelection": "Clear selection",
+      "scope": "All channels · Before filters",
+      "scopeHint": "These figures include all orders available to you, before filtering."
     }
   },
   "productSearch": {
@@ -685,7 +714,18 @@
     "noPurchases": "No posted purchases yet",
     "boughtFrom": "From {supplier}",
     "purchaseBasis": "{units} pieces on {invoices} invoices",
-    "varies": "Varies"
+    "varies": "Varies",
+    "preview": {
+      "description": "See what is available, where it is, and what needs restocking.",
+      "summary": "Inventory overview",
+      "products": "Products",
+      "viewLabel": "Inventory view",
+      "quantitiesView": "Quantities & locations",
+      "costsView": "Purchases & costs",
+      "available": "Available to sell",
+      "costNote": "Purchase prices exclude shipping and customs; inventory cost includes them. Open a product to see costs for each variant.",
+      "inOrdersHelp": "Units already deducted from available stock, in orders that have not shipped yet. Do not subtract them again."
+    }
   },
   "product": {
     "back": "Back to inventory",
