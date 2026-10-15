@@ -22,6 +22,11 @@ export interface InlineMenuSection {
  * A value you can change where it's shown — status, payment, assignee — right
  * from a list row. Rows are links (an overlay on the first cell), so the
  * trigger sits above it (`z-10`) and swallows its own click.
+ *
+ * In a table the whole cell is the control: the trigger's hit area stretches
+ * over its cell (the cell is positioned while it holds one), so a click beside
+ * the value opens the menu instead of falling through to the row's link — and
+ * the value lights up wherever the pointer is in that cell.
  */
 export function InlineMenu({
   label,
@@ -50,9 +55,11 @@ export function InlineMenu({
             e.preventDefault();
             e.stopPropagation();
           }}
+          data-slot="inline-menu"
           className={cn(
-            'group/inline relative z-10 inline-flex max-w-full items-center gap-1 outline-none',
-            'focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-60',
+            'group/inline relative z-10 -mx-2 inline-flex max-w-[calc(100%+1rem)] cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 outline-none transition-colors',
+            'hover:bg-muted data-[state=open]:bg-muted focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:opacity-60',
+            "[td_&]:static [td_&]:before:absolute [td_&]:before:inset-0 [td_&]:before:content-['']",
             className,
           )}
         >

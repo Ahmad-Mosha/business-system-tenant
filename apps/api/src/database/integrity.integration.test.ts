@@ -90,6 +90,20 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
       db.query('UPDATE customer_order SET order_number = $1 WHERE id = $2', [first.orderNumber, second.id]),
     );
   });
+  await t.test('status tabs count the filtered orders, and a tab can hold several statuses', async () => {
+    const variantId = await stock(2);
+    const customerName = `Tabs ${randomUUID()}`;
+    const first = await orders.create(actor, { ...input(variantId), customerName });
+    await orders.create(actor, { ...input(variantId), customerName });
+    await orders.updateStatus(actor, first.id, 'CONFIRMED');
+    const summary = await orders.summary(actor, { search: customerName, status: ['NEW'] });
+    assert.equal(summary.total, 2, 'a tab never narrows its own counts');
+    assert.equal(summary.byStatus.NEW, 1);
+    assert.equal(summary.byStatus.CONFIRMED, 1);
+    const page = await orders.list(actor, { search: customerName, status: ['NEW', 'CONFIRMED'] });
+    assert.equal(page.total, 2);
+    assert.equal((await orders.list(actor, { search: customerName, paymentStatus: 'PAID' })).total, 0);
+  });
   await t.test('empty later pages retain their filtered totals', async () => {
     const variantId = await stock(1);
     const customerName = `Pagination ${randomUUID()}`;
