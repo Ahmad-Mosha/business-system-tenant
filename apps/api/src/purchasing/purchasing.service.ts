@@ -87,7 +87,23 @@ export class PurchasingService {
       order: { name: 'ASC' },
     });
     const owed = await this.owedBySupplier();
-    return suppliers.map((s) => ({ ...s, balance: (owed.get(s.id) ?? 0).toFixed(2) }));
+    // What each has billed you — extra costs paid to someone else aren't theirs — on
+    // posted invoices, how many, and the latest date.
+    const stats: Array<{ supplierId: string; bought: string; invoices: number; lastInvoiceAt: string }> = await this.db.query(
+      `SELECT supplier_id AS "supplierId",
+              SUM(CASE WHEN extra_costs_paid_separately THEN goods_total ELSE landed_total END) AS bought,
+              count(*)::int AS invoices,
+              MAX(invoice_date)::text AS "lastInvoiceAt"
+       FROM purchase_invoice WHERE status = 'POSTED' GROUP BY supplier_id`,
+    );
+    const of = new Map(stats.map((r) => [r.supplierId, r]));
+    return suppliers.map((s) => ({
+      ...s,
+      balance: (owed.get(s.id) ?? 0).toFixed(2),
+      bought: Number(of.get(s.id)?.bought ?? 0).toFixed(2),
+      invoiceCount: of.get(s.id)?.invoices ?? 0,
+      lastInvoiceAt: of.get(s.id)?.lastInvoiceAt ?? null,
+    }));
   }
 
   async createSupplier(input: { name: string; phone?: string; note?: string }) {

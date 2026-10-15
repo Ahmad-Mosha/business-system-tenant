@@ -545,6 +545,8 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     assert.equal(inv.payableTotal, '30.00');
     assert.equal(inv.settledAmount, '0.00');
     assert.equal(inv.paidStatus, 'UNPAID');
+    const listed = (await purchasing.listSuppliers()).find((s) => s.id === supplier.id)!;
+    assert.deepEqual([listed.bought, listed.invoiceCount, listed.lastInvoiceAt], ['30.00', 1, '2026-09-16'], 'the separately paid cost was never billed by them');
     await purchasing.recordSupplierPayment(supplier.id, '10.00', undefined, user.id, inv.id);
     const partiallyPaid = await purchasing.getInvoice(inv.id);
     assert.equal(partiallyPaid.settledAmount, '10.00');

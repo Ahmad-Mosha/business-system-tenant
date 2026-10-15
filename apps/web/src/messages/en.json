@@ -1055,7 +1055,16 @@
         "status": "Status",
         "total": "Total"
       },
-      "noRef": "No ref"
+      "noRef": "No ref",
+      "search": "Search by supplier or invoice number…",
+      "noMatch": "No invoices match this view",
+      "views": {
+        "label": "Invoice views",
+        "draft": "Drafts",
+        "due": "Owed",
+        "paid": "Paid",
+        "cancelled": "Cancelled"
+      }
     },
     "invoice": {
       "back": "Back to purchases",
@@ -1095,7 +1104,8 @@
       "draftDeleted": "Draft deleted",
       "draftUpdated": "Draft saved",
       "editTitle": "Edit draft invoice",
-      "editDescription": "Nothing moves until you post it."
+      "editDescription": "Nothing moves until you post it.",
+      "paidOfTotal": "{paid} of {total} EGP paid to the supplier"
     },
     "newInvoice": {
       "title": "New purchase invoice",
@@ -1148,7 +1158,9 @@
         "supplier": "Supplier",
         "phone": "Phone",
         "balance": "Balance owed",
-        "added": "Added"
+        "added": "Added",
+        "lastInvoice": "Last invoice",
+        "bought": "Bought"
       },
       "settled": "Settled",
       "add": "Add supplier",
@@ -1163,7 +1175,19 @@
       "updated": "Supplier updated",
       "showArchived": "Archived suppliers",
       "showActive": "Active suppliers",
-      "archivedEmpty": "No archived suppliers."
+      "archivedEmpty": "No archived suppliers.",
+      "boughtTotal": "Bought from suppliers",
+      "boughtHint": "What they billed on posted invoices",
+      "search": "Search by name, phone or note…",
+      "noMatch": "No suppliers match this view",
+      "noInvoicesYet": "No invoices yet",
+      "boughtAmount": "{amount} EGP bought",
+      "views": {
+        "label": "Supplier views",
+        "owed": "You owe",
+        "settled": "Settled",
+        "archived": "Archived"
+      }
     },
     "supplier": {
       "back": "Back to suppliers",
@@ -1517,7 +1541,17 @@
     "status": "Status",
     "recorded": "Recorded",
     "trace": "Ledger",
-    "voidedBecause": "Cancelled:"
+    "voidedBecause": "Cancelled:",
+    "periods": {
+      "thisMonth": "This month",
+      "lastMonth": "Last month",
+      "thisYear": "This year",
+      "vsLast": "{change} vs last month"
+    },
+    "columns": {
+      "note": "Note",
+      "amount": "Amount"
+    }
   },
   "drafts": {
     "restored": "Unsaved work from {when} was restored.",
