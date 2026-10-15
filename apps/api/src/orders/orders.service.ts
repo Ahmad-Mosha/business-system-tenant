@@ -636,6 +636,30 @@ export class OrdersService {
     return { ...row, byStatus };
   }
 
+  /**
+   * The customer behind a phone number, from their latest order, so a
+   * returning customer's name and address are offered instead of retyped.
+   * Matched on the last ten digits (010…, +2010… and 2010… are one number).
+   * Scoped like the list: a moderator only finds the customers of their own
+   * orders.
+   */
+  async customerByPhone(user: SessionUser, phone: string) {
+    const digits = phone.replace(/\D/g, '').slice(-10);
+    if (digits.length < 10) return null;
+    const params: unknown[] = [digits];
+    const mine = user.role === 'ADMIN' ? '' : `AND o.assigned_to_id = $${params.push(user.id)}`;
+    const [row] = await this.db.query(
+      `SELECT o.customer_name AS name, o.governorate, o.address,
+              count(*) OVER()::int AS orders, o.placed_at AS "lastOrderAt"
+       FROM customer_order o
+       WHERE right(regexp_replace(o.customer_phone, '\\D', '', 'g'), 10) = $1 ${mine}
+       ORDER BY o.placed_at DESC
+       LIMIT 1`,
+      params,
+    );
+    return (row as { name: string; governorate: string | null; address: string | null; orders: number; lastOrderAt: Date } | undefined) ?? null;
+  }
+
   private async titlesFor(tx: EntityManager, variantIds: string[]) {
     const titles = new Map<string, string>();
     if (!variantIds.length) return titles;

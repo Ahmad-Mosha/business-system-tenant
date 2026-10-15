@@ -145,3 +145,17 @@ export async function trackBostaLive(trackingNumber: string) {
   if (!clean) return { ok: false as const, message: (await getTranslations('errors'))('trackingRequired') };
   return apiRequest<ShipmentTracking>(`/bosta/track/${encodeURIComponent(clean)}`, 'GET');
 }
+
+export interface ReturningCustomer {
+  name: string;
+  governorate: string | null;
+  address: string | null;
+  orders: number;
+  lastOrderAt: string;
+}
+
+/** A customer who ordered before, by phone — their latest details, offered on the new order form. */
+export async function findCustomer(phone: string) {
+  const r = await apiRequest<{ customer: ReturningCustomer | null }>(`/orders/customer?phone=${encodeURIComponent(phone)}`, 'GET');
+  return r.ok ? r.data.customer : null;
+}

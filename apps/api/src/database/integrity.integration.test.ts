@@ -104,6 +104,17 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     assert.equal(page.total, 2);
     assert.equal((await orders.list(actor, { search: customerName, paymentStatus: 'PAID' })).total, 0);
   });
+  await t.test('a returning customer is found by phone, however the number is written', async () => {
+    const variantId = await stock(2);
+    const phone = `010${String(Date.now()).slice(-8)}`;
+    await orders.create(actor, { ...input(variantId), customerName: 'Returning one', customerPhone: phone, address: 'First street' });
+    await orders.create(actor, { ...input(variantId), customerName: 'Returning two', customerPhone: `+2${phone}`, address: 'Second street' });
+    const found = await orders.customerByPhone(actor, `2${phone}`);
+    assert.equal(found?.name, 'Returning two', 'the latest order wins');
+    assert.equal(found?.address, 'Second street');
+    assert.equal(found?.orders, 2);
+    assert.equal(await orders.customerByPhone(actor, '0100'), null);
+  });
   await t.test('empty later pages retain their filtered totals', async () => {
     const variantId = await stock(1);
     const customerName = `Pagination ${randomUUID()}`;

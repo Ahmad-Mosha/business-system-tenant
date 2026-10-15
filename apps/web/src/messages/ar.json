@@ -547,11 +547,15 @@
       "create": "إنشاء الطلب",
       "needsItem": "أضف صنفًا واحدًا على الأقل.",
       "needsQuantity": "كل صنف يحتاج إلى كمية لا تقل عن 1.",
-      "needsNameAndPrice": "كل صنف يحتاج إلى اسم وسعر.",
       "needsPhone": "أدخل رقم هاتف صحيحًا.",
       "needsGovernorate": "اختر المحافظة.",
       "overStock": "لا يتوفر سوى <num>{count}</num> من <bdi>{name}</bdi>.",
-      "belowCost": "سعر <bdi>{name}</bdi> أقل من تكلفته (<num>{cost}</num>)."
+      "belowCost": "سعر <bdi>{name}</bdi> أقل من تكلفته (<num>{cost}</num>).",
+      "returning": "{count, plural, one {طلب مرة واحدة من قبل، في {date}:} two {طلب مرتين، آخرها في {date}:} few {طلب # مرات، آخرها في {date}:} many {طلب # مرة، آخرها في {date}:} other {طلب # مرة، آخرها في {date}:}}",
+      "useDetails": "استخدم هذه البيانات",
+      "needsItemName": "كل صنف يحتاج إلى اسم.",
+      "needsPrice": "كل صنف يحتاج إلى سعر.",
+      "needsName": "أدخل اسم العميل."
     },
     "return": {
       "title": "استلام طلب مرتجع",

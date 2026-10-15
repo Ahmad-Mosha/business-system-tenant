@@ -62,6 +62,12 @@ export class OrdersController {
     return this.orders.summary(this.user(req), filtersOf(query));
   }
 
+  /** A returning customer's latest details, by phone — offered on the new order form. */
+  @Get('customer')
+  async customer(@Req() req: Request, @Query('phone') phone = '') {
+    return { customer: await this.orders.customerByPhone(this.user(req), phone) };
+  }
+
   @Get(':id')
   get(@Req() req: Request, @Param('id', ParseUUIDPipe) id: string) {
     return this.orders.get(this.user(req), id);
