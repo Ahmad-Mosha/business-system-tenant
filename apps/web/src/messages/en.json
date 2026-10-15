@@ -1654,7 +1654,8 @@
       "remaining": "Remaining",
       "settled": "Fully paid",
       "atPosting": "Paid at posting",
-      "payment": "Payment"
+      "payment": "Payment",
+      "paidOf": "{paid} of {total} EGP received"
     },
     "void": {
       "action": "Void invoice",
@@ -1669,7 +1670,22 @@
       "keep": "Keep invoice"
     },
     "owed": "Owed by customers",
-    "owedHint": "The unpaid part of posted invoices"
+    "owedHint": "The unpaid part of posted invoices",
+    "sold": "Sold",
+    "nothingOwed": "Every posted invoice is paid",
+    "collected": "Collected",
+    "collectedHint": "Received against posted invoices",
+    "draftValueOf": "{amount} EGP waiting to be posted",
+    "search": "Search by customer or invoice number…",
+    "noMatch": "No invoices match this view",
+    "dueAmount": "{amount} due",
+    "views": {
+      "label": "Invoice views",
+      "draft": "Drafts",
+      "due": "Awaiting payment",
+      "paid": "Paid",
+      "cancelled": "Cancelled"
+    }
   },
   "customers": {
     "title": "Customers",
@@ -1694,7 +1710,9 @@
       "customer": "Customer",
       "phone": "Phone",
       "balance": "Owes",
-      "added": "Added"
+      "added": "Added",
+      "lastInvoice": "Last invoice",
+      "sold": "Sold"
     },
     "settled": "Settled",
     "total": "Customers",
@@ -1720,9 +1738,27 @@
       "deleteDescription": "This customer has no invoices, so they can be removed completely. This can’t be undone.",
       "deleteConfirm": "Delete customer",
       "deleted": "Customer deleted",
-      "newInvoice": "New invoice"
+      "newInvoice": "New invoice",
+      "sold": "Bought from you",
+      "lastInvoice": "Last invoice",
+      "since": "Customer since {date}",
+      "statement": "Invoices",
+      "contact": "Contact",
+      "noPhone": "No phone saved"
     },
-    "activeHint": "Active — archived ones are listed separately"
+    "activeHint": "Active — archived ones are listed separately",
+    "soldTotal": "Sold to customers",
+    "soldHint": "Posted invoices, all time",
+    "search": "Search by name, phone or note…",
+    "noMatch": "No customers match this view",
+    "noInvoicesYet": "No invoices yet",
+    "soldAmount": "{amount} EGP sold",
+    "views": {
+      "label": "Customer views",
+      "owing": "Owe you",
+      "settled": "Settled",
+      "archived": "Archived"
+    }
   },
   "search": {
     "title": "Search",
