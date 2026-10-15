@@ -894,6 +894,13 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
   });
 
   await t.test('a cash voucher is cancelled or corrected through a reversal, never edited', async () => {
+    const day = new Date().toISOString().slice(0, 10);
+    const shipping = async () => {
+      const flow = await ledger.flow('CASH', day, day, 'day');
+      const of = (direction: string) => Number(flow.sources.find((x) => x.code === 'SHIPPING' && x.direction === direction)?.amount ?? 0);
+      return { in: of('in'), out: of('out') };
+    };
+    const before = await shipping();
     const wrong = await finance.recordVoucher({ direction: 'OUT', counter: 'SHIPPING', amount: '15000.00', userId: user.id });
     const fix = { direction: 'OUT' as const, counter: 'SHIPPING' as const, amount: '1500.00', reason: 'extra zero', userId: user.id };
     const [a, b] = await Promise.all([finance.correctVoucher(wrong.id, fix), finance.correctVoucher(wrong.id, fix)]);
@@ -904,6 +911,9 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
       [wrong.id]);
     assert.equal(rows.length, 3);
     assert.equal(netOn(rows, 'CASH'), -1500);
+    // Money in and out shows the corrected 1,500 — not 15,000 out and 15,000 back in.
+    const after = await shipping();
+    assert.deepEqual([after.out - before.out, after.in - before.in], [1500, 0]);
     // The correction can itself be cancelled; cancelling twice changes nothing.
     const [c1, c2] = await Promise.all([finance.cancelVoucher(a.id, 'not paid after all', user.id), finance.cancelVoucher(a.id, 'not paid after all', user.id)]);
     assert.equal(c1.id, c2.id);
