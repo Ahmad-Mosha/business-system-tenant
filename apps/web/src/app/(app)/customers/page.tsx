@@ -41,8 +41,10 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
     settled: active.filter((c) => !owes(c)).filter(matches),
     archived: archived.filter(matches),
   };
-  // Who owes most first; otherwise by name.
-  const shown = [...pools[view ?? 'all']].sort((a, b) => Number(b.balance) - Number(a.balance) || a.name.localeCompare(b.name));
+  // Who owes most first, then the biggest buyers, then by name.
+  const shown = [...pools[view ?? 'all']].sort(
+    (a, b) => Number(b.balance) - Number(a.balance) || Number(b.sold ?? 0) - Number(a.sold ?? 0) || a.name.localeCompare(b.name),
+  );
   const href = (v?: View) => {
     const q = new URLSearchParams();
     if (v) q.set('view', v);
