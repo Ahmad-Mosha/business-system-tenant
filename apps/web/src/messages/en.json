@@ -547,11 +547,15 @@
       "create": "Create order",
       "needsItem": "Add at least one item.",
       "needsQuantity": "Every item needs a quantity of at least 1.",
-      "needsNameAndPrice": "Every item needs a name and a price.",
       "needsPhone": "Add a valid phone number.",
       "needsGovernorate": "Pick a governorate.",
       "overStock": "Only <num>{count}</num> of <bdi>{name}</bdi> in stock.",
-      "belowCost": "<bdi>{name}</bdi> is priced below its <num>{cost}</num> cost."
+      "belowCost": "<bdi>{name}</bdi> is priced below its <num>{cost}</num> cost.",
+      "returning": "{count, plural, one {Ordered once before, on {date}:} other {Ordered # times, last on {date}:}}",
+      "useDetails": "Use these details",
+      "needsItemName": "Every item needs a name.",
+      "needsPrice": "Every item needs a price.",
+      "needsName": "Add the customer's name."
     },
     "return": {
       "title": "Receive returned order",
