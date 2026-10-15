@@ -14,6 +14,7 @@ import { PurchasingService } from '../purchasing/purchasing.service';
 import { CatalogService } from '../catalog/catalog.service';
 import { CatalogController } from '../catalog/catalog.controller';
 import { SalesService } from '../sales/sales.service';
+import { PerformanceService } from '../reporting/performance.service';
 import type { Request } from 'express';
 import { Product } from '../catalog/product.entity';
 import { ProductVariant } from '../catalog/product-variant.entity';
@@ -766,6 +767,26 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     await assert.rejects(catalog.deleteProduct(created.id, user.id), refusedWith('product.usedInSales'));
     await sales.deleteDraft(draft.id);
     await catalog.deleteProduct(created.id, user.id);
+  });
+  await t.test('profit and loss adds up: sales less cost of goods less expenses, per period and per month', async () => {
+    const sales = new SalesService(db, ledger);
+    const expenses = new ExpensesService(db, ledger);
+    const performance = new PerformanceService(db);
+    const day = '2031-05-10'; // a day nothing else in the suite touches
+    const before = await performance.report(day, day, 1);
+    const variant = await stock(4);
+    const customer = await sales.createCustomer({ name: `P&L ${randomUUID()}` });
+    const draft = await sales.createDraft({ customerId: customer.id, invoiceDate: day, lines: [{ variantId: variant, quantity: 3, unitPrice: '50' }] }, user.id);
+    await sales.postInvoice(draft.id, '0', user.id);
+    await expenses.create({ category: 'P&L test', amount: '30.00', spentOn: day, requestId: randomUUID() }, user.id);
+
+    const after = await performance.report(day, day, 1);
+    const delta = (k: 'revenue' | 'cogs' | 'expenses' | 'netProfit') => Number(after[k]) - Number(before[k]);
+    assert.deepEqual([delta('revenue'), delta('cogs'), delta('expenses'), delta('netProfit')], [150, 30, 30, 90]); // 3 × 50, 3 × 10 cost
+    const wholesale = after.channels.find((c) => c.key === 'wholesale')!;
+    assert.equal(wholesale.cogsBasis, 'actual');
+    assert.equal(after.trend.length, 1);
+    assert.equal(Number(after.trend[0].netProfit) - Number(before.trend[0].netProfit), 90, 'the month agrees with the period');
   });
   await t.test('posting a sales invoice moves stock and books revenue once; void undoes it exactly', async () => {
     const sales = new SalesService(db, ledger);

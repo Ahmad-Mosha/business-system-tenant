@@ -558,15 +558,41 @@ export const getCashSeries = (days = 90) =>
 export const getPeriodSummary = (from?: string, to?: string) =>
   get<PeriodSummary>(`/finance/summary${from && to ? `?from=${from}&to=${to}` : ''}`);
 
-export interface BusinessProfitReport {
-  sales: string;
+export type SalesChannel = 'noon' | 'website' | 'social' | 'wholesale';
+
+/** Profit and loss for a period from the business's own records — see PerformanceService. */
+export interface PerformanceReport {
+  from: string;
+  to: string;
+  revenue: string;
+  cogs: string;
+  grossProfit: string;
+  fees: string;
   shipping: string;
-  businessProfit: string;
-  unreconciledEntries: number;
-  series: Array<{ period: string; sales: string; shipping: string; businessProfit: string }>;
+  expenses: string;
+  netProfit: string;
+  /** Units sold with no cost anywhere — their cost of goods is missing, so profit reads high. */
+  uncostedUnits: number;
+  channels: Array<{
+    key: SalesChannel;
+    revenue: string;
+    cogs: string;
+    /** Wholesale's cost was frozen at posting; the others are estimated at today's average cost. */
+    cogsBasis: 'actual' | 'estimate';
+    /** noon's fees, or the shipping on paid orders. */
+    directCosts: string;
+    contribution: string;
+    units: number;
+    uncostedUnits: number;
+    count: number;
+  }>;
+  /** `name` null: cash vouchers booked to costs without an expense record. */
+  expenseCategories: Array<{ name: string | null; amount: string }>;
+  trend: Array<{ month: string; revenue: string; costs: string; netProfit: string }>;
 }
-export const getBusinessProfit = (from: string, to: string, bucket: 'day' | 'week' | 'month') =>
-  get<BusinessProfitReport>(`/finance/business-profit?from=${from}&to=${to}&bucket=${bucket}`);
+
+export const getPerformance = (from: string, to: string, months = 0) =>
+  get<PerformanceReport>(`/finance/performance?from=${from}&to=${to}&months=${months}`);
 
 /** Money into and out of the treasury between two dates — per bucket, and by where. */
 export interface CashFlow {

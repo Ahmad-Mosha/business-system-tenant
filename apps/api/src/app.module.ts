@@ -29,6 +29,7 @@ import { OrdersService } from './orders/orders.service';
 import { PurchasesController, SuppliersController } from './purchasing/purchasing.controller';
 import { PurchasingService } from './purchasing/purchasing.service';
 import { NoonReportingService } from './reporting/noon-reporting.service';
+import { PerformanceService } from './reporting/performance.service';
 import { CustomersController, SalesInvoicesController } from './sales/sales.controller';
 import { SalesService } from './sales/sales.service';
 
@@ -85,6 +86,7 @@ import { SalesService } from './sales/sales.service';
     AuthService,
     NoonImportService,
     NoonReportingService,
+    PerformanceService,
     OrdersService,
     CatalogService,
     EasyOrdersService,
