@@ -35,10 +35,8 @@ const LIVE = `e.reverses_id IS NULL AND NOT EXISTS (SELECT 1 FROM ledger_entry r
 export class PerformanceService {
   constructor(@InjectDataSource() private readonly db: DataSource) {}
 
-  async report(from: string, to: string, months = 0) {
-    // The trend covers whole months up to `to`; the queries cover both windows at once.
-    const trendStart = months > 0 ? monthsBack(to, months - 1) : from;
-    const start = trendStart < from ? trendStart : from;
+  /** `bucket` adds the period day by day, week by week or month by month, for its chart. */
+  async report(from: string, to: string, bucket?: 'day' | 'week' | 'month') {
 
     const [noon, orders, wholesale, expenses, vouchers] = await Promise.all([
       this.db.query(
@@ -56,7 +54,7 @@ export class PerformanceService {
          LEFT JOIN product_variant v ON v.id = l.variant_id
          WHERE t.transaction_date BETWEEN $1::date AND $2::date
          GROUP BY 1`,
-        [start, to],
+        [from, to],
       ),
       // The owners' measure for orders: what was paid, less the shipping
       // captured with the payment; a return or reversal carries the same
@@ -83,7 +81,7 @@ export class PerformanceService {
            AND (e.debit_code = 'SALES' OR e.credit_code = 'SALES')
            AND ${CAIRO_DAY} BETWEEN $1::date AND $2::date
          GROUP BY 1, 2`,
-        [start, to],
+        [from, to],
       ),
       this.db.query(
         `SELECT s.invoice_date::text AS day,
@@ -98,14 +96,14 @@ export class PerformanceService {
          ) c ON true
          WHERE s.status = 'POSTED' AND s.invoice_date BETWEEN $1::date AND $2::date
          GROUP BY 1`,
-        [start, to],
+        [from, to],
       ),
       this.db.query(
         `SELECT x.spent_on::text AS day, c.name, SUM(x.amount) AS amount
          FROM expense x JOIN expense_category c ON c.id = x.category_id
          WHERE x.voided_at IS NULL AND x.spent_on BETWEEN $1::date AND $2::date
          GROUP BY 1, 2`,
-        [start, to],
+        [from, to],
       ),
       // Cash vouchers booked straight to a cost — fees, shipping or other costs
       // paid without an expense record.
@@ -115,51 +113,49 @@ export class PerformanceService {
          WHERE e.source_type = 'voucher' AND e.debit_code IN ('CHANNEL_FEES', 'SHIPPING', 'OTHER_EXPENSE')
            AND ${LIVE} AND ${CAIRO_DAY} BETWEEN $1::date AND $2::date
          GROUP BY 1, 2`,
-        [start, to],
+        [from, to],
       ),
     ]);
 
-    const inPeriod = (day: string) => day >= from && day <= to;
     const channels = new Map<Channel, Day>((['noon', 'website', 'social', 'wholesale'] as const).map((c) => [c, blank()]));
     const add = (channel: Channel, r: Partial<Record<keyof Day, string | number>>) => {
       const d = channels.get(channel)!;
       for (const k of Object.keys(d) as Array<keyof Day>) d[k] += Number(r[k] ?? 0);
     };
-    const byMonth = new Map<string, { revenue: number; costs: number }>();
-    /** Adds a day's revenue and costs to its month of the trend. */
-    const toMonth = (day: string, revenue: string | number, costs: number) => {
-      if (day < trendStart) return;
-      const m = byMonth.get(day.slice(0, 7)) ?? { revenue: 0, costs: 0 };
-      byMonth.set(day.slice(0, 7), { revenue: m.revenue + Number(revenue), costs: m.costs + costs });
+    const byBucket = new Map<string, { revenue: number; costs: number }>();
+    /** Adds a day's revenue and costs to its bucket of the series. */
+    const toBucket = (day: string, revenue: string | number, costs: number) => {
+      if (!bucket) return;
+      const key = bucketOf(day, bucket);
+      const m = byBucket.get(key) ?? { revenue: 0, costs: 0 };
+      byBucket.set(key, { revenue: m.revenue + Number(revenue), costs: m.costs + costs });
     };
 
     for (const r of noon) {
-      if (inPeriod(r.day)) add('noon', r);
-      toMonth(r.day, r.revenue, Number(r.cogs) + Number(r.direct));
+      add('noon', r);
+      toBucket(r.day, r.revenue, Number(r.cogs) + Number(r.direct));
     }
     for (const r of orders) {
       const channel: Channel = r.source === 'EASYORDERS' ? 'website' : 'social';
-      if (inPeriod(r.day)) add(channel, r);
-      toMonth(r.day, r.revenue, Number(r.cogs) + Number(r.direct));
+      add(channel, r);
+      toBucket(r.day, r.revenue, Number(r.cogs) + Number(r.direct));
     }
     for (const r of wholesale) {
-      if (inPeriod(r.day)) add('wholesale', r);
-      toMonth(r.day, r.revenue, Number(r.cogs));
+      add('wholesale', r);
+      toBucket(r.day, r.revenue, Number(r.cogs));
     }
 
     const categories = new Map<string, number>();
     let expenseTotal = 0;
     for (const r of expenses) {
-      if (inPeriod(r.day)) {
-        categories.set(r.name, (categories.get(r.name) ?? 0) + Number(r.amount));
-        expenseTotal += Number(r.amount);
-      }
-      toMonth(r.day, 0, Number(r.amount));
+      categories.set(r.name, (categories.get(r.name) ?? 0) + Number(r.amount));
+      expenseTotal += Number(r.amount);
+      toBucket(r.day, 0, Number(r.amount));
     }
     const voucher = { CHANNEL_FEES: 0, SHIPPING: 0, OTHER_EXPENSE: 0 } as Record<string, number>;
     for (const r of vouchers) {
-      if (inPeriod(r.day)) voucher[r.code] += Number(r.amount);
-      toMonth(r.day, 0, Number(r.amount));
+      voucher[r.code] += Number(r.amount);
+      toBucket(r.day, 0, Number(r.amount));
     }
 
     const list = [...channels.entries()].map(([key, d]) => ({
@@ -182,12 +178,12 @@ export class PerformanceService {
     const otherCosts = expenseTotal + voucher.OTHER_EXPENSE;
     const netProfit = revenue - cogs - fees - shipping - otherCosts;
 
-    const trend: Array<{ month: string; revenue: string; costs: string; netProfit: string }> = [];
-    if (months > 0) {
-      for (let i = months - 1; i >= 0; i--) {
-        const key = monthsBack(to, i).slice(0, 7);
-        const m = byMonth.get(key) ?? { revenue: 0, costs: 0 };
-        trend.push({ month: key, revenue: money(m.revenue), costs: money(m.costs), netProfit: money(m.revenue - m.costs) });
+    // Every bucket of the period, empty ones included, so the chart's axis is even.
+    const series: Array<{ period: string; revenue: string; costs: string; netProfit: string }> = [];
+    if (bucket) {
+      for (let key = bucketOf(from, bucket); key <= to; key = nextBucket(key, bucket)) {
+        const m = byBucket.get(key) ?? { revenue: 0, costs: 0 };
+        series.push({ period: key, revenue: money(m.revenue), costs: money(m.costs), netProfit: money(m.revenue - m.costs) });
       }
     }
 
@@ -207,14 +203,23 @@ export class PerformanceService {
         ...[...categories.entries()].map(([name, amount]) => ({ name, amount: money(amount) })),
         ...(voucher.OTHER_EXPENSE > 0 ? [{ name: null, amount: money(voucher.OTHER_EXPENSE) }] : []),
       ].sort((a, b) => Number(b.amount) - Number(a.amount)),
-      trend,
+      series,
     };
   }
 }
 
-/** The first day of the month `n` months before the month of `date`. */
-function monthsBack(date: string, n: number) {
-  const d = new Date(`${date.slice(0, 7)}-01T00:00:00Z`);
-  d.setUTCMonth(d.getUTCMonth() - n);
+/** The first day of the bucket holding `day` — weeks start on Saturday, as the Egyptian week does. */
+function bucketOf(day: string, bucket: 'day' | 'week' | 'month') {
+  if (bucket === 'day') return day;
+  if (bucket === 'month') return `${day.slice(0, 7)}-01`;
+  const d = new Date(`${day}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 1) % 7));
+  return d.toISOString().slice(0, 10);
+}
+
+function nextBucket(key: string, bucket: 'day' | 'week' | 'month') {
+  const d = new Date(`${key}T00:00:00Z`);
+  if (bucket === 'month') d.setUTCMonth(d.getUTCMonth() + 1);
+  else d.setUTCDate(d.getUTCDate() + (bucket === 'week' ? 7 : 1));
   return d.toISOString().slice(0, 10);
 }

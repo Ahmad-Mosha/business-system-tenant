@@ -1,13 +1,11 @@
-import { ArrowDownRight, ArrowUpRight, ChevronDown, ChevronLeft, FileClock, FileText, Landmark, Minus, PackagePlus, PiggyBank, Scale, Store, TrendingUp, TriangleAlert, Truck, Undo2, Wallet, type LucideIcon } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, ChevronLeft, Minus, Wallet } from 'lucide-react';
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { Amount } from '@/components/amount';
-import { BarList, CashFlowChart, OUT_FILL, ProfitTrendChart, type BarItem, type Bucket } from '@/components/charts';
-import { SummaryMetric, SummaryStrip } from '@/components/list-page';
+import { ProfitTrendChart, type Bucket } from '@/components/charts';
 import { MoneyAnchorForm } from '@/components/money-anchor-form';
 import { Page, PageHeader } from '@/components/page';
 import { PeriodTabs } from '@/components/period-tabs';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Empty,
   EmptyContent,
@@ -17,48 +15,44 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty';
 import {
-  getCashFlow,
   getFinanceOverview,
-  getPerformance,
   getMoneyAccounts,
   getOrderSummary,
-  getPurchases,
-  getSalesInvoices,
-  type CashFlow,
+  getPerformance,
+  type PerformanceReport,
 } from '@/lib/api';
 import { daysAgo, money, today } from '@/lib/format';
-import { accountByCode, accountName, groupAccounts, purchaseDue } from '@/lib/money';
+import { accountByCode } from '@/lib/money';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
-import { getLocale, getTranslations } from 'next-intl/server';
+import { getTranslations } from 'next-intl/server';
 
-/** The windows the overview can cover, and how finely each one is bucketed. */
+/** The windows the overview can cover, and how finely its chart is bucketed. */
 const RANGES = [
   { value: '7d', days: 7, bucket: 'day' },
-  // A month reads best as weeks — thirty thin daily bars were mostly empty.
-  { value: '30d', days: 30, bucket: 'week' },
+  { value: '30d', days: 30, bucket: 'day' },
   { value: '90d', days: 90, bucket: 'week' },
   { value: '12m', days: 365, bucket: 'month' },
 ] as const satisfies ReadonlyArray<{ value: string; days: number; bucket: Bucket }>;
 
 const DEFAULT_RANGE = '30d';
 
-const sum = (series: CashFlow['series'], key: 'in' | 'out') =>
-  series.reduce((n, p) => n + Number(p[key]), 0);
-
 /** Change against the window before, in percent — only when there was something to compare with. */
 const change = (now: number, before: number) => (before > 0 ? ((now - before) / before) * 100 : null);
 
+/**
+ * The owners' money screen, answering one question first: is the business
+ * making money? Net profit for the period, large, with its chart; then how
+ * sales became that profit, and which channels it came from; then, in a line,
+ * who owes whom. Everything else — the treasury's movements, the expenses, the
+ * books — is one click away rather than another box here.
+ */
 export default async function MoneyOverviewPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
-  const [t, tr, locale] = await Promise.all([
-    getTranslations('money'),
-    getTranslations(),
-    getLocale(),
-  ]);
+  const [t, tr] = await Promise.all([getTranslations('money'), getTranslations()]);
   await requireAdmin();
   const overview = await getFinanceOverview();
 
@@ -86,97 +80,42 @@ export default async function MoneyOverviewPage({
   const range = RANGES.find((r) => r.value === params.range) ?? RANGES.find((r) => r.value === DEFAULT_RANGE)!;
   const to = today();
   const from = daysAgo(range.days - 1);
-  // The same length of time just before, for "vs the previous 30 days".
   const before = { from: daysAgo(range.days * 2 - 1), to: daysAgo(range.days) };
 
-  const [accounts, flow, previous, pnl, pnlBefore, orders, sales, purchases] = await Promise.all([
+  const [accounts, pnl, pnlBefore, orders] = await Promise.all([
     getMoneyAccounts(),
-    getCashFlow(from, to, range.bucket),
-    getCashFlow(before.from, before.to, 'month'),
-    getPerformance(from, to, 12),
+    getPerformance(from, to, range.bucket),
     getPerformance(before.from, before.to),
     getOrderSummary(),
-    getSalesInvoices(),
-    getPurchases(),
   ]);
 
   const balance = (code: string) => Number(accountByCode(accounts, code)?.balance ?? 0);
-  const cash = balance('CASH');
   const rangeLabel = t(`ranges.${range.value}`);
   const span = t('lastRange', { range: rangeLabel });
-  const compared = t('vsBefore', { range: rangeLabel });
   // A window that starts before the books did holds only part of its days —
   // "+8,700% vs the 90 days before" would be comparing against nothing.
   const comparable = before.from >= overview.openingAsOf;
-  const moneyIn = sum(flow.series, 'in');
-  const moneyOut = sum(flow.series, 'out');
-  const net = moneyIn - moneyOut;
-  const inChange = comparable ? change(moneyIn, sum(previous.series, 'in')) : null;
-  const outChange = comparable ? change(moneyOut, sum(previous.series, 'out')) : null;
+  const compare = (now: number, then: number) => (comparable ? change(now, then) : null);
 
   const revenue = Number(pnl.revenue);
-  const gross = Number(pnl.grossProfit);
   const netProfit = Number(pnl.netProfit);
-  const margin = (v: number) => (revenue > 0 ? `${((v / revenue) * 100).toFixed(1)}%` : '—');
-  const revenueChange = comparable ? change(revenue, Number(pnlBefore.revenue)) : null;
-  const profitChange = comparable && Number(pnlBefore.netProfit) > 0 ? change(netProfit, Number(pnlBefore.netProfit)) : null;
+  const costs = revenue - netProfit;
+  // A share of sales means something only between −100% and 100%; past that
+  // (sales of 3,500 against 40,000 of costs) it reads as noise, so it's left out.
+  const share = (v: number) => (revenue > 0 && Math.abs(v) <= revenue ? `${((v / revenue) * 100).toFixed(1)}%` : '');
 
-  // Who owes the business, and whom it owes — every line opens the records behind it.
-  const salesDue = sales.filter((i) => i.status === 'POSTED' && Number(i.total) - Number(i.paidAmount) > 0.005).length;
-  const purchasesDue = purchases.filter((i) => purchaseDue(i) > 0.005).length;
-  const owedToYou: Row[] = [
-    { key: 'noon', icon: Store, label: t('home.noon'), detail: t('home.noonDetail'), amount: balance('NOON_RECEIVABLE'), href: '/' },
-    { key: 'customers', icon: FileText, label: t('home.customers'), detail: t('home.customersDetail', { count: salesDue }), amount: balance('CUSTOMER_RECEIVABLE'), href: '/sales?view=due' },
-    {
-      key: 'cod',
-      icon: Truck,
-      label: t('home.cod'),
-      detail: t('home.codDetail', { count: orders.deliveredUnpaid }),
-      amount: Number(orders.deliveredUnpaidAmount),
-      href: '/orders?status=DELIVERED&paymentStatus=UNPAID',
-    },
-    { key: 'bosta', icon: Truck, label: t('home.bosta'), detail: t('home.bostaDetail'), amount: balance('BOSTA_COD'), href: '/shipments' },
-    { key: 'cheques', icon: FileClock, label: t('home.cheques'), detail: t('home.chequesDetail'), amount: balance('CHEQUES_PENDING'), href: '/money/treasury' },
-    { key: 'amazon', icon: Store, label: t('home.amazon'), detail: t('home.amazonDetail'), amount: balance('AMAZON_RECEIVABLE'), href: '/money/ledger?code=AMAZON_RECEIVABLE' },
-  ].filter((r) => Math.abs(r.amount) > 0.005);
-  const youOwe: Row[] = [
-    { key: 'suppliers', icon: PackagePlus, label: t('home.suppliers'), detail: t('home.suppliersDetail', { count: purchasesDue }), amount: balance('SUPPLIER_PAYABLE'), href: '/money/purchases?view=due' },
-    { key: 'refunds', icon: Undo2, label: t('home.refunds'), detail: t('home.refundsDetail'), amount: balance('CUSTOMER_REFUNDS'), href: '/orders?paymentStatus=REFUND_DUE' },
-  ].filter((r) => Math.abs(r.amount) > 0.005);
-  const totalOf = (rows: Row[]) => rows.reduce((n, r) => n + r.amount, 0);
-
-  // The statement, top to bottom: what was sold, what it cost, what's left.
-  const estimate = pnl.channels.some((c) => c.cogsBasis === 'estimate' && Number(c.cogs) > 0) || pnl.uncostedUnits > 0;
-  const ladder: Step[] = [
-    { key: 'revenue', label: t('pnl.revenue'), value: revenue, kind: 'total' },
-    { key: 'cogs', label: t('pnl.cogs'), value: -Number(pnl.cogs), note: estimate ? t('pnl.estimated') : undefined },
-    { key: 'gross', label: t('pnl.grossProfit'), value: gross, kind: 'subtotal' },
-    { key: 'fees', label: t('pnl.fees'), value: -Number(pnl.fees) },
-    { key: 'shipping', label: t('pnl.shipping'), value: -Number(pnl.shipping) },
-    { key: 'expenses', label: t('pnl.expenses'), value: -Number(pnl.expenses), href: `/money/expenses?from=${from}&to=${to}` },
-    { key: 'tax', label: t('pnl.taxes'), value: null, note: t('pnl.notYet') },
-    { key: 'net', label: t('pnl.netProfit'), value: netProfit, kind: 'result' },
-  ];
-
-  const channelRows = [
-    ...pnl.channels,
-    // Not connected yet: shown so the table already has its place.
-    { key: 'amazon' as const, revenue: null, cogs: null, cogsBasis: 'estimate' as const, directCosts: null, contribution: null, units: 0, uncostedUnits: 0, count: 0 },
-  ].sort((a, b) => Number(b.revenue ?? -1) - Number(a.revenue ?? -1));
-
-  const expenseItems: BarItem[] = pnl.expenseCategories.map((c) => ({
-    key: c.name ?? 'vouchers',
-    label: c.name ?? t('pnl.vouchers'),
-    value: Number(c.amount),
-    fill: OUT_FILL,
-    href: c.name ? `/money/expenses?from=${from}&to=${to}` : '/money/treasury',
-  }));
-
-  const groups = groupAccounts(accounts);
-  const held = groups.held.map((a) => ({ key: a.code, label: accountName(a, locale), balance: a.balance, href: `/money/ledger?code=${a.code}` }));
-  held.push({ key: 'STOCK', label: tr('inventory.stockValue'), balance: overview.stockValue, href: '/inventory' });
-  const rows = (list: typeof groups.owe) =>
-    list.map((a) => ({ key: a.code, label: accountName(a, locale), balance: a.balance, href: `/money/ledger?code=${a.code}` }));
+  const owedToYou = [
+    { key: 'noon', label: t('home.noon'), amount: balance('NOON_RECEIVABLE'), href: '/' },
+    { key: 'customers', label: t('home.customers'), amount: balance('CUSTOMER_RECEIVABLE'), href: '/sales?view=due' },
+    { key: 'cod', label: t('home.cod'), amount: Number(orders.deliveredUnpaidAmount), href: '/orders?status=DELIVERED&paymentStatus=UNPAID' },
+    { key: 'bosta', label: t('home.bosta'), amount: balance('BOSTA_COD'), href: '/shipments' },
+    { key: 'cheques', label: t('home.cheques'), amount: balance('CHEQUES_PENDING'), href: '/money/treasury' },
+    { key: 'amazon', label: t('home.amazon'), amount: balance('AMAZON_RECEIVABLE'), href: '/money/ledger?code=AMAZON_RECEIVABLE' },
+  ].filter((r) => r.amount > 0.005);
+  const youOwe = [
+    { key: 'suppliers', label: t('home.suppliers'), amount: balance('SUPPLIER_PAYABLE'), href: '/money/purchases?view=due' },
+    { key: 'refunds', label: t('home.refunds'), amount: balance('CUSTOMER_REFUNDS'), href: '/orders?paymentStatus=REFUND_DUE' },
+  ].filter((r) => r.amount > 0.005);
 
   return (
     <Page>
@@ -192,387 +131,300 @@ export default async function MoneyOverviewPage({
         }
       />
 
-      {/* The headline: what the period earned, and the cash there is today. */}
-      <SummaryStrip label={t('pnl.title')}>
-        <SummaryMetric
-          label={t('pnl.revenue')}
-          icon={TrendingUp}
-          value={<Amount value={revenue} />}
-          hint={revenueChange !== null ? <Change value={revenueChange} note={compared} /> : span}
-          sensitive
-        />
-        <SummaryMetric
-          label={t('pnl.grossProfit')}
-          icon={PiggyBank}
-          value={<Amount value={gross} className={cn(gross < 0 && 'text-destructive')} />}
-          hint={t('pnl.margin', { margin: margin(gross) })}
-          sensitive
-        />
-        <SummaryMetric
-          label={t('pnl.netProfit')}
-          icon={Scale}
-          value={<Amount value={netProfit} className={cn(netProfit < 0 ? 'text-destructive' : 'text-success')} />}
-          hint={profitChange !== null ? <Change value={profitChange} note={compared} /> : t('pnl.margin', { margin: margin(netProfit) })}
-          attention={netProfit < 0}
-          sensitive
-        />
-        <SummaryMetric
-          label={tr('charts.cashOnHand')}
-          icon={Landmark}
-          value={<Amount value={cash} className={cn(cash < 0 && 'text-destructive')} />}
-          hint={t('home.cashHint')}
-          href="/money/treasury"
-          sensitive
-        />
-      </SummaryStrip>
-
-      {pnl.uncostedUnits > 0 ? (
-        <Alert variant="warning">
-          <TriangleAlert />
-          <AlertDescription>
+      {/* 1. The answer: net profit for the period, its chart, and the four figures behind it. */}
+      <section className="overflow-hidden rounded-2xl border bg-card" data-sensitive-scope>
+        <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-5 px-6 pt-6 md:px-8 md:pt-7">
+          <div>
+            <p className="text-sm font-medium text-muted-foreground">{t('pnl.netProfitFor', { span })}</p>
+            <p className="mt-2 flex items-baseline gap-2.5">
+              <Amount
+                value={netProfit}
+                className={cn('text-[40px] leading-none font-semibold tracking-[-0.03em] md:text-[52px]', netProfit < 0 && 'text-destructive')}
+              />
+              <span className="text-sm text-muted-foreground">{tr('common.egp')}</span>
+            </p>
+            <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted-foreground">
+              <Change value={compare(netProfit, Number(pnlBefore.netProfit))} note={t('vsBefore', { range: rangeLabel })} />
+              <span>
+                {netProfit < 0
+                  ? t('pnl.lossNote', { amount: money(-netProfit) })
+                  : share(netProfit) && t('pnl.margin', { margin: share(netProfit) })}
+              </span>
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <Key color="var(--primary)" label={t('pnl.salesSoFar')} />
+            <Key color="var(--muted-foreground)" label={t('pnl.costsSoFar')} line />
+          </div>
+        </div>
+        <div className="px-3 pt-6 pb-2 md:px-5">
+          <ProfitTrendChart series={pnl.series} bucket={range.bucket} className="h-64 md:h-72" />
+        </div>
+        <dl className="grid grid-cols-2 border-t md:grid-cols-4 max-md:[&>*:nth-child(even)]:border-s max-md:[&>*:nth-child(n+3)]:border-t md:[&>*+*]:border-s">
+          <Figure label={t('pnl.revenue')} value={<Amount value={revenue} />}>
+            <Change value={compare(revenue, Number(pnlBefore.revenue))} />
+          </Figure>
+          <Figure label={t('pnl.costs')} value={<Amount value={costs} />}>
+            <Change value={compare(costs, Number(pnlBefore.revenue) - Number(pnlBefore.netProfit))} invert />
+          </Figure>
+          <Figure label={t('pnl.grossProfit')} value={<Amount value={pnl.grossProfit} />}>
+            {share(Number(pnl.grossProfit)) ? t('pnl.margin', { margin: share(Number(pnl.grossProfit)) }) : t('pnl.afterCogs')}
+          </Figure>
+          <Figure label={tr('charts.cashOnHand')} value={<Amount value={balance('CASH')} />} href="/money/treasury">
+            {t('home.cashHint')}
+          </Figure>
+        </dl>
+        {pnl.uncostedUnits > 0 ? (
+          <p className="border-t bg-warning-subtle/60 px-6 py-3 text-xs leading-relaxed text-warning md:px-8">
             {t.rich('pnl.uncosted', { count: pnl.uncostedUnits, b: (c) => <b className="font-semibold">{c}</b> })}{' '}
             <Link href="/products" className="font-medium underline underline-offset-4">{t('pnl.uncostedFix')}</Link>
-          </AlertDescription>
-        </Alert>
-      ) : null}
+          </p>
+        ) : null}
+      </section>
 
-      <div className="grid items-stretch gap-5 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-        <Card data-sensitive-scope>
-          <CardHeader>
-            <CardTitle>{t('pnl.statement')}</CardTitle>
-            <CardDescription>{span}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Ladder steps={ladder} revenue={revenue} />
-          </CardContent>
-        </Card>
-        <Card data-sensitive-scope>
-          <CardHeader>
-            <CardTitle>{t('pnl.trend')}</CardTitle>
-            <CardDescription>{t('pnl.trendHint')}</CardDescription>
-            <CardAction className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-              <Key color="var(--primary)" label={t('pnl.revenue')} />
-              <Key color={OUT_FILL} label={t('pnl.costs')} />
-              <Key color="var(--foreground)" label={t('pnl.netProfit')} line />
-            </CardAction>
-          </CardHeader>
-          <CardContent>
-            <ProfitTrendChart series={pnl.trend} />
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="gap-0 pb-0" data-sensitive-scope>
-        <CardHeader className="pb-4">
-          <CardTitle>{t('pnl.channelsTitle')}</CardTitle>
-          <CardDescription>{t('pnl.channelsHint', { span })}</CardDescription>
-        </CardHeader>
-        <ChannelTable rows={channelRows} revenue={revenue} />
-      </Card>
-
-      <div className="grid items-start gap-5 lg:grid-cols-2">
-        <Balances title={t('home.owedToYou')} total={totalOf(owedToYou)} rows={owedToYou} empty={t('home.owedNone')} />
-        <Balances title={t('home.youOwe')} total={totalOf(youOwe)} rows={youOwe} empty={t('home.oweNone')} owing />
-      </div>
-
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-        <Card data-sensitive-scope>
-          <CardHeader>
-            <CardTitle>{t('pnl.expenseBreakdown')}</CardTitle>
-            <CardDescription>{span}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <BarList items={expenseItems} empty={t('pnl.noExpenses')} />
-          </CardContent>
-        </Card>
-        <Card className="gap-0 py-0" data-sensitive-scope>
-          <div className="px-5 pt-5">
-            <h2 className="text-base font-semibold">{t('pnl.cash')}</h2>
-            <p className="mt-0.5 text-[13px] text-muted-foreground">{t('pnl.cashHint', { span })}</p>
-          </div>
-          <div className="mt-4 grid border-y sm:grid-cols-3 [&>*+*]:border-t sm:[&>*+*]:border-t-0 sm:[&>*+*]:border-s">
-            <FlowStat label={tr('charts.moneyIn')} value={<Amount value={moneyIn} />}>
-              {inChange !== null ? <Change value={inChange} note={compared} /> : t('inLast', { range: rangeLabel })}
-            </FlowStat>
-            <FlowStat label={tr('charts.moneyOut')} value={<Amount value={moneyOut} />}>
-              {outChange !== null ? <Change value={outChange} invert note={compared} /> : t('inLast', { range: rangeLabel })}
-            </FlowStat>
-            <FlowStat label={t('overview.netFlow')} value={<Amount value={net} signed className={cn(net < 0 && 'text-destructive')} />}>
-              {net >= 0 ? t('overview.netPositive') : t('overview.netNegative')}
-            </FlowStat>
-          </div>
-          <div className="px-5 pt-5 pb-3">
-            <CashFlowChart series={flow.series} bucket={range.bucket} />
-          </div>
-        </Card>
-      </div>
-
-      {/* For the accountant: every account's balance, folded away. */}
-      <details className="group rounded-xl border bg-card">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 [&::-webkit-details-marker]:hidden">
-          <span>
-            <span className="block text-sm font-semibold">{t('overview.books')}</span>
-            <span className="block text-xs text-muted-foreground">{t('overview.booksHint')}</span>
-          </span>
-          <ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden />
-        </summary>
-        <div className="grid gap-x-8 gap-y-5 border-t px-5 py-5 md:grid-cols-2 xl:grid-cols-4" data-sensitive-scope>
-          <AccountList title={t('overview.held')} rows={held} />
-          <AccountList title={t('overview.owe')} rows={rows(groups.owe)} />
-          <AccountList title={t('overview.capital')} rows={rows(groups.capital)} />
-          <AccountList title={t('overview.performance')} rows={rows(groups.performance)} muted />
+      {/* 2. How it got there: the statement, and where the sales came from. */}
+      <section className="grid overflow-hidden rounded-2xl border bg-card lg:grid-cols-2 max-lg:[&>*+*]:border-t lg:[&>*+*]:border-s" data-sensitive-scope>
+        <div className="px-6 py-6 md:px-8">
+          <h2 className="text-base font-semibold">{t('pnl.statement')}</h2>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">{span}</p>
+          <Statement pnl={pnl} share={share} expensesHref={`/money/expenses?from=${from}&to=${to}`} />
         </div>
-      </details>
+        <div className="px-6 py-6 md:px-8">
+          <h2 className="text-base font-semibold">{t('pnl.channelsTitle')}</h2>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">{t('pnl.channelsHint', { span })}</p>
+          <Channels pnl={pnl} revenue={revenue} />
+        </div>
+      </section>
+
+      {/* 3. Who owes whom: what will come in, what will go out, and the difference. */}
+      <section className="overflow-hidden rounded-2xl border bg-card" data-sensitive-scope>
+        <div className="grid md:grid-cols-2 max-md:[&>*+*]:border-t md:[&>*+*]:border-s">
+          <Owed title={t('home.owedToYou')} hint={t('home.owedToYouHint')} rows={owedToYou} empty={t('home.owedNone')} />
+          <Owed title={t('home.youOwe')} hint={t('home.youOweHint')} rows={youOwe} empty={t('home.oweNone')} owing />
+        </div>
+        <NetOwed owed={owedToYou.reduce((n, r) => n + r.amount, 0)} owe={youOwe.reduce((n, r) => n + r.amount, 0)} />
+      </section>
+
+      <nav aria-label={t('pnl.more')} className="flex flex-wrap gap-2 px-1">
+        {[
+          { href: '/money/treasury', label: tr('nav.items.treasury') },
+          { href: '/money/expenses', label: tr('nav.items.expenses') },
+          { href: '/money/purchases', label: tr('nav.items.purchases') },
+          { href: '/money/ledger', label: tr('nav.items.ledger') },
+        ].map((l) => (
+          <Link
+            key={l.href}
+            href={l.href}
+            className="inline-flex h-8 items-center gap-1.5 rounded-full border bg-card px-3.5 text-[13px] text-muted-foreground transition-colors hover:text-foreground"
+          >
+            {l.label}
+            <ChevronLeft className="size-3.5 ltr:rotate-180" aria-hidden />
+          </Link>
+        ))}
+      </nav>
     </Page>
   );
 }
 
-interface Row {
-  key: string;
-  icon: LucideIcon;
-  label: string;
-  detail: string;
-  amount: number;
-  href: string;
-}
-
-interface Step {
-  key: string;
-  label: string;
-  /** Signed as it reads in the statement; null for a line not calculated yet. */
-  value: number | null;
-  kind?: 'total' | 'subtotal' | 'result';
-  note?: string;
-  href?: string;
+/** One of the figures under the chart: what it is, how much, and against what. */
+function Figure({ label, value, href, children }: { label: string; value: ReactNode; href?: string; children: ReactNode }) {
+  const body = (
+    <>
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="num mt-1.5 text-xl font-semibold tracking-[-0.02em]">{value}</dd>
+      <dd className="mt-1 text-xs text-muted-foreground">{children}</dd>
+    </>
+  );
+  return href ? (
+    <Link href={href} className="block px-6 py-4 transition-colors hover:bg-muted/40 md:px-8">{body}</Link>
+  ) : (
+    <div className="px-6 py-4 md:px-8">{body}</div>
+  );
 }
 
 /**
- * The profit and loss as a statement anyone can follow: sales at the top, each
- * cost taken off in turn with a bar sized against sales, the subtotals ruled
- * off, and the result in bold. A line we can't calculate yet still has its
- * place, marked as such — never a made-up figure.
+ * Sales down to net profit, the way an accountant would write it on paper:
+ * each cost taken off in turn, subtotals ruled off, the result in bold. A line
+ * not calculated yet keeps its place, marked — never a made-up figure.
  */
-function Ladder({ steps, revenue }: { steps: Step[]; revenue: number }) {
+async function Statement({ pnl, share, expensesHref }: { pnl: PerformanceReport; share: (v: number) => string; expensesHref: string }) {
+  const t = await getTranslations('money.pnl');
+  const estimate = pnl.channels.some((c) => c.cogsBasis === 'estimate' && Number(c.cogs) > 0) || pnl.uncostedUnits > 0;
+  const less = (label: string, value: string, note?: string, href?: string) => ({ label, value: -Number(value), note, href, less: true });
+  const rows: Array<{ label: string; value: number | null; note?: string; href?: string; total?: 'sub' | 'final'; less?: boolean }> = [
+    { label: t('revenue'), value: Number(pnl.revenue) },
+    less(t('cogs'), pnl.cogs, estimate ? t('estimated') : undefined),
+    { label: t('grossProfit'), value: Number(pnl.grossProfit), total: 'sub' },
+    less(t('fees'), pnl.fees),
+    less(t('shipping'), pnl.shipping),
+    less(t('expenses'), pnl.expenses, undefined, expensesHref),
+    { label: t('taxes'), value: null, note: t('notYet'), less: true },
+    { label: t('netProfit'), value: Number(pnl.netProfit), total: 'final' },
+  ];
   return (
-    <ol className="grid">
-      {steps.map((s) => {
-        const ruled = s.kind === 'subtotal' || s.kind === 'result';
-        const share = s.value === null || revenue <= 0 ? 0 : Math.min(Math.abs(s.value) / revenue, 1);
+    <dl className="mt-5 grid text-sm">
+      {rows.map((r) => {
         const label = (
-          <span className="flex min-w-0 items-center gap-2">
-            <span className={cn('truncate', ruled ? 'font-semibold' : s.kind === 'total' ? 'font-medium' : 'text-muted-foreground')}>{s.label}</span>
-            {s.note ? <span className="shrink-0 rounded-full bg-muted px-2 py-px text-[10.5px] font-medium text-muted-foreground">{s.note}</span> : null}
+          <span className={cn(r.total ? 'font-semibold' : r.less ? 'ps-4 text-muted-foreground' : 'font-medium')}>
+            {r.label}
+            {r.note ? <span className="ms-2 rounded-full bg-muted px-2 py-px text-[10.5px] font-medium text-muted-foreground">{r.note}</span> : null}
           </span>
         );
         return (
-          <li key={s.key} className={cn('grid gap-1.5 py-2.5', ruled && 'border-t', s.kind === 'result' && 'mt-1 border-t-2 border-foreground/15 pt-3.5')}>
-            <div className="flex items-baseline justify-between gap-3 text-sm">
-              {s.href ? <Link href={s.href} className="min-w-0 hover:underline hover:underline-offset-4">{label}</Link> : label}
-              {s.value === null ? (
+          <div
+            key={r.label}
+            className={cn(
+              'flex items-baseline justify-between gap-4 py-2',
+              r.total === 'sub' && 'mt-1 border-t pt-3',
+              r.total === 'final' && 'mt-2 border-t-2 border-foreground/20 pt-3.5',
+            )}
+          >
+            <dt>{r.href ? <Link href={r.href} className="underline-offset-4 hover:underline">{label}</Link> : label}</dt>
+            <dd className="flex items-baseline gap-3">
+              {r.total ? <span className="num text-xs text-muted-foreground">{share(r.value ?? 0)}</span> : null}
+              {r.value === null ? (
                 <span className="text-muted-foreground">—</span>
               ) : (
                 <Amount
-                  value={s.value}
-                  signed={!s.kind}
+                  value={r.value}
                   className={cn(
-                    'shrink-0',
-                    s.kind === 'result' ? cn('text-xl font-semibold tracking-tight', s.value < 0 ? 'text-destructive' : 'text-success') : ruled || s.kind === 'total' ? 'font-semibold' : 'text-muted-foreground',
+                    r.total === 'final'
+                      ? cn('text-lg font-semibold', r.value < 0 ? 'text-destructive' : 'text-success')
+                      : r.total
+                        ? 'font-semibold'
+                        : r.less
+                          ? 'text-muted-foreground'
+                          : 'font-medium',
                   )}
                 />
               )}
+            </dd>
+          </div>
+        );
+      })}
+    </dl>
+  );
+}
+
+/** Each channel's sales and its part of the whole, biggest first; Amazon waits in its row until connected. */
+async function Channels({ pnl, revenue }: { pnl: PerformanceReport; revenue: number }) {
+  const t = await getTranslations('money.pnl');
+  const rows = [...pnl.channels].sort((a, b) => Number(b.revenue) - Number(a.revenue));
+  return (
+    <ul className="mt-5 grid gap-4">
+      {rows.map((c) => {
+        const sold = Number(c.revenue);
+        const left = Number(c.contribution);
+        const part = revenue > 0 ? sold / revenue : 0;
+        return (
+          <li key={c.key}>
+            <div className="flex items-baseline justify-between gap-4 text-sm">
+              <span className="font-medium">{t(`channels.${c.key}`)}</span>
+              <Amount value={sold} className={cn('font-semibold', sold === 0 && 'font-normal text-muted-foreground')} />
             </div>
-            {s.value !== null && s.kind !== 'result' ? (
-              <span className="block h-1 overflow-hidden rounded-full bg-muted">
-                <span
-                  className="block h-full rounded-full"
-                  style={{ width: `${Math.max(share * 100, s.value ? 1.5 : 0)}%`, background: s.kind ? 'var(--primary)' : OUT_FILL }}
-                />
+            <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-muted">
+              <span className="block h-full rounded-full bg-primary" style={{ width: `${Math.max(part * 100, sold > 0 ? 1 : 0)}%` }} />
+            </span>
+            <p className="mt-1.5 flex flex-wrap justify-between gap-x-4 text-xs text-muted-foreground">
+              <span>
+                {sold > 0
+                  ? `${Math.round(part * 100)}% · ${t(`counts.${c.key === 'wholesale' ? 'invoices' : 'orders'}`, { count: c.count })}`
+                  : t('noSales')}
               </span>
-            ) : null}
+              {sold > 0 ? (
+                <span className={cn(c.uncostedUnits > 0 && 'text-warning')}>
+                  {c.uncostedUnits > 0
+                    ? t('uncostedShort', { count: c.uncostedUnits })
+                    : t('leftAfter', { amount: money(left), margin: `${((left / sold) * 100).toFixed(0)}%` })}
+                </span>
+              ) : null}
+            </p>
           </li>
         );
       })}
-    </ol>
+      <li className="text-sm text-muted-foreground">
+        <div className="flex items-baseline justify-between gap-4">
+          <span>{t('channels.amazon')}</span>
+          <span className="text-xs">{t('notConnected')}</span>
+        </div>
+        <span className="mt-2 block h-1.5 rounded-full border border-dashed" />
+      </li>
+    </ul>
   );
 }
 
-/** Each channel's sales, what they cost, and what they leave — Amazon waits in its row until it's connected. */
-async function ChannelTable({
+/** One side of who-owes-whom: its total, what it means, then each part opening its records. */
+function Owed({
+  title,
+  hint,
   rows,
-  revenue,
+  empty,
+  owing = false,
 }: {
-  rows: Array<{
-    key: 'noon' | 'website' | 'social' | 'wholesale' | 'amazon';
-    revenue: string | null;
-    cogs: string | null;
-    cogsBasis: 'actual' | 'estimate';
-    directCosts: string | null;
-    contribution: string | null;
-    count: number;
-    uncostedUnits: number;
-  }>;
-  revenue: number;
+  title: string;
+  hint: string;
+  rows: Array<{ key: string; label: string; amount: number; href: string }>;
+  empty: string;
+  owing?: boolean;
 }) {
-  const t = await getTranslations('money.pnl');
+  const total = rows.reduce((n, r) => n + r.amount, 0);
   return (
-    <div className="overflow-x-auto border-t">
-      <table className="w-full min-w-[44rem] text-sm">
-        <thead>
-          <tr className="text-xs text-muted-foreground [&>th]:h-9 [&>th]:px-3 [&>th]:font-medium [&>th:first-child]:ps-5 [&>th:last-child]:pe-5">
-            <th className="text-start">{t('channel')}</th>
-            <th className="text-end">{t('revenue')}</th>
-            <th className="w-[18%] text-start">{t('share')}</th>
-            <th className="text-end">{t('cogs')}</th>
-            <th className="text-end">{t('directCosts')}</th>
-            <th className="text-end">{t('contribution')}</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y border-t">
-          {rows.map((c) => {
-            const sold = c.revenue === null ? null : Number(c.revenue);
-            const left = c.contribution === null ? null : Number(c.contribution);
-            const share = sold && revenue > 0 ? sold / revenue : 0;
-            return (
-              <tr key={c.key} className="[&>td]:h-16 [&>td]:px-3 [&>td:first-child]:ps-5 [&>td:last-child]:pe-5">
-                <td>
-                  <p className="font-medium">{t(`channels.${c.key}`)}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {sold === null ? t('notConnected') : c.count ? t(`counts.${c.key === 'wholesale' ? 'invoices' : 'orders'}`, { count: c.count }) : t('noSales')}
-                  </p>
-                </td>
-                <td className="num text-end font-semibold">{sold === null ? <span className="font-normal text-muted-foreground">—</span> : money(sold)}</td>
-                <td>
-                  {sold === null ? null : (
-                    <div className="flex items-center gap-2">
-                      <span className="block h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                        <span className="block h-full rounded-full bg-primary" style={{ width: `${share * 100}%` }} />
-                      </span>
-                      <span className="num w-10 text-end text-xs text-muted-foreground">{`${Math.round(share * 100)}%`}</span>
-                    </div>
-                  )}
-                </td>
-                <td className="text-end">
-                  {c.cogs === null ? (
-                    <span className="text-muted-foreground">—</span>
-                  ) : (
-                    <>
-                      <span className="num">{money(c.cogs)}</span>
-                      <p className="mt-0.5 text-[11px] text-muted-foreground">
-                        {c.uncostedUnits > 0 ? <span className="text-warning">{t('uncostedShort', { count: c.uncostedUnits })}</span> : t(c.cogsBasis === 'actual' ? 'actual' : 'estimated')}
-                      </p>
-                    </>
-                  )}
-                </td>
-                <td className="num text-end text-muted-foreground">{c.directCosts === null ? '—' : money(c.directCosts)}</td>
-                <td className="text-end">
-                  {left === null ? (
-                    <span className="text-muted-foreground">—</span>
-                  ) : (
-                    <>
-                      <span className={cn('num font-semibold', left < 0 && 'text-destructive')}>{money(left)}</span>
-                      <p className="num mt-0.5 text-[11px] text-muted-foreground">{sold ? `${((left / sold) * 100).toFixed(1)}%` : '—'}</p>
-                    </>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-/** One side of the books in plain words: its total, then each line, each opening its records. */
-function Balances({ title, total, rows, empty, owing = false }: { title: string; total: number; rows: Row[]; empty: string; owing?: boolean }) {
-  return (
-    <Card className="gap-0 py-0" data-sensitive-scope>
-      <div className="flex items-baseline justify-between gap-3 px-5 py-4">
+    <div className="px-6 py-6 md:px-8">
+      <div className="flex items-baseline justify-between gap-4">
         <h2 className="text-base font-semibold">{title}</h2>
-        <Amount value={total} className={cn('text-xl font-semibold tracking-tight', owing && total > 0.005 && 'text-warning')} />
+        <Amount value={total} className={cn('text-2xl font-semibold tracking-tight', owing && total > 0.005 && 'text-warning')} />
       </div>
+      <p className="mt-0.5 text-[13px] text-muted-foreground">{hint}</p>
       {rows.length ? (
-        <ul className="divide-y border-t">
+        <ul className="mt-4 divide-y border-t">
           {rows.map((r) => (
             <li key={r.key}>
-              <Link href={r.href} className="group flex items-center gap-3.5 px-5 py-3.5 transition-colors hover:bg-muted/40">
-                <span aria-hidden className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-muted/60 text-muted-foreground">
-                  <r.icon className="size-4" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium group-hover:text-highlight">{r.label}</span>
-                  <span className="block truncate text-xs text-muted-foreground">{r.detail}</span>
-                </span>
-                <span className="num shrink-0 font-semibold">{money(r.amount)}</span>
-                <ChevronLeft className="size-4 shrink-0 text-muted-foreground ltr:rotate-180" aria-hidden />
+              <Link href={r.href} className="group flex items-center gap-3 py-3 text-sm">
+                <span className="min-w-0 flex-1 truncate group-hover:text-highlight">{r.label}</span>
+                <span className="num font-medium">{money(r.amount)}</span>
+                <ChevronLeft className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:-translate-x-0.5 ltr:rotate-180 ltr:group-hover:translate-x-0.5" aria-hidden />
               </Link>
             </li>
           ))}
         </ul>
       ) : (
-        <p className="border-t px-5 py-6 text-sm text-muted-foreground">{empty}</p>
+        <p className="mt-4 border-t pt-4 text-sm text-muted-foreground">{empty}</p>
       )}
-    </Card>
+    </div>
   );
 }
 
-/** One of the figures under the balance: what it is, how much, and against what. */
-function FlowStat({ label, value, children }: { label: string; value: React.ReactNode; children: React.ReactNode }) {
+/** The difference, said in a sentence — which way it leans, and by how much. */
+async function NetOwed({ owed, owe }: { owed: number; owe: number }) {
+  const t = await getTranslations('money.home');
+  const net = owed - owe;
+  if (Math.abs(net) < 0.005 && owed < 0.005) return null;
   return (
-    <div className="px-(--card-spacing) py-4 [--card-spacing:--spacing(4)]">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <div className="mt-1.5 text-xl font-semibold tracking-[-0.02em]">{value}</div>
-      <p className="mt-1 text-xs text-muted-foreground">{children}</p>
-    </div>
+    <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t bg-muted/30 px-6 py-3.5 text-sm md:px-8">
+      <span className="text-muted-foreground">{t(net >= 0 ? 'netOwedToYou' : 'netYouOwe')}</span>
+      <Amount value={Math.abs(net)} className={cn('font-semibold', net < 0 && 'text-warning')} />
+    </p>
   );
 }
 
 /**
  * A change against the period before, as words with a small arrow — not a
- * coloured pill. `invert` is for figures where less is better (money out).
+ * coloured pill. `invert` is for figures where less is better (costs). Nothing
+ * to compare with, nothing shown.
  */
-function Change({ value, invert = false, note }: { value: number; invert?: boolean; note: string }) {
+function Change({ value, invert = false, note }: { value: number | null; invert?: boolean; note?: string }) {
+  if (value === null) return note ? null : <span>—</span>;
   const flat = Math.abs(value) < 0.05;
   const Icon = flat ? Minus : value > 0 ? ArrowUpRight : ArrowDownRight;
   const good = invert ? value < 0 : value > 0;
   return (
-    <>
+    <span>
       <span className={cn('inline-flex items-center gap-0.5 font-medium', !flat && (good ? 'text-success' : 'text-destructive'))}>
         <Icon className="size-3.5" />
         <bdi className="num">{`${Math.abs(value).toFixed(1)}%`}</bdi>
-      </span>{' '}
-      {note}
-    </>
-  );
-}
-
-function AccountList({
-  title,
-  rows,
-  muted,
-}: {
-  title: string;
-  rows: Array<{ key: string; label: string; balance: string; href: string }>;
-  muted?: boolean;
-}) {
-  if (rows.length === 0) return null;
-  return (
-    <section>
-      <h3 className="mb-1 border-b pb-2 font-sans text-xs font-medium text-muted-foreground">{title}</h3>
-      <ul className="grid">
-        {rows.map((a) => (
-          <li key={a.key}>
-            <Link
-              href={a.href}
-              className="-mx-2 flex items-baseline justify-between gap-3 rounded-md px-2 py-1.5 text-[13px] transition-colors hover:bg-muted/60"
-            >
-              <span className={cn('truncate', muted && 'text-muted-foreground')}>{a.label}</span>
-              <span className={cn('num shrink-0', muted ? 'text-muted-foreground' : 'font-medium')}>{money(a.balance)}</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </section>
+      </span>
+      {note ? <> {note}</> : null}
+    </span>
   );
 }
 
