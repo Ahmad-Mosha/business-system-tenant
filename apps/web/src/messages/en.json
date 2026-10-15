@@ -483,7 +483,10 @@
       "summary": "Summary",
       "subtotal": "Subtotal",
       "shipping": "Shipping",
-      "total": "Total"
+      "total": "Total",
+      "call": "Call",
+      "whatsapp": "WhatsApp",
+      "customerDelivery": "Customer & delivery"
     },
     "history": {
       "created": "Created from {source, select, EASYORDERS {the website} other {social}}",
@@ -502,7 +505,14 @@
       "description": "Change any of these in place.",
       "assignedTo": "Assigned to",
       "status": "Status",
-      "payment": "Payment"
+      "payment": "Payment",
+      "next": {
+        "CONFIRMED": "Confirm order",
+        "SHIPPED": "Mark as shipped",
+        "DELIVERED": "Mark as delivered",
+        "PAID": "Mark as paid"
+      },
+      "nextHint": "Or change anything below."
     },
     "form": {
       "backToOrder": "Back to the order",
