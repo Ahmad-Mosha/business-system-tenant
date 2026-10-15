@@ -137,3 +137,7 @@ export function groupAccounts(accounts: AccountBalance[]) {
 
 export const accountByCode = (accounts: AccountBalance[], code: string) =>
   accounts.find((a) => a.code === code);
+
+/** What a posted credit purchase still owes its supplier; 0 for a cash, draft or cancelled one. */
+export const purchaseDue = (i: { status: string; payment: string; payableTotal: string; settledAmount: string }) =>
+  i.status === 'POSTED' && i.payment === 'CREDIT' ? Math.max(Number(i.payableTotal) - Number(i.settledAmount), 0) : 0;

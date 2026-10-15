@@ -472,6 +472,10 @@ export interface SupplierRow {
   active: boolean;
   balance: string;
   createdAt: string;
+  /** What they billed on posted invoices, how many, and the latest date (null before the first). */
+  bought?: string;
+  invoiceCount?: number;
+  lastInvoiceAt?: string | null;
 }
 
 export type PaidStatus = 'DRAFT' | 'UNPAID' | 'PARTIAL' | 'PAID' | 'VOID';

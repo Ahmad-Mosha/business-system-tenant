@@ -1,4 +1,4 @@
-import { Ban, CheckCircle2, Info, Pencil, Trash2 } from 'lucide-react';
+import { Ban, CheckCircle2, ChevronLeft, Info, Package, Pencil, Trash2, Truck, Wallet } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { cancelPurchase, deleteDraftInvoice } from '@/app/(app)/money/actions';
@@ -11,8 +11,10 @@ import { PaidChip } from '@/components/paid-chip';
 import { PaySupplier } from '@/components/pay-supplier';
 import { PostInvoiceButton } from '@/components/post-invoice-button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 import {
   Table,
   TableBody,
@@ -46,6 +48,7 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
   const canPay = isCredit && invoice.paidStatus !== 'PAID' && remaining > 0.005;
   // Landed cost is part of inventory value, distinct from the supplier balance.
   const hasExtras = Number(invoice.extraCosts) > 0;
+  const units = invoice.lines.reduce((n, l) => n + l.quantity, 0);
 
   return (
     <Page>
@@ -170,70 +173,115 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
         </Alert>
       ) : null}
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <Card className="min-w-0 pb-0">
-          <CardHeader>
-            <CardTitle>{t('lines')}</CardTitle>
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <Card className="min-w-0 gap-0 pb-0">
+          <CardHeader className="items-center pb-4">
+            <CardTitle className="flex items-center gap-2.5">
+              <Package className="size-4 text-muted-foreground" aria-hidden />
+              {t('lines')}
+            </CardTitle>
+            <CardAction>
+              <Badge variant="secondary" className="rounded-md px-2.5 py-1">{tr('nouns.units', { count: units })}</Badge>
+            </CardAction>
           </CardHeader>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t('columns.product')}</TableHead>
-                <TableHead className="w-[80px] text-end">{t('columns.qty')}</TableHead>
-                <TableHead className="w-[130px] text-end">{t('columns.unitCost')}</TableHead>
-                {hasExtras ? <TableHead className="w-[130px] text-end">{t('columns.landedUnit')}</TableHead> : null}
-                <TableHead className="w-[140px] text-end">{t('columns.lineTotal')}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {invoice.lines.map((l) => (
-                <TableRow key={l.id}>
-                  <TableCell className="min-w-40 whitespace-normal">
-                    <p className="line-clamp-2 leading-snug font-medium" title={l.label}>
-                      <bdi>{l.label}</bdi>
-                    </p>
-                  </TableCell>
-                  <TableCell className="num text-end">{l.quantity}</TableCell>
-                  <TableCell className="num text-end">{unitMoney(l.unitCost)}</TableCell>
-                  {hasExtras ? (
-                    <TableCell className="num text-end text-muted-foreground">
-                      {l.landedUnitCost ? unitMoney(l.landedUnitCost) : '—'}
-                    </TableCell>
-                  ) : null}
-                  <TableCell className="num text-end font-medium">{money(l.lineTotal)}</TableCell>
+          <div className="hidden sm:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('columns.product')}</TableHead>
+                  <TableHead className="w-[80px] text-end">{t('columns.qty')}</TableHead>
+                  <TableHead className="w-[130px] text-end">{t('columns.unitCost')}</TableHead>
+                  {hasExtras ? <TableHead className="w-[130px] text-end">{t('columns.landedUnit')}</TableHead> : null}
+                  <TableHead className="w-[140px] text-end">{t('columns.lineTotal')}</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {invoice.lines.map((l) => (
+                  <TableRow key={l.id} className="hover:bg-transparent">
+                    <TableCell className="min-w-40 py-3.5 whitespace-normal">
+                      <p className="line-clamp-2 leading-snug font-medium" title={l.label}>
+                        <bdi>{l.label}</bdi>
+                      </p>
+                    </TableCell>
+                    <TableCell className="num text-end">{f.count(l.quantity)}</TableCell>
+                    <TableCell className="num text-end">{unitMoney(l.unitCost)}</TableCell>
+                    {hasExtras ? (
+                      <TableCell className="num text-end text-muted-foreground">
+                        {l.landedUnitCost ? unitMoney(l.landedUnitCost) : '—'}
+                      </TableCell>
+                    ) : null}
+                    <TableCell className="num text-end font-semibold">{money(l.lineTotal)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <ul className="divide-y border-t sm:hidden">
+            {invoice.lines.map((l) => (
+              <li key={l.id} className="grid gap-3 px-5 py-4">
+                <p className="leading-snug font-medium"><bdi>{l.label}</bdi></p>
+                <dl className="grid grid-cols-3 gap-3 text-sm">
+                  <div><dt className="text-xs text-muted-foreground">{t('columns.qty')}</dt><dd className="num mt-1">{f.count(l.quantity)}</dd></div>
+                  <div><dt className="text-xs text-muted-foreground">{t('columns.unitCost')}</dt><dd className="num mt-1">{unitMoney(l.unitCost)}</dd></div>
+                  <div className="text-end"><dt className="text-xs text-muted-foreground">{t('columns.lineTotal')}</dt><dd className="num mt-1 font-semibold">{money(l.lineTotal)}</dd></div>
+                </dl>
+              </li>
+            ))}
+          </ul>
+          {/* The bill under the lines it adds up: goods, extra costs, and what went into stock. */}
+          <div className="flex justify-end border-t bg-muted/25 px-5 py-5 md:px-6">
+            <div className="grid w-full gap-2 text-sm sm:w-80">
+              <Row label={t('goods')} value={money(invoice.goodsTotal)} />
+              {hasExtras ? <Row label={t('extras', { allocation: invoice.allocation })} value={money(invoice.extraCosts)} /> : null}
+              {hasExtras && invoice.extraCostsPaidSeparately ? <p className="text-xs text-muted-foreground">{t('separateCosts')}</p> : null}
+              <div className="mt-1 flex items-baseline justify-between gap-4 border-t pt-3">
+                <span className="font-medium">{t('intoStock')}</span>
+                <span className="flex items-baseline gap-1.5">
+                  <Amount value={invoice.landedTotal} className={cn('text-2xl font-semibold tracking-tight', voided && 'text-muted-foreground line-through')} />
+                  <span className="text-xs text-muted-foreground">{tr('common.egp')}</span>
+                </span>
+              </div>
+            </div>
+          </div>
         </Card>
 
-        <aside className="grid gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('totals')}</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-2 text-[13px]">
-              <Row label={t('goods')} value={money(invoice.goodsTotal)} />
-              {hasExtras ? (
-                <Row label={t('extras', { allocation: invoice.allocation })} value={money(invoice.extraCosts)} />
-              ) : null}
-              {hasExtras && invoice.extraCostsPaidSeparately ? <p className="text-xs text-muted-foreground">{t('separateCosts')}</p> : null}
-              <div className="mt-1 flex items-baseline justify-between gap-3 border-t pt-3">
-                <span className="font-medium">{t('intoStock')}</span>
-                <Amount value={invoice.landedTotal} className="text-2xl font-semibold tracking-tight" />
-              </div>
-              {!draft && !voided && invoice.payment === 'CREDIT' ? (
-                <>
-                  <Row label={t('paidSoFar')} value={money(invoice.settledAmount)} />
-                  <Row
-                    label={t('stillOwed')}
-                    value={money(remaining)}
-                    strong
-                    className={remaining > 0.005 ? 'text-warning' : 'text-success'}
-                  />
-                </>
-              ) : null}
-            </CardContent>
+        <aside className="grid min-w-0 gap-5 max-xl:row-start-1 xl:col-start-2">
+          {isCredit ? (
+            // A credit invoice: how much of what the supplier billed is paid, at a glance.
+            <Card data-sensitive-scope>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2.5">
+                  <Wallet className="size-4 text-muted-foreground" aria-hidden />
+                  {tr('money.supplier.payments')}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-3">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-sm text-muted-foreground">{t('stillOwed')}</span>
+                  <span className={cn('num text-2xl font-semibold tracking-tight', remaining > 0.005 ? 'text-warning' : 'text-success')}>
+                    {remaining > 0.005 ? money(remaining) : tr('sales.payments.settled')}
+                  </span>
+                </div>
+                <Progress value={Number(invoice.payableTotal) > 0 ? (Number(invoice.settledAmount) / Number(invoice.payableTotal)) * 100 : 0} aria-label={t('paidSoFar')} />
+                <p className="num text-xs text-muted-foreground">
+                  {t('paidOfTotal', { paid: money(invoice.settledAmount), total: money(invoice.payableTotal) })}
+                </p>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          <Card className="gap-0 py-0">
+            <Link href={`/money/suppliers/${invoice.supplier.id}`} className="group flex items-center gap-3.5 px-5 py-5">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/8 text-primary" aria-hidden>
+                <Truck className="size-5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-xs text-muted-foreground">{tr('money.purchases.columns.supplier')}</span>
+                <span className="block truncate font-semibold group-hover:text-highlight group-hover:underline group-hover:underline-offset-4"><bdi>{invoice.supplier.name}</bdi></span>
+                {invoice.supplier.phone ? <span className="num block text-sm text-muted-foreground"><bdi>{invoice.supplier.phone}</bdi></span> : null}
+              </span>
+              <ChevronLeft className="size-4 text-muted-foreground ltr:rotate-180" aria-hidden />
+            </Link>
           </Card>
 
           {voided ? null : <Alert variant={!draft && (invoice.payment === 'CASH' || invoice.paidStatus === 'PAID') ? 'success' : 'default'}>

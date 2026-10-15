@@ -1,4 +1,4 @@
-import { Archive, ArchiveRestore, Trash2, Undo2 } from 'lucide-react';
+import { Archive, ArchiveRestore, ClipboardList, HandCoins, PackagePlus, Trash2, Undo2, Wallet } from 'lucide-react';
 import Link from 'next/link';
 import { deleteSupplier, reverseSupplierPayment, setSupplierActive } from '@/app/(app)/money/actions';
 import { CancelAction } from '@/components/cancel-action';
@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { bdi } from '@/i18n/rich';
 import { notFound } from 'next/navigation';
 import { Amount } from '@/components/amount';
-import { MetricCard, MetricGrid } from '@/components/metric-card';
+import { SummaryMetric, SummaryStrip } from '@/components/list-page';
 import { Page, PageHeader } from '@/components/page';
 import { PaidChip } from '@/components/paid-chip';
 import { PaySupplier } from '@/components/pay-supplier';
@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/table';
 import { getSupplier } from '@/lib/api';
 import { money } from '@/lib/format';
-import { isSystemMemo } from '@/lib/money';
+import { isSystemMemo, purchaseDue } from '@/lib/money';
 import { blockedBy } from '@/lib/problem';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
@@ -48,7 +48,8 @@ export default async function SupplierDetailPage({
   if (!supplier) notFound();
 
   const posted = supplier.invoices.filter((i) => i.status === 'POSTED');
-  const purchased = posted.reduce((n, i) => n + Number(i.landedTotal), 0);
+  // What they billed — the same figure as the suppliers list; costs paid to someone else aren't theirs.
+  const purchased = posted.reduce((n, i) => n + Number(i.payableTotal), 0);
   // Live payments only: a reversed one and its reversal cancel out.
   const livePayments = supplier.payments.filter((p) => !p.reversesId && !p.cancelledAt);
   const paid = livePayments.reduce((n, p) => n + Number(p.amount), 0);
@@ -129,40 +130,37 @@ export default async function SupplierDetailPage({
         </Alert>
       ) : null}
 
-      <MetricGrid>
-        <MetricCard
+      <SummaryStrip label={supplier.name}>
+        <SummaryMetric
           label={t('owed')}
+          icon={HandCoins}
           value={<Amount value={supplier.balance} />}
-          tone={owed > 0 ? 'warning' : 'default'}
           hint={owed > 0 ? t('owedSome') : t('settled')}
+          attention={owed > 0}
+          sensitive
         />
-        <MetricCard
-          label={t('bought')}
-          value={<Amount value={purchased} />}
-          hint={t('postedInvoices', { count: posted.length })}
-        />
-        <MetricCard
-          label={t('paid')}
-          value={<Amount value={paid} />}
-          hint={tr('nouns.payments', { count: livePayments.length })}
-        />
-      </MetricGrid>
+        <SummaryMetric label={t('bought')} icon={PackagePlus} value={<Amount value={purchased} />} hint={t('postedInvoices', { count: posted.length })} sensitive />
+        <SummaryMetric label={t('paid')} icon={Wallet} value={<Amount value={paid} />} hint={tr('nouns.payments', { count: livePayments.length })} sensitive />
+      </SummaryStrip>
 
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_400px]">
         <Card className="min-w-0 pb-0">
           <CardHeader>
-            <CardTitle>{t('invoices')}</CardTitle>
+            <CardTitle className="flex items-center gap-2.5">
+              <ClipboardList className="size-4 text-muted-foreground" aria-hidden />
+              {t('invoices')}
+            </CardTitle>
           </CardHeader>
           {supplier.invoices.length === 0 ? (
             <p className="border-t p-10 text-center text-[13px] text-muted-foreground">{t('noInvoices')}</p>
           ) : (
-            <Table>
+            <Table className="[&_td]:h-16">
               <TableHeader>
                 <TableRow>
                   <TableHead>{tr('money.purchases.columns.invoice')}</TableHead>
-                  <TableHead className="w-[120px]">{tr('money.purchases.columns.date')}</TableHead>
-                  <TableHead className="w-[130px]">{tr('money.purchases.columns.status')}</TableHead>
-                  <TableHead className="w-[140px] text-end">{tr('money.purchases.columns.total')}</TableHead>
+                  <TableHead className="w-[22%]">{tr('money.purchases.columns.status')}</TableHead>
+                  <TableHead className="w-[20%] text-end">{tr('money.purchases.columns.total')}</TableHead>
+                  <TableHead className="w-[20%] text-end">{tr('sales.columns.remaining')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -171,20 +169,25 @@ export default async function SupplierDetailPage({
                     <TableCell>
                       <Link
                         href={`/money/purchases/${i.id}`}
-                        className="font-medium after:absolute after:inset-0 hover:underline focus-visible:underline focus-visible:outline-none"
+                        className={cn(
+                          'after:absolute after:inset-0 hover:text-highlight hover:underline hover:underline-offset-4 focus-visible:underline focus-visible:outline-none',
+                          i.invoiceNo ? 'font-semibold' : 'text-muted-foreground',
+                        )}
                       >
-                        {i.invoiceNo ?? tr('money.purchases.noRef')}
+                        {i.invoiceNo ? <bdi>{i.invoiceNo}</bdi> : tr('money.purchases.noRef')}
                       </Link>
-                      <span className="ms-2 text-xs text-muted-foreground">
-                        {tr(`enums.purchasePayment.${i.payment}`)}
-                      </span>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {f.date(i.invoiceDate)} · {tr(`enums.purchasePayment.${i.payment}`)}
+                      </p>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{f.date(i.invoiceDate)}</TableCell>
                     <TableCell>
                       <PaidChip status={i.paidStatus} />
                     </TableCell>
-                    <TableCell className={cn('num text-end font-medium', i.status === 'VOID' && 'font-normal line-through')}>
+                    <TableCell className={cn('num text-end font-medium', i.status === 'VOID' && 'font-normal line-through')} data-sensitive>
                       {money(i.landedTotal)}
+                    </TableCell>
+                    <TableCell className="num text-end" data-sensitive>
+                      {purchaseDue(i) > 0.005 ? <span className="font-semibold text-warning">{money(purchaseDue(i))}</span> : <span className="text-muted-foreground">—</span>}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -195,7 +198,10 @@ export default async function SupplierDetailPage({
 
         <Card className="pb-0">
           <CardHeader>
-            <CardTitle>{t('payments')}</CardTitle>
+            <CardTitle className="flex items-center gap-2.5">
+              <Wallet className="size-4 text-muted-foreground" aria-hidden />
+              {t('payments')}
+            </CardTitle>
             <CardDescription>{t('paymentsHint')}</CardDescription>
           </CardHeader>
           {supplier.payments.length === 0 ? (
