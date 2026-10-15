@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/table';
 import { getAssignees, getOrder } from '@/lib/api';
 import { money } from '@/lib/format';
+import { whatsappHref } from '@/lib/phone';
 import { BlockedDialog } from '@/components/blocked-dialog';
 import { requireSession } from '@/lib/session';
 import { isOneOf } from '@/lib/utils';
@@ -259,7 +260,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                 <a href={`tel:${order.customerPhone}`}><Phone />{t('detail.call')}</a>
               </Button>
               <Button variant="outline" asChild>
-                <a href={whatsapp(order.customerPhone)} target="_blank" rel="noreferrer"><MessageCircle />{t('detail.whatsapp')}</a>
+                <a href={whatsappHref(order.customerPhone)} target="_blank" rel="noreferrer"><MessageCircle />{t('detail.whatsapp')}</a>
               </Button>
             </div>
             <dl className="grid gap-4 border-t px-5 py-5 sm:grid-cols-2 xl:grid-cols-1">
@@ -278,12 +279,6 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       </div>
     </Page>
   );
-}
-
-/** An Egyptian mobile as a WhatsApp chat link: 010… becomes 2010…. */
-function whatsapp(phone: string) {
-  const digits = phone.replace(/\D/g, '');
-  return `https://wa.me/${digits.startsWith('0') ? `2${digits}` : digits.length === 10 ? `20${digits}` : digits}`;
 }
 
 function Detail({ label, children }: { label: string; children: ReactNode }) {

@@ -55,14 +55,32 @@ export class SalesService {
     return new Map(rows.map((r) => [r.customerId, Number(r.owed)]));
   }
 
-  /** Active customers for everyday use; `archived` lists the archived ones instead. */
+  /**
+   * Active customers for everyday use; `archived` lists the archived ones
+   * instead. Each comes with what they owe and how much they've bought —
+   * posted invoices only, so a draft or a cancelled one never counts.
+   */
   async listCustomers(archived = false) {
     const customers = await this.db.getRepository(Customer).find({
       where: { active: !archived },
       order: { name: 'ASC' },
     });
-    const owed = await this.owedByCustomer();
-    return customers.map((c) => ({ ...c, balance: money(owed.get(c.id) ?? 0) }));
+    const stats: Array<{ customerId: string; owed: string; sold: string; invoices: number; lastInvoiceAt: string }> = await this.db.query(
+      `SELECT customer_id AS "customerId", SUM(total - paid_amount) AS owed, SUM(total) AS sold,
+              count(*)::int AS invoices, MAX(invoice_date)::text AS "lastInvoiceAt"
+       FROM sales_invoice WHERE status = 'POSTED' GROUP BY customer_id`,
+    );
+    const of = new Map(stats.map((r) => [r.customerId, r]));
+    return customers.map((c) => {
+      const s = of.get(c.id);
+      return {
+        ...c,
+        balance: money(Number(s?.owed ?? 0)),
+        sold: money(Number(s?.sold ?? 0)),
+        invoiceCount: s?.invoices ?? 0,
+        lastInvoiceAt: s?.lastInvoiceAt ?? null,
+      };
+    });
   }
 
   async createCustomer(input: { name?: string; phone?: string; note?: string }) {

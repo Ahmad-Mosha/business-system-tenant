@@ -794,6 +794,8 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     assert.equal(posted.lines[0].unitCost, '10.0000'); // cost frozen on the line
     assert.equal(await balance(a), 2);
     assert.equal(await owed(), '100.00');
+    const listed = (await sales.listCustomers()).find((c) => c.id === customer.id)!;
+    assert.deepEqual([listed.balance, listed.sold, listed.invoiceCount, listed.lastInvoiceAt], ['100.00', '140.00', 1, '2026-10-13']);
     assert.deepEqual((await entries(inv.id)).map((e: { debit: string; credit: string; amount: string }) => `${e.debit}>${e.credit} ${e.amount}`),
       ['CUSTOMER_RECEIVABLE>SALES 140.00', 'CASH>CUSTOMER_RECEIVABLE 40.00']);
     await assert.rejects(sales.updateDraft(inv.id, { customerId: customer.id, invoiceDate: '2026-10-13', lines: [{ variantId: a, quantity: 1, unitPrice: '1' }] }), /cannot be edited/);

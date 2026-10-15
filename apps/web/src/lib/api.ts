@@ -605,6 +605,10 @@ export interface CustomerRow {
   /** Unpaid remainder of their posted invoices. */
   balance: string;
   createdAt: string;
+  /** Their posted invoices: how much, how many, and the latest date (null before the first). */
+  sold?: string;
+  invoiceCount?: number;
+  lastInvoiceAt?: string | null;
 }
 
 export type SalesInvoiceStatus = 'DRAFT' | 'POSTED' | 'VOID';
