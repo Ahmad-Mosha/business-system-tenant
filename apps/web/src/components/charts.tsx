@@ -10,7 +10,8 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Cell,
+  ComposedChart,
+  Line,
   ReferenceLine,
   XAxis,
   YAxis,
@@ -203,57 +204,49 @@ export function CashFlowChart({
   );
 }
 
-/** The confirmed manual/Easy Order business-profit measure over time. */
-export function ProfitChart({
+/**
+ * Month by month: what was sold and what it cost, as paired bars, with what
+ * was left — net profit — as a line over them. A month that lost money dips
+ * the line below zero; no colour change needed to see it.
+ */
+export function ProfitTrendChart({
   series,
-  bucket,
 }: {
-  series: Array<{
-    period: string;
-    sales: string;
-    shipping: string;
-    businessProfit: string;
-  }>;
-  bucket: Bucket;
+  series: Array<{ month: string; revenue: string; costs: string; netProfit: string }>;
 }) {
-  const t = useTranslations('charts');
-  const tm = useTranslations('money.overview');
+  const t = useTranslations('money.pnl');
   const f = useFormat();
   const axisWidth = useAxisWidth();
   const tick = useTick();
   const rtl = useDirection() === 'rtl';
-
   const data = series.map((p) => ({
-    period: p.period,
-    sales: Number(p.sales),
-    shipping: Number(p.shipping),
-    businessProfit: Number(p.businessProfit),
+    month: p.month,
+    revenue: Number(p.revenue),
+    costs: Number(p.costs),
+    netProfit: Number(p.netProfit),
   }));
-
-  if (data.every((d) => d.sales === 0 && d.shipping === 0)) {
-    return <ChartEmpty className="h-64">{tm('businessProfitEmpty')}</ChartEmpty>;
+  if (data.every((d) => d.revenue === 0 && d.costs === 0)) {
+    return <ChartEmpty className="h-72">{t('trendEmpty')}</ChartEmpty>;
   }
-
   const config = {
-    businessProfit: { label: tm('businessProfit'), color: 'var(--primary)' },
+    revenue: { label: t('revenue'), color: 'var(--primary)' },
+    costs: { label: t('costs'), color: OUT_FILL },
+    netProfit: { label: t('netProfit'), color: 'var(--foreground)' },
   } satisfies ChartConfig;
-  const weekOf = (date: string) => t('weekOf', { date });
-
   return (
-    <ChartContainer key={rtl ? 'rtl' : 'ltr'} config={config} className="aspect-auto h-64 w-full">
-      <BarChart accessibilityLayer data={data} margin={{ top: 8, right: 0, bottom: 0, left: 0 }}>
+    <ChartContainer key={rtl ? 'rtl' : 'ltr'} config={config} className="aspect-auto h-72 w-full">
+      <ComposedChart accessibilityLayer data={data} margin={{ top: 8, right: 0, bottom: 0, left: 0 }}>
         <CartesianGrid vertical={false} strokeDasharray="3 4" />
         <XAxis
-          dataKey="period"
+          dataKey="month"
           tickLine={false}
           axisLine={false}
           tickMargin={10}
-          minTickGap={24}
-          tickFormatter={(v: string) => tick(bucketLabel(f, weekOf, v, bucket))}
+          tickFormatter={(v: string) => tick(f.monthShort(v))}
         />
         <YAxis
           orientation={rtl ? 'right' : 'left'}
-          tickCount={4}
+          tickCount={5}
           tickLine={false}
           axisLine={false}
           width={axisWidth}
@@ -262,22 +255,12 @@ export function ProfitChart({
         <ReferenceLine y={0} stroke="var(--border)" />
         <ChartTooltip
           cursor={{ fill: 'var(--muted)', fillOpacity: 0.5 }}
-          content={
-            <ChartTooltipContent
-              labelFormatter={(v) => bucketLabel(f, weekOf, String(v), bucket, true)}
-              valueFormatter={signedMoney}
-            />
-          }
+          content={<ChartTooltipContent labelFormatter={(v) => f.month(String(v))} valueFormatter={signedOrPlain} />}
         />
-        <Bar dataKey="businessProfit" fill="var(--color-businessProfit)" radius={[2, 2, 0, 0]} maxBarSize={28}>
-          {data.map((point) => (
-            <Cell
-              key={point.period}
-              fill={point.businessProfit < 0 ? 'var(--destructive)' : 'var(--color-businessProfit)'}
-            />
-          ))}
-        </Bar>
-      </BarChart>
+        <Bar dataKey="revenue" fill="var(--color-revenue)" radius={[2, 2, 0, 0]} maxBarSize={18} />
+        <Bar dataKey="costs" fill="var(--color-costs)" radius={[2, 2, 0, 0]} maxBarSize={18} />
+        <Line dataKey="netProfit" type="monotone" stroke="var(--color-netProfit)" strokeWidth={2} dot={{ r: 2.5 }} activeDot={{ r: 4 }} />
+      </ComposedChart>
     </ChartContainer>
   );
 }
