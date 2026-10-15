@@ -1,12 +1,10 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
 import {
   Area,
-  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
@@ -23,6 +21,7 @@ import {
   type ChartConfig,
 } from '@/components/ui/chart';
 import { useDirection } from '@/components/ui/direction';
+import { useIsMobile } from '@/hooks/use-mobile';
 import type { Format } from '@/i18n/format';
 import { useFormat } from '@/i18n/use-format';
 import type { Period } from '@/lib/api';
@@ -52,9 +51,6 @@ function bucketLabel(f: Format, weekOf: (date: string) => string, iso: string, b
   return bucket === 'week' ? weekOf(full) : full;
 }
 
-/** Signed money for a tooltip: `+490.00`, `−10,000.00`. */
-const signedMoney = (v: number) => (v > 0 ? '+' : v < 0 ? '−' : '') + money(Math.abs(v));
-
 /** Amounts in a breakdown read unsigned unless they're below zero. */
 const signedOrPlain = (v: number) => (v < 0 ? '−' : '') + money(Math.abs(v));
 
@@ -82,169 +78,58 @@ function ChartEmpty({ children, className = 'h-64' }: { children: ReactNode; cla
   );
 }
 
-/** The treasury's closing balance, day by day. */
-export function CashBalanceChart({
-  series,
-  className = 'h-64',
-}: {
-  series: Array<{ date: string; balance: string }>;
-  className?: string;
-}) {
-  const t = useTranslations('charts');
-  const f = useFormat();
-  const axisWidth = useAxisWidth();
-  const tick = useTick();
-  if (series.length < 2) {
-    return <ChartEmpty className={className}>{t('notEnoughHistory')}</ChartEmpty>;
-  }
-  const config = { balance: { label: t('cashOnHand'), color: 'var(--primary)' } } satisfies ChartConfig;
-  const data = series.map((p) => ({ date: p.date, balance: Number(p.balance) }));
-  return (
-    <ChartContainer config={config} className={`aspect-auto w-full ${className}`}>
-      <AreaChart accessibilityLayer data={data} margin={{ top: 8, right: 0, bottom: 0, left: 0 }}>
-        <CartesianGrid vertical={false} strokeDasharray="3 4" />
-        <XAxis
-          dataKey="date"
-          tickLine={false}
-          axisLine={false}
-          tickMargin={10}
-          minTickGap={48}
-          tickFormatter={(v: string) => tick(f.dayShort(v))}
-        />
-        <YAxis
-          orientation="right"
-          tickLine={false}
-          axisLine={false}
-          width={axisWidth}
-          tickCount={4}
-          domain={['auto', 'auto']}
-          tickFormatter={(v: number) => tick(f.compact(v))}
-        />
-        <ChartTooltip
-          content={
-            <ChartTooltipContent
-              indicator="line"
-              labelFormatter={(v) => f.date(`${String(v)}T12:00:00Z`)}
-              valueFormatter={money}
-            />
-          }
-        />
-        <Area
-          dataKey="balance"
-          type="monotone"
-          stroke="var(--color-balance)"
-          strokeWidth={1.75}
-          fill="var(--color-balance)"
-          fillOpacity={0.06}
-          activeDot={{ r: 3.5, strokeWidth: 2, stroke: 'var(--card)' }}
-        />
-      </AreaChart>
-    </ChartContainer>
-  );
-}
-
 /**
- * Money in above the line, money out below it — one bar pair per day, week or
- * month, so which way cash moved reads before any number does.
+ * The period at a glance, as running totals: sales so far as a filled area,
+ * costs so far as a line. The gap between them is the profit; where the line
+ * rises above the area, the period is losing money. Running totals read far
+ * better than day-by-day figures, which swing with every large payment.
  */
-export function CashFlowChart({
+export function ProfitTrendChart({
   series,
   bucket,
+  className = 'h-72',
 }: {
-  series: Array<{ period: string; in: string; out: string }>;
+  series: Array<{ period: string; revenue: string; costs: string; netProfit: string }>;
   bucket: Bucket;
+  className?: string;
 }) {
-  const t = useTranslations('charts');
+  const t = useTranslations('money.pnl');
+  const tc = useTranslations('charts');
   const f = useFormat();
   const axisWidth = useAxisWidth();
   const tick = useTick();
-  const data = series.map((p) => ({ period: p.period, in: Number(p.in), out: -Number(p.out) }));
-  if (data.every((d) => d.in === 0 && d.out === 0)) {
-    return <ChartEmpty>{t('noMovement')}</ChartEmpty>;
+  const rtl = useDirection() === 'rtl';
+  const mobile = useIsMobile();
+  const data = series.reduce<Array<{ period: string; revenue: number; costs: number; netProfit: number }>>((sofar, p) => {
+    const last = sofar.at(-1) ?? { revenue: 0, costs: 0 };
+    const revenue = last.revenue + Number(p.revenue);
+    const costs = last.costs + Number(p.costs);
+    return [...sofar, { period: p.period, revenue, costs, netProfit: revenue - costs }];
+  }, []);
+  if (data.every((d) => d.revenue === 0 && d.costs === 0)) {
+    return <ChartEmpty className={className}>{t('trendEmpty')}</ChartEmpty>;
   }
   const config = {
-    in: { label: t('moneyIn'), color: 'var(--primary)' },
-    out: { label: t('moneyOut'), color: OUT_FILL },
+    revenue: { label: t('salesSoFar'), color: 'var(--primary)' },
+    costs: { label: t('costsSoFar'), color: 'var(--muted-foreground)' },
+    netProfit: { label: t('netProfit'), color: 'transparent' },
   } satisfies ChartConfig;
-  const weekOf = (date: string) => t('weekOf', { date });
+  const weekOf = (date: string) => tc('weekOf', { date });
   return (
-    <ChartContainer config={config} className="aspect-auto h-64 w-full">
-      <BarChart accessibilityLayer data={data} stackOffset="sign" margin={{ top: 8, right: 0, bottom: 0, left: 0 }}>
+    <ChartContainer key={rtl ? 'rtl' : 'ltr'} config={config} className={`aspect-auto w-full ${className}`}>
+      <ComposedChart accessibilityLayer data={data} margin={{ top: 8, right: 0, bottom: 0, left: 0 }}>
         <CartesianGrid vertical={false} strokeDasharray="3 4" />
         <XAxis
           dataKey="period"
           tickLine={false}
           axisLine={false}
           tickMargin={10}
-          minTickGap={24}
+          minTickGap={28}
           tickFormatter={(v: string) => tick(bucketLabel(f, weekOf, v, bucket))}
         />
+        {/* On a phone the value axis would crowd the curve; the tooltip gives exact figures instead. */}
         <YAxis
-          orientation="right"
-          tickLine={false}
-          axisLine={false}
-          width={axisWidth}
-          tickCount={5}
-          tickFormatter={(v: number) => tick(f.compact(Math.abs(v)))}
-        />
-        <ReferenceLine y={0} stroke="var(--border)" />
-        <ChartTooltip
-          cursor={{ fill: 'var(--muted)', fillOpacity: 0.6 }}
-          content={
-            <ChartTooltipContent
-              labelFormatter={(v) => bucketLabel(f, weekOf, String(v), bucket, true)}
-              valueFormatter={signedMoney}
-            />
-          }
-        />
-        <Bar dataKey="in" stackId="flow" fill="var(--color-in)" radius={[2, 2, 0, 0]} maxBarSize={22} />
-        <Bar dataKey="out" stackId="flow" fill="var(--color-out)" radius={[2, 2, 0, 0]} maxBarSize={22} />
-      </BarChart>
-    </ChartContainer>
-  );
-}
-
-/**
- * Month by month: what was sold and what it cost, as paired bars, with what
- * was left — net profit — as a line over them. A month that lost money dips
- * the line below zero; no colour change needed to see it.
- */
-export function ProfitTrendChart({
-  series,
-}: {
-  series: Array<{ month: string; revenue: string; costs: string; netProfit: string }>;
-}) {
-  const t = useTranslations('money.pnl');
-  const f = useFormat();
-  const axisWidth = useAxisWidth();
-  const tick = useTick();
-  const rtl = useDirection() === 'rtl';
-  const data = series.map((p) => ({
-    month: p.month,
-    revenue: Number(p.revenue),
-    costs: Number(p.costs),
-    netProfit: Number(p.netProfit),
-  }));
-  if (data.every((d) => d.revenue === 0 && d.costs === 0)) {
-    return <ChartEmpty className="h-72">{t('trendEmpty')}</ChartEmpty>;
-  }
-  const config = {
-    revenue: { label: t('revenue'), color: 'var(--primary)' },
-    costs: { label: t('costs'), color: OUT_FILL },
-    netProfit: { label: t('netProfit'), color: 'var(--foreground)' },
-  } satisfies ChartConfig;
-  return (
-    <ChartContainer key={rtl ? 'rtl' : 'ltr'} config={config} className="aspect-auto h-72 w-full">
-      <ComposedChart accessibilityLayer data={data} margin={{ top: 8, right: 0, bottom: 0, left: 0 }}>
-        <CartesianGrid vertical={false} strokeDasharray="3 4" />
-        <XAxis
-          dataKey="month"
-          tickLine={false}
-          axisLine={false}
-          tickMargin={10}
-          tickFormatter={(v: string) => tick(f.monthShort(v))}
-        />
-        <YAxis
+          hide={mobile}
           orientation={rtl ? 'right' : 'left'}
           tickCount={5}
           tickLine={false}
@@ -252,73 +137,23 @@ export function ProfitTrendChart({
           width={axisWidth}
           tickFormatter={(v: number) => tick(f.compact(v))}
         />
-        <ReferenceLine y={0} stroke="var(--border)" />
         <ChartTooltip
-          cursor={{ fill: 'var(--muted)', fillOpacity: 0.5 }}
-          content={<ChartTooltipContent labelFormatter={(v) => f.month(String(v))} valueFormatter={signedOrPlain} />}
+          cursor={{ stroke: 'var(--border)' }}
+          content={
+            <ChartTooltipContent
+              indicator="line"
+              labelFormatter={(v) => bucketLabel(f, weekOf, String(v), bucket, true)}
+              valueFormatter={signedOrPlain}
+            />
+          }
         />
-        <Bar dataKey="revenue" fill="var(--color-revenue)" radius={[2, 2, 0, 0]} maxBarSize={18} />
-        <Bar dataKey="costs" fill="var(--color-costs)" radius={[2, 2, 0, 0]} maxBarSize={18} />
-        <Line dataKey="netProfit" type="monotone" stroke="var(--color-netProfit)" strokeWidth={2} dot={{ r: 2.5 }} activeDot={{ r: 4 }} />
+        <Area dataKey="revenue" type="monotone" stroke="var(--color-revenue)" strokeWidth={2} fill="var(--color-revenue)" fillOpacity={0.12} />
+        <Line dataKey="costs" type="monotone" stroke="var(--color-costs)" strokeWidth={2} strokeDasharray="5 4" dot={false} />
+        {/* Not drawn, on its own hidden scale — there so the tooltip says the profit at each point. */}
+        <YAxis yAxisId="profit" hide />
+        <Line yAxisId="profit" dataKey="netProfit" stroke="transparent" dot={false} activeDot={false} legendType="none" />
       </ComposedChart>
     </ChartContainer>
-  );
-}
-
-export interface BarItem {
-  key: string;
-  label: string;
-  /** Signed, as it should read; the bar is drawn from its size. */
-  value: number;
-  fill: string;
-  /** Where clicking the bar goes — the records behind it. */
-  href?: string;
-}
-
-/**
- * A ranked breakdown — "what made this up" — as a plain list: each line its
- * name and amount, with a thin bar underneath scaled to the largest line, and
- * (with `share`) its part of the whole. Plain markup rather than a chart, so it
- * mirrors in Arabic by itself and long names wrap instead of being clipped. A
- * line with an `href` opens the records behind it.
- */
-export function BarList({ items, empty, share = true }: { items: BarItem[]; empty: string; share?: boolean }) {
-  if (items.length === 0) return <ChartEmpty className="h-24">{empty}</ChartEmpty>;
-  const sizes = items.map((i) => Math.abs(i.value));
-  const largest = Math.max(...sizes) || 1;
-  const whole = sizes.reduce((n, v) => n + v, 0) || 1;
-  return (
-    <ul className="-mx-2 grid gap-0.5">
-      {items.map((i, n) => {
-        const line = (
-          <>
-            <span className="flex items-baseline justify-between gap-3">
-              <span className="min-w-0 truncate">{i.label}</span>
-              <span className="flex shrink-0 items-baseline gap-2.5">
-                <span className={`num font-medium ${i.value < 0 ? 'text-destructive' : ''}`}>{signedOrPlain(i.value)}</span>
-                {share ? (
-                  <span className="num w-8 text-end text-xs text-muted-foreground">{`${Math.round((sizes[n] / whole) * 100)}%`}</span>
-                ) : null}
-              </span>
-            </span>
-            <span className="mt-2 block h-1 overflow-hidden rounded-full bg-muted">
-              <span className="block h-full rounded-full" style={{ width: `${Math.max((sizes[n] / largest) * 100, 1.5)}%`, background: i.fill }} />
-            </span>
-          </>
-        );
-        return (
-          <li key={i.key}>
-            {i.href ? (
-              <Link href={i.href} className="block rounded-md px-2 py-2 text-[13px] transition-colors hover:bg-muted/60">
-                {line}
-              </Link>
-            ) : (
-              <div className="px-2 py-2 text-[13px]">{line}</div>
-            )}
-          </li>
-        );
-      })}
-    </ul>
   );
 }
 

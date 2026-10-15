@@ -27,14 +27,14 @@ export class FinanceController {
   ) {}
 
   /**
-   * Profit and loss between two dates, by channel, with `months` of monthly
-   * trend ending at `to` (0 for none) — the money overview's main panel.
+   * Profit and loss between two dates, by channel — with a series by `bucket`
+   * (day, week or month) when one is asked for. The money overview's main panel.
    */
   @Get('performance')
-  performanceReport(@Query('from') from?: string, @Query('to') to?: string, @Query('months') months?: string) {
+  performanceReport(@Query('from') from?: string, @Query('to') to?: string, @Query('bucket') bucket?: string) {
     if (!isDate(from) || !isDate(to) || from > to) throw new BadRequestException('from and to are required as YYYY-MM-DD, with from on or before to');
-    const m = Number(months ?? 0);
-    return this.performance.report(from, to, Number.isInteger(m) && m >= 0 && m <= 24 ? m : 0);
+    const b = bucket === 'day' || bucket === 'week' || bucket === 'month' ? bucket : undefined;
+    return this.performance.report(from, to, b);
   }
 
   @Get('overview')

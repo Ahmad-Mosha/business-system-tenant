@@ -588,11 +588,12 @@ export interface PerformanceReport {
   }>;
   /** `name` null: cash vouchers booked to costs without an expense record. */
   expenseCategories: Array<{ name: string | null; amount: string }>;
-  trend: Array<{ month: string; revenue: string; costs: string; netProfit: string }>;
+  /** The period by `bucket`, when one was asked for; every bucket present, empty ones as zero. */
+  series: Array<{ period: string; revenue: string; costs: string; netProfit: string }>;
 }
 
-export const getPerformance = (from: string, to: string, months = 0) =>
-  get<PerformanceReport>(`/finance/performance?from=${from}&to=${to}&months=${months}`);
+export const getPerformance = (from: string, to: string, bucket?: 'day' | 'week' | 'month') =>
+  get<PerformanceReport>(`/finance/performance?from=${from}&to=${to}${bucket ? `&bucket=${bucket}` : ''}`);
 
 /** Money into and out of the treasury between two dates — per bucket, and by where. */
 export interface CashFlow {
