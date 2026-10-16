@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
 import {
@@ -24,7 +23,6 @@ import { useDirection } from '@/components/ui/direction';
 import { useIsMobile } from '@/hooks/use-mobile';
 import type { Format } from '@/i18n/format';
 import { useFormat } from '@/i18n/use-format';
-import type { Period } from '@/lib/api';
 import { money } from '@/lib/format';
 
 /**
@@ -153,58 +151,6 @@ export function ProfitTrendChart({
         <YAxis yAxisId="profit" hide />
         <Line yAxisId="profit" dataKey="netProfit" stroke="transparent" dot={false} activeDot={false} legendType="none" />
       </ComposedChart>
-    </ChartContainer>
-  );
-}
-
-/** noon's net proceeds per settlement month; a bar opens its month. */
-export function MonthlyProceedsChart({ periods }: { periods: Period[] }) {
-  const t = useTranslations('charts');
-  const tn = useTranslations('nouns');
-  const f = useFormat();
-  const router = useRouter();
-  const axisWidth = useAxisWidth();
-  const tick = useTick();
-  const config = { netProceeds: { label: t('netProceeds'), color: 'var(--primary)' } } satisfies ChartConfig;
-  const data = [...periods]
-    .sort((a, b) => a.month.localeCompare(b.month))
-    .map((p) => ({ ...p, netProceeds: Number(p.netProceeds) }));
-  return (
-    <ChartContainer config={config} className="aspect-auto h-60 w-full">
-      <BarChart accessibilityLayer data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-        <CartesianGrid vertical={false} strokeDasharray="3 4" />
-        <XAxis
-          dataKey="month"
-          tickLine={false}
-          axisLine={false}
-          tickMargin={8}
-          tickFormatter={(m: string) => tick(f.monthShort(m))}
-        />
-        <YAxis tickLine={false} axisLine={false} width={axisWidth} tickFormatter={(v: number) => tick(f.compact(v))} />
-        <ReferenceLine y={0} stroke="var(--border)" />
-        <ChartTooltip
-          cursor={{ fill: 'var(--muted)', fillOpacity: 0.6 }}
-          content={
-            <ChartTooltipContent
-              labelFormatter={(_, payload) => {
-                const p = payload?.[0]?.payload as Period | undefined;
-                return p ? `${f.month(p.month)} · ${tn('units', { count: p.unitsSold })}` : '';
-              }}
-              valueFormatter={money}
-            />
-          }
-        />
-        <Bar
-          dataKey="netProceeds"
-          fill="var(--color-netProceeds)"
-          radius={[2, 2, 0, 0]}
-          maxBarSize={36}
-          className="cursor-pointer"
-          onClick={(bar: { payload?: Period }) => {
-            if (bar.payload?.month) router.push(`/months/${bar.payload.month}`);
-          }}
-        />
-      </BarChart>
     </ChartContainer>
   );
 }

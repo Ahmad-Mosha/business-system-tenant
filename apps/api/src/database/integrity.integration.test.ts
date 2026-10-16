@@ -16,6 +16,8 @@ import { PurchasingService } from '../purchasing/purchasing.service';
 import { CatalogService } from '../catalog/catalog.service';
 import { CatalogController } from '../catalog/catalog.controller';
 import { SalesService } from '../sales/sales.service';
+import { AmazonImportService } from '../amazon/amazon-import.service';
+import { AmazonReportingService } from '../reporting/amazon-reporting.service';
 import { PerformanceService } from '../reporting/performance.service';
 import type { Request } from 'express';
 import { Product } from '../catalog/product.entity';
@@ -157,6 +159,54 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     assert.deepEqual(stock, [{ location: 'NOON', n: 0 }, { location: 'WAREHOUSE', n: 4 }], 'two from noon, then one from the warehouse; the 5 Oct order left alone');
     const again = await noon.import(`settlement-${tag}.csv`, Buffer.from(csv));
     assert.equal(again.alreadyImported, true, 'the same file twice moves nothing twice');
+  });
+  await t.test('an Amazon report moves stock by quantity after the opening moment, attributes order fees, and refreshes released money', async () => {
+    const tag = randomUUID().slice(0, 8);
+    const sku = `AMZ-${tag}`;
+    await importLinkedCatalog(db, [{
+      name: `Amazon item ${tag}`, category: null, sellingPrice: '100.00', noonStock: 0, warehouseStock: 10,
+      listings: [{ channel: 'amazon', externalId: sku, partnerSku: null, title: 'Amazon item', price: '100.00' }],
+    }], { actorId: null, apply: true, stockAsOf: new Date('2026-10-12T12:23:00+03:00') });
+    const [{ id: variantId, listingId }] = await db.query(
+      `SELECT v.id, l.id AS "listingId" FROM product_variant v JOIN product p ON p.id = v.product_id
+       JOIN channel_listing l ON l.variant_id = v.id WHERE p.name = $1`, [`Amazon item ${tag}`]);
+    const header = '"date/time","settlement id","type","order id","sku","description","quantity","marketplace","fulfillment","order city","order state","order postal","product sales","shipping credits","promotional rebates","selling fees","fba fees","other transaction fees","other","total","Transaction Status","Transaction Release Date"';
+    const line = (at: string, type: string, order: string, sku: string, qty: string, sales: string, selling: string, other: string, total: string, status = 'Released') =>
+      `"${at}","S1","${type}","${order}","${sku}","${type} ${tag}","${qty}","amazon.eg","Seller","","","","${sales}","0","0","${selling}","0","0","${other}","${total}","${status}","20 Oct 2026 9:00:00 AM UTC"`;
+    const rows = (heldStatus: string) => [
+      line('12 Oct 2026 8:00:00 AM UTC', 'Order', `A-${tag}`, sku, '2', '200.00', '-20.00', '0', '180.00'), // 11:00 Cairo, before the 12:23 count
+      line('12 Oct 2026 10:00:00 AM UTC', 'Order', `B-${tag}`, sku, '3', '300.00', '-30.00', '0', '270.00', heldStatus),
+      line('12 Oct 2026 10:00:01 AM UTC', 'Amazon Fees', `B-${tag}`, '', '', '0', '-15.00', '0', '-15.00'),
+      line('14 Oct 2026 9:00:00 AM UTC', 'Refund', `B-${tag}`, sku, '1', '-100.00', '10.00', '0', '-90.00'),
+      line('15 Oct 2026 9:00:00 AM UTC', 'Transfer', '', '', '', '0', '0', '-500.00', '-500.00'),
+      line('15 Oct 2026 10:00:00 AM UTC', 'Order', `C-${tag}`, `UNKNOWN-${tag}`, '1', '50.00', '0', '0', '50.00'),
+    ];
+    const file = (heldStatus: string) => Buffer.from(['"Includes Amazon Marketplace transactions"', header, ...rows(heldStatus)].join('\n'));
+    const amazon = new AmazonImportService(db, finance);
+    const reporting = new AmazonReportingService(db);
+    const before = await reporting.statement('2026-10-12', '2026-10-15');
+
+    const result = await amazon.import(`amazon-${tag}.csv`, file('Deferred'));
+    assert.deepEqual(
+      [result.rowsInserted, result.unmappedListings, result.stockMoved, result.stockBeforeOpening],
+      [6, 1, 4, 2],
+      'three units out and one back after the count; the two sold before it were already counted',
+    );
+    assert.equal(await balance(variantId), 8);
+    const [fee] = await db.query(`SELECT listing_id AS "listingId" FROM amazon_transaction WHERE type = 'Amazon Fees' AND order_id = $1`, [`B-${tag}`]);
+    assert.equal(fee.listingId, listingId, "an order's Easy Ship charge belongs to the product it shipped");
+    const [payout] = await db.query(`SELECT amount, (occurred_at AT TIME ZONE 'Africa/Cairo')::date::text AS day FROM ledger_entry WHERE kind = 'AMAZON_PAYOUT' AND source_id IN (SELECT fingerprint FROM amazon_transaction WHERE description = $1)`, [`Transfer ${tag}`]);
+    assert.deepEqual([payout.amount, payout.day], ['500.00', '2026-10-15']);
+
+    const after = await reporting.statement('2026-10-12', '2026-10-15');
+    const delta = (k: 'movement' | 'income' | 'fees' | 'payouts' | 'held') => (Number(after[k]) - Number(before[k])).toFixed(2);
+    assert.deepEqual([delta('movement'), delta('income'), delta('fees'), delta('payouts'), delta('held')], ['-105.00', '450.00', '-55.00', '-500.00', '270.00']);
+
+    assert.equal((await amazon.import(`amazon-${tag}.csv`, file('Deferred'))).alreadyImported, true);
+    const released = await amazon.import(`amazon-${tag}-later.csv`, file('Released'));
+    assert.deepEqual([released.rowsInserted, released.rowsSkipped, released.rowsUpdated, released.stockMoved], [0, 6, 1, 0]);
+    assert.equal(await balance(variantId), 8, 'a later download moves nothing twice');
+    assert.equal((Number((await reporting.statement('2026-10-12', '2026-10-15')).held) - Number(before.held)).toFixed(2), '0.00', 'released money is no longer held');
   });
   await t.test('a count already holds everything dated before it: old invoices move no stock and no treasury', async () => {
     const sales = new SalesService(db, ledger);

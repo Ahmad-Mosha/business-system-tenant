@@ -29,6 +29,7 @@ export type LedgerEntryKind =
   | 'NOON_ACCRUAL' // a noon sale: what noon now owes us
   | 'NOON_FEE' // noon's commission / fulfilment / ads on a settlement
   | 'NOON_PAYOUT' // noon transferred money to our bank
+  | 'AMAZON_PAYOUT' // Amazon transferred money to our bank
   | 'ORDER_SALE' // a website / social order delivered
   | 'SALES_INVOICE' // a sales invoice posted: revenue, owed by the customer
   | 'CUSTOMER_PAYMENT' // a customer paid against a sales invoice

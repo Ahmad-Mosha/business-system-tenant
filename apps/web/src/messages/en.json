@@ -55,7 +55,8 @@
       "money": "Money",
       "noon": "noon",
       "admin": "Admin",
-      "sales": "Sales"
+      "sales": "Sales",
+      "amazon": "Amazon"
     },
     "items": {
       "orders": "Orders",
@@ -73,7 +74,10 @@
       "team": "Team",
       "expenses": "Expenses",
       "salesInvoices": "Sales invoices",
-      "customers": "Customers"
+      "customers": "Customers",
+      "amazonOverview": "Overview",
+      "amazonProducts": "Products",
+      "amazonImports": "Imports"
     },
     "crumbs": {
       "new": "New",
@@ -310,7 +314,8 @@
         "failed": "Easy Orders didn’t answer (error {status})."
       },
       "import": {
-        "notNoon": "This file isn’t a noon settlement export."
+        "notNoon": "This file isn’t a noon settlement export.",
+        "notAmazon": "That is not an Amazon transaction report."
       },
       "shipment": {
         "notFound": "No Bosta shipment has the tracking number {trackingNumber}."
@@ -1554,6 +1559,7 @@
       "NOON_ACCRUAL": "noon sale",
       "NOON_FEE": "noon fee",
       "NOON_PAYOUT": "noon payout",
+      "AMAZON_PAYOUT": "Amazon payout",
       "ORDER_SALE": "Order paid",
       "COGS": "Cost of goods",
       "BOSTA_PAYOUT": "Bosta payout",
@@ -1990,6 +1996,158 @@
       "editStep2": "A new draft opens with the same supplier and lines.",
       "editStep3": "You fix what’s wrong and post it — it takes this invoice’s place.",
       "editReason": "What needs correcting?"
+    }
+  },
+  "channel": {
+    "name": {
+      "noon": "noon",
+      "amazon": "Amazon"
+    },
+    "overview": {
+      "description": "What {channel} owes us, and why — {range}.",
+      "emptyTitle": "No {channel} reports yet",
+      "emptyHint": "{channel, select, amazon {Download the transaction report from Seller Central (Payments → Reports repository) and upload it here.} other {Download the settlement export from the noon portal and upload it here.}}",
+      "upload": "Upload report",
+      "allTime": "All time",
+      "period": "Period"
+    },
+    "metrics": {
+      "sales": "Sales",
+      "salesHint": "{units, plural, one {# unit sold} other {# units sold}}{returned, plural, =0 {} one {, # returned} other {, # returned}}",
+      "fees": "{channel} fees",
+      "feesHint": "{rate} of sales",
+      "paid": "Paid to our bank",
+      "paidHint": "Transferred by {channel}",
+      "owed": "Owed by {channel}",
+      "owedHint": "At the end of the period",
+      "owedHeld": "{amount} of it held until {date}",
+      "owedUnknown": "Set the opening balance"
+    },
+    "statement": {
+      "title": "Where the money went",
+      "hint": "{channel}’s own report, line by line.",
+      "net": "Left from sales",
+      "paid": "Paid to our bank",
+      "movement": "Added to what {channel} owes",
+      "balance": "{channel} owed <b>{opening}</b> at the start and <b>{closing}</b> at the end.",
+      "noBalance": "Set the opening balance below to follow what {channel} owes.",
+      "held": "<b>{amount}</b> of this period’s money is still held by Amazon — released by {date}."
+    },
+    "lines": {
+      "netProceeds": "Sales (net proceeds)",
+      "sales": "Sales",
+      "refunds": "Refunds",
+      "referralFee": "Referral fee",
+      "fulfilmentFee": "Fulfilment & logistics",
+      "shippingCredits": "Shipping credits",
+      "otherOrderFees": "Other order fees",
+      "orderSubsidies": "Order subsidies",
+      "advertisingFee": "Advertising",
+      "advertisingSubsidy": "Advertising subsidy",
+      "sellingFees": "Selling fees",
+      "shippingCharges": "Easy Ship charges",
+      "serviceFees": "Subscription & cancellation charges",
+      "adjustments": "Adjustments",
+      "other": "Other"
+    },
+    "best": {
+      "title": "Best sellers",
+      "hint": "By what was left after {channel}’s fees.",
+      "all": "All products",
+      "none": "No product sales in this period.",
+      "units": "Units",
+      "left": "Left"
+    },
+    "unattributed": {
+      "title": "Not tied to a product",
+      "hint": "Charges and credits no single product owns.",
+      "none": "Nothing in this period.",
+      "types": {
+        "order": "Shipping-only order lines",
+        "order_update": "Post-sale adjustments",
+        "statement_fee": "Advertising & statement fees",
+        "balance_transfer": "Balance transfers",
+        "Order": "Orders with an unlinked SKU",
+        "Refund": "Refunds with an unlinked SKU",
+        "Amazon Fees": "Easy Ship charges on mixed orders",
+        "Service Fee": "Subscription & cancellation charges",
+        "Adjustment": "Adjustments"
+      }
+    },
+    "months": {
+      "title": "By month",
+      "hint": "Open a month to see its statement.",
+      "month": "Month",
+      "units": "Units",
+      "sales": "Sales",
+      "fees": "Fees",
+      "paid": "Paid to bank",
+      "movement": "Added",
+      "owed": "Owed at end"
+    },
+    "opening": {
+      "title": "Opening balance",
+      "hint": "A report only covers the days you downloaded, so the balance it describes is relative. Enter what {channel} owed <strong>before</strong> your earliest report, and every later balance follows from it.",
+      "set": "Set",
+      "notSet": "Not set",
+      "balance": "Balance",
+      "saved": "Opening balance saved."
+    },
+    "products": {
+      "description": "How each product did on {channel} — units, sales, fees, and profit where its cost is known.",
+      "descriptionMonth": "How each product did on {channel} in {month}.",
+      "hasReturns": "Has returns",
+      "missingCost": "Missing cost",
+      "noMatch": "No products match these filters",
+      "none": "No {channel} sales on products yet",
+      "noneHint": "A sale lands on a product once its {channel} SKU is linked — open the product in Inventory to link it.",
+      "product": "Product",
+      "units": "Units",
+      "returned": "Returned",
+      "sales": "Sales",
+      "fees": "Fees",
+      "net": "Left",
+      "profit": "Profit",
+      "noCost": "No cost recorded, so profit can’t be calculated."
+    },
+    "uploads": {
+      "description": "{channel, select, amazon {Amazon transaction reports — how Amazon’s figures get in.} other {noon settlement exports — how noon’s figures get in.}}",
+      "upload": "Upload a report",
+      "uploadHint": "{channel, select, amazon {In Seller Central: Payments → Reports repository → Transaction, as CSV.} other {From the noon portal: the settlement report, as CSV.}}",
+      "history": "Uploaded reports",
+      "empty": "No reports uploaded yet",
+      "emptyHint": "Your first upload shows up here.",
+      "columns": {
+        "file": "File",
+        "period": "Period",
+        "rows": "Lines",
+        "new": "New",
+        "skipped": "Already held",
+        "updated": "Released since",
+        "unmapped": "Unlinked SKUs",
+        "imported": "Uploaded"
+      },
+      "alreadyImported": "This exact file was already uploaded.",
+      "allKnown": "Every line was already on record.",
+      "importedRows": "{count, plural, one {Added # new line.} other {Added # new lines.}}",
+      "notCsv": "That is not a CSV file.",
+      "choose": "Choose a report",
+      "remove": "Remove file",
+      "drop": "Drop the report here",
+      "browse": "or click to choose · CSV",
+      "reading": "Reading…",
+      "import": "Upload report",
+      "parsing": "Reading lines, matching products, moving stock.",
+      "safe": "Uploading the same report twice is safe — files are recognised by content and lines already held are skipped.",
+      "rowsRead": "Lines read",
+      "alreadyHeld": "Already held",
+      "unmappedSkus": "Unlinked SKUs",
+      "alreadyImportedNote": "This exact file had already been uploaded, so nothing changed.",
+      "allKnownNote": "Every line was already on record from an earlier report.",
+      "updatedNote": "{count, plural, one {# line Amazon was holding has been released since — updated.} other {# lines Amazon was holding have been released since — updated.}}",
+      "fileSize": "{size} KB",
+      "stockEffect": "{moved, plural, =0 {No stock moved.} one {# unit moved on stock.} other {# units moved on stock.}} {before, plural, =0 {} one {# unit sold before the opening count left stock alone — the count already includes it.} other {# units sold before the opening count left stock alone — the count already includes them.}}",
+      "unmappedHint": "{count, plural, one {# SKU in this report isn’t linked to a product yet: its sales are kept, but no stock moves for it. Link it from the product’s page in Inventory.} other {# SKUs in this report aren’t linked to a product yet: their sales are kept, but no stock moves for them. Link them from each product’s page in Inventory.}}"
     }
   }
 }

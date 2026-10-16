@@ -22,12 +22,15 @@ import { EasyOrdersService } from './integrations/easyorders/easyorders.service'
 import { BostaClient } from './integrations/bosta/bosta.client';
 import { BostaController } from './integrations/bosta/bosta.controller';
 import { BostaService } from './integrations/bosta/bosta.service';
+import { AmazonController } from './amazon/amazon.controller';
+import { AmazonImportService } from './amazon/amazon-import.service';
 import { NoonImportService } from './noon/noon-import.service';
 import { NoonController } from './noon/noon.controller';
 import { OrdersController } from './orders/orders.controller';
 import { OrdersService } from './orders/orders.service';
 import { PurchasesController, SuppliersController } from './purchasing/purchasing.controller';
 import { PurchasingService } from './purchasing/purchasing.service';
+import { AmazonReportingService } from './reporting/amazon-reporting.service';
 import { NoonReportingService } from './reporting/noon-reporting.service';
 import { PerformanceService } from './reporting/performance.service';
 import { CustomersController, SalesInvoicesController } from './sales/sales.controller';
@@ -68,6 +71,7 @@ import { SalesService } from './sales/sales.service';
     ExpensesController,
     AuthController,
     NoonController,
+    AmazonController,
     OrdersController,
     CatalogController,
     EasyOrdersController,
@@ -87,6 +91,8 @@ import { SalesService } from './sales/sales.service';
     AuthService,
     NoonImportService,
     NoonReportingService,
+    AmazonImportService,
+    AmazonReportingService,
     PerformanceService,
     OrdersService,
     CatalogService,
