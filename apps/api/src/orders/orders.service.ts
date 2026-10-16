@@ -700,13 +700,16 @@ export class OrdersService {
     externalId: string,
     externalVariantId = '',
   ): Promise<string | null> {
+    // The exact variant first; otherwise the product-level listing — a website
+    // product linked as a whole sells all its colours from one stock.
     const [listing] = await tx.query(
       `SELECT l.variant_id AS "variantId"
        FROM channel_listing l
        JOIN product_variant v ON v.id = l.variant_id
        JOIN product p ON p.id = v.product_id
-       WHERE l.channel = $1 AND l.external_id = $2 AND l.external_variant_id = $3
+       WHERE l.channel = $1 AND l.external_id = $2 AND l.external_variant_id IN ($3, '')
          AND v.active AND p.active
+       ORDER BY l.external_variant_id = $3 DESC
        LIMIT 1`,
       [channel, externalId, externalVariantId],
     );
