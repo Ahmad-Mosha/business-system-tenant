@@ -238,10 +238,12 @@ export class FinanceService {
   }
 
   /** A real noon bank transfer landed — receivable becomes actual cash. */
-  recordNoonPayout(tx: EntityManager, amount: string, sourceId: string) {
+  /** Dated the day noon sent it, not the day the settlement was uploaded. */
+  recordNoonPayout(tx: EntityManager, amount: string, sourceId: string, occurredAt?: Date) {
     return this.ledger.post(
       {
         amount,
+        occurredAt,
         debit: 'CASH',
         credit: 'NOON_RECEIVABLE',
         kind: 'NOON_PAYOUT',
