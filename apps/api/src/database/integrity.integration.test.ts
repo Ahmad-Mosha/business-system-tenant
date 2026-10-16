@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import { DataSource } from 'typeorm';
 import { ormOptions } from './orm-options';
 import { checkMigrations } from './migration-guard';
+import { NoonImportService } from '../noon/noon-import.service';
 import { importLinkedCatalog, validateLinkedCatalog, type LinkedProduct } from '../catalog/linked-catalog-import';
 import { LedgerService } from '../finance/ledger.service';
 import { FinanceService } from '../finance/finance.service';
@@ -121,6 +122,28 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
 
     const again = await importLinkedCatalog(db, file, { actorId: null, apply: true });
     assert.deepEqual([again.created, again.skipped.length], [0, 1], 're-running the same file creates nothing twice');
+  });
+  await t.test('a noon settlement moves stock only for orders after the opening count, from noon first', async () => {
+    const tag = randomUUID().slice(0, 8);
+    const psku = `PSKU_TEST_${tag}_X`;
+    await importLinkedCatalog(db, [{
+      name: `Settled ${tag}`, category: null, sellingPrice: '100.00', noonStock: 2, warehouseStock: 5,
+      listings: [{ channel: 'noon', externalId: `Z${tag}Z-1`, partnerSku: psku, title: 'Settled item', price: '100.00' }],
+    }], { actorId: null, apply: true, stockAsOf: new Date('2026-10-12T12:23:00+03:00') });
+    const [{ id: variantId }] = await db.query(
+      `SELECT v.id FROM product_variant v JOIN product p ON p.id = v.product_id WHERE p.name = $1`, [`Settled ${tag}`]);
+    const header = 'Contract,Contract Title,Reference Nr,Order Nr,Item Nr,Order Date,Transaction Date,Title,SKUs,Partner SKUs,Transaction Type,Currency,Net Proceeds,Referral Fee including VAT,Fullfilment & Logistics Fees including VAT,Shipping Credits including VAT,Other Order Fees including VAT,Order Subsidies including VAT,Non-Order Fees including VAT,Non-Order Subsidies including VAT,Others including VAT,Total';
+    const row = (n: number, ordered: string) =>
+      `C1,Noon EG,PS-${tag},N${tag}${n},N${tag}${n}-1,${ordered},2026-10-20,Settled item,Z${tag}Z-1,${psku},order,EGP,100,-10,0,0,0,0,0,0,0,90`;
+    const csv = [header, row(1, '2026-10-05'), row(2, '2026-10-13'), row(3, '2026-10-14'), row(4, '2026-10-15')].join('\n');
+    const noon = new NoonImportService(db, finance);
+    const result = await noon.import(`settlement-${tag}.csv`, Buffer.from(csv));
+    assert.deepEqual([result.rowsInserted, result.unmappedListings, result.stockMoved, result.stockBeforeOpening], [4, 0, 3, 1]);
+    const stock = await db.query(
+      `SELECT location, SUM(quantity)::int AS n FROM stock_movement WHERE variant_id = $1 GROUP BY location ORDER BY location`, [variantId]);
+    assert.deepEqual(stock, [{ location: 'NOON', n: 0 }, { location: 'WAREHOUSE', n: 4 }], 'two from noon, then one from the warehouse; the 5 Oct order left alone');
+    const again = await noon.import(`settlement-${tag}.csv`, Buffer.from(csv));
+    assert.equal(again.alreadyImported, true, 'the same file twice moves nothing twice');
   });
   await t.test('status tabs count the filtered orders, and a tab can hold several statuses', async () => {
     const variantId = await stock(2);

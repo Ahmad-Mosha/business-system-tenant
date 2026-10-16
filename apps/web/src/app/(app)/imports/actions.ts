@@ -13,6 +13,10 @@ export interface ImportOutcome {
   unmappedListings: number;
   periodStart: string | null;
   periodEnd: string | null;
+  /** Units the file's orders and returns moved on stock. */
+  stockMoved?: number;
+  /** Orders from before the opening count — already reflected in it, so stock was left alone. */
+  stockBeforeOpening?: number;
 }
 
 export type UploadState =
