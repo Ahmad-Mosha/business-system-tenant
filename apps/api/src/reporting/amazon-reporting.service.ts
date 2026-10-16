@@ -36,7 +36,6 @@ export class AmazonReportingService {
          COALESCE(SUM(${SOLD}) FILTER (WHERE t.type = 'Refund'), 0)                       AS refunds,
          COALESCE(SUM(t.selling_fees) FILTER (WHERE t.type IN ('Order', 'Refund')), 0)   AS "sellingFees",
          COALESCE(SUM(t.total) FILTER (WHERE t.type = 'Amazon Fees'), 0)                 AS "shippingCharges",
-         COALESCE(SUM(t.fba_fees) FILTER (WHERE t.type IN ('Order', 'Refund')), 0)       AS "fulfilmentFees",
          COALESCE(SUM(t.total) FILTER (WHERE t.type = 'Service Fee'), 0)                 AS "serviceFees",
          COALESCE(SUM(t.total) FILTER (WHERE t.type = 'Adjustment'), 0)                  AS adjustments,
          COALESCE(SUM(t.total) FILTER (WHERE t.type = 'Transfer'), 0)                    AS payouts,
@@ -53,7 +52,9 @@ export class AmazonReportingService {
     );
     const n = (k: string) => Number(r[k]);
     const income = n('sales') + n('refunds');
-    const named = n('sellingFees') + n('shippingCharges') + n('fulfilmentFees') + n('serviceFees') + n('adjustments');
+    // Amazon books a small charge and its credit on many orders (fba fees and
+    // other, ±12): they cancel out, so they stay inside `other`, never as two lines.
+    const named = n('sellingFees') + n('shippingCharges') + n('serviceFees') + n('adjustments');
     const fees = n('movement') - n('payouts') - income;
     const opening = await this.balanceAt(previousDay(from));
     return {

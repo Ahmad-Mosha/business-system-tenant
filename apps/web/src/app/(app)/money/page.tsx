@@ -15,6 +15,7 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty';
 import {
+  getChannelBalance,
   getFinanceOverview,
   getMoneyAccounts,
   getOrderSummary,
@@ -82,11 +83,15 @@ export default async function MoneyOverviewPage({
   const from = daysAgo(range.days - 1);
   const before = { from: daysAgo(range.days * 2 - 1), to: daysAgo(range.days) };
 
-  const [accounts, pnl, pnlBefore, orders] = await Promise.all([
+  const [accounts, pnl, pnlBefore, orders, noonOwes, amazonOwes] = await Promise.all([
     getMoneyAccounts(),
     getPerformance(from, to, range.bucket),
     getPerformance(before.from, before.to),
     getOrderSummary(),
+    // What each marketplace owes comes from its own reports, not the books:
+    // only its transfers are booked, so its ledger account is never the balance.
+    getChannelBalance('noon'),
+    getChannelBalance('amazon'),
   ]);
 
   const balance = (code: string) => Number(accountByCode(accounts, code)?.balance ?? 0);
@@ -105,12 +110,12 @@ export default async function MoneyOverviewPage({
   const share = (v: number) => (revenue > 0 && Math.abs(v) <= revenue ? `${((v / revenue) * 100).toFixed(1)}%` : '');
 
   const owedToYou = [
-    { key: 'noon', label: t('home.noon'), amount: balance('NOON_RECEIVABLE'), href: '/' },
+    { key: 'noon', label: t('home.noon'), amount: Number(noonOwes.balance ?? 0), href: '/' },
     { key: 'customers', label: t('home.customers'), amount: balance('CUSTOMER_RECEIVABLE'), href: '/sales?view=due' },
     { key: 'cod', label: t('home.cod'), amount: Number(orders.deliveredUnpaidAmount), href: '/orders?status=DELIVERED&paymentStatus=UNPAID' },
     { key: 'bosta', label: t('home.bosta'), amount: balance('BOSTA_COD'), href: '/shipments' },
     { key: 'cheques', label: t('home.cheques'), amount: balance('CHEQUES_PENDING'), href: '/money/treasury' },
-    { key: 'amazon', label: t('home.amazon'), amount: balance('AMAZON_RECEIVABLE'), href: '/money/ledger?code=AMAZON_RECEIVABLE' },
+    { key: 'amazon', label: t('home.amazon'), amount: Number(amazonOwes.balance ?? 0), href: '/amazon' },
   ].filter((r) => r.amount > 0.005);
   const youOwe = [
     { key: 'suppliers', label: t('home.suppliers'), amount: balance('SUPPLIER_PAYABLE'), href: '/money/purchases?view=due' },
@@ -306,7 +311,7 @@ async function Statement({ pnl, share, expensesHref }: { pnl: PerformanceReport;
   );
 }
 
-/** Each channel's sales and its part of the whole, biggest first; Amazon waits in its row until connected. */
+/** Each channel's sales and its part of the whole, biggest first. */
 async function Channels({ pnl, revenue }: { pnl: PerformanceReport; revenue: number }) {
   const t = await getTranslations('money.pnl');
   const rows = [...pnl.channels].sort((a, b) => Number(b.revenue) - Number(a.revenue));
@@ -342,13 +347,6 @@ async function Channels({ pnl, revenue }: { pnl: PerformanceReport; revenue: num
           </li>
         );
       })}
-      <li className="text-sm text-muted-foreground">
-        <div className="flex items-baseline justify-between gap-4">
-          <span>{t('channels.amazon')}</span>
-          <span className="text-xs">{t('notConnected')}</span>
-        </div>
-        <span className="mt-2 block h-1.5 rounded-full border border-dashed" />
-      </li>
     </ul>
   );
 }
