@@ -218,7 +218,7 @@ export async function ChannelOverview({ channel, params }: { channel: Marketplac
           </ToneBadge>
         </div>
         <div className="mt-5">
-          <OpeningBalanceForm channel={channel} openingBalance={account.openingBalance} openingAsOf={account.openingAsOf} />
+          <OpeningBalanceForm channel={channel} openingBalance={account.openingAsOf ? account.openingBalance : ''} openingAsOf={account.openingAsOf} />
         </div>
       </section>
     </Page>

@@ -77,7 +77,7 @@ export function ImportForm({ channel }: { channel: Marketplace }) {
         {file ? (
           <div className="pointer-events-none flex items-center justify-center gap-2.5">
             <FileText className="size-4 shrink-0 text-muted-foreground" />
-            <bdi className="truncate text-[13px] font-medium">{file.name}</bdi>
+            <bdi className="min-w-0 truncate text-[13px] font-medium" title={file.name}>{file.name}</bdi>
             <span className="num shrink-0 text-xs text-muted-foreground">{t('fileSize', { size: (file.size / 1024).toFixed(0) })}</span>
             {!pending ? (
               <Button
@@ -139,8 +139,9 @@ function Outcome({ state }: { state: Extract<UploadState, { status: 'done' }> })
       <dl className="grid grid-cols-2 sm:grid-cols-4">
         {[
           { label: t('rowsRead'), value: r.rowsInFile },
-          { label: t('columns.new'), value: r.rowsInserted },
-          { label: t('alreadyHeld'), value: r.rowsSkipped },
+          // The same file again added nothing, whatever its first upload added.
+          { label: t('columns.new'), value: r.alreadyImported ? 0 : r.rowsInserted },
+          { label: t('alreadyHeld'), value: r.alreadyImported ? r.rowsInFile : r.rowsSkipped },
           { label: t('unmappedSkus'), value: r.unmappedListings },
         ].map((cell, i) => (
           <div key={cell.label} className={cn('px-4 py-3', i > 0 && 'border-s')}>
