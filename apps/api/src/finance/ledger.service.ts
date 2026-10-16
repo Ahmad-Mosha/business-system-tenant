@@ -383,9 +383,12 @@ export class LedgerService {
     series: Array<{ period: string; in: string; out: string }>;
     sources: Array<{ direction: 'in' | 'out'; code: string; nameEn: string; nameAr: string; amount: string }>;
   }> {
+    // A cancelled entry and the reversal that cancels it net to nothing — left
+    // in, a corrected mistake would read as money that came in and went out.
     const window = `(e.debit_code = $1 OR e.credit_code = $1)
        AND e.kind <> 'OPENING_BALANCE'
-       AND e.occurred_at::date BETWEEN $2::date AND $3::date`;
+       AND e.occurred_at::date BETWEEN $2::date AND $3::date
+       AND ${live('e')}`;
 
     const series = await tx.query(
       `WITH moves AS (

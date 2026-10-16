@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useState, useTransition, type ReactNode } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, UsersRound, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { bulkAssignOrders } from '@/app/(app)/orders/actions';
 import { AssignMenu } from '@/components/assign-menu';
@@ -22,10 +22,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useFormat } from '@/i18n/use-format';
 import type { Assignee, OrderRow } from '@/lib/api';
 import { money } from '@/lib/format';
+import { cn } from '@/lib/utils';
 
 const NOBODY = 'unassigned';
 
@@ -36,8 +36,8 @@ const NOBODY = 'unassigned';
  *
  * On a phone the same orders read as cards — number, customer and total on
  * top, status and payment (still changeable) underneath — instead of a table
- * that hides everything past the customer off to the side. Bulk assignment
- * needs the table's checkboxes, so it waits for a wider screen.
+ * that hides everything past the customer off to the side. Selection works in
+ * both layouts and stays scoped to this page.
  */
 export function OrdersTable({
   orders,
@@ -52,6 +52,8 @@ export function OrdersTable({
 }) {
   const t = useTranslations('orders');
   const te = useTranslations('enums');
+  const tc = useTranslations('common');
+  const tn = useTranslations('nouns');
   const status = useTranslations('status');
   const f = useFormat();
   const router = useRouter();
@@ -75,11 +77,15 @@ export function OrdersTable({
     });
   };
 
-  const toolbar = isAdmin ? (
-    <div className="flex min-h-11 flex-wrap items-center gap-2 px-4 py-2">
-      <p className="me-auto text-xs text-muted-foreground" aria-live="polite">
-        {selected.size > 0 ? t('bulk.selected', { count: selected.size }) : t('bulk.selectionHint')}
+  // Shows only while orders are selected, like a bulk-action bar: an always-on
+  // "select orders to assign" strip was a row of noise above every list.
+  const toolbar = isAdmin && selected.size > 0 ? (
+    <div className="flex min-h-12 flex-wrap items-center gap-3 bg-highlight/5 px-5 py-2.5">
+      <UsersRound className="size-4 text-highlight" aria-hidden />
+      <p className="me-auto text-sm font-medium" aria-live="polite">
+        {t('bulk.selected', { count: selected.size })}
       </p>
+      <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}><X />{t('preview.clearSelection')}</Button>
       <Select value={assignee} onValueChange={setAssignee} disabled={pending}>
         <SelectTrigger className="min-w-44">
           <SelectValue placeholder={t('bulk.chooseAssignee')} />
@@ -119,31 +125,65 @@ export function OrdersTable({
     </div>
   ) : undefined;
 
+  /** Under the total: how many items, and any the stock can't follow. */
+  const items = (order: OrderRow) => (
+    <>
+      {tn('items', { count: order.itemCount })}
+      {order.unmappedCount > 0 ? (
+        <span className="text-warning">
+          {' · '}
+          <AlertTriangle aria-hidden className="inline size-3 align-[-2px]" /> {t('unlinked', { count: order.unmappedCount })}
+        </span>
+      ) : null}
+    </>
+  );
+  const total = (order: OrderRow) => (
+    <span className={cn('num text-[15px] font-semibold', order.status === 'CANCELLED' && 'text-muted-foreground')}>
+      {money(order.total)} <span className="text-xs font-normal text-muted-foreground">{tc('egp')}</span>
+    </span>
+  );
+  const select = (order: OrderRow) => (
+    <Checkbox
+      className="relative z-20"
+      checked={selected.has(order.id)}
+      onCheckedChange={(checked) => toggle(order.id, checked === true)}
+      aria-label={t('bulk.selectOrder', { number: order.orderNumber })}
+    />
+  );
+  const link = (order: OrderRow) => (
+    <Link
+      href={`/orders/${order.id}`}
+      className="num font-semibold after:absolute after:inset-0 hover:text-highlight hover:underline hover:underline-offset-4 focus-visible:underline focus-visible:outline-none"
+    >
+      {order.orderNumber}
+    </Link>
+  );
+  const contact = (order: OrderRow) =>
+    [order.customerPhone, te(`orderSource.${order.source}`), order.governorate].filter(Boolean).map((part, i) => (
+      <span key={i}>{i > 0 ? <span aria-hidden> · </span> : null}<bdi className={i === 0 ? 'num' : undefined}>{part}</bdi></span>
+    ));
+
   return (
-    <TablePanel minWidth={isAdmin ? '72rem' : '64rem'} toolbar={toolbar} toolbarClassName="hidden md:block" footer={footer}>
-      <ul className="divide-y md:hidden">
+    <TablePanel minWidth={isAdmin ? '60rem' : '50rem'} toolbar={toolbar} footer={footer}>
+      <ul className="divide-y lg:hidden">
         {orders.map((order) => (
-          <li key={order.id} className="relative px-4 py-3.5">
+          <li key={order.id} className="relative px-5 py-4" data-state={selected.has(order.id) ? 'selected' : undefined}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <Link href={`/orders/${order.id}`} className="num text-[13px] font-semibold after:absolute after:inset-0">
-                    {order.orderNumber}
-                  </Link>
-                  {order.unmappedCount > 0 ? (
-                    <AlertTriangle aria-label={t('unmapped', { count: order.unmappedCount })} className="size-3.5 text-warning" />
-                  ) : null}
+                <div className="flex items-center gap-2.5">
+                  {isAdmin ? select(order) : null}
+                  {link(order)}
+                  <span className="text-xs text-muted-foreground">{f.date(order.placedAt)}</span>
                 </div>
-                <p className="mt-0.5 truncate text-[13px]">
-                  <bdi>{order.customerName}</bdi>
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  <bdi className="num">{order.customerPhone}</bdi> · {f.date(order.placedAt)}
-                </p>
+                <p className="mt-1.5 truncate font-medium"><bdi>{order.customerName}</bdi></p>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">{contact(order)}</p>
               </div>
-              <span className="num shrink-0 text-[15px] font-semibold">{money(order.total)}</span>
+              <div className="shrink-0 text-end">
+                {total(order)}
+                <p className="mt-1 text-xs text-muted-foreground">{items(order)}</p>
+              </div>
             </div>
-            <div className="relative z-10 mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px]">
+            <div className="relative z-10 mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 border-t pt-2.5 text-[13px]">
               <OrderStatusMenu orderId={order.id} status={order.status} canRevert={isAdmin} />
               <PaymentStatusMenu orderId={order.id} status={order.paymentStatus} orderStatus={order.status} />
               {isAdmin ? (
@@ -158,11 +198,11 @@ export function OrdersTable({
           </li>
         ))}
       </ul>
-      <Table className="hidden md:table">
+      <Table className="hidden lg:table [&_td]:h-[4.5rem]">
         <TableHeader>
           <TableRow>
             {isAdmin ? (
-              <TableHead className="w-10">
+              <TableHead className="w-12">
                 <Checkbox
                   checked={selectionState}
                   onCheckedChange={(checked) =>
@@ -172,55 +212,26 @@ export function OrdersTable({
                 />
               </TableHead>
             ) : null}
-            <TableHead className="w-[120px]">{t('columns.order')}</TableHead>
+            <TableHead className="w-[14%]">{t('columns.order')}</TableHead>
             <TableHead>{t('columns.customer')}</TableHead>
-            <TableHead className="w-[96px]">{t('columns.channel')}</TableHead>
-            <TableHead className="w-[140px]">{t('columns.status')}</TableHead>
-            <TableHead className="w-[120px]">{t('columns.payment')}</TableHead>
-            {isAdmin ? <TableHead className="w-[150px]">{t('columns.assigned')}</TableHead> : null}
-            <TableHead className="w-[120px] text-end">{t('columns.total')}</TableHead>
-            <TableHead className="w-[110px] text-end">{t('columns.placed')}</TableHead>
+            <TableHead className="w-[14%]">{t('columns.status')}</TableHead>
+            <TableHead className="w-[13%]">{t('columns.payment')}</TableHead>
+            {isAdmin ? <TableHead className="w-[15%]">{t('columns.assigned')}</TableHead> : null}
+            <TableHead className="w-[15%] text-end">{t('columns.total')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {orders.map((order) => (
             <TableRow key={order.id} className="relative" data-state={selected.has(order.id) ? 'selected' : undefined}>
-              {isAdmin ? (
-                <TableCell>
-                  <Checkbox
-                    className="relative z-20"
-                    checked={selected.has(order.id)}
-                    onCheckedChange={(checked) => toggle(order.id, checked === true)}
-                    aria-label={t('bulk.selectOrder', { number: order.orderNumber })}
-                  />
-                </TableCell>
-              ) : null}
+              {isAdmin ? <TableCell>{select(order)}</TableCell> : null}
               <TableCell>
-                <div className="flex items-center gap-1.5">
-                  <Link
-                    href={`/orders/${order.id}`}
-                    className="num font-medium after:absolute after:inset-0 hover:underline focus-visible:underline focus-visible:outline-none"
-                  >
-                    {order.orderNumber}
-                  </Link>
-                  {order.unmappedCount > 0 ? (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <AlertTriangle
-                          aria-label={t('unmapped', { count: order.unmappedCount })}
-                          className="relative z-10 size-3.5 text-warning"
-                        />
-                      </TooltipTrigger>
-                      <TooltipContent>{t('unmapped', { count: order.unmappedCount })}</TooltipContent>
-                    </Tooltip>
-                  ) : null}
-                </div>
+                {link(order)}
+                <p className="mt-1 text-xs text-muted-foreground">{f.date(order.placedAt)}</p>
               </TableCell>
               <TableCell className="max-w-0">
                 <p className="truncate font-medium"><bdi>{order.customerName}</bdi></p>
-                <p className="num truncate text-xs text-muted-foreground"><bdi>{order.customerPhone}</bdi></p>
+                <p className="mt-1 truncate text-xs text-muted-foreground">{contact(order)}</p>
               </TableCell>
-              <TableCell className="text-muted-foreground">{te(`orderSource.${order.source}`)}</TableCell>
               <TableCell>
                 <OrderStatusMenu orderId={order.id} status={order.status} canRevert={isAdmin} />
               </TableCell>
@@ -237,8 +248,10 @@ export function OrdersTable({
                   />
                 </TableCell>
               ) : null}
-              <TableCell className="num text-end font-medium">{money(order.total)}</TableCell>
-              <TableCell className="text-end text-muted-foreground">{f.date(order.placedAt)}</TableCell>
+              <TableCell className="text-end">
+                {total(order)}
+                <p className="mt-1 text-xs text-muted-foreground">{items(order)}</p>
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>

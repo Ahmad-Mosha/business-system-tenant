@@ -6,6 +6,7 @@ import type { LedgerAccountCode } from './ledger-account.entity';
 import type { LedgerEntryKind } from './ledger-entry.entity';
 import { LedgerService } from './ledger.service';
 import { FinanceService } from './finance.service';
+import { PerformanceService } from '../reporting/performance.service';
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -22,7 +23,19 @@ export class FinanceController {
   constructor(
     private readonly finance: FinanceService,
     private readonly ledger: LedgerService,
+    private readonly performance: PerformanceService,
   ) {}
+
+  /**
+   * Profit and loss between two dates, by channel — with a series by `bucket`
+   * (day, week or month) when one is asked for. The money overview's main panel.
+   */
+  @Get('performance')
+  performanceReport(@Query('from') from?: string, @Query('to') to?: string, @Query('bucket') bucket?: string) {
+    if (!isDate(from) || !isDate(to) || from > to) throw new BadRequestException('from and to are required as YYYY-MM-DD, with from on or before to');
+    const b = bucket === 'day' || bucket === 'week' || bucket === 'month' ? bucket : undefined;
+    return this.performance.report(from, to, b);
+  }
 
   @Get('overview')
   overview() {

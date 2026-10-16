@@ -1,0 +1,60 @@
+/* The list-screen kit, first designed on the inventory list: a summary strip
+   of headline figures, a titled list with its count, and quick views. */
+.summary {
+  display: grid;
+  grid-template-columns: repeat(var(--metrics, 4), minmax(0, 1fr));
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+.metric {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 22px 24px;
+  border-inline-start: 1px solid var(--border);
+  /* The figure sizes itself to its own cell, so a long amount never runs out of it. */
+  container-type: inline-size;
+}
+.metric:first-child { border-inline-start: 0; background: color-mix(in srgb, var(--primary) 6%, var(--card)); }
+.metricLabel { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 500; color: var(--muted-foreground); }
+.metricLabel svg { width: 18px; height: 18px; flex-shrink: 0; }
+.metricValue { font-size: min(clamp(25px, 2.1vw, 34px), 13cqi); font-weight: 650; line-height: 1.15; white-space: nowrap; }
+.metricHint { font-size: 12px; color: var(--muted-foreground); line-height: 1.7; }
+.metricHint svg { display: inline; width: 14px; height: 14px; margin-inline-start: 8px; }
+.metricLink { color: var(--foreground); transition: background 150ms; }
+.metricLink:hover { background: color-mix(in srgb, var(--primary) 4%, var(--card)); }
+.metricLink:focus-visible { outline: 2px solid var(--ring); outline-offset: -4px; }
+.warning { color: var(--warning); }
+.listTitle { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 600; }
+.listCount { padding: 2px 9px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--muted-foreground); font-size: 12px; font-weight: 500; }
+.views { display: flex; align-items: center; gap: 7px; max-width: 100%; overflow-x: auto; padding: 2px; }
+.views { scrollbar-width: none; }
+.views::-webkit-scrollbar { display: none; }
+.view { display: inline-flex; align-items: center; gap: 10px; min-height: 38px; padding: 7px 13px; border: 1px solid transparent; border-radius: 8px; white-space: nowrap; color: var(--muted-foreground); font-size: 13px; font-weight: 500; transition: background 150ms; }
+.view:hover { background: var(--card); color: var(--foreground); }
+.view[aria-current='page'] { border-color: var(--border); background: var(--card); color: var(--foreground); box-shadow: 0 1px 2px #00000004; }
+.view:focus-visible { outline: 2px solid var(--ring); outline-offset: 0; }
+.viewCount { font-size: 11px; background: var(--muted); border-radius: 5px; padding: 1px 6px; color: var(--muted-foreground); }
+@media (max-width: 1100px) {
+  .metric { padding: 18px; }
+}
+@media (max-width: 700px) {
+  .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .metric { gap: 9px; padding: 16px; }
+  .metric:nth-child(odd) { border-inline-start: 0; }
+  .metric:nth-child(n+3) { border-top: 1px solid var(--border); }
+  /* An odd one out takes the whole last row instead of half of it. */
+  .metric:last-child:nth-child(odd) { grid-column: span 2; }
+  .metricValue { font-size: min(27px, 13cqi); }
+  .metricLabel { font-size: 12px; }
+  .metricHint { font-size: 11px; }
+  .view { min-height: 42px; padding-inline: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .metricLink, .view { transition: none; }
+}

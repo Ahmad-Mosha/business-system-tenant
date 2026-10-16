@@ -29,6 +29,7 @@ import { OrdersService } from './orders/orders.service';
 import { PurchasesController, SuppliersController } from './purchasing/purchasing.controller';
 import { PurchasingService } from './purchasing/purchasing.service';
 import { NoonReportingService } from './reporting/noon-reporting.service';
+import { PerformanceService } from './reporting/performance.service';
 import { CustomersController, SalesInvoicesController } from './sales/sales.controller';
 import { SalesService } from './sales/sales.service';
 
@@ -46,7 +47,8 @@ import { SalesService } from './sales/sales.service';
           NODE_ENV: config.get<string>('NODE_ENV'),
           JWT_SECRET: config.get<string>('JWT_SECRET'),
         }),
-        signOptions: { expiresIn: '12h' },
+        // Thirty days: people stay signed in through normal use; signing out ends it at once.
+        signOptions: { expiresIn: '30d' },
       }),
     }),
     TypeOrmModule.forRoot({
@@ -85,6 +87,7 @@ import { SalesService } from './sales/sales.service';
     AuthService,
     NoonImportService,
     NoonReportingService,
+    PerformanceService,
     OrdersService,
     CatalogService,
     EasyOrdersService,

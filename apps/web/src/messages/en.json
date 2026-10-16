@@ -80,12 +80,22 @@
       "edit": "Edit",
       "details": "Details"
     },
-    "breadcrumb": "Breadcrumb"
+    "breadcrumb": "Breadcrumb",
+    "skipToContent": "Skip to content",
+    "create": {
+      "label": "Create",
+      "order": "Order",
+      "salesInvoice": "Sales invoice",
+      "purchase": "Purchase invoice",
+      "product": "Product"
+    },
+    "needsWork": "{count, plural, one {# order needs work} other {# orders need work}}"
   },
   "user": {
     "lightTheme": "Light theme",
     "darkTheme": "Dark theme",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "theme": "Switch light / dark"
   },
   "table": {
     "showing": "Showing <b>{from}–{to}</b> of {items}",
@@ -404,6 +414,11 @@
     }
   },
   "orders": {
+    "detailPreview": {
+      "controls": "Manage order",
+      "controlsHint": "Status, payment and assignment in one place.",
+      "historyHint": "Latest update first."
+    },
     "title": "Orders",
     "descriptionAdmin": "Every order from social and the website, in one list.",
     "descriptionMine": "The orders assigned to you.",
@@ -421,6 +436,10 @@
     "deliveredUnpaid": "Delivered, unpaid",
     "deliveredUnpaidSome": "Cash not yet collected",
     "deliveredUnpaidNone": "All delivered orders paid",
+    "inTransitHint": "Shipped, waiting for delivery",
+    "toCollect": "{amount} EGP still to collect",
+    "anyPayment": "Any payment",
+    "unlinked": "{count} not in inventory",
     "search": "Search orders, customers, phones…",
     "allChannels": "All channels",
     "anyStatus": "Any status",
@@ -473,7 +492,10 @@
       "summary": "Summary",
       "subtotal": "Subtotal",
       "shipping": "Shipping",
-      "total": "Total"
+      "total": "Total",
+      "call": "Call",
+      "whatsapp": "WhatsApp",
+      "customerDelivery": "Customer & delivery"
     },
     "history": {
       "created": "Created from {source, select, EASYORDERS {the website} other {social}}",
@@ -492,7 +514,14 @@
       "description": "Change any of these in place.",
       "assignedTo": "Assigned to",
       "status": "Status",
-      "payment": "Payment"
+      "payment": "Payment",
+      "next": {
+        "CONFIRMED": "Confirm order",
+        "SHIPPED": "Mark as shipped",
+        "DELIVERED": "Mark as delivered",
+        "PAID": "Mark as paid"
+      },
+      "nextHint": "Or change anything below."
     },
     "form": {
       "backToOrder": "Back to the order",
@@ -527,11 +556,15 @@
       "create": "Create order",
       "needsItem": "Add at least one item.",
       "needsQuantity": "Every item needs a quantity of at least 1.",
-      "needsNameAndPrice": "Every item needs a name and a price.",
       "needsPhone": "Add a valid phone number.",
       "needsGovernorate": "Pick a governorate.",
       "overStock": "Only <num>{count}</num> of <bdi>{name}</bdi> in stock.",
-      "belowCost": "<bdi>{name}</bdi> is priced below its <num>{cost}</num> cost."
+      "belowCost": "<bdi>{name}</bdi> is priced below its <num>{cost}</num> cost.",
+      "returning": "{count, plural, one {Ordered once before, on {date}:} other {Ordered # times, last on {date}:}}",
+      "useDetails": "Use these details",
+      "needsItemName": "Every item needs a name.",
+      "needsPrice": "Every item needs a price.",
+      "needsName": "Add the customer's name."
     },
     "return": {
       "title": "Receive returned order",
@@ -543,6 +576,25 @@
       "refundHint": "A paid order becomes refund due. Record the cash refund separately when it is actually paid.",
       "submit": "Receive return",
       "saved": "Return received; stock and finances updated"
+    },
+    "preview": {
+      "eyebrow": "OPERATIONS WORKSPACE",
+      "description": "Track your orders, share the workload, and keep every order moving.",
+      "overview": "All orders at a glance",
+      "worklist": "Order workspace",
+      "worklistHint": "Open an order for details, or update it directly in the list.",
+      "views": "Order views",
+      "newOrders": "New",
+      "assignedOrders": "Assigned",
+      "confirmedOrders": "Confirmed",
+      "shippedOrders": "In transit",
+      "deliveredOrders": "Delivered",
+      "currency": "EGP",
+      "open": "Open order",
+      "selectionHint": "Select one or more orders to assign a team member.",
+      "clearSelection": "Clear selection",
+      "scope": "All channels · Before filters",
+      "scopeHint": "These figures include all orders available to you, before filtering."
     }
   },
   "productSearch": {
@@ -685,7 +737,18 @@
     "noPurchases": "No posted purchases yet",
     "boughtFrom": "From {supplier}",
     "purchaseBasis": "{units} pieces on {invoices} invoices",
-    "varies": "Varies"
+    "varies": "Varies",
+    "preview": {
+      "description": "See what is available, where it is, and what needs restocking.",
+      "summary": "Inventory overview",
+      "products": "Products",
+      "viewLabel": "Inventory view",
+      "quantitiesView": "Quantities & locations",
+      "costsView": "Purchases & costs",
+      "available": "Available to sell",
+      "costNote": "Purchase prices exclude shipping and customs; inventory cost includes them. Open a product to see costs for each variant.",
+      "inOrdersHelp": "Units already deducted from available stock, in orders that have not shipped yet. Do not subtract them again."
+    }
   },
   "product": {
     "back": "Back to inventory",
@@ -1001,7 +1064,16 @@
         "status": "Status",
         "total": "Total"
       },
-      "noRef": "No ref"
+      "noRef": "No ref",
+      "search": "Search by supplier or invoice number…",
+      "noMatch": "No invoices match this view",
+      "views": {
+        "label": "Invoice views",
+        "draft": "Drafts",
+        "due": "Owed",
+        "paid": "Paid",
+        "cancelled": "Cancelled"
+      }
     },
     "invoice": {
       "back": "Back to purchases",
@@ -1041,7 +1113,8 @@
       "draftDeleted": "Draft deleted",
       "draftUpdated": "Draft saved",
       "editTitle": "Edit draft invoice",
-      "editDescription": "Nothing moves until you post it."
+      "editDescription": "Nothing moves until you post it.",
+      "paidOfTotal": "{paid} of {total} EGP paid to the supplier"
     },
     "newInvoice": {
       "title": "New purchase invoice",
@@ -1094,7 +1167,9 @@
         "supplier": "Supplier",
         "phone": "Phone",
         "balance": "Balance owed",
-        "added": "Added"
+        "added": "Added",
+        "lastInvoice": "Last invoice",
+        "bought": "Bought"
       },
       "settled": "Settled",
       "add": "Add supplier",
@@ -1109,7 +1184,19 @@
       "updated": "Supplier updated",
       "showArchived": "Archived suppliers",
       "showActive": "Active suppliers",
-      "archivedEmpty": "No archived suppliers."
+      "archivedEmpty": "No archived suppliers.",
+      "boughtTotal": "Bought from suppliers",
+      "boughtHint": "What they billed on posted invoices",
+      "search": "Search by name, phone or note…",
+      "noMatch": "No suppliers match this view",
+      "noInvoicesYet": "No invoices yet",
+      "boughtAmount": "{amount} EGP bought",
+      "views": {
+        "label": "Supplier views",
+        "owed": "You owe",
+        "settled": "Settled",
+        "archived": "Archived"
+      }
     },
     "supplier": {
       "back": "Back to suppliers",
@@ -1151,6 +1238,67 @@
       "paidSeparately": "Extra costs are paid separately now (cash), not owed to this supplier",
       "paymentHint": "Cash paid now: {cash} · Owed to supplier: {supplier}",
       "breakdown": "Goods: {goods} + extra costs: {extra}"
+    },
+    "home": {
+      "description": "Profit and loss across every channel, the cash you hold, and who owes whom.",
+      "cashHint": "In the treasury now",
+      "owedToYou": "Owed to you",
+      "owedNone": "Nobody owes you anything right now.",
+      "youOwe": "You owe",
+      "oweNone": "You don't owe anyone right now.",
+      "noon": "noon",
+      "customers": "Customers on invoice",
+      "cod": "Cash on delivery, not collected",
+      "bosta": "Held by Bosta",
+      "cheques": "Cheques not cleared",
+      "amazon": "Amazon",
+      "suppliers": "Suppliers",
+      "refunds": "Refunds due to customers",
+      "owedToYouHint": "Money that will come into the treasury once collected.",
+      "youOweHint": "Money that will leave the treasury once paid.",
+      "netOwedToYou": "You are owed more than you owe, by",
+      "netYouOwe": "You owe more than you are owed, by"
+    },
+    "pnl": {
+      "revenue": "Sales",
+      "cogs": "Cost of goods",
+      "estimated": "Estimate",
+      "grossProfit": "Gross profit",
+      "fees": "Channel fees",
+      "shipping": "Shipping",
+      "expenses": "Expenses",
+      "taxes": "Taxes",
+      "notYet": "Not calculated yet",
+      "netProfit": "Net profit",
+      "costs": "Costs",
+      "margin": "{margin} of sales",
+      "uncosted": "<b>{count, plural, one {# unit sold has} other {# units sold have}} no cost yet</b> — their cost of goods isn’t counted, so profit reads higher than it is.",
+      "uncostedFix": "Link products to inventory",
+      "statement": "Profit and loss",
+      "trendEmpty": "No sales or costs recorded in the last 12 months.",
+      "channelsTitle": "Sales by channel",
+      "channelsHint": "What each channel sold, what it cost, and what it left, {span}.",
+      "channels": {
+        "noon": "noon",
+        "website": "Website (Easy Orders)",
+        "social": "Social media",
+        "wholesale": "Wholesale invoices",
+        "amazon": "Amazon"
+      },
+      "counts": {
+        "orders": "{count, plural, one {# order} other {# orders}}",
+        "invoices": "{count, plural, one {# invoice} other {# invoices}}"
+      },
+      "notConnected": "Not connected yet",
+      "noSales": "No sales in this period",
+      "uncostedShort": "{count} without cost",
+      "netProfitFor": "Net profit, {span}",
+      "leftAfter": "{amount} left · {margin}",
+      "more": "More about money",
+      "salesSoFar": "Sales so far",
+      "costsSoFar": "Costs so far",
+      "lossNote": "Costs ran {amount} over sales",
+      "afterCogs": "Sales less cost of goods"
     }
   },
   "noon": {
@@ -1463,16 +1611,29 @@
     "status": "Status",
     "recorded": "Recorded",
     "trace": "Ledger",
-    "voidedBecause": "Cancelled:"
+    "voidedBecause": "Cancelled:",
+    "periods": {
+      "thisMonth": "This month",
+      "lastMonth": "Last month",
+      "thisYear": "This year",
+      "vsLast": "{change} vs last month"
+    },
+    "columns": {
+      "note": "Note",
+      "amount": "Amount"
+    }
   },
   "drafts": {
-    "restored": "Unsaved work from {when} was restored.",
-    "stale": "You have unsaved changes from {when}, made before this record was last updated.",
     "restore": "Restore them",
     "discard": "Discard draft",
     "discarded": "Draft discarded",
     "undo": "Undo",
-    "autosaved": "Saved on this device as you type. Nothing is recorded until you submit."
+    "autosaved": "Saved on this device as you type. Nothing is recorded until you submit.",
+    "restoredTitle": "Your unsaved work is back",
+    "restoredDetail": "Last edited {when}. It is kept on this device only — nothing is recorded until you submit.",
+    "staleTitle": "You have older unsaved changes",
+    "staleDetail": "Made {when}, before this record was last updated. Restoring them replaces what is shown now.",
+    "keepEditing": "Keep editing"
   },
   "privacy": {
     "hide": "Hide costs",
@@ -1600,7 +1761,8 @@
       "remaining": "Remaining",
       "settled": "Fully paid",
       "atPosting": "Paid at posting",
-      "payment": "Payment"
+      "payment": "Payment",
+      "paidOf": "{paid} of {total} EGP received"
     },
     "void": {
       "action": "Void invoice",
@@ -1615,7 +1777,22 @@
       "keep": "Keep invoice"
     },
     "owed": "Owed by customers",
-    "owedHint": "The unpaid part of posted invoices"
+    "owedHint": "The unpaid part of posted invoices",
+    "sold": "Sold",
+    "nothingOwed": "Every posted invoice is paid",
+    "collected": "Collected",
+    "collectedHint": "Received against posted invoices",
+    "draftValueOf": "{amount} EGP waiting to be posted",
+    "search": "Search by customer or invoice number…",
+    "noMatch": "No invoices match this view",
+    "dueAmount": "{amount} due",
+    "views": {
+      "label": "Invoice views",
+      "draft": "Drafts",
+      "due": "Awaiting payment",
+      "paid": "Paid",
+      "cancelled": "Cancelled"
+    }
   },
   "customers": {
     "title": "Customers",
@@ -1640,7 +1817,9 @@
       "customer": "Customer",
       "phone": "Phone",
       "balance": "Owes",
-      "added": "Added"
+      "added": "Added",
+      "lastInvoice": "Last invoice",
+      "sold": "Sold"
     },
     "settled": "Settled",
     "total": "Customers",
@@ -1666,9 +1845,27 @@
       "deleteDescription": "This customer has no invoices, so they can be removed completely. This can’t be undone.",
       "deleteConfirm": "Delete customer",
       "deleted": "Customer deleted",
-      "newInvoice": "New invoice"
+      "newInvoice": "New invoice",
+      "sold": "Bought from you",
+      "lastInvoice": "Last invoice",
+      "since": "Customer since {date}",
+      "statement": "Invoices",
+      "contact": "Contact",
+      "noPhone": "No phone saved"
     },
-    "activeHint": "Active — archived ones are listed separately"
+    "activeHint": "Active — archived ones are listed separately",
+    "soldTotal": "Sold to customers",
+    "soldHint": "Posted invoices, all time",
+    "search": "Search by name, phone or note…",
+    "noMatch": "No customers match this view",
+    "noInvoicesYet": "No invoices yet",
+    "soldAmount": "{amount} EGP sold",
+    "views": {
+      "label": "Customer views",
+      "owing": "Owe you",
+      "settled": "Settled",
+      "archived": "Archived"
+    }
   },
   "search": {
     "title": "Search",

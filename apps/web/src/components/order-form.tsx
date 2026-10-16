@@ -1,14 +1,15 @@
 'use client';
 
-import { AlertTriangle, CheckCircle2, Plus, Trash2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, CircleDashed, Package, PackageSearch, Plus, Trash2, UserRound, UserRoundCheck, Wallet } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
-import { useActionState, useRef, useState } from 'react';
-import { createOrder, updateOrder, type CreateOrderState } from '@/app/(app)/orders/actions';
+import { useActionState, useEffect, useRef, useState } from 'react';
+import { createOrder, findCustomer, updateOrder, type CreateOrderState, type ReturningCustomer } from '@/app/(app)/orders/actions';
 import { Amount } from '@/components/amount';
 import { DraftNotice } from '@/components/draft-notice';
 import { useDraft } from '@/hooks/use-draft';
+import { useFormat } from '@/i18n/use-format';
 import { Page, PageHeader } from '@/components/page';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -35,14 +36,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { VariantSearch, type VariantHit } from '@/components/variant-search';
 import type { OrderDetail } from '@/lib/api';
@@ -114,6 +107,7 @@ export function OrderForm({
   const te = useTranslations('enums');
   const tn = useTranslations('nouns');
   const tr = useTranslations();
+  const f = useFormat();
   const router = useRouter();
   const editing = !!order;
   // Everything typed lives in one object so it can be kept as a draft.
@@ -151,8 +145,10 @@ export function OrderForm({
   }, INITIAL);
   const seq = useRef(0);
 
+  const [lastAdded, setLastAdded] = useState<string>();
   const addLine = (hit?: VariantHit) => {
     seq.current += 1;
+    setLastAdded(`l${seq.current}`);
     setLines((l) => [
       ...l,
       {
@@ -178,25 +174,45 @@ export function OrderForm({
 
   const phoneOk = isEgyptianPhone(phone);
   const phoneBad = phone.length > 0 && !phoneOk;
+  // A phone that ordered before offers that customer's latest details — new orders only.
+  const [returning, setReturning] = useState<{ phone: string; customer: ReturningCustomer } | null>(null);
+  useEffect(() => {
+    if (editing || !phoneOk) return;
+    let stale = false;
+    const timer = setTimeout(async () => {
+      const customer = await findCustomer(phone);
+      if (!stale) setReturning(customer ? { phone, customer } : null);
+    }, 300);
+    return () => {
+      stale = true;
+      clearTimeout(timer);
+    };
+  }, [editing, phone, phoneOk]);
+  const found = returning?.phone === phone ? returning.customer : null;
+  // Offered until its details are in the form.
+  const offer =
+    found &&
+    (found.name !== form.customerName ||
+      (!!found.address && found.address !== form.address) ||
+      (!!found.governorate && (GOVERNORATES as readonly string[]).includes(found.governorate) && found.governorate !== governorate))
+      ? found
+      : null;
   const overStock = lines.filter((l) => l.onHand !== undefined && qty(l) > l.onHand);
   const belowCost = lines.filter(
     (l) => l.unitCost && Number(l.unitPrice) > 0 && Number(l.unitPrice) < Number(l.unitCost),
   );
-  const unpriced = lines.filter((l) => !l.title.trim() || !(Number(l.unitPrice) > 0));
-  // The first thing still missing, said under the disabled button — a button
-  // that won't press without saying why is the worst kind of form.
-  const missing = !lines.length
-    ? t('form.needsItem')
-    : lines.some((l) => !Number.isInteger(qty(l)) || qty(l) < 1)
-      ? t('form.needsQuantity')
-    : unpriced.length
-      ? t('form.needsNameAndPrice')
-      : !phoneOk
-        ? t('form.needsPhone')
-        : !governorate
-          ? t('form.needsGovernorate')
-          : null;
-  const ready = !missing && !overStock.length;
+  // Everything still missing, all at once, under the disabled button — a
+  // button that won't press without saying why is the worst kind of form.
+  const missing = [
+    !lines.length && t('form.needsItem'),
+    lines.some((l) => !Number.isInteger(qty(l)) || qty(l) < 1) && t('form.needsQuantity'),
+    lines.some((l) => !l.title.trim()) && t('form.needsItemName'),
+    lines.some((l) => !(Number(l.unitPrice) > 0)) && t('form.needsPrice'),
+    !form.customerName.trim() && t('form.needsName'),
+    !phoneOk && t('form.needsPhone'),
+    !governorate && t('form.needsGovernorate'),
+  ].filter((m): m is string => !!m);
+  const ready = !missing.length && !overStock.length;
   const back = editing ? `/orders/${order.id}` : '/orders';
   // An order can carry a governorate outside the 27 (a website order's own
   // spelling). Offer it too — otherwise the form's native select falls back
@@ -245,97 +261,120 @@ export function OrderForm({
 
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
           <div className="grid min-w-0 gap-6">
-            <div className="grid gap-6 xl:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle>{t('detail.customer')}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <FieldGroup className="grid gap-4 sm:grid-cols-2">
-                    <Field>
-                      <FieldLabel htmlFor="customerName">{t('form.fullName')}</FieldLabel>
-                      <Input
-                        id="customerName"
-                        name="customerName"
-                        dir="auto"
-                        required
-                        value={form.customerName}
-                        onChange={(e) => set('customerName')(e.target.value)}
-                        placeholder={t('form.namePlaceholder')}
-                        disabled={pending}
-                      />
-                    </Field>
-                    <Field data-invalid={phoneBad}>
-                      <FieldLabel htmlFor="customerPhone">{t('form.phone')}</FieldLabel>
-                      <Input
-                        id="customerPhone"
-                        name="customerPhone"
-                        required
-                        inputMode="tel"
-                        dir="ltr"
-                        placeholder="01xxxxxxxxx"
-                        value={phone}
-                        onChange={(e) => set('phone')(e.target.value)}
-                        aria-invalid={phoneBad}
-                        disabled={pending}
-                        className="num"
-                      />
-                      {phoneBad ? <FieldError>{t('form.phoneInvalid')}</FieldError> : null}
-                    </Field>
-                  </FieldGroup>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>{t('detail.delivery')}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <FieldGroup className="grid gap-4 sm:grid-cols-[160px_minmax(0,1fr)]">
-                    <Field>
-                      <FieldLabel htmlFor="governorate">{t('detail.governorate')}</FieldLabel>
-                      <Select
-                        name="governorate"
-                        value={governorate}
-                        onValueChange={set('governorate')}
-                        disabled={pending}
-                      >
-                        <SelectTrigger id="governorate" className="w-full">
-                          <SelectValue placeholder={t('form.select')} />
-                        </SelectTrigger>
-                        <SelectContent position="popper" className="max-h-72">
-                          {governorates.map((g) => (
-                            <SelectItem key={g} value={g}>
-                              {g}
-                            </SelectItem>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2.5">
+                  <UserRound className="size-4 text-muted-foreground" aria-hidden />
+                  {t('detail.customerDelivery')}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-4">
+                {/* Phone first: it's how a returning customer is recognised. */}
+                <FieldGroup className="grid gap-4 sm:grid-cols-2">
+                  <Field data-invalid={phoneBad}>
+                    <FieldLabel htmlFor="customerPhone">{t('form.phone')}</FieldLabel>
+                    <Input
+                      id="customerPhone"
+                      name="customerPhone"
+                      required
+                      inputMode="tel"
+                      dir="ltr"
+                      placeholder="01xxxxxxxxx"
+                      value={phone}
+                      onChange={(e) => set('phone')(e.target.value)}
+                      aria-invalid={phoneBad}
+                      disabled={pending}
+                      className="num"
+                    />
+                    {phoneBad ? <FieldError>{t('form.phoneInvalid')}</FieldError> : null}
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="customerName">{t('form.fullName')}</FieldLabel>
+                    <Input
+                      id="customerName"
+                      name="customerName"
+                      dir="auto"
+                      required
+                      value={form.customerName}
+                      onChange={(e) => set('customerName')(e.target.value)}
+                      placeholder={t('form.namePlaceholder')}
+                      disabled={pending}
+                    />
+                  </Field>
+                  {offer ? (
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-highlight/25 bg-highlight/5 px-3.5 py-2.5 text-sm sm:col-span-2">
+                      <UserRoundCheck className="size-4 shrink-0 text-highlight" aria-hidden />
+                      <p className="min-w-0 flex-1">
+                        <span className="font-medium">{t('form.returning', { count: offer.orders, date: f.date(offer.lastOrderAt) })}</span>
+                        <span className="text-muted-foreground">
+                          {[offer.name, offer.governorate, offer.address].filter(Boolean).map((part, i) => (
+                            <span key={i}>{i ? ' · ' : ' '}<bdi>{part}</bdi></span>
                           ))}
-                        </SelectContent>
-                      </Select>
-                    </Field>
-                    <Field>
-                      <FieldLabel htmlFor="address">{t('form.address')}</FieldLabel>
-                      <Input
-                        id="address"
-                        name="address"
-                        dir="auto"
-                        value={form.address}
-                        onChange={(e) => set('address')(e.target.value)}
-                        placeholder={t('form.addressPlaceholder')}
-                        disabled={pending}
-                      />
-                    </Field>
-                  </FieldGroup>
-                </CardContent>
-              </Card>
-            </div>
+                        </span>
+                      </p>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          setForm((current) => ({
+                            ...current,
+                            customerName: offer.name,
+                            governorate: offer.governorate && governorates.includes(offer.governorate) ? offer.governorate : current.governorate,
+                            address: offer.address ?? current.address,
+                          }))
+                        }
+                      >
+                        {t('form.useDetails')}
+                      </Button>
+                    </div>
+                  ) : null}
+                  <Field>
+                    <FieldLabel htmlFor="governorate">{t('detail.governorate')}</FieldLabel>
+                    <Select
+                      name="governorate"
+                      value={governorate}
+                      onValueChange={set('governorate')}
+                      disabled={pending}
+                    >
+                      <SelectTrigger id="governorate" className="w-full">
+                        <SelectValue placeholder={t('form.select')} />
+                      </SelectTrigger>
+                      <SelectContent position="popper" className="max-h-72">
+                        {governorates.map((g) => (
+                          <SelectItem key={g} value={g}>
+                            {g}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="address">{t('form.address')}</FieldLabel>
+                    <Input
+                      id="address"
+                      name="address"
+                      dir="auto"
+                      value={form.address}
+                      onChange={(e) => set('address')(e.target.value)}
+                      placeholder={t('form.addressPlaceholder')}
+                      disabled={pending}
+                    />
+                  </Field>
+                </FieldGroup>
+              </CardContent>
+            </Card>
 
             <Card className="pb-0">
               <CardHeader>
-                <CardTitle>{t('detail.items')}</CardTitle>
+                <CardTitle className="flex items-center gap-2.5">
+                  <Package className="size-4 text-muted-foreground" aria-hidden />
+                  {t('detail.items')}
+                </CardTitle>
                 <CardDescription>{t('form.itemsHint')}</CardDescription>
               </CardHeader>
               <CardContent className="flex flex-wrap gap-2">
-                <div className="min-w-0 flex-1">
+                <div className="min-w-60 flex-1">
                   <VariantSearch
                     onPick={addLine}
                     disabled={pending}
@@ -352,113 +391,116 @@ export function OrderForm({
                   {t('form.customItem')}
                 </Button>
               </CardContent>
+              {/* Lines as a grid, not a table: on a phone each line stacks —
+                  name on top, quantity, price and total under it — instead of
+                  four squeezed columns of inputs. */}
               <div className="mt-4 border-t">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t('columns.item')}</TableHead>
-                      <TableHead className="w-[90px] text-end">{t('columns.qty')}</TableHead>
-                      <TableHead className="w-[120px] text-end">{t('columns.unitPrice')}</TableHead>
-                      <TableHead className="w-[110px] text-end">{t('columns.total')}</TableHead>
-                      <TableHead className="w-12" />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {lines.length === 0 ? (
-                      <TableRow className="hover:bg-transparent">
-                        <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                          {t('form.noItems')}
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      lines.map((l) => {
-                        const over = l.onHand !== undefined && qty(l) > l.onHand;
-                        const under =
-                          !!l.unitCost &&
-                          Number(l.unitPrice) > 0 &&
-                          Number(l.unitPrice) < Number(l.unitCost);
-                        return (
-                          <TableRow key={l.key} className="align-top">
-                            <TableCell className="h-auto py-1.5 ps-2">
-                              <Input
-                                value={l.title}
-                                onChange={(e) => patch(l.key, { title: e.target.value })}
-                                placeholder={t('form.itemName')}
-                                aria-label={t('form.itemName')}
-                                dir="auto"
-                                disabled={pending}
-                                className={cn(cellInput, 'text-page bg-transparent font-medium dark:bg-transparent')}
-                              />
-                              <p className="px-2 text-xs text-muted-foreground">
-                                {!l.variantId ? (
-                                  <span className="text-warning">{t('form.notLinked')}</span>
-                                ) : l.onHand === undefined ? (
-                                  // Loaded from a saved order — linked, but
-                                  // today's stock isn't known here.
-                                  t('form.linked')
-                                ) : (
-                                  <span className="num">
-                                    {t('form.inStock', { count: l.onHand })}
-                                    {l.unitCost ? (
-                                      <span data-sensitive>{` · ${t('form.cost', { amount: money(l.unitCost) })}`}</span>
-                                    ) : null}
-                                  </span>
-                                )}
-                              </p>
-                            </TableCell>
-                            <TableCell className="h-auto py-1.5">
-                              <NumberField
-                                value={l.quantity}
-                                onValueChange={(v) => patch(l.key, { quantity: v })}
-                                decimals={0}
-                                min={1}
-                                aria-label={t('form.quantity')}
-                                aria-invalid={over || qty(l) < 1}
-                                disabled={pending}
-                                className={cn(cellInput, over && 'border-destructive')}
-                              />
-                            </TableCell>
-                            <TableCell className="h-auto py-1.5">
-                              <NumberField
-                                value={l.unitPrice}
-                                onValueChange={(v) => patch(l.key, { unitPrice: v })}
-                                group
-                                aria-label={t('columns.unitPrice')}
-                                placeholder="0.00"
-                                disabled={pending}
-                                className={cn(cellInput, under && 'border-warning')}
-                              />
-                            </TableCell>
-                            <TableCell className="num h-auto py-1.5 text-end leading-8 font-medium">
-                              {money(lineTotal(l))}
-                            </TableCell>
-                            <TableCell className="h-auto py-1.5 pe-2">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setLines((x) => x.filter((y) => y.key !== l.key))}
-                                aria-label={
-                                  l.title ? t('form.remove', { name: l.title }) : t('form.removeItem')
-                                }
-                                disabled={pending}
-                                className="text-muted-foreground hover:bg-destructive-subtle hover:text-destructive"
-                              >
-                                <Trash2 />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
+                <div className="hidden h-9 grid-cols-[minmax(0,1fr)_90px_120px_110px_40px] items-center gap-x-2 bg-muted/40 px-3 text-xs font-medium text-muted-foreground sm:grid sm:ps-5">
+                  <span>{t('columns.item')}</span>
+                  <span className="text-end">{t('columns.qty')}</span>
+                  <span className="text-end">{t('columns.unitPrice')}</span>
+                  <span className="text-end">{t('columns.total')}</span>
+                </div>
+                {lines.length === 0 ? (
+                  <div className="flex flex-col items-center gap-2 px-5 py-9 text-center text-sm text-muted-foreground">
+                    <PackageSearch className="size-5" aria-hidden />
+                    {t('form.noItems')}
+                  </div>
+                ) : (
+                  <ul className="divide-y border-t">
+                    {lines.map((l) => {
+                      const over = l.onHand !== undefined && qty(l) > l.onHand;
+                      const under =
+                        !!l.unitCost &&
+                        Number(l.unitPrice) > 0 &&
+                        Number(l.unitPrice) < Number(l.unitCost);
+                      return (
+                        <li
+                          key={l.key}
+                          className="grid grid-cols-[1fr_1fr_1fr_40px] items-start gap-x-2 gap-y-2 px-3 py-3 sm:grid-cols-[minmax(0,1fr)_90px_120px_110px_40px] sm:py-2 sm:ps-3"
+                        >
+                          <div className="col-span-4 min-w-0 sm:col-span-1">
+                            <Input
+                              value={l.title}
+                              onChange={(e) => patch(l.key, { title: e.target.value })}
+                              placeholder={t('form.itemName')}
+                              aria-label={t('form.itemName')}
+                              dir="auto"
+                              disabled={pending}
+                              className={cn(cellInput, 'text-page bg-transparent font-medium dark:bg-transparent')}
+                            />
+                            <p className="px-2 text-xs text-muted-foreground">
+                              {!l.variantId ? (
+                                <span className="text-warning">{t('form.notLinked')}</span>
+                              ) : l.onHand === undefined ? (
+                                // Loaded from a saved order — linked, but
+                                // today's stock isn't known here.
+                                t('form.linked')
+                              ) : (
+                                <span className="num">
+                                  {t('form.inStock', { count: l.onHand })}
+                                  {l.unitCost ? (
+                                    <span data-sensitive>{` · ${t('form.cost', { amount: money(l.unitCost) })}`}</span>
+                                  ) : null}
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                          <label className="grid gap-1">
+                            <span className="px-2 text-[11px] text-muted-foreground sm:hidden">{t('columns.qty')}</span>
+                            <NumberField
+                              value={l.quantity}
+                              onValueChange={(v) => patch(l.key, { quantity: v })}
+                              decimals={0}
+                              min={1}
+                              aria-label={t('form.quantity')}
+                              autoFocus={l.key === lastAdded}
+                              aria-invalid={over || qty(l) < 1}
+                              disabled={pending}
+                              className={cn(cellInput, over && 'border-destructive')}
+                            />
+                          </label>
+                          <label className="grid gap-1">
+                            <span className="px-2 text-[11px] text-muted-foreground sm:hidden">{t('columns.unitPrice')}</span>
+                            <NumberField
+                              value={l.unitPrice}
+                              onValueChange={(v) => patch(l.key, { unitPrice: v })}
+                              group
+                              aria-label={t('columns.unitPrice')}
+                              placeholder="0"
+                              disabled={pending}
+                              className={cn(cellInput, under && 'border-warning')}
+                            />
+                          </label>
+                          <div className="grid gap-1 text-end">
+                            <span className="text-[11px] text-muted-foreground sm:hidden">{t('columns.total')}</span>
+                            <span className="num text-sm leading-8 font-medium">{money(lineTotal(l))}</span>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setLines((x) => x.filter((y) => y.key !== l.key))}
+                            aria-label={l.title ? t('form.remove', { name: l.title }) : t('form.removeItem')}
+                            disabled={pending}
+                            className="self-end text-muted-foreground hover:bg-destructive-subtle hover:text-destructive sm:self-start"
+                          >
+                            <Trash2 />
+                          </Button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
               </div>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>{t('form.paymentAndNotes')}</CardTitle>
+                <CardTitle className="flex items-center gap-2.5">
+                  <Wallet className="size-4 text-muted-foreground" aria-hidden />
+                  {t('form.paymentAndNotes')}
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <FieldGroup>
@@ -509,7 +551,7 @@ export function OrderForm({
               <CardContent className="grid gap-3 text-[13px]">
                 <div className="flex items-baseline justify-between gap-3">
                   <span className="text-muted-foreground">
-                    {t('form.subtotal', { items: tn('items', { count: units }) })}
+                    {units ? t('form.subtotal', { items: tn('items', { count: units }) }) : t('detail.subtotal')}
                   </span>
                   <span className="num">{money(subtotal)}</span>
                 </div>
@@ -554,8 +596,15 @@ export function OrderForm({
                   {pending ? tc('saving') : editing ? tc('saveChanges') : t('form.create')}
                 </Button>
 
-                {missing && !pending ? (
-                  <p className="text-center text-xs text-muted-foreground">{missing}</p>
+                {missing.length && !pending ? (
+                  <ul className="grid gap-1.5 text-xs text-muted-foreground">
+                    {missing.map((m) => (
+                      <li key={m} className="flex items-start gap-2">
+                        <CircleDashed className="mt-px size-3.5 shrink-0" aria-hidden />
+                        {m}
+                      </li>
+                    ))}
+                  </ul>
                 ) : null}
                 <p className="text-center text-xs text-muted-foreground">{tr('drafts.autosaved')}</p>
 

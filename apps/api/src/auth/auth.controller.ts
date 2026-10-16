@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { Public, Roles, SESSION_COOKIE } from './auth.guard';
 
-const SESSION_MAX_AGE_MS = 12 * 60 * 60 * 1000; // one working day
+const SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // thirty days — matches the token's own expiry
 
 @Controller('auth')
 export class AuthController {

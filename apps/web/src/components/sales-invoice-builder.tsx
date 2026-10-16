@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, FileText, Save, Send, Trash2 } from 'lucide-react';
+import { AlertTriangle, CircleDashed, FileText, Package, Save, Send, Store, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
@@ -23,7 +23,6 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from '@/components/u
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { useDraft } from '@/hooks/use-draft';
 import { b, num } from '@/i18n/rich';
@@ -66,10 +65,13 @@ const cellInput = 'h-8 border-transparent bg-muted/60 px-2 shadow-none hover:bor
  */
 export function SalesInvoiceBuilder({
   customers,
+  customerId,
   draftKey,
   invoice,
 }: {
   customers: CustomerRow[];
+  /** Chosen up front — a new invoice started from a customer's page. */
+  customerId?: string;
   /** Identifies this user's unfinished invoice in the browser. */
   draftKey: string;
   /** A saved draft being edited; absent for a new invoice. */
@@ -86,7 +88,7 @@ export function SalesInvoiceBuilder({
 
   const [form, setForm] = useState<SalesForm>(() => ({
     requestId: crypto.randomUUID(),
-    customerId: invoice?.customerId ?? '',
+    customerId: invoice?.customerId ?? customerId ?? '',
     invoiceDate: invoice?.invoiceDate ?? todayISO(),
     notes: invoice?.notes ?? '',
     discount: invoice ? trimZeros(invoice.discount) : '',
@@ -128,26 +130,26 @@ export function SalesInvoiceBuilder({
   const over = lines.filter((l) => l.onHand !== null && qty(l) > l.onHand);
   const below = lines.filter((l) => l.cost !== null && Number(price(l).unitPrice) > 0 && Number(price(l).unitPrice) < Number(l.cost));
 
-  const missing = !form.customerId
-    ? t('missing.customer')
-    : !lines.length
-      ? t('missing.product')
-      : lines.some((l) => !Number.isInteger(qty(l)) || qty(l) < 1)
-        ? t('missing.quantity')
-        : lines.some((l) => !(Number(price(l).lineTotal) > 0))
-          ? t('missing.price')
-          : discount > subtotal + 0.005
-            ? t('missing.discount')
-            : null;
+  // Everything still missing, all at once — never a button that won't press without saying why.
+  const missing = [
+    !form.customerId && t('missing.customer'),
+    !lines.length && t('missing.product'),
+    lines.some((l) => !Number.isInteger(qty(l)) || qty(l) < 1) && t('missing.quantity'),
+    lines.some((l) => !(Number(price(l).lineTotal) > 0)) && t('missing.price'),
+    discount > subtotal + 0.005 && t('missing.discount'),
+  ].filter((m): m is string => !!m);
+  const [lastAdded, setLastAdded] = useState<string>();
 
-  const addLine = (hit: { id: string; label: string; onHand: number; sellingPrice: string | null; unitCost: string | null }) =>
+  const addLine = (hit: { id: string; label: string; onHand: number; sellingPrice: string | null; unitCost: string | null }) => {
+    const key = crypto.randomUUID();
+    setLastAdded(key);
     setLines((ls) =>
       ls.some((l) => l.variantId === hit.id)
         ? ls
         : [
             ...ls,
             {
-              key: crypto.randomUUID(),
+              key,
               variantId: hit.id,
               label: hit.label,
               quantity: '1',
@@ -158,6 +160,7 @@ export function SalesInvoiceBuilder({
             },
           ],
     );
+  };
 
   const persist = () => {
     const payload: SalesInvoicePayload = {
@@ -212,7 +215,10 @@ export function SalesInvoiceBuilder({
         <div className="grid min-w-0 gap-6">
           <Card>
             <CardHeader>
-              <CardTitle>{t('customerAndDate')}</CardTitle>
+              <CardTitle className="flex items-center gap-2.5">
+                <Store className="size-4 text-muted-foreground" aria-hidden />
+                {t('customerAndDate')}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <FieldGroup className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_200px]">
@@ -265,7 +271,10 @@ export function SalesInvoiceBuilder({
 
           <Card className="pb-0">
             <CardHeader>
-              <CardTitle>{t('products')}</CardTitle>
+              <CardTitle className="flex items-center gap-2.5">
+                <Package className="size-4 text-muted-foreground" aria-hidden />
+                {t('products')}
+              </CardTitle>
               <CardDescription>{t('productsHint')}</CardDescription>
             </CardHeader>
             <CardContent>
@@ -281,23 +290,25 @@ export function SalesInvoiceBuilder({
             </CardContent>
             <div className="mt-4 border-t">
               {lines.length ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{tr('sales.detail.columns.product')}</TableHead>
-                      <TableHead className="w-[84px] text-end">{tr('sales.detail.columns.qty')}</TableHead>
-                      <TableHead className="w-[118px] text-end">{tr('sales.detail.columns.unitPrice')}</TableHead>
-                      <TableHead className="w-[124px] text-end">{tr('sales.detail.columns.lineTotal')}</TableHead>
-                      <TableHead className="w-12" />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                // A grid, not a table: on a phone each line stacks — product on
+                // top, quantity, price and total under it.
+                <>
+                  <div className="hidden h-9 grid-cols-[minmax(0,1fr)_84px_118px_124px_40px] items-center gap-x-2 bg-muted/40 px-3 text-xs font-medium text-muted-foreground sm:grid sm:ps-5">
+                    <span>{tr('sales.detail.columns.product')}</span>
+                    <span className="text-end">{tr('sales.detail.columns.qty')}</span>
+                    <span className="text-end">{tr('sales.detail.columns.unitPrice')}</span>
+                    <span className="text-end">{tr('sales.detail.columns.lineTotal')}</span>
+                  </div>
+                  <ul className="divide-y border-t">
                     {lines.map((l) => {
                       const short = l.onHand !== null && qty(l) > l.onHand;
                       const cheap = below.includes(l);
                       return (
-                        <TableRow key={l.key} className="hover:bg-transparent">
-                          <TableCell className="min-w-40 py-2 whitespace-normal">
+                        <li
+                          key={l.key}
+                          className="grid grid-cols-[1fr_1fr_1fr_40px] items-start gap-x-2 gap-y-2 px-3 py-3 sm:grid-cols-[minmax(0,1fr)_84px_118px_124px_40px] sm:py-2 sm:ps-5"
+                        >
+                          <div className="col-span-4 min-w-0 sm:col-span-1 sm:py-1">
                             {/* Wraps rather than truncates: a product cut short on an invoice is the wrong product. */}
                             <p className="line-clamp-2 leading-snug font-medium" title={l.label}>
                               <bdi>{l.label}</bdi>
@@ -306,61 +317,63 @@ export function SalesInvoiceBuilder({
                               {l.onHand !== null ? t('inStock', { count: l.onHand }) : null}
                               {l.cost !== null ? <span data-sensitive>{` · ${t('cost', { amount: unitMoney(l.cost) })}`}</span> : null}
                             </p>
-                          </TableCell>
-                          <TableCell className="py-1.5">
+                          </div>
+                          <label className="grid gap-1">
+                            <span className="px-2 text-[11px] text-muted-foreground sm:hidden">{tr('sales.detail.columns.qty')}</span>
                             <NumberField
                               value={l.quantity}
                               onValueChange={(v) => patchLine(l.key, { quantity: v })}
                               decimals={0}
                               min={1}
                               aria-label={tr('sales.detail.columns.qty')}
+                              autoFocus={l.key === lastAdded}
                               aria-invalid={short || qty(l) < 1}
                               disabled={pending}
                               className={cellInput}
                             />
-                          </TableCell>
-                          <TableCell className="py-1.5">
+                          </label>
+                          <label className="grid gap-1">
+                            <span className="px-2 text-[11px] text-muted-foreground sm:hidden">{tr('sales.detail.columns.unitPrice')}</span>
                             <NumberField
                               value={price(l).unitPrice}
                               onValueChange={(v) => patchLine(l.key, { unitPrice: v, source: 'unit' })}
                               decimals={4}
                               group
-                              placeholder="0.00"
+                              placeholder="0"
                               aria-label={tr('sales.detail.columns.unitPrice')}
                               title={l.source === 'total' ? tr('money.newInvoice.calculated') : undefined}
                               disabled={pending}
                               className={cn(cellInput, l.source === 'total' && 'text-muted-foreground', cheap && 'border-warning')}
                             />
-                          </TableCell>
-                          <TableCell className="py-1.5">
+                          </label>
+                          <label className="grid gap-1">
+                            <span className="px-2 text-[11px] text-muted-foreground sm:hidden">{tr('sales.detail.columns.lineTotal')}</span>
                             <NumberField
                               value={price(l).lineTotal}
                               onValueChange={(v) => patchLine(l.key, { lineTotal: v, source: 'total' })}
                               group
-                              placeholder="0.00"
+                              placeholder="0"
                               aria-label={tr('sales.detail.columns.lineTotal')}
                               title={l.source !== 'total' ? tr('money.newInvoice.calculated') : undefined}
                               disabled={pending}
                               className={cn(cellInput, 'font-medium', l.source !== 'total' && 'text-muted-foreground')}
                             />
-                          </TableCell>
-                          <TableCell className="pe-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))}
-                              aria-label={tr('orders.form.remove', { name: l.label })}
-                              disabled={pending}
-                              className="text-muted-foreground hover:bg-destructive-subtle hover:text-destructive"
-                            >
-                              <Trash2 />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
+                          </label>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))}
+                            aria-label={tr('orders.form.remove', { name: l.label })}
+                            disabled={pending}
+                            className="self-end text-muted-foreground hover:bg-destructive-subtle hover:text-destructive sm:self-start"
+                          >
+                            <Trash2 />
+                          </Button>
+                        </li>
                       );
                     })}
-                  </TableBody>
-                </Table>
+                  </ul>
+                </>
               ) : (
                 <Empty className="py-10">
                   <EmptyHeader>
@@ -382,7 +395,7 @@ export function SalesInvoiceBuilder({
             </CardHeader>
             <CardContent className="grid gap-3 text-[13px]">
               <div className="flex items-baseline justify-between gap-3">
-                <span className="text-muted-foreground">{t('subtotal', { items: tr('nouns.units', { count: units }) })}</span>
+                <span className="text-muted-foreground">{units ? t('subtotal', { items: tr('nouns.units', { count: units }) }) : tr('orders.detail.subtotal')}</span>
                 <span className="num">{money(subtotal)}</span>
               </div>
               <div className="flex items-center justify-between gap-3">
@@ -427,7 +440,7 @@ export function SalesInvoiceBuilder({
 
               <PostSalesDialog
                 trigger={
-                  <Button size="lg" disabled={pending || !!missing || over.length > 0} className="mt-1 w-full">
+                  <Button size="lg" disabled={pending || missing.length > 0 || over.length > 0} className="mt-1 w-full">
                     <Send />
                     {tr('sales.post.saveAndPost')}
                   </Button>
@@ -437,11 +450,20 @@ export function SalesInvoiceBuilder({
                 items={tr('nouns.units', { count: units })}
                 onPost={saveAndPost}
               />
-              <Button variant="outline" onClick={save} disabled={pending || !!missing} className="w-full">
+              <Button variant="outline" onClick={save} disabled={pending || missing.length > 0} className="w-full">
                 {pending ? <Spinner /> : <Save />}
                 {t('saveDraft')}
               </Button>
-              {missing && !pending ? <p className="text-center text-xs text-muted-foreground">{missing}</p> : null}
+              {missing.length && !pending ? (
+                <ul className="grid gap-1.5 text-xs text-muted-foreground">
+                  {missing.map((m) => (
+                    <li key={m} className="flex items-start gap-2">
+                      <CircleDashed className="mt-px size-3.5 shrink-0" aria-hidden />
+                      {m}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
               {refusal ? <ProblemNotice problem={refusal.problem} message={refusal.message} /> : null}
               <p className="text-center text-xs text-muted-foreground">{tr('sales.post.draftHint')} {tr('drafts.autosaved')}</p>
 
