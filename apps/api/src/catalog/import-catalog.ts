@@ -21,7 +21,10 @@ async function main() {
   const target = new URL(url);
   console.log(`Database: ${target.hostname}:${target.port || 5432}${target.pathname}${apply ? '' : '  (dry run — nothing is written)'}`);
 
-  const { products } = JSON.parse(readFileSync(file, 'utf8')) as { products: LinkedProduct[] };
+  const { products, stockAsOf } = JSON.parse(readFileSync(file, 'utf8')) as { products: LinkedProduct[]; stockAsOf?: string };
+  const asOf = stockAsOf ? new Date(stockAsOf) : undefined;
+  if (asOf && Number.isNaN(asOf.getTime())) throw new Error(`stockAsOf is not a date: ${stockAsOf}`);
+  console.log(`Opening counts dated ${asOf ? asOf.toISOString() : 'now'} — channel sales before then won't move stock again.`);
   const problems = validateLinkedCatalog(products);
   if (problems.length) {
     console.error(`The file has ${problems.length} problem(s); nothing was imported:\n${problems.slice(0, 30).join('\n')}`);
@@ -37,7 +40,7 @@ async function main() {
       if (!user) throw new Error(`no user ${actorEmail}`);
       actorId = user.id;
     }
-    const report = await importLinkedCatalog(dataSource, products, { actorId, apply });
+    const report = await importLinkedCatalog(dataSource, products, { actorId, apply, stockAsOf: asOf });
     console.log(`${apply ? 'Created' : 'Would create'} ${report.created} products with ${report.listings} listings; ` +
       `opening stock ${report.units.warehouse} in the warehouse and ${report.units.noon} at noon.`);
     if (report.skipped.length) console.log(`Skipped ${report.skipped.length} already in the catalogue, e.g. ${report.skipped.slice(0, 3).map((s) => `${s.name} → ${s.linkedTo}`).join('; ')}`);

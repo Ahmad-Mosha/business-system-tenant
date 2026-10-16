@@ -70,8 +70,11 @@ export function validateLinkedCatalog(products: LinkedProduct[]): string[] {
 export async function importLinkedCatalog(
   db: DataSource,
   products: LinkedProduct[],
-  { actorId, apply }: { actorId: string | null; apply: boolean },
+  { actorId, apply, stockAsOf }: { actorId: string | null; apply: boolean; stockAsOf?: Date },
 ): Promise<ImportReport> {
+  // When the counts were true: the exports' snapshot, not the moment of import —
+  // channel sales after it still have to come off, sales before it already did.
+  const asOf = stockAsOf ?? new Date();
   const report: ImportReport = { created: 0, skipped: [], failed: [], listings: 0, units: { warehouse: 0, noon: 0 } };
   for (const p of products) {
     try {
@@ -126,7 +129,7 @@ export async function importLinkedCatalog(
                 unitCost: null,
                 sourceType: OPENING_IMPORT,
                 createdById: actorId,
-                occurredAt: new Date(),
+                occurredAt: asOf,
               })
             : null;
         await opening('WAREHOUSE', p.warehouseStock, 'opening stock — declared on the channel listings');

@@ -151,6 +151,11 @@ function Outcome({ state }: { state: Extract<UploadState, { status: 'done' }> })
         <p className="border-t px-4 py-3 text-xs text-muted-foreground">
           {r.alreadyImported ? t('alreadyImportedNote') : t('allKnownNote')}
         </p>
+      ) : r.stockMoved !== undefined ? (
+        // What the file did to inventory, in one line — the part owners check first.
+        <p className="border-t px-4 py-3 text-xs text-muted-foreground">
+          {t('stockEffect', { moved: r.stockMoved, before: r.stockBeforeOpening ?? 0 })}
+        </p>
       ) : null}
     </div>
   );

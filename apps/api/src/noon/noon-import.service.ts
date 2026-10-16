@@ -9,6 +9,7 @@ import { StockMovement } from '../inventory/stock-movement.entity';
 import { NoonImport } from './noon-import.entity';
 import { NoonTransaction } from './noon-transaction.entity';
 import { NoonRow, parseNoonReport } from './noon-report.parser';
+import { OPENING_IMPORT } from '../catalog/linked-catalog-import';
 
 export interface ImportResult {
   importId: string;
@@ -20,6 +21,10 @@ export interface ImportResult {
   unmappedListings: number;
   periodStart: string | null;
   periodEnd: string | null;
+  /** Units taken off (or put back on) stock by this file's orders and returns. */
+  stockMoved?: number;
+  /** Orders from before a product's opening count, which already reflects them — stock left alone. */
+  stockBeforeOpening?: number;
 }
 
 @Injectable()
@@ -87,13 +92,14 @@ export class NoonImportService {
         );
       }
 
-      await this.applyStockMovements(tx, fresh, listingBySku);
+      const stock = await this.applyStockMovements(tx, fresh, listingBySku);
       await this.applyCashPayouts(tx, fresh);
 
       this.log.log(
-        `${filename}: ${fresh.length} new, ${rows.length - fresh.length} skipped, ${unmapped} unmapped`,
+        `${filename}: ${fresh.length} new, ${rows.length - fresh.length} skipped, ${unmapped} unmapped, ` +
+          `${stock.moved} stock moves, ${stock.beforeOpening} before the opening count`,
       );
-      return { ...this.describe(record), alreadyImported: false };
+      return { ...this.describe(record), alreadyImported: false, stockMoved: stock.moved, stockBeforeOpening: stock.beforeOpening };
     });
   }
 
@@ -123,60 +129,83 @@ export class NoonImportService {
 
   /**
    * One stock movement per unit sold or returned, for rows newly inserted this
-   * import only. Historical rows already imported before this feature existed
-   * are deliberately not backfilled: whatever physical stock count is entered
-   * as the opening baseline already nets out sales that happened before it was
-   * taken, so replaying old rows on top would double-count them.
+   * import only (`order` rows are one unit each — there is no quantity column;
+   * only `order_update` rows with negative net proceeds are real returns).
    *
-   * Evidence-based, not a guess: `order` rows are one unit each (no quantity
-   * column exists — see docs/evidence). `order_update` rows are mostly fee
-   * adjustments, not returns; only the ones with negative net proceeds reverse
-   * real value, so only those move stock back in.
+   * When: a sale leaves stock on its order date, not the later settlement
+   * date. A product whose stock was opened from a catalogue snapshot already
+   * has every sale before that snapshot netted out, so rows ordered before it
+   * move nothing — otherwise an October settlement would take early-October
+   * sales off the opening count a second time.
+   *
+   * Where: noon ships from its own warehouse only what is there, so a sale
+   * comes off the product's noon stock while it has some, and off our
+   * warehouse after that (noon's report doesn't say which per row). A return
+   * goes back where the product's noon stock lives, if it has any.
    */
   private async applyStockMovements(
     tx: EntityManager,
     fresh: NoonRow[],
     listingBySku: Map<string, { listingId: string; variantId: string }>,
   ) {
-    const movements: Array<Partial<StockMovement>> = [];
-    for (const r of fresh) {
-      if (!r.partnerSku) continue;
-      const listing = listingBySku.get(r.partnerSku);
-      if (!listing) continue; // unmapped: no product to move stock on
-
+    type StockEvent = { row: NoonRow; variantId: string; quantity: number; reason: 'SALE' | 'RETURN'; on: string | null };
+    const events = fresh.flatMap((r): StockEvent[] => {
+      const listing = r.partnerSku ? listingBySku.get(r.partnerSku) : undefined;
+      if (!listing) return []; // unmapped: no product to move stock on
       if (r.transactionType === 'order' && r.itemNr) {
-        movements.push({
-          variantId: listing.variantId,
-          quantity: -1,
-          reason: 'SALE',
-          sourceType: 'noon_transaction',
-          sourceId: r.fingerprint,
-          occurredAt: r.transactionDate ? new Date(r.transactionDate) : new Date(),
-        });
-      } else if (r.transactionType === 'order_update' && Number(r.netProceeds) < 0) {
-        movements.push({
-          variantId: listing.variantId,
-          quantity: 1,
-          reason: 'RETURN',
-          sourceType: 'noon_transaction',
-          sourceId: r.fingerprint,
-          occurredAt: r.transactionDate ? new Date(r.transactionDate) : new Date(),
-        });
+        return [{ row: r, variantId: listing.variantId, quantity: -1, reason: 'SALE', on: r.orderDate ?? r.transactionDate }];
       }
+      if (r.transactionType === 'order_update' && Number(r.netProceeds) < 0) {
+        return [{ row: r, variantId: listing.variantId, quantity: 1, reason: 'RETURN', on: r.transactionDate ?? r.orderDate }];
+      }
+      return [];
+    });
+    if (!events.length) return { moved: 0, beforeOpening: 0 };
+
+    const variantIds = [...new Set(events.map((e) => e.variantId))];
+    await lockStock(tx, variantIds);
+    const state: Array<{ id: string; opened: string | null; noon: number; atNoon: boolean }> = await tx.query(
+      `SELECT v.id,
+              (SELECT (min(m.occurred_at) AT TIME ZONE 'Africa/Cairo')::date::text FROM stock_movement m
+                WHERE m.variant_id = v.id AND m.source_type = $2) AS opened,
+              COALESCE((SELECT SUM(m.quantity) FROM stock_movement m WHERE m.variant_id = v.id AND m.location = 'NOON'), 0)::int AS noon,
+              EXISTS (SELECT 1 FROM stock_movement m WHERE m.variant_id = v.id AND m.location = 'NOON') AS "atNoon"
+       FROM product_variant v JOIN product p ON p.id = v.product_id
+       WHERE v.id = ANY($1::uuid[]) AND v.active AND p.active`,
+      [variantIds, OPENING_IMPORT],
+    );
+    const byId = new Map(state.map((s) => [s.id, s]));
+
+    let beforeOpening = 0;
+    const movements: Array<Partial<StockMovement>> = [];
+    // Oldest first, so noon's stock is used up in the order it sold.
+    for (const e of [...events].sort((a, b) => String(a.on).localeCompare(String(b.on)))) {
+      const v = byId.get(e.variantId);
+      if (!v) continue; // archived product
+      if (v.opened && e.on && e.on < v.opened) {
+        beforeOpening++;
+        continue;
+      }
+      let location: 'NOON' | 'WAREHOUSE' = 'WAREHOUSE';
+      if (e.quantity < 0 && v.noon > 0) {
+        location = 'NOON';
+        v.noon -= 1;
+      } else if (e.quantity > 0 && v.atNoon) {
+        location = 'NOON';
+        v.noon += 1;
+      }
+      movements.push({
+        variantId: e.variantId,
+        location,
+        quantity: e.quantity,
+        reason: e.reason,
+        sourceType: 'noon_transaction',
+        sourceId: e.row.fingerprint,
+        occurredAt: e.on ? new Date(`${e.on}T12:00:00+03:00`) : new Date(),
+      });
     }
-    if (movements.length) {
-      const variantIds = movements.flatMap((movement) => movement.variantId ? [movement.variantId] : []);
-      await lockStock(tx, variantIds);
-      const activeRows: Array<{ id: string }> = await tx.query(
-        `SELECT v.id FROM product_variant v
-         JOIN product p ON p.id = v.product_id
-         WHERE v.id = ANY($1::uuid[]) AND v.active AND p.active`,
-        [variantIds],
-      );
-      const active = new Set(activeRows.map((row) => row.id));
-      const safe = movements.filter((movement) => movement.variantId && active.has(movement.variantId));
-      if (safe.length) await tx.insert(StockMovement, safe);
-    }
+    if (movements.length) await tx.insert(StockMovement, movements);
+    return { moved: movements.length, beforeOpening };
   }
 
   /**

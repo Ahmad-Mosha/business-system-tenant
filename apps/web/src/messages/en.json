@@ -1394,7 +1394,8 @@
       "unmappedSkus": "Unmapped SKUs",
       "alreadyImportedNote": "This exact file had already been imported, so nothing changed.",
       "allKnownNote": "Every row was already on record from an earlier export.",
-      "fileSize": "{size} KB"
+      "fileSize": "{size} KB",
+      "stockEffect": "{moved, plural, =0 {No stock moved.} one {# unit moved on stock.} other {# units moved on stock.}} {before, plural, =0 {} one {# order from before the opening count left stock alone — the count already includes it.} other {# orders from before the opening count left stock alone — the count already includes them.}}"
     }
   },
   "team": {
