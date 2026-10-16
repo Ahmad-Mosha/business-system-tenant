@@ -22,3 +22,12 @@ export const beforeOpening = (opened: Map<string, string | null>, variantId: str
   const day = opened.get(variantId);
   return !!day && !!on && on < day;
 };
+
+/** Whether a record wrote any stock movement. */
+export async function movedStock(tx: DataSource | EntityManager, sourceType: string, sourceId: string) {
+  const [{ moved }] = await tx.query(
+    'SELECT EXISTS (SELECT 1 FROM stock_movement WHERE source_type = $1 AND source_id = $2) AS moved',
+    [sourceType, sourceId],
+  );
+  return moved as boolean;
+}

@@ -5,7 +5,7 @@ import { ProductVariant } from '../catalog/product-variant.entity';
 import { LedgerEntry } from '../finance/ledger-entry.entity';
 import { LedgerService } from '../finance/ledger.service';
 import { StockMovement } from '../inventory/stock-movement.entity';
-import { beforeOpening as isBeforeOpening, stockOpenedOn } from '../inventory/stock-opening';
+import { beforeOpening as isBeforeOpening, movedStock, stockOpenedOn } from '../inventory/stock-opening';
 import { isUniqueViolation } from '../database/unique-violation';
 import { lockStock } from '../inventory/stock-lock';
 import { problem, refuse, type Reason } from '../problem';
@@ -222,7 +222,10 @@ export class SalesService {
       void: invoice.status === 'POSTED' ? await this.voidBlockers(this.db, invoice) : [],
     };
     const opened = await stockOpenedOn(this.db, lines.map((l: { variantId: string }) => l.variantId));
-    const beforeOpening = lines.some((l: { variantId: string }) => isBeforeOpening(opened, l.variantId, invoice.invoiceDate));
+    // A draft by its date; a posted invoice by what it actually did.
+    const beforeOpening = invoice.status === 'DRAFT'
+      ? lines.some((l: { variantId: string }) => isBeforeOpening(opened, l.variantId, invoice.invoiceDate))
+      : lines.length > 0 && !(await movedStock(this.db, 'sales_invoice', id));
     return { ...invoice, voidedBy: voider?.name ?? null, lines, payments, blocked, beforeOpening };
   }
 
