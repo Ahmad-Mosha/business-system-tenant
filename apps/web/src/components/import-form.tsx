@@ -1,23 +1,25 @@
 'use client';
 
-import { CheckCircle2, FileText, Info, Upload, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, FileText, Info, Upload, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useActionState, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { uploadReport, type UploadState } from '@/app/(app)/imports/actions';
+import { uploadReport, type UploadState } from '@/app/(app)/channel-actions';
+import type { Marketplace } from '@/lib/channels';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 
-export function ImportForm() {
-  const t = useTranslations('noon.imports');
+/** Drop a marketplace report, upload it, and say plainly what it did. */
+export function ImportForm({ channel }: { channel: Marketplace }) {
+  const t = useTranslations('channel.uploads');
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
   const [state, submit, pending] = useActionState<UploadState, FormData>(async (prev, form) => {
-    const next = await uploadReport(prev, form);
+    const next = await uploadReport(channel, prev, form);
     if (next.status === 'error') toast.error(next.message);
     if (next.status === 'done') {
       const { rowsInserted, alreadyImported } = next.result;
@@ -118,7 +120,7 @@ export function ImportForm() {
 }
 
 function Outcome({ state }: { state: Extract<UploadState, { status: 'done' }> }) {
-  const t = useTranslations('noon.imports');
+  const t = useTranslations('channel.uploads');
   const r = state.result;
   const nothingNew = r.alreadyImported || r.rowsInserted === 0;
 
@@ -155,6 +157,15 @@ function Outcome({ state }: { state: Extract<UploadState, { status: 'done' }> })
         // What the file did to inventory, in one line — the part owners check first.
         <p className="border-t px-4 py-3 text-xs text-muted-foreground">
           {t('stockEffect', { moved: r.stockMoved, before: r.stockBeforeOpening ?? 0 })}
+        </p>
+      ) : null}
+      {r.rowsUpdated ? (
+        <p className="border-t px-4 py-3 text-xs text-muted-foreground">{t('updatedNote', { count: r.rowsUpdated })}</p>
+      ) : null}
+      {r.unmappedListings > 0 && !r.alreadyImported ? (
+        <p className="flex gap-2 border-t bg-warning-subtle/60 px-4 py-3 text-xs leading-relaxed text-warning">
+          <AlertTriangle className="mt-px size-3.5 shrink-0" aria-hidden />
+          {t('unmappedHint', { count: r.unmappedListings })}
         </p>
       ) : null}
     </div>

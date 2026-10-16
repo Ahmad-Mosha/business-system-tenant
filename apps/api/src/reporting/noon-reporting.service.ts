@@ -54,6 +54,8 @@ export class NoonReportingService {
                     + non_order_fees + non_order_subsidies), 0)    AS "fees",
          COALESCE(SUM(others), 0)                                  AS "payouts",
          COALESCE(SUM(total), 0)                                   AS "movement",
+         COUNT(*) FILTER (WHERE transaction_type = 'order' AND item_nr IS NOT NULL)::int AS "unitsSold",
+         COUNT(*) FILTER (WHERE transaction_type = 'order_update' AND net_proceeds < 0)::int AS "unitsReturned",
          COUNT(*)::int                                             AS "rows"
        FROM noon_transaction
        WHERE transaction_date BETWEEN $1 AND $2`,

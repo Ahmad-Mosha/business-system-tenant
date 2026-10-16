@@ -23,6 +23,8 @@ export interface Statement {
   fees: string;
   payouts: string;
   movement: string;
+  unitsSold: number;
+  unitsReturned: number;
   rows: number;
   closingBalance: string | null;
 }
@@ -109,6 +111,70 @@ export const getProducts = (from: string, to: string) =>
 
 export const getUnattributed = (from: string, to: string) =>
   get<Unattributed[]>(`/noon/unattributed?${range(from, to)}`);
+
+export interface AmazonStatement {
+  from: string;
+  to: string;
+  sales: string;
+  refunds: string;
+  income: string;
+  sellingFees: string;
+  shippingCharges: string;
+  serviceFees: string;
+  adjustments: string;
+  other: string;
+  fees: string;
+  net: string;
+  payouts: string;
+  movement: string;
+  held: string;
+  heldUntil: string | null;
+  unitsSold: number;
+  unitsRefunded: number;
+  orders: number;
+  rows: number;
+  openingBalance: string | null;
+  closingBalance: string | null;
+}
+
+export interface AmazonPeriod {
+  month: string;
+  from: string;
+  to: string;
+  rows: number;
+  income: string;
+  fees: string;
+  payouts: string;
+  movement: string;
+  unitsSold: number;
+  openingBalance: string | null;
+  closingBalance: string | null;
+}
+
+export interface AmazonProductPerformance {
+  productId: string;
+  name: string;
+  unitCost: string | null;
+  unitsSold: number;
+  unitsReturned: number;
+  income: string;
+  fees: string;
+  net: string;
+  grossProfit: string | null;
+}
+
+export interface AmazonImportRecord extends ImportRecord {
+  rowsUpdated: number;
+}
+
+export const getAmazonImports = () => get<AmazonImportRecord[]>('/amazon/imports');
+export const getAmazonStatement = (from: string, to: string) => get<AmazonStatement>(`/amazon/statement?${range(from, to)}`);
+export const getAmazonPeriods = () => get<AmazonPeriod[]>('/amazon/periods');
+export const getAmazonAccount = () => get<ChannelAccount>('/amazon/account');
+export const getAmazonProducts = (from: string, to: string) => get<AmazonProductPerformance[]>(`/amazon/products?${range(from, to)}`);
+export const getAmazonUnattributed = (from: string, to: string) => get<Unattributed[]>(`/amazon/unattributed?${range(from, to)}`);
+/** What a marketplace owes today; null until its opening balance is set. */
+export const getChannelBalance = (channel: 'noon' | 'amazon') => get<{ balance: string | null }>(`/${channel}/balance`);
 
 /**
  * The window every page defaults to: everything we hold. Derived from the
@@ -560,7 +626,7 @@ export const getCashSeries = (days = 90) =>
 export const getPeriodSummary = (from?: string, to?: string) =>
   get<PeriodSummary>(`/finance/summary${from && to ? `?from=${from}&to=${to}` : ''}`);
 
-export type SalesChannel = 'noon' | 'website' | 'social' | 'wholesale';
+export type SalesChannel = 'noon' | 'amazon' | 'website' | 'social' | 'wholesale';
 
 /** Profit and loss for a period from the business's own records — see PerformanceService. */
 export interface PerformanceReport {
