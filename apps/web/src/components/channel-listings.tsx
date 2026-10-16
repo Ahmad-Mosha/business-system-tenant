@@ -154,7 +154,14 @@ function ChannelRow({
       } else toast.error(res.message);
     });
 
+  // What the channel calls it — its own SKU and title — so a linked listing is
+  // recognisable during review, not just an opaque id.
+  const caption = listing
+    ? [listing.partnerSku && listing.partnerSku !== listing.externalId ? listing.partnerSku : null, listing.title].filter(Boolean)
+    : [];
+
   return (
+    <div className="grid gap-1">
     <div className="flex gap-2">
       <Input
         value={value}
@@ -208,6 +215,12 @@ function ChannelRow({
           </TooltipTrigger>
           <TooltipContent>{tr('common.cancel')}</TooltipContent>
         </Tooltip>
+      ) : null}
+    </div>
+      {caption.length ? (
+        <p className="truncate px-1 text-xs text-muted-foreground" title={caption.join(' · ')}>
+          {caption.map((part, n) => <span key={n}>{n ? ' · ' : ''}<bdi>{part}</bdi></span>)}
+        </p>
       ) : null}
     </div>
   );

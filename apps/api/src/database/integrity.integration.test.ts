@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import { DataSource } from 'typeorm';
 import { ormOptions } from './orm-options';
 import { checkMigrations } from './migration-guard';
+import { importLinkedCatalog, validateLinkedCatalog, type LinkedProduct } from '../catalog/linked-catalog-import';
 import { LedgerService } from '../finance/ledger.service';
 import { FinanceService } from '../finance/finance.service';
 import { OrdersService } from '../orders/orders.service';
@@ -90,6 +91,36 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     await assert.rejects(
       db.query('UPDATE customer_order SET order_number = $1 WHERE id = $2', [first.orderNumber, second.id]),
     );
+  });
+  await t.test('a linked catalogue imports one product per item with every channel listing, once', async () => {
+    const tag = randomUUID().slice(0, 8);
+    const file: LinkedProduct[] = [{
+      name: `Picnic mat ${tag}`, category: 'HOME', sellingPrice: '900.00', noonStock: 7, warehouseStock: 30,
+      listings: [
+        { channel: 'noon', externalId: `Z${tag}-1`, partnerSku: `PSKU_${tag}`, title: 'Foldable picnic mat', price: '429.00' },
+        { channel: 'amazon', externalId: `AMZ-${tag}`, partnerSku: null, title: 'AYBUY Picnic Blanket', price: '449.00' },
+        { channel: 'easyorders', externalId: randomUUID(), partnerSku: `MAT-${tag}`, title: 'مفرش رحلات', price: '900.00' },
+      ],
+    }];
+    assert.deepEqual(validateLinkedCatalog([...file, file[0]]).length > 0, true, 'the same listing twice is refused');
+    const dry = await importLinkedCatalog(db, file, { actorId: null, apply: false });
+    assert.equal(dry.created, 1);
+    assert.equal((await db.query('SELECT count(*)::int AS n FROM product WHERE name = $1', [file[0].name]))[0].n, 0, 'a dry run writes nothing');
+
+    const done = await importLinkedCatalog(db, file, { actorId: null, apply: true });
+    assert.deepEqual([done.created, done.listings, done.failed.length], [1, 3, 0]);
+    const [variant] = await db.query(
+      `SELECT v.id, v.sku FROM product_variant v JOIN product p ON p.id = v.product_id WHERE p.name = $1`, [file[0].name]);
+    assert.equal(variant.sku, null, 'no SKU of our own');
+    const stock = await db.query(
+      `SELECT location, SUM(quantity)::int AS n FROM stock_movement WHERE variant_id = $1 GROUP BY location ORDER BY location`, [variant.id]);
+    assert.deepEqual(stock, [{ location: 'NOON', n: 7 }, { location: 'WAREHOUSE', n: 30 }]);
+    assert.equal(await OrdersService.resolveVariant(db.manager, 'amazon', `AMZ-${tag}`), variant.id);
+    // A website order for one of its colours finds the product linked as a whole.
+    assert.equal(await OrdersService.resolveVariant(db.manager, 'easyorders', file[0].listings[2].externalId, randomUUID()), variant.id);
+
+    const again = await importLinkedCatalog(db, file, { actorId: null, apply: true });
+    assert.deepEqual([again.created, again.skipped.length], [0, 1], 're-running the same file creates nothing twice');
   });
   await t.test('status tabs count the filtered orders, and a tab can hold several statuses', async () => {
     const variantId = await stock(2);
