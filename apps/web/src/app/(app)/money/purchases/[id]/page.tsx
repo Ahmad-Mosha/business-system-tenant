@@ -161,6 +161,12 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
           </AlertDescription>
         </Alert>
       ) : null}
+      {invoice.beforeOpening && !voided ? (
+        <Alert>
+          <Info />
+          <AlertDescription>{t('beforeOpening')}</AlertDescription>
+        </Alert>
+      ) : null}
       {draft && invoice.replacesId ? (
         <Alert>
           <Info />

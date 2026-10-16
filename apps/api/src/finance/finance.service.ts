@@ -106,6 +106,40 @@ export class FinanceService {
   }
 
   /**
+   * The treasury counted by hand: what is really there now, cash and bank
+   * together. The difference from the books is recorded against the opening
+   * balance, and anything entered later but dated before today leaves the
+   * treasury alone — the count already holds it (see `LedgerService.post`).
+   * Counting again is always allowed; a count that matches records nothing.
+   */
+  async countCash(counted: string, userId: string, note?: string) {
+    if (!MONEY.test(counted ?? '')) {
+      throw new BadRequestException(problem('cash.counted', 'enter the amount counted like 150000.00'));
+    }
+    return this.db.transaction(async (tx) => {
+      // One count at a time: the books are read and corrected under the same lock.
+      await tx.query(`SELECT code FROM ledger_account WHERE code = 'CASH' FOR UPDATE`);
+      const before = Number(await this.ledger.balanceOf('CASH', {}, tx));
+      const change = Math.round((Number(counted) - before) * 100) / 100;
+      if (change !== 0) {
+        await this.ledger.post(
+          {
+            amount: Math.abs(change).toFixed(2),
+            debit: change > 0 ? 'CASH' : 'OPENING_EQUITY',
+            credit: change > 0 ? 'OPENING_EQUITY' : 'CASH',
+            kind: 'CASH_COUNT',
+            memo: note?.trim() || null,
+            sourceType: 'cash_count',
+            actorId: userId,
+          },
+          tx,
+        );
+      }
+      return { before: before.toFixed(2), counted: Number(counted).toFixed(2), change: change.toFixed(2) };
+    });
+  }
+
+  /**
    * A hand-entered cash voucher: سند قبض (money in) or سند صرف (money out),
    * moving cash against one permitted counter-account. إيداع نقدي is just this
    * with the counter set to owner capital.

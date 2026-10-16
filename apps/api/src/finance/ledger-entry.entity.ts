@@ -16,6 +16,7 @@ import { LedgerAccount } from './ledger-account.entity';
  */
 export type LedgerEntryKind =
   | 'OPENING_BALANCE' // the anchor figure the ledger starts from
+  | 'CASH_COUNT' // the treasury counted by hand: the difference from the books
   | 'CASH_DEPOSIT' // إيداع نقدي — owner puts cash in
   | 'CHEQUE_DEPOSIT' // إيداع سندي — a cheque received, not yet cleared
   | 'CHEQUE_CLEAR' // that cheque cleared into cash

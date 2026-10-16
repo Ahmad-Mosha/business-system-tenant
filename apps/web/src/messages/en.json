@@ -370,6 +370,9 @@
         "reason": "Write why it’s cancelled.",
         "amount": "Enter an amount like 1000.00.",
         "alreadyCancelled": "This voucher is already cancelled. Turn on “Show cancelled” in the treasury to see it."
+      },
+      "cash": {
+        "counted": "Enter the amount counted, like 150000.00."
       }
     },
     "status": {
@@ -1144,7 +1147,8 @@
       "draftUpdated": "Draft saved",
       "editTitle": "Edit draft invoice",
       "editDescription": "Nothing moves until you post it.",
-      "paidOfTotal": "{paid} of {total} EGP paid to the supplier"
+      "paidOfTotal": "{paid} of {total} EGP paid to the supplier",
+      "beforeOpening": "Dated before the stock count: it records the money, the supplier’s balance and the price, but no stock comes in — the count already includes these goods."
     },
     "newInvoice": {
       "title": "New purchase invoice",
@@ -1183,7 +1187,8 @@
       "hint": "Moves cash out of the till and clears what we owe them.",
       "recorded": "Payment recorded.",
       "owedTotal": "Owed in total: <num>{amount}</num> — a payment can’t exceed it.",
-      "memoPlaceholder": "e.g. against invoice INV-42"
+      "memoPlaceholder": "e.g. against invoice INV-42",
+      "dateHint": "Paid earlier? Pick the day it was paid — a payment from before the cash count doesn’t move the treasury."
     },
     "suppliers": {
       "description": "Everyone we buy stock from, and what we owe each of them.",
@@ -1329,6 +1334,14 @@
       "costsSoFar": "Costs so far",
       "lossNote": "Costs ran {amount} over sales",
       "afterCogs": "Sales less cost of goods"
+    },
+    "count": {
+      "button": "Count cash",
+      "title": "Count the treasury",
+      "hint": "Type what is really there now — cash and bank together. The difference from the books is recorded. Anything entered later with an earlier date won’t change the treasury again.",
+      "books": "The books say",
+      "counted": "Counted now",
+      "recorded": "Cash count recorded."
     }
   },
   "noon": {
@@ -1528,6 +1541,7 @@
     },
     "entryKind": {
       "OPENING_BALANCE": "Opening balance",
+      "CASH_COUNT": "Cash count",
       "CASH_DEPOSIT": "Cash deposit",
       "CHEQUE_DEPOSIT": "Cheque received",
       "CHEQUE_CLEAR": "Cheque cleared",
@@ -1754,7 +1768,8 @@
         "profit": "Profit"
       },
       "stockNow": "{count} in stock now",
-      "profitHintPosted": "Total minus the inventory cost when it was posted. <num>{margin}</num> of the total."
+      "profitHintPosted": "Total minus the inventory cost when it was posted. <num>{margin}</num> of the total.",
+      "beforeOpening": "Dated before the stock count: it records the money and the customer’s balance, but no stock goes out — the count was taken after these goods left."
     },
     "postedCount": "{count, plural, =0 {None posted yet} other {# posted}}",
     "post": {

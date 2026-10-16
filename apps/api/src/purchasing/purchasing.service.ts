@@ -5,6 +5,7 @@ import { ProductVariant } from '../catalog/product-variant.entity';
 import { LedgerEntry } from '../finance/ledger-entry.entity';
 import { LedgerService } from '../finance/ledger.service';
 import { StockMovement } from '../inventory/stock-movement.entity';
+import { beforeOpening, movedStock, stockOpenedOn } from '../inventory/stock-opening';
 import { allocateExtraCosts, allocateOldestFirst, lineTotalFor, movingAverage, round2, unitCostFor } from './costing';
 import {
   type CostAllocation,
@@ -224,8 +225,11 @@ export class PurchasingService {
     memo: string | undefined,
     userId: string,
     invoiceId?: string,
+    /** The day it was paid (YYYY-MM-DD); today when omitted. */
+    paidOn?: string,
   ) {
     if (!MONEY.test(amount)) throw new BadRequestException('amount must be like 1000.00');
+    if (paidOn && !ISO_DATE.test(paidOn)) throw new BadRequestException('paidOn must be YYYY-MM-DD');
     const value = round2(Number(amount));
     if (value <= 0) throw new BadRequestException(problem('payment.amount', 'enter an amount greater than zero'));
 
@@ -284,6 +288,7 @@ export class PurchasingService {
           debit: 'SUPPLIER_PAYABLE',
           credit: 'CASH',
           kind: 'SUPPLIER_PAYMENT',
+          occurredAt: paidOn ? new Date(`${paidOn}T00:00:00Z`) : undefined,
           memo: memo?.trim() || `Payment to ${supplier.name}`,
           supplierId,
           sourceType: invoiceId ? 'purchase_invoice' : 'supplier',
@@ -419,9 +424,14 @@ export class PurchasingService {
               (SELECT id FROM purchase_invoice WHERE replaces_id = $1 LIMIT 1) AS "replacedById"`,
       [id, invoice.voidedById],
     );
+    const opened = await stockOpenedOn(this.db, lines.map((l: { variantId: string }) => l.variantId));
     return {
       ...invoice,
       ...audit,
+      // A draft by its date; a posted invoice by what it actually did.
+      beforeOpening: invoice.status === 'DRAFT'
+        ? lines.some((l: { variantId: string }) => beforeOpening(opened, l.variantId, invoice.invoiceDate))
+        : lines.length > 0 && !(await movedStock(this.db, 'purchase_invoice', id)),
       blocked: { cancel: invoice.status === 'POSTED' ? (await this.cancelBlockers(this.db, invoice)).reasons : [] },
       payableTotal: payableTotalOf(invoice).toFixed(2),
       paidStatus: paidStatusOf(invoice),
@@ -572,9 +582,18 @@ export class PurchasingService {
         invoice.allocation,
       );
 
+      // Goods bought before the opening count are already inside it: their price
+      // still gives the product its cost, but no stock comes in.
+      const opened = await stockOpenedOn(tx, invoice.lines.map((l) => l.variantId));
+      const counted: string[] = [];
       for (const [i, line] of invoice.lines.entries()) {
         const landedLineTotal = round2(Number(line.lineTotal) + shares[i]);
         const landedUnitCost = landedLineTotal / line.quantity;
+        if (beforeOpening(opened, line.variantId, invoice.invoiceDate)) {
+          await tx.update(PurchaseInvoiceLine, { id: line.id }, { landedUnitCost: landedUnitCost.toFixed(4) });
+          counted.push(line.variantId);
+          continue;
+        }
 
         const [{ onHand, avg }] = await tx.query(
           `SELECT COALESCE(SUM(m.quantity), 0)::int AS "onHand", v.unit_cost AS avg
@@ -638,7 +657,28 @@ export class PurchasingService {
             : '0',
         },
       );
+      await this.openingCost(tx, counted);
       this.log.log(`purchase invoice ${id} posted: ${invoice.lines.length} lines, ${invoice.landedTotal}`);
+  }
+
+  /**
+   * Until a product's moving average starts (its first purchase after the
+   * opening count), its cost is the latest price paid before the count — the
+   * best guess at what the counted units cost. Re-read after every posting or
+   * cancellation of such a purchase, so cancelling one falls back to the one before.
+   */
+  private async openingCost(tx: EntityManager, variantIds: string[]) {
+    if (!variantIds.length) return;
+    await tx.query(
+      `UPDATE product_variant v SET unit_cost = (
+         SELECT l.landed_unit_cost FROM purchase_invoice_line l JOIN purchase_invoice i ON i.id = l.invoice_id
+         WHERE l.variant_id = v.id AND i.status = 'POSTED' AND NOT EXISTS (
+           SELECT 1 FROM stock_movement m WHERE m.source_type = 'purchase_invoice' AND m.source_id = i.id::text AND m.variant_id = v.id)
+         ORDER BY i.invoice_date DESC, i.posted_at DESC LIMIT 1)
+       WHERE v.id = ANY($1::uuid[])
+         AND NOT EXISTS (SELECT 1 FROM stock_movement m WHERE m.variant_id = v.id AND m.avg_cost_after IS NOT NULL)`,
+      [variantIds],
+    );
   }
 
   /**
@@ -724,6 +764,7 @@ export class PurchasingService {
       await tx.update(PurchaseInvoice, { id }, {
         status: 'VOID', voidedAt: new Date(), voidedById: userId, voidReason: reason.trim(), settledAmount: '0',
       });
+      await this.openingCost(tx, (await tx.findBy(PurchaseInvoiceLine, { invoiceId: id })).map((l) => l.variantId));
       this.log.log(`purchase invoice ${id} cancelled`);
       return { id, draftId: correct ? await this.reenter(tx, invoice, userId) : null };
     });

@@ -5,6 +5,7 @@ import { ProductVariant } from '../catalog/product-variant.entity';
 import { LedgerEntry } from '../finance/ledger-entry.entity';
 import { LedgerService } from '../finance/ledger.service';
 import { StockMovement } from '../inventory/stock-movement.entity';
+import { beforeOpening as isBeforeOpening, movedStock, stockOpenedOn } from '../inventory/stock-opening';
 import { isUniqueViolation } from '../database/unique-violation';
 import { lockStock } from '../inventory/stock-lock';
 import { problem, refuse, type Reason } from '../problem';
@@ -216,11 +217,16 @@ export class SalesService {
       : [];
     const blocked = {
       post: invoice.status === 'DRAFT' && lines.length
-        ? (await this.postBlockers(this.db, invoice.customerId, lines as Array<{ variantId: string; quantity: number }>)).reasons
+        ? (await this.postBlockers(this.db, invoice.customerId, lines as Array<{ variantId: string; quantity: number }>, invoice.invoiceDate)).reasons
         : [],
       void: invoice.status === 'POSTED' ? await this.voidBlockers(this.db, invoice) : [],
     };
-    return { ...invoice, voidedBy: voider?.name ?? null, lines, payments, blocked };
+    const opened = await stockOpenedOn(this.db, lines.map((l: { variantId: string }) => l.variantId));
+    // A draft by its date; a posted invoice by what it actually did.
+    const beforeOpening = invoice.status === 'DRAFT'
+      ? lines.some((l: { variantId: string }) => isBeforeOpening(opened, l.variantId, invoice.invoiceDate))
+      : lines.length > 0 && !(await movedStock(this.db, 'sales_invoice', id));
+    return { ...invoice, voidedBy: voider?.name ?? null, lines, payments, blocked, beforeOpening };
   }
 
   /** Creates a DRAFT invoice — nothing leaves stock or reaches the books until it is posted. */
@@ -298,7 +304,7 @@ export class SalesService {
       const lines = await tx.find(SalesInvoiceLine, { where: { invoiceId: id }, order: { id: 'ASC' } });
       if (!lines.length) throw new BadRequestException(problem('sales.noLines', 'add at least one product'));
       await lockStock(tx, lines.map((l) => l.variantId));
-      const { reasons, stock } = await this.postBlockers(tx, invoice.customerId, lines);
+      const { reasons, stock, opened } = await this.postBlockers(tx, invoice.customerId, lines, invoice.invoiceDate);
       if (reasons.length) refuse('sales.postBlocked', 'this invoice cannot be posted as it stands', reasons);
       const byId = new Map(stock.map((r) => [r.id, r]));
 
@@ -308,6 +314,8 @@ export class SalesService {
       for (const l of lines) {
         const cost = byId.get(l.variantId)!.cost;
         await tx.update(SalesInvoiceLine, { id: l.id }, { unitCost: cost });
+        // Sold before the opening count: the count already left it out.
+        if (isBeforeOpening(opened, l.variantId, invoice.invoiceDate)) continue;
         await tx.insert(StockMovement, {
           variantId: l.variantId, location: 'WAREHOUSE', quantity: -l.quantity, reason: 'SALE', unitCost: cost,
           sourceType: 'sales_invoice', sourceId: id, createdById: userId, occurredAt, note: number,
@@ -379,15 +387,22 @@ export class SalesService {
       if (invoice.status !== 'POSTED') throw new BadRequestException(problem('sales.notPosted', 'only a posted invoice can be voided'));
       const blocked = await this.voidBlockers(tx, invoice);
       if (blocked.length) refuse('sales.voidBlocked', 'reverse its payments before voiding this invoice', blocked);
-      const lines = await tx.find(SalesInvoiceLine, { where: { invoiceId: id } });
-      await lockStock(tx, lines.map((l) => l.variantId));
+      // Exactly what it took out — nothing for lines sold before the opening count.
+      const took: Array<{ variantId: string; quantity: number; unitCost: string | null }> = await tx.query(
+        `SELECT variant_id AS "variantId", -quantity AS quantity, unit_cost AS "unitCost" FROM stock_movement
+         WHERE source_type = 'sales_invoice' AND source_id = $1 AND reason = 'SALE'`,
+        [id],
+      );
+      await lockStock(tx, took.map((l) => l.variantId));
       // ponytail: returns at the cost it left with without re-averaging, like an
       // order cancellation; exact while no COGS is booked (sales-invoice-decisions).
-      await tx.insert(StockMovement, lines.map((l) => ({
-        variantId: l.variantId, location: 'WAREHOUSE' as const, quantity: l.quantity, reason: 'ADJUSTMENT' as const,
-        unitCost: l.unitCost, sourceType: 'sales_invoice', sourceId: id, createdById: userId,
-        note: `${invoice.invoiceNumber} voided — ${reason.trim()}`,
-      })));
+      if (took.length) {
+        await tx.insert(StockMovement, took.map((l) => ({
+          variantId: l.variantId, location: 'WAREHOUSE' as const, quantity: l.quantity, reason: 'ADJUSTMENT' as const,
+          unitCost: l.unitCost, sourceType: 'sales_invoice', sourceId: id, createdById: userId,
+          note: `${invoice.invoiceNumber} voided — ${reason.trim()}`,
+        })));
+      }
       const [revenue] = await tx.query(
         `SELECT id FROM ledger_entry WHERE source_type = 'sales_invoice' AND source_id = $1 AND kind = 'SALES_INVOICE'
            AND reverses_id IS NULL AND NOT EXISTS (SELECT 1 FROM ledger_entry r WHERE r.reverses_id = ledger_entry.id)`,
@@ -460,11 +475,17 @@ export class SalesService {
    * by `postInvoice` under its locks. `stock` carries each product's warehouse
    * count and cost for the posting itself.
    */
-  private async postBlockers(tx: DataSource | EntityManager, customerId: string, lines: Array<{ variantId: string; quantity: number }>) {
+  private async postBlockers(
+    tx: DataSource | EntityManager,
+    customerId: string,
+    lines: Array<{ variantId: string; quantity: number }>,
+    invoiceDate: string,
+  ) {
     const reasons: Reason[] = [];
     const wanted = new Map<string, number>();
     for (const l of lines) wanted.set(l.variantId, (wanted.get(l.variantId) ?? 0) + l.quantity);
     const ids = [...wanted.keys()];
+    const opened = await stockOpenedOn(tx, ids);
     const archived = await archivedProducts(tx as EntityManager, ids);
     if (archived.length) reasons.push({ code: 'invoice.productsGone', params: { count: archived.length }, blockers: archived });
     const customer = await tx.getRepository(Customer).findOneBy({ id: customerId });
@@ -483,7 +504,7 @@ export class SalesService {
     );
     for (const s of stock) {
       const quantity = wanted.get(s.id)!;
-      if (quantity > s.onHand) {
+      if (quantity > s.onHand && !isBeforeOpening(opened, s.id, invoiceDate)) {
         reasons.push({
           code: 'sales.stockShort',
           params: { name: s.name, onHand: s.onHand, requested: quantity },
@@ -491,7 +512,7 @@ export class SalesService {
         });
       }
     }
-    return { reasons, stock };
+    return { reasons, stock, opened };
   }
 
   /** A posted invoice is voided only while nothing is collected on it: the payments to reverse first, each linked. */
