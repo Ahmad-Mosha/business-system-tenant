@@ -5,7 +5,7 @@ import { ProductVariant } from '../catalog/product-variant.entity';
 import { LedgerEntry } from '../finance/ledger-entry.entity';
 import { LedgerService } from '../finance/ledger.service';
 import { StockMovement } from '../inventory/stock-movement.entity';
-import { beforeOpening, stockOpenedOn } from '../inventory/stock-opening';
+import { beforeOpening, movedStock, stockOpenedOn } from '../inventory/stock-opening';
 import { allocateExtraCosts, allocateOldestFirst, lineTotalFor, movingAverage, round2, unitCostFor } from './costing';
 import {
   type CostAllocation,
@@ -428,7 +428,10 @@ export class PurchasingService {
     return {
       ...invoice,
       ...audit,
-      beforeOpening: lines.some((l: { variantId: string }) => beforeOpening(opened, l.variantId, invoice.invoiceDate)),
+      // A draft by its date; a posted invoice by what it actually did.
+      beforeOpening: invoice.status === 'DRAFT'
+        ? lines.some((l: { variantId: string }) => beforeOpening(opened, l.variantId, invoice.invoiceDate))
+        : lines.length > 0 && !(await movedStock(this.db, 'purchase_invoice', id)),
       blocked: { cancel: invoice.status === 'POSTED' ? (await this.cancelBlockers(this.db, invoice)).reasons : [] },
       payableTotal: payableTotalOf(invoice).toFixed(2),
       paidStatus: paidStatusOf(invoice),

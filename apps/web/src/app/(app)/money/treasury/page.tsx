@@ -144,12 +144,19 @@ export default async function TreasuryPage({ searchParams }: { searchParams: Pro
                         </TableCell>
                         <TableCell className="hidden md:table-cell">
                           <span className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-                            {effect > 0 ? t('from') : t('to')}
-                            <AccountChip
-                              name={nameOf(other, effect > 0 ? m.creditAr : m.debitAr)}
-                              title={nameOf(other, '')}
-                              href={`/money/ledger?code=${other}`}
-                            />
+                            {/* A count's other side is bookkeeping; the count itself is the story. */}
+                            {m.kind === 'CASH_COUNT' ? (
+                              <AccountChip name={tr('enums.entryKind.CASH_COUNT')} />
+                            ) : (
+                              <>
+                                {effect > 0 ? t('from') : t('to')}
+                                <AccountChip
+                                  name={nameOf(other, effect > 0 ? m.creditAr : m.debitAr)}
+                                  title={nameOf(other, '')}
+                                  href={`/money/ledger?code=${other}`}
+                                />
+                              </>
+                            )}
                           </span>
                         </TableCell>
                         <TableCell className="text-end">
