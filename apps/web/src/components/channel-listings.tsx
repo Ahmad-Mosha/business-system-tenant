@@ -1,10 +1,11 @@
 'use client';
 
-import { Check, Link2, Plus, Unlink, X } from 'lucide-react';
+import { ArrowRightLeft, Check, Link2, Plus, Unlink, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
-import { addListing, removeListing, updateListing } from '@/app/(app)/inventory/actions';
+import { addListing, moveListing, removeListing, updateListing } from '@/app/(app)/inventory/actions';
+import { PickProductDialog } from '@/components/pick-product-dialog';
 import { ToneBadge } from '@/components/tone-badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,7 +41,7 @@ export function ChannelListings({ product }: { product: ProductDetail }) {
   return (
     <div className="mt-1 border-t">
       {LISTING_CHANNELS.map((c) => (
-        <ChannelSection key={c} productId={product.id} channel={c} listings={byChannel.get(c) ?? []} />
+        <ChannelSection key={c} productId={product.id} variantIds={product.variants.map((v) => v.id)} channel={c} listings={byChannel.get(c) ?? []} />
       ))}
       <p className="px-4 py-3 text-xs text-muted-foreground">{t('socialNote')}</p>
     </div>
@@ -55,9 +56,11 @@ export function ChannelListings({ product }: { product: ProductDetail }) {
  */
 function ChannelSection({
   productId,
+  variantIds,
   channel,
   listings,
 }: {
+  variantIds: string[];
   productId: string;
   channel: Channel;
   listings: Listing[];
@@ -86,7 +89,7 @@ function ChannelSection({
       </div>
       <div className="mt-2 grid gap-2">
         {listings.map((l) => (
-          <ChannelRow key={l.id} productId={productId} channel={channel} listing={l} />
+          <ChannelRow key={l.id} productId={productId} variantIds={variantIds} channel={channel} listing={l} />
         ))}
         {drafts.map((id) => (
           <ChannelRow
@@ -110,12 +113,15 @@ function ChannelSection({
 
 function ChannelRow({
   productId,
+  variantIds = [],
   channel,
   listing,
   onSaved,
   onDiscard,
 }: {
   productId: string;
+  /** This product's variants — never a target for moving its listing. */
+  variantIds?: string[];
   channel: Channel;
   listing: Listing | null;
   /** Called once after a brand-new (draft) listing saves successfully. */
@@ -183,6 +189,24 @@ function ChannelRow({
         {pending ? <Spinner /> : linked ? <Check /> : <Link2 />}
         {linked ? tr('common.save') : t('listings.link')}
       </Button>
+      {listing ? (
+        <PickProductDialog
+          trigger={
+            <Button variant="outline" size="icon" disabled={pending} aria-label={t('listings.move', { channel: name })} title={t('listings.move', { channel: name })}>
+              <ArrowRightLeft />
+            </Button>
+          }
+          title={t('listings.moveTitle', { channel: name })}
+          description={t('listings.moveDescription')}
+          confirmLabel={t('listings.moveConfirm')}
+          exclude={variantIds}
+          onConfirm={async (target) => {
+            const r = await moveListing(productId, listing.id, target.id);
+            if (r.ok) toast.success(t('listings.moved', { name: r.data.name }));
+            return r;
+          }}
+        />
+      ) : null}
       {linked ? (
         <Tooltip>
           <TooltipTrigger asChild>

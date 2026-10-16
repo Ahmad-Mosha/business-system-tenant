@@ -145,6 +145,41 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     const again = await noon.import(`settlement-${tag}.csv`, Buffer.from(csv));
     assert.equal(again.alreadyImported, true, 'the same file twice moves nothing twice');
   });
+  await t.test('the owners can fix the catalogue by hand: count, move a listing, merge a duplicate', async () => {
+    const catalog = new CatalogService(db, finance);
+    const tag = randomUUID().slice(0, 8);
+    const make = (name: string, noon: number, shelf: number, sku: string) => importLinkedCatalog(db, [{
+      name: `${name} ${tag}`, category: null, sellingPrice: null, noonStock: noon, warehouseStock: shelf,
+      listings: [{ channel: 'amazon', externalId: `${sku}-${tag}`, partnerSku: null, title: name, price: '10.00' }],
+    }], { actorId: null, apply: true });
+    await make('Keeper', 1, 4, 'K');
+    await make('Duplicate', 2, 3, 'D');
+    const variantOf = async (name: string) =>
+      (await db.query('SELECT v.id, v.product_id AS "productId" FROM product_variant v JOIN product p ON p.id = v.product_id WHERE p.name = $1', [`${name} ${tag}`]))[0];
+    const keeper = await variantOf('Keeper');
+    const dup = await variantOf('Duplicate');
+    const at = async (variantId: string) => Object.fromEntries((await db.query(
+      'SELECT location, SUM(quantity)::int AS n FROM stock_movement WHERE variant_id = $1 GROUP BY location', [variantId])).map((r: { location: string; n: number }) => [r.location, r.n]));
+
+    const counted = await catalog.countStock(keeper.id, 'WAREHOUSE', 9, user.id);
+    assert.deepEqual([counted.before, counted.change], [4, 5]);
+    assert.equal((await catalog.countStock(keeper.id, 'WAREHOUSE', 9, user.id)).change, 0, 'the same count twice records nothing');
+
+    const [listing] = await db.query('SELECT id FROM channel_listing WHERE variant_id = $1', [dup.id]);
+    await catalog.moveListing(listing.id, keeper.id);
+    assert.equal(await OrdersService.resolveVariant(db.manager, 'amazon', `D-${tag}`), keeper.id, 'its orders now reach the other product');
+    await catalog.moveListing(listing.id, dup.id);
+
+    await catalog.mergeProduct(dup.productId, keeper.id);
+    assert.deepEqual(await at(keeper.id), { NOON: 3, WAREHOUSE: 12 }, 'counts and history come along');
+    assert.equal((await db.query('SELECT count(*)::int AS n FROM channel_listing WHERE variant_id = $1', [keeper.id]))[0].n, 2);
+    assert.equal((await db.query('SELECT count(*)::int AS n FROM product WHERE id = $1', [dup.productId]))[0].n, 0, 'the duplicate is gone');
+
+    const traded = await stock(3);
+    await orders.create(actor, input(traded));
+    const [{ productId: tradedProduct }] = await db.query('SELECT product_id AS "productId" FROM product_variant WHERE id = $1', [traded]);
+    await assert.rejects(catalog.mergeProduct(tradedProduct, keeper.id), refusedWith('product.usedInOrders'), 'a product on an order keeps its history');
+  });
   await t.test('status tabs count the filtered orders, and a tab can hold several statuses', async () => {
     const variantId = await stock(2);
     const customerName = `Tabs ${randomUUID()}`;
