@@ -47,7 +47,7 @@ export async function signIn(_previous: LoginState, formData: FormData): Promise
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
-    maxAge: 12 * 60 * 60,
+    maxAge: 30 * 24 * 60 * 60, // thirty days — matches the token's own expiry
     path: '/',
   });
 

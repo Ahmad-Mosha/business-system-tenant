@@ -47,7 +47,8 @@ import { SalesService } from './sales/sales.service';
           NODE_ENV: config.get<string>('NODE_ENV'),
           JWT_SECRET: config.get<string>('JWT_SECRET'),
         }),
-        signOptions: { expiresIn: '12h' },
+        // Thirty days: people stay signed in through normal use; signing out ends it at once.
+        signOptions: { expiresIn: '30d' },
       }),
     }),
     TypeOrmModule.forRoot({
