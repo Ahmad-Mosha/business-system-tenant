@@ -6,6 +6,8 @@ import { test } from 'node:test';
 import { DataSource } from 'typeorm';
 import { ormOptions } from './orm-options';
 import { checkMigrations } from './migration-guard';
+import { NoonImportService } from '../noon/noon-import.service';
+import { importLinkedCatalog, validateLinkedCatalog, type LinkedProduct } from '../catalog/linked-catalog-import';
 import { LedgerService } from '../finance/ledger.service';
 import { FinanceService } from '../finance/finance.service';
 import { OrdersService } from '../orders/orders.service';
@@ -90,6 +92,93 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     await assert.rejects(
       db.query('UPDATE customer_order SET order_number = $1 WHERE id = $2', [first.orderNumber, second.id]),
     );
+  });
+  await t.test('a linked catalogue imports one product per item with every channel listing, once', async () => {
+    const tag = randomUUID().slice(0, 8);
+    const file: LinkedProduct[] = [{
+      name: `Picnic mat ${tag}`, category: 'HOME', sellingPrice: '900.00', noonStock: 7, warehouseStock: 30,
+      listings: [
+        { channel: 'noon', externalId: `Z${tag}-1`, partnerSku: `PSKU_${tag}`, title: 'Foldable picnic mat', price: '429.00' },
+        { channel: 'amazon', externalId: `AMZ-${tag}`, partnerSku: null, title: 'AYBUY Picnic Blanket', price: '449.00' },
+        { channel: 'easyorders', externalId: randomUUID(), partnerSku: `MAT-${tag}`, title: 'مفرش رحلات', price: '900.00' },
+      ],
+    }];
+    assert.deepEqual(validateLinkedCatalog([...file, file[0]]).length > 0, true, 'the same listing twice is refused');
+    const dry = await importLinkedCatalog(db, file, { actorId: null, apply: false });
+    assert.equal(dry.created, 1);
+    assert.equal((await db.query('SELECT count(*)::int AS n FROM product WHERE name = $1', [file[0].name]))[0].n, 0, 'a dry run writes nothing');
+
+    const done = await importLinkedCatalog(db, file, { actorId: null, apply: true });
+    assert.deepEqual([done.created, done.listings, done.failed.length], [1, 3, 0]);
+    const [variant] = await db.query(
+      `SELECT v.id, v.sku FROM product_variant v JOIN product p ON p.id = v.product_id WHERE p.name = $1`, [file[0].name]);
+    assert.equal(variant.sku, null, 'no SKU of our own');
+    const stock = await db.query(
+      `SELECT location, SUM(quantity)::int AS n FROM stock_movement WHERE variant_id = $1 GROUP BY location ORDER BY location`, [variant.id]);
+    assert.deepEqual(stock, [{ location: 'NOON', n: 7 }, { location: 'WAREHOUSE', n: 30 }]);
+    assert.equal(await OrdersService.resolveVariant(db.manager, 'amazon', `AMZ-${tag}`), variant.id);
+    // A website order for one of its colours finds the product linked as a whole.
+    assert.equal(await OrdersService.resolveVariant(db.manager, 'easyorders', file[0].listings[2].externalId, randomUUID()), variant.id);
+
+    const again = await importLinkedCatalog(db, file, { actorId: null, apply: true });
+    assert.deepEqual([again.created, again.skipped.length], [0, 1], 're-running the same file creates nothing twice');
+  });
+  await t.test('a noon settlement moves stock only for orders after the opening count, from noon first', async () => {
+    const tag = randomUUID().slice(0, 8);
+    const psku = `PSKU_TEST_${tag}_X`;
+    await importLinkedCatalog(db, [{
+      name: `Settled ${tag}`, category: null, sellingPrice: '100.00', noonStock: 2, warehouseStock: 5,
+      listings: [{ channel: 'noon', externalId: `Z${tag}Z-1`, partnerSku: psku, title: 'Settled item', price: '100.00' }],
+    }], { actorId: null, apply: true, stockAsOf: new Date('2026-10-12T12:23:00+03:00') });
+    const [{ id: variantId }] = await db.query(
+      `SELECT v.id FROM product_variant v JOIN product p ON p.id = v.product_id WHERE p.name = $1`, [`Settled ${tag}`]);
+    const header = 'Contract,Contract Title,Reference Nr,Order Nr,Item Nr,Order Date,Transaction Date,Title,SKUs,Partner SKUs,Transaction Type,Currency,Net Proceeds,Referral Fee including VAT,Fullfilment & Logistics Fees including VAT,Shipping Credits including VAT,Other Order Fees including VAT,Order Subsidies including VAT,Non-Order Fees including VAT,Non-Order Subsidies including VAT,Others including VAT,Total';
+    const row = (n: number, ordered: string) =>
+      `C1,Noon EG,PS-${tag},N${tag}${n},N${tag}${n}-1,${ordered},2026-10-20,Settled item,Z${tag}Z-1,${psku},order,EGP,100,-10,0,0,0,0,0,0,0,90`;
+    const csv = [header, row(1, '2026-10-05'), row(2, '2026-10-13'), row(3, '2026-10-14'), row(4, '2026-10-15')].join('\n');
+    const noon = new NoonImportService(db, finance);
+    const result = await noon.import(`settlement-${tag}.csv`, Buffer.from(csv));
+    assert.deepEqual([result.rowsInserted, result.unmappedListings, result.stockMoved, result.stockBeforeOpening], [4, 0, 3, 1]);
+    const stock = await db.query(
+      `SELECT location, SUM(quantity)::int AS n FROM stock_movement WHERE variant_id = $1 GROUP BY location ORDER BY location`, [variantId]);
+    assert.deepEqual(stock, [{ location: 'NOON', n: 0 }, { location: 'WAREHOUSE', n: 4 }], 'two from noon, then one from the warehouse; the 5 Oct order left alone');
+    const again = await noon.import(`settlement-${tag}.csv`, Buffer.from(csv));
+    assert.equal(again.alreadyImported, true, 'the same file twice moves nothing twice');
+  });
+  await t.test('the owners can fix the catalogue by hand: count, move a listing, merge a duplicate', async () => {
+    const catalog = new CatalogService(db, finance);
+    const tag = randomUUID().slice(0, 8);
+    const make = (name: string, noon: number, shelf: number, sku: string) => importLinkedCatalog(db, [{
+      name: `${name} ${tag}`, category: null, sellingPrice: null, noonStock: noon, warehouseStock: shelf,
+      listings: [{ channel: 'amazon', externalId: `${sku}-${tag}`, partnerSku: null, title: name, price: '10.00' }],
+    }], { actorId: null, apply: true });
+    await make('Keeper', 1, 4, 'K');
+    await make('Duplicate', 2, 3, 'D');
+    const variantOf = async (name: string) =>
+      (await db.query('SELECT v.id, v.product_id AS "productId" FROM product_variant v JOIN product p ON p.id = v.product_id WHERE p.name = $1', [`${name} ${tag}`]))[0];
+    const keeper = await variantOf('Keeper');
+    const dup = await variantOf('Duplicate');
+    const at = async (variantId: string) => Object.fromEntries((await db.query(
+      'SELECT location, SUM(quantity)::int AS n FROM stock_movement WHERE variant_id = $1 GROUP BY location', [variantId])).map((r: { location: string; n: number }) => [r.location, r.n]));
+
+    const counted = await catalog.countStock(keeper.id, 'WAREHOUSE', 9, user.id);
+    assert.deepEqual([counted.before, counted.change], [4, 5]);
+    assert.equal((await catalog.countStock(keeper.id, 'WAREHOUSE', 9, user.id)).change, 0, 'the same count twice records nothing');
+
+    const [listing] = await db.query('SELECT id FROM channel_listing WHERE variant_id = $1', [dup.id]);
+    await catalog.moveListing(listing.id, keeper.id);
+    assert.equal(await OrdersService.resolveVariant(db.manager, 'amazon', `D-${tag}`), keeper.id, 'its orders now reach the other product');
+    await catalog.moveListing(listing.id, dup.id);
+
+    await catalog.mergeProduct(dup.productId, keeper.id);
+    assert.deepEqual(await at(keeper.id), { NOON: 3, WAREHOUSE: 12 }, 'counts and history come along');
+    assert.equal((await db.query('SELECT count(*)::int AS n FROM channel_listing WHERE variant_id = $1', [keeper.id]))[0].n, 2);
+    assert.equal((await db.query('SELECT count(*)::int AS n FROM product WHERE id = $1', [dup.productId]))[0].n, 0, 'the duplicate is gone');
+
+    const traded = await stock(3);
+    await orders.create(actor, input(traded));
+    const [{ productId: tradedProduct }] = await db.query('SELECT product_id AS "productId" FROM product_variant WHERE id = $1', [traded]);
+    await assert.rejects(catalog.mergeProduct(tradedProduct, keeper.id), refusedWith('product.usedInOrders'), 'a product on an order keeps its history');
   });
   await t.test('status tabs count the filtered orders, and a tab can hold several statuses', async () => {
     const variantId = await stock(2);

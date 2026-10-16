@@ -51,7 +51,9 @@ export interface MigrationState {
 export async function checkMigrations(db: DataSource, acceptEdits = false): Promise<MigrationState> {
   await db.query(`CREATE TABLE IF NOT EXISTS migration_fingerprint (
     name text PRIMARY KEY, fingerprint text NOT NULL, recorded_at timestamptz NOT NULL DEFAULT now())`);
-  const ran: Array<{ name: string }> = await db.query('SELECT name FROM migrations');
+  // A brand-new database has no migrations table until the first run creates it.
+  const [{ exists }] = await db.query(`SELECT to_regclass('migrations') IS NOT NULL AS exists`);
+  const ran: Array<{ name: string }> = exists ? await db.query('SELECT name FROM migrations') : [];
   const stored = new Map<string, string>(
     (await db.query('SELECT name, fingerprint FROM migration_fingerprint')).map((r: { name: string; fingerprint: string }) => [r.name, r.fingerprint]),
   );

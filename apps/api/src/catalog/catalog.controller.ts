@@ -19,6 +19,8 @@ import { PRODUCT_CATEGORIES, type ProductCategory } from './product.entity';
 import { CatalogService, type CreateProductInput } from './catalog.service';
 import { problem } from '../problem';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const REASONS: StockReason[] = ['RETURN', 'ADJUSTMENT', 'DAMAGE', 'COUNT'];
 
 /**
@@ -181,6 +183,27 @@ export class CatalogController {
       throw new BadRequestException(`reason must be one of: ${REASONS.join(', ')}`);
     }
     return this.catalog.recordStock(id, Number(body.quantity), body.reason, req.user!.id, body.note, body.location);
+  }
+
+  @Roles('ADMIN')
+  @Post('variants/:id/count')
+  countStock(@Req() req: Request, @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { location: StockLocation; counted: number; note?: string }) {
+    return this.catalog.countStock(id, body?.location, Number(body?.counted), req.user!.id, body?.note);
+  }
+
+  @Roles('ADMIN')
+  @Post('listings/:id/move')
+  moveListing(@Param('id', ParseUUIDPipe) id: string, @Body() body: { variantId?: string }) {
+    if (!body?.variantId || !UUID_RE.test(body.variantId)) throw new BadRequestException(problem('listing.moveTarget', 'choose an active product to move it to'));
+    return this.catalog.moveListing(id, body.variantId);
+  }
+
+  @Roles('ADMIN')
+  @Post('products/:id/merge')
+  mergeProduct(@Param('id', ParseUUIDPipe) id: string, @Body() body: { intoVariantId?: string }) {
+    if (!body?.intoVariantId || !UUID_RE.test(body.intoVariantId)) throw new BadRequestException(problem('product.mergeTarget', 'choose an active product to merge into'));
+    return this.catalog.mergeProduct(id, body.intoVariantId);
   }
 
   @Roles('ADMIN')

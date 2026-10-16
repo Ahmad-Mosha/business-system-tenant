@@ -113,7 +113,7 @@ export class CatalogService {
       whereClauses.push(`(p.name ILIKE ${term}
         OR EXISTS (SELECT 1 FROM product_variant sv WHERE sv.product_id = p.id AND sv.sku ILIKE ${term})
         OR EXISTS (SELECT 1 FROM channel_listing sl JOIN product_variant lv ON lv.id = sl.variant_id
-                   WHERE lv.product_id = p.id AND sl.external_id ILIKE ${term}))`);
+                   WHERE lv.product_id = p.id AND (sl.external_id ILIKE ${term} OR sl.partner_sku ILIKE ${term})))`);
     }
     if (f.category) {
       whereClauses.push(
@@ -778,6 +778,102 @@ export class CatalogService {
   }
 
   /** A transfer is a conserved pair, in one transaction and one audit group. */
+  /**
+   * Sets a location to what was actually counted. The difference is recorded
+   * as a COUNT movement ("counted 12, was 15"), so nobody does the subtraction
+   * and the history still says what changed. Counting the same figure twice
+   * records nothing.
+   */
+  async countStock(variantId: string, location: StockLocation, counted: number, userId: string, note?: string) {
+    if (!STOCK_LOCATIONS.includes(location)) throw new BadRequestException('unknown stock location');
+    if (!Number.isInteger(counted) || counted < 0) {
+      throw new BadRequestException(problem('stock.counted', 'enter the counted quantity as a whole number of 0 or more'));
+    }
+    return this.db.transaction(async (tx) => {
+      const variant = await tx.findOne(ProductVariant, { where: { id: variantId }, lock: { mode: 'pessimistic_write' } });
+      if (!variant) throw new NotFoundException(problem('notFound', 'variant not found'));
+      if (!variant.active) throw new BadRequestException(problem('product.archived', 'this product is archived'));
+      const [{ onHand }] = await tx.query(
+        'SELECT COALESCE(SUM(quantity), 0)::int AS "onHand" FROM stock_movement WHERE variant_id = $1 AND location = $2',
+        [variantId, location],
+      );
+      const change = counted - onHand;
+      if (change !== 0) {
+        await this.addMovement(tx, variantId, change, 'COUNT', userId,
+          note?.trim() || `counted ${counted}, was ${onHand}`, variant.unitCost, location);
+      }
+      return { location, before: onHand, counted, change };
+    });
+  }
+
+  /**
+   * Moves one channel listing to another product — the fix for a SKU linked
+   * to the wrong item. Its future sales follow it; stock already counted stays
+   * where it is.
+   */
+  async moveListing(listingId: string, toVariantId: string) {
+    return this.db.transaction(async (tx) => {
+      const listing = await tx.findOne(ChannelListing, { where: { id: listingId }, lock: { mode: 'pessimistic_write' } });
+      if (!listing) throw new NotFoundException(problem('notFound', 'listing not found'));
+      const [target] = await tx.query(
+        `SELECT v.id, v.product_id AS "productId", p.name FROM product_variant v JOIN product p ON p.id = v.product_id
+         WHERE v.id = $1 AND v.active AND p.active`,
+        [toVariantId],
+      );
+      if (!target) throw new BadRequestException(problem('listing.moveTarget', 'choose an active product to move it to'));
+      if (target.id === listing.variantId) {
+        throw new BadRequestException(problem('listing.moveSame', 'this listing is already on that product'));
+      }
+      await tx.update(ChannelListing, { id: listingId }, { variantId: target.id });
+      return { productId: target.productId as string, name: target.name as string };
+    });
+  }
+
+  /**
+   * Merges a duplicate into another product: its listings and every stock
+   * movement move over (so the counts add up and the history comes along),
+   * then the duplicate is removed. Only a product never traded can be merged
+   * — nothing on an order or invoice points at it; a traded one is refused
+   * with the records in the way, and its listings can still be moved one by
+   * one.
+   */
+  async mergeProduct(productId: string, intoVariantId: string) {
+    return this.db.transaction(async (tx) => {
+      const variants = await tx.find(ProductVariant, { where: { productId } });
+      if (!variants.length) throw new NotFoundException(problem('notFound', 'product not found'));
+      const [target] = await tx.query(
+        `SELECT v.id, v.product_id AS "productId", v.unit_cost AS "unitCost", v.selling_price AS "sellingPrice", p.name
+         FROM product_variant v JOIN product p ON p.id = v.product_id
+         WHERE v.id = $1 AND v.active AND p.active`,
+        [intoVariantId],
+      );
+      if (!target) throw new BadRequestException(problem('product.mergeTarget', 'choose an active product to merge into'));
+      if (target.productId === productId) {
+        throw new BadRequestException(problem('product.mergeSelf', 'a product cannot be merged into itself'));
+      }
+      if (variants.length !== 1) {
+        throw new BadRequestException(problem('product.mergeVariants', 'a product with several variants cannot be merged — move its listings instead'));
+      }
+      const [source] = variants;
+      await lockStock(tx, [source.id, target.id]);
+      // Its channel links are what's being merged, so they don't stand in the way.
+      const blocked = (await productBlockers(tx, productId)).delete.filter((r) => r.code !== 'product.usedInChannels');
+      if (blocked.length) refuse('product.mergeBlocked', 'this product has trading history — move its listings instead', blocked);
+
+      await tx.query('UPDATE channel_listing SET variant_id = $2 WHERE variant_id = $1', [source.id, target.id]);
+      const moved = await tx.query('UPDATE stock_movement SET variant_id = $2 WHERE variant_id = $1', [source.id, target.id]);
+      // Fill in what the target is missing; never overwrite what it has.
+      if (target.unitCost === null && source.unitCost !== null) {
+        await tx.update(ProductVariant, { id: target.id }, { unitCost: source.unitCost });
+      }
+      if (target.sellingPrice === null && source.sellingPrice !== null) {
+        await tx.update(ProductVariant, { id: target.id }, { sellingPrice: source.sellingPrice });
+      }
+      await tx.delete(Product, { id: productId }); // its variant cascades
+      return { productId: target.productId as string, name: target.name as string, movements: moved[1] as number };
+    });
+  }
+
   async transferStock(variantId: string, quantity: number, from: StockLocation, to: StockLocation, userId: string, note?: string) {
     if (!Number.isInteger(quantity) || quantity <= 0 || !STOCK_LOCATIONS.includes(from) || !STOCK_LOCATIONS.includes(to) || from === to) {
       throw new BadRequestException(problem('stock.transfer', 'choose different locations and a positive whole quantity'));

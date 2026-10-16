@@ -1,11 +1,12 @@
 'use client';
 
-import { Archive, ArchiveRestore, Check, Pencil, Trash2, X } from 'lucide-react';
+import { Archive, ArchiveRestore, Check, Merge, Pencil, Trash2, X } from 'lucide-react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
-import { archiveProduct, deleteProduct, restoreProduct, updateProduct } from '@/app/(app)/inventory/actions';
+import { archiveProduct, deleteProduct, mergeProduct, restoreProduct, updateProduct } from '@/app/(app)/inventory/actions';
+import { PickProductDialog } from '@/components/pick-product-dialog';
 import { blockedBy } from '@/lib/problem';
 import { ConfirmAction } from '@/components/confirm-action';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -178,6 +179,19 @@ export function ProductScreen({
                 action={() => archiveProduct(product.id)}
                 blocked={blockedBy('product.archiveBlocked', product.blocked?.archive)}
                 blockedTitle={<bdi>{product.name}</bdi>}
+              />
+              <PickProductDialog
+                trigger={
+                  <Button variant="outline">
+                    <Merge />
+                    {t('merge.action')}
+                  </Button>
+                }
+                title={t.rich('merge.title', { name: product.name, bdi })}
+                description={t('merge.description')}
+                confirmLabel={t('merge.confirm')}
+                exclude={product.variants.map((v) => v.id)}
+                onConfirm={(target) => mergeProduct(product.id, target.id)}
               />
               {deleteButton}
             </>
