@@ -14,6 +14,7 @@ import { PurchasingService } from '../purchasing/purchasing.service';
 import { CatalogService } from '../catalog/catalog.service';
 import { CatalogController } from '../catalog/catalog.controller';
 import { SalesService } from '../sales/sales.service';
+import { PerformanceService } from '../reporting/performance.service';
 import type { Request } from 'express';
 import { Product } from '../catalog/product.entity';
 import { ProductVariant } from '../catalog/product-variant.entity';
@@ -89,6 +90,31 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     await assert.rejects(
       db.query('UPDATE customer_order SET order_number = $1 WHERE id = $2', [first.orderNumber, second.id]),
     );
+  });
+  await t.test('status tabs count the filtered orders, and a tab can hold several statuses', async () => {
+    const variantId = await stock(2);
+    const customerName = `Tabs ${randomUUID()}`;
+    const first = await orders.create(actor, { ...input(variantId), customerName });
+    await orders.create(actor, { ...input(variantId), customerName });
+    await orders.updateStatus(actor, first.id, 'CONFIRMED');
+    const summary = await orders.summary(actor, { search: customerName, status: ['NEW'] });
+    assert.equal(summary.total, 2, 'a tab never narrows its own counts');
+    assert.equal(summary.byStatus.NEW, 1);
+    assert.equal(summary.byStatus.CONFIRMED, 1);
+    const page = await orders.list(actor, { search: customerName, status: ['NEW', 'CONFIRMED'] });
+    assert.equal(page.total, 2);
+    assert.equal((await orders.list(actor, { search: customerName, paymentStatus: 'PAID' })).total, 0);
+  });
+  await t.test('a returning customer is found by phone, however the number is written', async () => {
+    const variantId = await stock(2);
+    const phone = `010${String(Date.now()).slice(-8)}`;
+    await orders.create(actor, { ...input(variantId), customerName: 'Returning one', customerPhone: phone, address: 'First street' });
+    await orders.create(actor, { ...input(variantId), customerName: 'Returning two', customerPhone: `+2${phone}`, address: 'Second street' });
+    const found = await orders.customerByPhone(actor, `2${phone}`);
+    assert.equal(found?.name, 'Returning two', 'the latest order wins');
+    assert.equal(found?.address, 'Second street');
+    assert.equal(found?.orders, 2);
+    assert.equal(await orders.customerByPhone(actor, '0100'), null);
   });
   await t.test('empty later pages retain their filtered totals', async () => {
     const variantId = await stock(1);
@@ -520,6 +546,8 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     assert.equal(inv.payableTotal, '30.00');
     assert.equal(inv.settledAmount, '0.00');
     assert.equal(inv.paidStatus, 'UNPAID');
+    const listed = (await purchasing.listSuppliers()).find((s) => s.id === supplier.id)!;
+    assert.deepEqual([listed.bought, listed.invoiceCount, listed.lastInvoiceAt], ['30.00', 1, '2026-09-16'], 'the separately paid cost was never billed by them');
     await purchasing.recordSupplierPayment(supplier.id, '10.00', undefined, user.id, inv.id);
     const partiallyPaid = await purchasing.getInvoice(inv.id);
     assert.equal(partiallyPaid.settledAmount, '10.00');
@@ -740,6 +768,27 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     await sales.deleteDraft(draft.id);
     await catalog.deleteProduct(created.id, user.id);
   });
+  await t.test('profit and loss adds up: sales less cost of goods less expenses, per period and per month', async () => {
+    const sales = new SalesService(db, ledger);
+    const expenses = new ExpensesService(db, ledger);
+    const performance = new PerformanceService(db);
+    const day = '2031-05-10'; // a day nothing else in the suite touches
+    const before = await performance.report(day, day, 'month');
+    const variant = await stock(4);
+    const customer = await sales.createCustomer({ name: `P&L ${randomUUID()}` });
+    const draft = await sales.createDraft({ customerId: customer.id, invoiceDate: day, lines: [{ variantId: variant, quantity: 3, unitPrice: '50' }] }, user.id);
+    await sales.postInvoice(draft.id, '0', user.id);
+    await expenses.create({ category: 'P&L test', amount: '30.00', spentOn: day, requestId: randomUUID() }, user.id);
+
+    const after = await performance.report(day, day, 'month');
+    const delta = (k: 'revenue' | 'cogs' | 'expenses' | 'netProfit') => Number(after[k]) - Number(before[k]);
+    assert.deepEqual([delta('revenue'), delta('cogs'), delta('expenses'), delta('netProfit')], [150, 30, 30, 90]); // 3 × 50, 3 × 10 cost
+    const wholesale = after.channels.find((c) => c.key === 'wholesale')!;
+    assert.equal(wholesale.cogsBasis, 'actual');
+    assert.equal(after.series.length, 1);
+    assert.equal(after.series[0].period, '2031-05-01');
+    assert.equal(Number(after.series[0].netProfit) - Number(before.series[0].netProfit), 90, 'the month agrees with the period');
+  });
   await t.test('posting a sales invoice moves stock and books revenue once; void undoes it exactly', async () => {
     const sales = new SalesService(db, ledger);
     const a = await stock(5);
@@ -769,6 +818,8 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     assert.equal(posted.lines[0].unitCost, '10.0000'); // cost frozen on the line
     assert.equal(await balance(a), 2);
     assert.equal(await owed(), '100.00');
+    const listed = (await sales.listCustomers()).find((c) => c.id === customer.id)!;
+    assert.deepEqual([listed.balance, listed.sold, listed.invoiceCount, listed.lastInvoiceAt], ['100.00', '140.00', 1, '2026-10-13']);
     assert.deepEqual((await entries(inv.id)).map((e: { debit: string; credit: string; amount: string }) => `${e.debit}>${e.credit} ${e.amount}`),
       ['CUSTOMER_RECEIVABLE>SALES 140.00', 'CASH>CUSTOMER_RECEIVABLE 40.00']);
     await assert.rejects(sales.updateDraft(inv.id, { customerId: customer.id, invoiceDate: '2026-10-13', lines: [{ variantId: a, quantity: 1, unitPrice: '1' }] }), /cannot be edited/);
@@ -865,6 +916,13 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
   });
 
   await t.test('a cash voucher is cancelled or corrected through a reversal, never edited', async () => {
+    const day = new Date().toISOString().slice(0, 10);
+    const shipping = async () => {
+      const flow = await ledger.flow('CASH', day, day, 'day');
+      const of = (direction: string) => Number(flow.sources.find((x) => x.code === 'SHIPPING' && x.direction === direction)?.amount ?? 0);
+      return { in: of('in'), out: of('out') };
+    };
+    const before = await shipping();
     const wrong = await finance.recordVoucher({ direction: 'OUT', counter: 'SHIPPING', amount: '15000.00', userId: user.id });
     const fix = { direction: 'OUT' as const, counter: 'SHIPPING' as const, amount: '1500.00', reason: 'extra zero', userId: user.id };
     const [a, b] = await Promise.all([finance.correctVoucher(wrong.id, fix), finance.correctVoucher(wrong.id, fix)]);
@@ -875,6 +933,9 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
       [wrong.id]);
     assert.equal(rows.length, 3);
     assert.equal(netOn(rows, 'CASH'), -1500);
+    // Money in and out shows the corrected 1,500 — not 15,000 out and 15,000 back in.
+    const after = await shipping();
+    assert.deepEqual([after.out - before.out, after.in - before.in], [1500, 0]);
     // The correction can itself be cancelled; cancelling twice changes nothing.
     const [c1, c2] = await Promise.all([finance.cancelVoucher(a.id, 'not paid after all', user.id), finance.cancelVoucher(a.id, 'not paid after all', user.id)]);
     assert.equal(c1.id, c2.id);

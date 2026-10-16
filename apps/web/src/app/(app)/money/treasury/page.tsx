@@ -1,8 +1,8 @@
-import { Receipt } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, FileClock, Landmark, Receipt } from 'lucide-react';
 import { Fragment } from 'react';
 import { Amount } from '@/components/amount';
 import { AccountChip, DayRow, directionOf, EntryCell, MONEY } from '@/components/ledger-entry';
-import { MetricCard, MetricGrid } from '@/components/metric-card';
+import { SummaryMetric, SummaryStrip } from '@/components/list-page';
 import { Page, PageHeader } from '@/components/page';
 import { PendingCheques } from '@/components/pending-cheques';
 import { TableCount, TableEmpty, TablePanel } from '@/components/table-panel';
@@ -63,30 +63,38 @@ export default async function TreasuryPage({ searchParams }: { searchParams: Pro
         actions={<TreasuryActions />}
       />
 
-      <MetricGrid>
-        <MetricCard
+      <SummaryStrip label={tr('nav.items.treasury')}>
+        <SummaryMetric
           label={tr('charts.cashOnHand')}
+          icon={Landmark}
           value={<Amount value={cash} className={cn(Number(cash) < 0 && 'text-destructive')} />}
           hint={t('cashHint')}
-          link={{ href: '/money/ledger?code=CASH', label: t('openInLedger') }}
+          href="/money/ledger?code=CASH"
+          sensitive
         />
-        <MetricCard
+        <SummaryMetric
           label={t('inThisMonth')}
+          icon={ArrowDownLeft}
           value={<Amount value={monthIn} signed className={monthIn > 0 ? 'text-success' : undefined} />}
           hint={sinceLabel}
+          sensitive
         />
-        <MetricCard
+        <SummaryMetric
           label={t('outThisMonth')}
+          icon={ArrowUpRight}
           value={<Amount value={monthOut} className={monthOut < 0 ? 'text-destructive' : undefined} />}
           hint={sinceLabel}
+          sensitive
         />
-        <MetricCard
+        <SummaryMetric
           label={t('chequesPending')}
+          icon={FileClock}
           value={<Amount value={chequesTotal} />}
-          tone={cheques.length ? 'warning' : 'default'}
           hint={cheques.length ? t('chequesNotCleared', { count: cheques.length }) : t('nothingPending')}
+          attention={cheques.length > 0}
+          sensitive
         />
-      </MetricGrid>
+      </SummaryStrip>
 
       <PendingCheques cheques={cheques} />
 

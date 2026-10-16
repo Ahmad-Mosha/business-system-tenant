@@ -51,15 +51,27 @@ export function LanguageMenuGroup() {
   );
 }
 
-/** Before signing in: one button offering the other language, in that language. */
-export function LanguageToggle({ className }: { className?: string }) {
+/**
+ * One button offering the other language, in that language — before signing
+ * in, and in the top bar (`compact`: "EN" / "ع", named in full for screen readers).
+ */
+export function LanguageToggle({ className, compact = false }: { className?: string; compact?: boolean }) {
   const t = useTranslations('language');
   const { current, change, pending } = useLanguage();
   const other: Language = current === 'ar' ? 'en' : 'ar';
   return (
-    <Button variant="ghost" size="sm" lang={other} disabled={pending} onClick={() => change(other)} className={className}>
+    <Button
+      variant="ghost"
+      size="sm"
+      lang={other}
+      disabled={pending}
+      onClick={() => change(other)}
+      aria-label={compact ? t(other) : undefined}
+      title={compact ? t(other) : undefined}
+      className={className}
+    >
       <Languages />
-      {t(other)}
+      {compact ? <span className="text-xs font-semibold">{other === 'en' ? 'EN' : 'ع'}</span> : t(other)}
     </Button>
   );
 }

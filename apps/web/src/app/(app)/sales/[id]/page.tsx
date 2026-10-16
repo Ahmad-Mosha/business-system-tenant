@@ -1,4 +1,4 @@
-import { Ban, Info, Pencil, Send, Trash2, Undo2 } from 'lucide-react';
+import { Ban, ChevronLeft, Info, Package, Pencil, Send, StickyNote, Store, Trash2, Undo2, Wallet } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
@@ -11,15 +11,17 @@ import { ProblemNotice } from '@/components/problem-notice';
 import { PostSalesDialog, RecordSalesPayment, VoidSalesInvoice } from '@/components/sales-invoice-actions';
 import { ToneBadge } from '@/components/tone-badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { getFormat } from '@/i18n/get-format';
 import { num, strong } from '@/i18n/rich';
 import { isSystemMemo } from '@/lib/money';
 import { getSalesInvoice } from '@/lib/api';
 import { money, unitMoney } from '@/lib/format';
-import { SALES_TONE, salesPaidStatus } from '@/lib/sales';
+import { salesState } from '@/lib/sales';
 import { blockedBy } from '@/lib/problem';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
@@ -33,7 +35,6 @@ export default async function SalesInvoicePage({ params }: { params: Promise<{ i
 
   const draft = invoice.status === 'DRAFT';
   const posted = invoice.status === 'POSTED';
-  const paidStatus = salesPaidStatus(invoice);
   const remaining = Number(invoice.total) - Number(invoice.paidAmount);
   const units = invoice.lines.reduce((n, l) => n + l.quantity, 0);
   // What would stop posting it right now, from the API's own rules.
@@ -49,12 +50,7 @@ export default async function SalesInvoicePage({ params }: { params: Promise<{ i
       <PageHeader
         back={{ href: '/sales', label: t('back') }}
         title={invoice.invoiceNumber ? t('title', { number: invoice.invoiceNumber }) : t('titleDraft')}
-        meta={
-          <>
-            <ToneBadge tone={SALES_TONE[invoice.status]}>{tr(`enums.salesStatus.${invoice.status}`)}</ToneBadge>
-            {paidStatus ? <PaidChip status={paidStatus} /> : null}
-          </>
-        }
+        meta={<PaidChip status={salesState(invoice)} />}
         description={t.rich('description', { customer: invoice.customer.name, date: f.date(invoice.invoiceDate), strong })}
         actions={
           draft ? (
@@ -118,108 +114,137 @@ export default async function SalesInvoicePage({ params }: { params: Promise<{ i
         </Alert>
       ) : null}
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <Card className="min-w-0 pb-0">
-          <CardHeader>
-            <CardTitle>{t('lines')}</CardTitle>
-          </CardHeader>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t('columns.product')}</TableHead>
-                <TableHead className="w-[80px] text-end">{t('columns.qty')}</TableHead>
-                <TableHead className="w-[120px] text-end">{t('columns.unitPrice')}</TableHead>
-                <TableHead className="w-[120px] text-end">{t('columns.cost')}</TableHead>
-                <TableHead className="w-[130px] text-end">{t('columns.lineTotal')}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="grid min-w-0 gap-5">
+          <Card className="gap-0 pb-0">
+            <CardHeader className="items-center pb-4">
+              <CardTitle className="flex items-center gap-2.5">
+                <Package className="size-4 text-muted-foreground" aria-hidden />
+                {t('lines')}
+              </CardTitle>
+              <CardAction>
+                <Badge variant="secondary" className="rounded-md px-2.5 py-1">{tr('nouns.units', { count: units })}</Badge>
+              </CardAction>
+            </CardHeader>
+            <div className="hidden sm:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{t('columns.product')}</TableHead>
+                    <TableHead className="w-[80px] text-end">{t('columns.qty')}</TableHead>
+                    <TableHead className="w-[120px] text-end">{t('columns.unitPrice')}</TableHead>
+                    <TableHead className="w-[120px] text-end">{t('columns.cost')}</TableHead>
+                    <TableHead className="w-[130px] text-end">{t('columns.lineTotal')}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {invoice.lines.map((l) => (
+                    <TableRow key={l.id} className="hover:bg-transparent">
+                      <TableCell className="min-w-40 py-3.5 whitespace-normal">
+                        <p className="line-clamp-2 leading-snug font-medium" title={l.label}>
+                          <bdi>{l.label}</bdi>
+                        </p>
+                        {draft ? (
+                          <p className={cn('num mt-0.5 text-xs', l.quantity > l.onHand ? 'text-destructive' : 'text-muted-foreground')}>
+                            {t('stockNow', { count: l.onHand })}
+                          </p>
+                        ) : null}
+                      </TableCell>
+                      <TableCell className="num text-end">{f.count(l.quantity)}</TableCell>
+                      <TableCell className="num text-end">{unitMoney(l.unitPrice)}</TableCell>
+                      <TableCell className="num text-end text-muted-foreground" data-sensitive>
+                        {costOf(l) !== null ? unitMoney(costOf(l)) : '—'}
+                      </TableCell>
+                      <TableCell className="num text-end font-semibold">{money(l.lineTotal)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <ul className="divide-y border-t sm:hidden">
               {invoice.lines.map((l) => (
-                <TableRow key={l.id}>
-                  <TableCell className="min-w-40 whitespace-normal">
-                    <p className="line-clamp-2 leading-snug font-medium" title={l.label}>
-                      <bdi>{l.label}</bdi>
-                    </p>
+                <li key={l.id} className="grid gap-3 px-5 py-4">
+                  <div>
+                    <p className="leading-snug font-medium"><bdi>{l.label}</bdi></p>
                     {draft ? (
-                      <p className={cn('num text-xs', l.quantity > l.onHand ? 'text-destructive' : 'text-muted-foreground')}>
+                      <p className={cn('num mt-0.5 text-xs', l.quantity > l.onHand ? 'text-destructive' : 'text-muted-foreground')}>
                         {t('stockNow', { count: l.onHand })}
                       </p>
                     ) : null}
-                  </TableCell>
-                  <TableCell className="num text-end">{f.count(l.quantity)}</TableCell>
-                  <TableCell className="num text-end">{unitMoney(l.unitPrice)}</TableCell>
-                  <TableCell className="num text-end text-muted-foreground" data-sensitive>
-                    {costOf(l) !== null ? unitMoney(costOf(l)) : '—'}
-                  </TableCell>
-                  <TableCell className="num text-end font-medium">{money(l.lineTotal)}</TableCell>
-                </TableRow>
+                  </div>
+                  <dl className="grid grid-cols-3 gap-3 text-sm">
+                    <div><dt className="text-xs text-muted-foreground">{t('columns.qty')}</dt><dd className="num mt-1">{f.count(l.quantity)}</dd></div>
+                    <div><dt className="text-xs text-muted-foreground">{t('columns.unitPrice')}</dt><dd className="num mt-1">{unitMoney(l.unitPrice)}</dd></div>
+                    <div className="text-end"><dt className="text-xs text-muted-foreground">{t('columns.lineTotal')}</dt><dd className="num mt-1 font-semibold">{money(l.lineTotal)}</dd></div>
+                  </dl>
+                </li>
               ))}
-            </TableBody>
-          </Table>
-        </Card>
-
-        <aside className="grid gap-6 lg:sticky lg:top-0">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('totals')}</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-2.5 text-[13px]">
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="text-muted-foreground">{tr('sales.builder.subtotal', { items: tr('nouns.units', { count: units }) })}</span>
-                <span className="num">{money(invoice.goodsTotal)}</span>
-              </div>
-              {Number(invoice.discount) > 0 ? (
-                <div className="flex items-baseline justify-between gap-3">
-                  <span className="text-muted-foreground">{tr('sales.builder.discount')}</span>
-                  <span className="num">{money(-Number(invoice.discount))}</span>
+            </ul>
+            {/* The bill under the lines it adds up. */}
+            <div className="flex justify-end border-t bg-muted/25 px-5 py-5 md:px-6">
+              <dl className="grid w-full gap-2 text-sm sm:w-72">
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">{tr('sales.builder.subtotal', { items: tr('nouns.units', { count: units }) })}</dt>
+                  <dd className="num">{money(invoice.goodsTotal)}</dd>
                 </div>
-              ) : null}
-              <div className="flex items-baseline justify-between gap-3 border-t pt-3">
-                <span className="font-medium">{tr('sales.builder.total')}</span>
-                <Amount value={invoice.total} className="text-[26px] font-semibold tracking-tight" />
-              </div>
-              {posted ? (
-                <>
-                  <div className="flex items-baseline justify-between gap-3">
-                    <span className="text-muted-foreground">{tp('paid')}</span>
-                    <span className="num">{money(invoice.paidAmount)}</span>
+                {Number(invoice.discount) > 0 ? (
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-muted-foreground">{tr('sales.builder.discount')}</dt>
+                    <dd className="num">{money(-Number(invoice.discount))}</dd>
                   </div>
-                  <div className="flex items-baseline justify-between gap-3">
-                    <span className="font-medium">{tp('remaining')}</span>
-                    <span className={cn('num font-semibold', remaining > 0.005 ? 'text-warning' : 'text-success')}>
-                      {remaining > 0.005 ? money(remaining) : tp('settled')}
-                    </span>
-                  </div>
-                </>
-              ) : null}
-              {invoice.status !== 'VOID' ? (
-                <div className="mt-1 rounded-lg bg-muted/50 px-3 py-2.5" data-sensitive-scope>
-                  <div className="flex items-baseline justify-between gap-3">
-                    <span className="text-muted-foreground">{tr('sales.builder.profit')}</span>
-                    {costKnown ? (
-                      <span className={cn('num font-semibold', profit < 0 ? 'text-destructive' : 'text-success')}>{money(profit)}</span>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {costKnown
-                      ? tr.rich(draft ? 'sales.builder.profitHint' : 'sales.detail.profitHintPosted', { margin: Number(invoice.total) > 0 ? `${((profit / Number(invoice.total)) * 100).toFixed(1)}%` : '—', num })
-                      : tr('sales.builder.profitUnknown')}
-                  </p>
+                ) : null}
+                <div className="mt-1 flex items-baseline justify-between gap-4 border-t pt-3">
+                  <dt className="font-medium">{tr('sales.builder.total')}</dt>
+                  <dd className="flex items-baseline gap-1.5">
+                    <Amount value={invoice.total} className={cn('text-2xl font-semibold tracking-tight', invoice.status === 'VOID' && 'text-muted-foreground line-through')} />
+                    <span className="text-xs text-muted-foreground">{tr('common.egp')}</span>
+                  </dd>
                 </div>
-              ) : null}
-            </CardContent>
+              </dl>
+            </div>
           </Card>
-          {!draft ? (
-            <Card size="sm" className="pb-0">
+
+          {invoice.notes ? (
+            <Card>
               <CardHeader>
-                <CardTitle>{tp('title')}</CardTitle>
+                <CardTitle className="flex items-center gap-2.5">
+                  <StickyNote className="size-4 text-muted-foreground" aria-hidden />
+                  {tr('sales.builder.notes')}
+                </CardTitle>
               </CardHeader>
+              <CardContent className="text-sm leading-7 whitespace-pre-line">
+                <bdi>{invoice.notes}</bdi>
+              </CardContent>
+            </Card>
+          ) : null}
+        </div>
+
+        <aside className="grid min-w-0 gap-5 max-xl:row-start-1 xl:col-start-2">
+          {posted ? (
+            <Card className="gap-0 pb-0">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2.5">
+                  <Wallet className="size-4 text-muted-foreground" aria-hidden />
+                  {tp('title')}
+                </CardTitle>
+              </CardHeader>
+              {/* How much of it has come in, at a glance, then each payment. */}
+              <CardContent className="grid gap-3 pb-5" data-sensitive-scope>
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-sm text-muted-foreground">{tp('remaining')}</span>
+                  <span className={cn('num text-2xl font-semibold tracking-tight', remaining > 0.005 ? 'text-warning' : 'text-success')}>
+                    {remaining > 0.005 ? money(remaining) : tp('settled')}
+                  </span>
+                </div>
+                <Progress value={Number(invoice.total) > 0 ? (Number(invoice.paidAmount) / Number(invoice.total)) * 100 : 0} aria-label={tp('paid')} />
+                <p className="num text-xs text-muted-foreground">
+                  {tp('paidOf', { paid: money(invoice.paidAmount), total: money(invoice.total) })}
+                </p>
+              </CardContent>
               {invoice.payments.length ? (
                 <ul className="divide-y border-t text-[13px]">
                   {invoice.payments.map((p) => (
-                    <li key={p.id} className="flex items-center gap-3 px-4 py-2.5">
+                    <li key={p.id} className="flex items-center gap-3 px-5 py-3">
                       <div className="min-w-0 flex-1">
                         <p className={cn('truncate', p.reversed && 'text-muted-foreground line-through')}>
                           <bdi>{p.memo?.startsWith('Paid with') ? tp('atPosting') : !p.memo || isSystemMemo(p.memo) ? tp('payment') : p.memo}</bdi>
@@ -229,7 +254,7 @@ export default async function SalesInvoicePage({ params }: { params: Promise<{ i
                       <span className={cn('num font-medium', p.reversed && 'text-muted-foreground line-through')}>{money(p.amount)}</span>
                       {p.reversed ? (
                         <ToneBadge tone="muted">{tp('reversedBadge')}</ToneBadge>
-                      ) : posted ? (
+                      ) : (
                         <ConfirmAction
                           trigger={
                             <Button variant="ghost" size="icon-sm" aria-label={tp('reverse')} title={tp('reverse')}>
@@ -243,22 +268,46 @@ export default async function SalesInvoicePage({ params }: { params: Promise<{ i
                           destructive
                           action={reverseSalesPayment.bind(null, invoice.id, p.id)}
                         />
-                      ) : null}
+                      )}
                     </li>
                   ))}
                 </ul>
               ) : (
-                <CardContent className="pb-4 text-[13px] text-muted-foreground">{tp('empty')}</CardContent>
+                <p className="border-t px-5 py-4 text-[13px] text-muted-foreground">{tp('empty')}</p>
               )}
             </Card>
           ) : null}
-          {invoice.notes ? (
-            <Card size="sm">
-              <CardHeader>
-                <CardTitle>{tr('sales.builder.notes')}</CardTitle>
-              </CardHeader>
-              <CardContent className="text-[13px] whitespace-pre-line">
-                <bdi>{invoice.notes}</bdi>
+
+          <Card className="gap-0 py-0">
+            <Link href={`/customers/${invoice.customer.id}`} className="group flex items-center gap-3.5 px-5 py-5">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/8 text-primary" aria-hidden>
+                <Store className="size-5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-xs text-muted-foreground">{tr('sales.columns.customer')}</span>
+                <span className="block truncate font-semibold group-hover:text-highlight group-hover:underline group-hover:underline-offset-4"><bdi>{invoice.customer.name}</bdi></span>
+                {invoice.customer.phone ? <span className="num block text-sm text-muted-foreground"><bdi>{invoice.customer.phone}</bdi></span> : null}
+              </span>
+              <ChevronLeft className="size-4 text-muted-foreground ltr:rotate-180" aria-hidden />
+            </Link>
+          </Card>
+
+          {invoice.status !== 'VOID' ? (
+            <Card size="sm" data-sensitive-scope>
+              <CardContent className="grid gap-1.5">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-sm text-muted-foreground">{tr('sales.builder.profit')}</span>
+                  {costKnown ? (
+                    <span className={cn('num text-lg font-semibold', profit < 0 ? 'text-destructive' : 'text-success')}>{money(profit)}</span>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </div>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  {costKnown
+                    ? tr.rich(draft ? 'sales.builder.profitHint' : 'sales.detail.profitHintPosted', { margin: Number(invoice.total) > 0 ? `${((profit / Number(invoice.total)) * 100).toFixed(1)}%` : '—', num })
+                    : tr('sales.builder.profitUnknown')}
+                </p>
               </CardContent>
             </Card>
           ) : null}

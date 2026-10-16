@@ -1,4 +1,4 @@
-import { AlertTriangle, Pencil } from 'lucide-react';
+import { AlertTriangle, Clock3, MessageCircle, Package, Pencil, Phone, StickyNote, UserRound } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
@@ -14,7 +14,7 @@ import { Page, PageHeader } from '@/components/page';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardHeader } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/table';
 import { getAssignees, getOrder } from '@/lib/api';
 import { money } from '@/lib/format';
+import { whatsappHref } from '@/lib/phone';
 import { BlockedDialog } from '@/components/blocked-dialog';
 import { requireSession } from '@/lib/session';
 import { isOneOf } from '@/lib/utils';
@@ -33,11 +34,12 @@ import { getTranslations } from 'next-intl/server';
 import { getFormat } from '@/i18n/get-format';
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
-  const [f, t, te, tn] = await Promise.all([
+  const [f, t, te, tn, tc] = await Promise.all([
     getFormat(),
     getTranslations('orders'),
     getTranslations('enums'),
     getTranslations('nouns'),
+    getTranslations('common'),
   ]);
   const user = await requireSession();
   const { id } = await params;
@@ -93,101 +95,107 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         }
       />
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="grid min-w-0 gap-6">
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>{t('detail.customer')}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <dl className="grid gap-3">
-                  <Detail label={t('detail.name')}>
-                    <bdi>{order.customerName}</bdi>
-                  </Detail>
-                  <Detail label={t('detail.phone')}>
-                    <a href={`tel:${order.customerPhone}`} className="num hover:underline">
-                      <bdi>{order.customerPhone}</bdi>
-                    </a>
-                  </Detail>
-                  <Detail label={t('detail.paymentMethod')}>
-                    {te(`paymentMethod.${order.paymentMethod}`)}
-                  </Detail>
-                </dl>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>{t('detail.delivery')}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <dl className="grid gap-3">
-                  <Detail label={t('detail.governorate')}>
-                    {order.governorate ? <bdi>{order.governorate}</bdi> : null}
-                  </Detail>
-                  <Detail label={t('detail.address')}>
-                    {order.address ? <bdi>{order.address}</bdi> : null}
-                  </Detail>
-                  <Detail label={t('detail.tracking')}>
-                    {order.trackingNumber ? (
-                      <span className="num">{order.trackingNumber}</span>
-                    ) : null}
-                  </Detail>
-                </dl>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card className="pb-0">
-            <CardHeader>
-              <CardTitle>{t('detail.items')}</CardTitle>
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="grid min-w-0 gap-5">
+          <Card className="gap-0 pb-0">
+            <CardHeader className="items-center pb-4">
+              <h2 className="flex items-center gap-2.5 text-base font-semibold">
+                <Package className="size-4 text-muted-foreground" aria-hidden />
+                {t('detail.items')}
+              </h2>
               <CardAction>
-                <Badge variant="secondary">{tn('units', { count: units })}</Badge>
+                <Badge variant="secondary" className="rounded-md px-2.5 py-1">{tn('units', { count: units })}</Badge>
               </CardAction>
             </CardHeader>
             {unmapped > 0 ? (
-              <CardContent>
+              <CardContent className="pb-4">
                 <Alert variant="warning">
                   <AlertTriangle />
                   <AlertDescription>{t('unmapped', { count: unmapped })}</AlertDescription>
                 </Alert>
               </CardContent>
             ) : null}
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('columns.item')}</TableHead>
-                  <TableHead className="w-[70px] text-end">{t('columns.qty')}</TableHead>
-                  <TableHead className="w-[120px] text-end">{t('columns.unitPrice')}</TableHead>
-                  <TableHead className="w-[120px] text-end">{t('columns.total')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {order.items.map((i) => (
-                  <TableRow key={i.id}>
-                    <TableCell className="max-w-0 whitespace-normal">
-                      <bdi className="font-medium">{i.title}</bdi>
-                      {!i.variantId ? (
-                        <span className="ms-2 text-xs text-warning">{t('detail.notInInventory')}</span>
-                      ) : null}
-                    </TableCell>
-                    <TableCell className="num text-end">{i.quantity}</TableCell>
-                    <TableCell className="num text-end text-muted-foreground">
-                      {money(i.unitPrice)}
-                    </TableCell>
-                    <TableCell className="num text-end font-medium">{money(i.lineTotal)}</TableCell>
+            <div className="hidden sm:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{t('columns.item')}</TableHead>
+                    <TableHead className="w-[70px] text-end">{t('columns.qty')}</TableHead>
+                    <TableHead className="w-[120px] text-end">{t('columns.unitPrice')}</TableHead>
+                    <TableHead className="w-[120px] text-end">{t('columns.total')}</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {order.items.map((i) => (
+                    <TableRow key={i.id} className="hover:bg-transparent">
+                      <TableCell className="max-w-0 py-4 whitespace-normal">
+                        <bdi className="text-sm font-medium leading-relaxed">{i.title}</bdi>
+                        {!i.variantId ? (
+                          <span className="mt-1 block text-xs text-warning">{t('detail.notInInventory')}</span>
+                        ) : null}
+                      </TableCell>
+                      <TableCell className="num text-end">{i.quantity}</TableCell>
+                      <TableCell className="num text-end text-muted-foreground">{money(i.unitPrice)}</TableCell>
+                      <TableCell className="num text-end font-semibold">{money(i.lineTotal)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <ul className="divide-y border-t sm:hidden">
+              {order.items.map((i) => (
+                <li key={i.id} className="grid gap-3 px-5 py-4">
+                  <div>
+                    <bdi className="text-sm font-medium leading-relaxed">{i.title}</bdi>
+                    {!i.variantId ? <p className="mt-1 text-xs text-warning">{t('detail.notInInventory')}</p> : null}
+                  </div>
+                  <dl className="grid grid-cols-3 gap-3 text-sm">
+                    <div><dt className="text-xs text-muted-foreground">{t('columns.qty')}</dt><dd className="num mt-1">{i.quantity}</dd></div>
+                    <div><dt className="text-xs text-muted-foreground">{t('columns.unitPrice')}</dt><dd className="num mt-1">{money(i.unitPrice)}</dd></div>
+                    <div className="text-end"><dt className="text-xs text-muted-foreground">{t('columns.total')}</dt><dd className="num mt-1 font-semibold">{money(i.lineTotal)}</dd></div>
+                  </dl>
+                </li>
+              ))}
+            </ul>
+            {/* The bill under what it bills for: lines, then subtotal,
+                shipping and total, with how it's being paid beside them. */}
+            <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-5 border-t bg-muted/25 px-5 py-5 md:px-6">
+              <div className="grid gap-1.5">
+                <p className="text-xs text-muted-foreground">{t('detail.paymentMethod')}</p>
+                <p className="flex items-center gap-3 text-sm font-medium">
+                  {te(`paymentMethod.${order.paymentMethod}`)}
+                  <PaymentBadge status={order.paymentStatus} />
+                </p>
+              </div>
+              <dl className="grid w-full max-w-72 gap-2 text-sm sm:w-72">
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">{t('detail.subtotal')}</dt>
+                  <dd className="num">{money(order.subtotal)}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">{t('detail.shipping')}</dt>
+                  <dd className="num">{money(order.shippingCost)}</dd>
+                </div>
+                <div className="mt-1 flex items-baseline justify-between gap-4 border-t pt-3">
+                  <dt className="font-medium">{t('detail.total')}</dt>
+                  <dd className="flex items-baseline gap-1.5">
+                    <Amount value={order.total} className="text-2xl font-semibold tracking-tight" />
+                    <span className="text-xs text-muted-foreground">{tc('egp')}</span>
+                  </dd>
+                </div>
+              </dl>
+            </div>
           </Card>
 
           {order.notes ? (
             <Card>
               <CardHeader>
-                <CardTitle>{t('detail.notes')}</CardTitle>
+                <h2 className="flex items-center gap-2.5 text-base font-semibold">
+                  <StickyNote className="size-4 text-muted-foreground" aria-hidden />
+                  {t('detail.notes')}
+                </h2>
               </CardHeader>
-              <CardContent className="text-[13px] whitespace-pre-line">
+              <CardContent className="text-sm leading-7 whitespace-pre-line break-words">
                 <bdi>{order.notes}</bdi>
               </CardContent>
             </Card>
@@ -195,25 +203,29 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
 
           <Card>
             <CardHeader>
-              <CardTitle>{t('detail.history')}</CardTitle>
+              <h2 className="flex items-center gap-2.5 text-base font-semibold">
+                <Clock3 className="size-4 text-muted-foreground" aria-hidden />
+                {t('detail.history')}
+              </h2>
+              <p className="text-xs text-muted-foreground">{t('detailPreview.historyHint')}</p>
             </CardHeader>
             <CardContent>
-              <ol className="relative grid gap-4 before:absolute before:inset-y-1.5 before:start-[3px] before:w-px before:bg-border">
+              <ol className="relative grid gap-5 before:absolute before:inset-y-2 before:start-[4px] before:w-px before:bg-border">
                 {order.events.map((e, i) => (
-                  <li key={e.id} className="relative flex items-baseline gap-3 ps-5">
+                  <li key={e.id} className="relative grid gap-1.5 ps-6">
                     <span
                       aria-hidden
-                      // Events arrive newest first — the top one is where the order is now.
-                      className={
-                        i === 0
-                          ? 'absolute top-1.5 start-0 size-[7px] bg-primary'
-                          : 'absolute top-1.5 start-0 size-[7px] border border-muted-foreground/50 bg-card'
-                      }
+                      // This marks the latest recorded event, not an inferred workflow step.
+                      className={i === 0
+                        ? 'absolute top-1.5 start-0 size-[9px] rounded-full bg-primary ring-4 ring-primary/8'
+                        : 'absolute top-1.5 start-0 size-[9px] rounded-full border border-muted-foreground/50 bg-card'}
                     />
-                    <span className="min-w-0 flex-1 text-[13px]"><EventLine e={e} /></span>
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      <bdi>{e.actorName ?? t('detail.system')}</bdi> · {f.dateTime(e.createdAt)}
-                    </span>
+                    <div className="min-w-0 text-sm leading-relaxed break-words"><EventLine e={e} /></div>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                      <bdi>{e.actorName ?? t('detail.system')}</bdi>
+                      <span aria-hidden>·</span>
+                      <time dateTime={e.createdAt}>{f.dateTime(e.createdAt)}</time>
+                    </div>
                   </li>
                 ))}
               </ol>
@@ -221,7 +233,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           </Card>
         </div>
 
-        <aside className="grid gap-6 lg:sticky lg:top-0">
+        {/* First on a phone: the moves, then who to call and where it goes. */}
+        <aside className="grid min-w-0 gap-5 max-xl:row-start-1 xl:col-start-2">
           <OrderActions
             orderId={order.id}
             status={order.status}
@@ -231,25 +244,36 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             assignees={assignees.map((a) => ({ id: a.id, name: a.name }))}
             canAssign={isAdmin}
           />
-
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('detail.summary')}</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-2 text-[13px]">
-              <div className="flex justify-between gap-3">
-                <span className="text-muted-foreground">{t('detail.subtotal')}</span>
-                <span className="num">{money(order.subtotal)}</span>
+          <Card className="gap-0 py-0">
+            <div className="flex items-start gap-3.5 px-5 py-5">
+              <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/8 text-primary" aria-hidden>
+                <UserRound className="size-5" />
               </div>
-              <div className="flex justify-between gap-3">
-                <span className="text-muted-foreground">{t('detail.shipping')}</span>
-                <span className="num">{money(order.shippingCost)}</span>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-muted-foreground">{t('detail.customer')}</p>
+                <h2 className="mt-0.5 text-lg font-semibold leading-relaxed break-words"><bdi>{order.customerName}</bdi></h2>
+                <p className="num text-sm text-muted-foreground"><bdi>{order.customerPhone}</bdi></p>
               </div>
-              <div className="mt-2 flex items-baseline justify-between gap-3 border-t pt-3">
-                <span className="font-medium">{t('detail.total')}</span>
-                <Amount value={order.total} className="text-2xl font-semibold tracking-tight" />
-              </div>
-            </CardContent>
+            </div>
+            <div className="grid grid-cols-2 gap-2 px-5 pb-5">
+              <Button variant="outline" asChild>
+                <a href={`tel:${order.customerPhone}`}><Phone />{t('detail.call')}</a>
+              </Button>
+              <Button variant="outline" asChild>
+                <a href={whatsappHref(order.customerPhone)} target="_blank" rel="noreferrer"><MessageCircle />{t('detail.whatsapp')}</a>
+              </Button>
+            </div>
+            <dl className="grid gap-4 border-t px-5 py-5 sm:grid-cols-2 xl:grid-cols-1">
+              <Detail label={t('detail.governorate')}>
+                {order.governorate ? <bdi>{order.governorate}</bdi> : null}
+              </Detail>
+              <Detail label={t('detail.address')}>
+                {order.address ? <bdi>{order.address}</bdi> : null}
+              </Detail>
+              <Detail label={t('detail.tracking')}>
+                {order.trackingNumber ? <span className="num">{order.trackingNumber}</span> : null}
+              </Detail>
+            </dl>
           </Card>
         </aside>
       </div>
@@ -260,10 +284,10 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
 function Detail({ label, children }: { label: string; children: ReactNode }) {
   const t = useTranslations('common');
   return (
-    <div className="grid gap-0.5">
+    <div className="grid gap-1.5">
       <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="text-[13px] break-words">
-        {children || <span className="text-muted-foreground/60">{t('notSet')}</span>}
+      <dd className="text-sm leading-relaxed break-words">
+        {children || <span className="text-muted-foreground">{t('notSet')}</span>}
       </dd>
     </div>
   );

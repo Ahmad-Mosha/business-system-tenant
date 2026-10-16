@@ -252,6 +252,9 @@ export interface OrderSummary {
   unassigned: number;
   needsWork: number;
   deliveredUnpaid: number;
+  /** What those delivered, unpaid orders still owe. */
+  deliveredUnpaidAmount: string;
+  byStatus: Record<OrderStatus, number>;
 }
 
 export interface Assignee {
@@ -374,7 +377,7 @@ export const getOrders = (query = '') =>
   );
 
 export const getOrder = (id: string) => get<OrderDetail>(`/orders/${id}`);
-export const getOrderSummary = () => get<OrderSummary>('/orders/summary');
+export const getOrderSummary = (query = '') => get<OrderSummary>(`/orders/summary${query ? `?${query}` : ''}`);
 export const getAssignees = () => get<Assignee[]>('/auth/users');
 export const getTeam = () => get<TeamMember[]>('/auth/team');
 export const getProductsCatalog = (query?: string) =>
@@ -469,6 +472,10 @@ export interface SupplierRow {
   active: boolean;
   balance: string;
   createdAt: string;
+  /** What they billed on posted invoices, how many, and the latest date (null before the first). */
+  bought?: string;
+  invoiceCount?: number;
+  lastInvoiceAt?: string | null;
 }
 
 export type PaidStatus = 'DRAFT' | 'UNPAID' | 'PARTIAL' | 'PAID' | 'VOID';
@@ -551,15 +558,42 @@ export const getCashSeries = (days = 90) =>
 export const getPeriodSummary = (from?: string, to?: string) =>
   get<PeriodSummary>(`/finance/summary${from && to ? `?from=${from}&to=${to}` : ''}`);
 
-export interface BusinessProfitReport {
-  sales: string;
+export type SalesChannel = 'noon' | 'website' | 'social' | 'wholesale';
+
+/** Profit and loss for a period from the business's own records — see PerformanceService. */
+export interface PerformanceReport {
+  from: string;
+  to: string;
+  revenue: string;
+  cogs: string;
+  grossProfit: string;
+  fees: string;
   shipping: string;
-  businessProfit: string;
-  unreconciledEntries: number;
-  series: Array<{ period: string; sales: string; shipping: string; businessProfit: string }>;
+  expenses: string;
+  netProfit: string;
+  /** Units sold with no cost anywhere — their cost of goods is missing, so profit reads high. */
+  uncostedUnits: number;
+  channels: Array<{
+    key: SalesChannel;
+    revenue: string;
+    cogs: string;
+    /** Wholesale's cost was frozen at posting; the others are estimated at today's average cost. */
+    cogsBasis: 'actual' | 'estimate';
+    /** noon's fees, or the shipping on paid orders. */
+    directCosts: string;
+    contribution: string;
+    units: number;
+    uncostedUnits: number;
+    count: number;
+  }>;
+  /** `name` null: cash vouchers booked to costs without an expense record. */
+  expenseCategories: Array<{ name: string | null; amount: string }>;
+  /** The period by `bucket`, when one was asked for; every bucket present, empty ones as zero. */
+  series: Array<{ period: string; revenue: string; costs: string; netProfit: string }>;
 }
-export const getBusinessProfit = (from: string, to: string, bucket: 'day' | 'week' | 'month') =>
-  get<BusinessProfitReport>(`/finance/business-profit?from=${from}&to=${to}&bucket=${bucket}`);
+
+export const getPerformance = (from: string, to: string, bucket?: 'day' | 'week' | 'month') =>
+  get<PerformanceReport>(`/finance/performance?from=${from}&to=${to}${bucket ? `&bucket=${bucket}` : ''}`);
 
 /** Money into and out of the treasury between two dates — per bucket, and by where. */
 export interface CashFlow {
@@ -602,6 +636,10 @@ export interface CustomerRow {
   /** Unpaid remainder of their posted invoices. */
   balance: string;
   createdAt: string;
+  /** Their posted invoices: how much, how many, and the latest date (null before the first). */
+  sold?: string;
+  invoiceCount?: number;
+  lastInvoiceAt?: string | null;
 }
 
 export type SalesInvoiceStatus = 'DRAFT' | 'POSTED' | 'VOID';

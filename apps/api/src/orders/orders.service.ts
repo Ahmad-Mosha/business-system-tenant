@@ -26,6 +26,7 @@ import { User } from '../auth/user.entity';
 import { isUniqueViolation } from '../database/unique-violation';
 
 /** Egyptian mobile: 01[0125] + 8 digits, with or without a +20/0020/20 prefix. */
+const STATUSES = Object.keys(ALLOWED_TRANSITIONS) as OrderStatus[];
 const EGYPT_PHONE = /^(?:\+?20|0)?1[0125]\d{8}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const GOVERNORATES = new Set<string>(EGYPT_GOVERNORATES);
@@ -44,7 +45,9 @@ export interface CreateOrderInput {
 }
 
 export interface OrderFilters {
-  status?: OrderStatus;
+  /** One status, or several — "to confirm" is NEW and ASSIGNED together. */
+  status?: OrderStatus[];
+  paymentStatus?: PaymentStatus;
   source?: string;
   assignedToId?: string;
   unassigned?: boolean;
@@ -70,11 +73,9 @@ export class OrdersService {
     return { ...filters, assignedToId: user.id, unassigned: false };
   }
 
-  async list(user: SessionUser, rawFilters: OrderFilters) {
-    const f = this.scope(user, rawFilters);
-    const limit = Math.min(Math.max(f.limit ?? 50, 1), 200);
-    const offset = Math.max(f.offset ?? 0, 0);
-
+  /** The WHERE clause for a filtered, scoped set of orders — shared by the list and its counts. */
+  private where(user: SessionUser, filters: OrderFilters) {
+    const f = this.scope(user, filters);
     const where: string[] = [];
     const params: unknown[] = [];
     /** Binds a value and returns its placeholder, so numbering stays in step. */
@@ -85,7 +86,8 @@ export class OrdersService {
 
     if (f.assignedToId) where.push(`o.assigned_to_id = ${bind(f.assignedToId)}`);
     if (f.unassigned) where.push('o.assigned_to_id IS NULL');
-    if (f.status) where.push(`o.status = ${bind(f.status)}`);
+    if (f.status?.length) where.push(`o.status = ANY(${bind(f.status)})`);
+    if (f.paymentStatus) where.push(`o.payment_status = ${bind(f.paymentStatus)}`);
     if (f.source) where.push(`o.source = ${bind(f.source)}`);
     if (f.search) {
       const term = bind(`%${f.search}%`); // one placeholder, referenced three times
@@ -93,8 +95,13 @@ export class OrdersService {
         `(o.customer_name ILIKE ${term} OR o.customer_phone ILIKE ${term} OR o.order_number ILIKE ${term})`,
       );
     }
+    return { sql: where.length ? `WHERE ${where.join(' AND ')}` : '', params };
+  }
 
-    const finalSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  async list(user: SessionUser, f: OrderFilters) {
+    const limit = Math.min(Math.max(f.limit ?? 50, 1), 200);
+    const offset = Math.max(f.offset ?? 0, 0);
+    const { sql: finalSql, params } = this.where(user, f);
 
     const rows = await this.db.query(
       `SELECT o.id, o.order_number AS "orderNumber", o.source, o.status,
@@ -607,19 +614,50 @@ export class OrdersService {
     });
   }
 
-  /** Counts for the orders header. Scoped the same way the list is. */
-  async summary(user: SessionUser) {
-    const scoped = user.role === 'ADMIN' ? '' : 'WHERE assigned_to_id = $1';
-    const params = user.role === 'ADMIN' ? [] : [user.id];
+  /**
+   * Counts for the orders header and its status tabs. Scoped and filtered the
+   * same way the list is — except by status, so picking a tab never zeroes
+   * the others.
+   */
+  async summary(user: SessionUser, filters: OrderFilters = {}) {
+    const { sql, params } = this.where(user, { ...filters, status: undefined });
     const [row] = await this.db.query(
       `SELECT count(*)::int AS total,
-              count(*) FILTER (WHERE assigned_to_id IS NULL)::int AS unassigned,
-              count(*) FILTER (WHERE status IN ('NEW','ASSIGNED'))::int AS "needsWork",
-              count(*) FILTER (WHERE status = 'DELIVERED' AND payment_status = 'UNPAID')::int AS "deliveredUnpaid"
-       FROM customer_order ${scoped}`,
+              count(*) FILTER (WHERE o.assigned_to_id IS NULL)::int AS unassigned,
+              count(*) FILTER (WHERE o.status IN ('NEW','ASSIGNED'))::int AS "needsWork",
+              count(*) FILTER (WHERE o.status = 'DELIVERED' AND o.payment_status = 'UNPAID')::int AS "deliveredUnpaid",
+              COALESCE(SUM(o.total) FILTER (WHERE o.status = 'DELIVERED' AND o.payment_status = 'UNPAID'), 0)::text AS "deliveredUnpaidAmount",
+              ${STATUSES.map((s) => `count(*) FILTER (WHERE o.status = '${s}')::int AS "${s}"`).join(', ')}
+       FROM customer_order o ${sql}`,
       params,
     );
-    return row;
+    const byStatus = Object.fromEntries(STATUSES.map((s) => [s, row[s]]));
+    for (const s of STATUSES) delete row[s];
+    return { ...row, byStatus };
+  }
+
+  /**
+   * The customer behind a phone number, from their latest order, so a
+   * returning customer's name and address are offered instead of retyped.
+   * Matched on the last ten digits (010…, +2010… and 2010… are one number).
+   * Scoped like the list: a moderator only finds the customers of their own
+   * orders.
+   */
+  async customerByPhone(user: SessionUser, phone: string) {
+    const digits = phone.replace(/\D/g, '').slice(-10);
+    if (digits.length < 10) return null;
+    const params: unknown[] = [digits];
+    const mine = user.role === 'ADMIN' ? '' : `AND o.assigned_to_id = $${params.push(user.id)}`;
+    const [row] = await this.db.query(
+      `SELECT o.customer_name AS name, o.governorate, o.address,
+              count(*) OVER()::int AS orders, o.placed_at AS "lastOrderAt"
+       FROM customer_order o
+       WHERE right(regexp_replace(o.customer_phone, '\\D', '', 'g'), 10) = $1 ${mine}
+       ORDER BY o.placed_at DESC
+       LIMIT 1`,
+      params,
+    );
+    return (row as { name: string; governorate: string | null; address: string | null; orders: number; lastOrderAt: Date } | undefined) ?? null;
   }
 
   private async titlesFor(tx: EntityManager, variantIds: string[]) {
