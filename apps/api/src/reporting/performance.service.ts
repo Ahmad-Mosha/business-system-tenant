@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
-export type Channel = 'noon' | 'website' | 'social' | 'wholesale';
+export type Channel = 'noon' | 'amazon' | 'website' | 'social' | 'wholesale';
 
 interface Day {
   revenue: number;
@@ -22,7 +22,7 @@ const LIVE = `e.reverses_id IS NULL AND NOT EXISTS (SELECT 1 FROM ledger_entry r
 
 /**
  * Profit and loss for owners, built from the business's own records rather
- * than ledger postings: noon's imported statements, paid orders, posted
+ * than ledger postings: noon's and Amazon's imported reports, paid orders, posted
  * wholesale invoices, expenses and cash vouchers. Each figure says how sure it
  * is — wholesale cost of goods is the cost frozen at posting; orders' and
  * noon's is estimated at today's average cost; units with no cost at all are
@@ -38,7 +38,7 @@ export class PerformanceService {
   /** `bucket` adds the period day by day, week by week or month by month, for its chart. */
   async report(from: string, to: string, bucket?: 'day' | 'week' | 'month') {
 
-    const [noon, orders, wholesale, expenses, vouchers] = await Promise.all([
+    const [noon, amazon, orders, wholesale, expenses, vouchers] = await Promise.all([
       this.db.query(
         `SELECT t.transaction_date::text AS day,
                 COALESCE(SUM(t.net_proceeds) FILTER (WHERE t.transaction_type IN ('order', 'order_update')), 0) AS revenue,
@@ -53,6 +53,26 @@ export class PerformanceService {
          LEFT JOIN channel_listing l ON l.id = t.listing_id
          LEFT JOIN product_variant v ON v.id = l.variant_id
          WHERE t.transaction_date BETWEEN $1::date AND $2::date
+         GROUP BY 1`,
+        [from, to],
+      ),
+      // Amazon: what customers paid (item, shipping, less promotions) on orders
+      // and refunds; every other line of its report — fees, Easy Ship charges,
+      // subscriptions — is the channel's cost. Transfers are only money moving.
+      this.db.query(
+        `SELECT (t.posted_at AT TIME ZONE 'Africa/Cairo')::date::text AS day,
+                COALESCE(SUM(t.product_sales + t.shipping_credits + t.promotional_rebates) FILTER (WHERE t.type IN ('Order', 'Refund')), 0) AS revenue,
+                COALESCE(SUM(t.product_sales + t.shipping_credits + t.promotional_rebates) FILTER (WHERE t.type IN ('Order', 'Refund')), 0)
+                  - COALESCE(SUM(t.total) FILTER (WHERE t.type <> 'Transfer'), 0) AS direct,
+                COALESCE(SUM(t.quantity) FILTER (WHERE t.type = 'Order'), 0)::int AS units,
+                COALESCE(SUM(t.quantity * v.unit_cost) FILTER (WHERE t.type = 'Order'), 0)
+                  - COALESCE(SUM(t.quantity * v.unit_cost) FILTER (WHERE t.type = 'Refund'), 0) AS cogs,
+                COALESCE(SUM(t.quantity) FILTER (WHERE t.type = 'Order' AND v.unit_cost IS NULL), 0)::int AS uncosted,
+                COUNT(DISTINCT t.order_id) FILTER (WHERE t.type = 'Order')::int AS count
+         FROM amazon_transaction t
+         LEFT JOIN channel_listing l ON l.id = t.listing_id
+         LEFT JOIN product_variant v ON v.id = l.variant_id
+         WHERE (t.posted_at AT TIME ZONE 'Africa/Cairo')::date BETWEEN $1::date AND $2::date
          GROUP BY 1`,
         [from, to],
       ),
@@ -117,7 +137,7 @@ export class PerformanceService {
       ),
     ]);
 
-    const channels = new Map<Channel, Day>((['noon', 'website', 'social', 'wholesale'] as const).map((c) => [c, blank()]));
+    const channels = new Map<Channel, Day>((['noon', 'amazon', 'website', 'social', 'wholesale'] as const).map((c) => [c, blank()]));
     const add = (channel: Channel, r: Partial<Record<keyof Day, string | number>>) => {
       const d = channels.get(channel)!;
       for (const k of Object.keys(d) as Array<keyof Day>) d[k] += Number(r[k] ?? 0);
@@ -133,6 +153,10 @@ export class PerformanceService {
 
     for (const r of noon) {
       add('noon', r);
+      toBucket(r.day, r.revenue, Number(r.cogs) + Number(r.direct));
+    }
+    for (const r of amazon) {
+      add('amazon', r);
       toBucket(r.day, r.revenue, Number(r.cogs) + Number(r.direct));
     }
     for (const r of orders) {
@@ -173,7 +197,7 @@ export class PerformanceService {
     const sum = (k: keyof Day) => [...channels.values()].reduce((n, d) => n + d[k], 0);
     const revenue = sum('revenue');
     const cogs = sum('cogs');
-    const fees = channels.get('noon')!.direct + voucher.CHANNEL_FEES;
+    const fees = channels.get('noon')!.direct + channels.get('amazon')!.direct + voucher.CHANNEL_FEES;
     const shipping = channels.get('website')!.direct + channels.get('social')!.direct + voucher.SHIPPING;
     const otherCosts = expenseTotal + voucher.OTHER_EXPENSE;
     const netProfit = revenue - cogs - fees - shipping - otherCosts;
