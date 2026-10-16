@@ -9,7 +9,7 @@ import { StockMovement } from '../inventory/stock-movement.entity';
 import { NoonImport } from './noon-import.entity';
 import { NoonTransaction } from './noon-transaction.entity';
 import { NoonRow, parseNoonReport } from './noon-report.parser';
-import { OPENING_IMPORT } from '../catalog/linked-catalog-import';
+import { beforeOpening as isBeforeOpening, stockOpenedOn } from '../inventory/stock-opening';
 
 export interface ImportResult {
   importId: string;
@@ -164,17 +164,14 @@ export class NoonImportService {
 
     const variantIds = [...new Set(events.map((e) => e.variantId))];
     await lockStock(tx, variantIds);
-    const state: Array<{ id: string; opened: string | null; noon: number; atNoon: boolean }> = await tx.query(
+    const opened = await stockOpenedOn(tx, variantIds);
+    const state: Array<{ id: string; noon: number; atNoon: boolean }> = await tx.query(
       `SELECT v.id,
-              -- A product that opened at zero has no count of its own; the catalogue's snapshot still holds.
-              (SELECT (min(m.occurred_at) AT TIME ZONE 'Africa/Cairo')::date::text FROM stock_movement m
-                WHERE m.source_type = $2 AND (m.variant_id = v.id OR NOT EXISTS (
-                  SELECT 1 FROM stock_movement o WHERE o.variant_id = v.id AND o.source_type = $2))) AS opened,
               COALESCE((SELECT SUM(m.quantity) FROM stock_movement m WHERE m.variant_id = v.id AND m.location = 'NOON'), 0)::int AS noon,
               EXISTS (SELECT 1 FROM stock_movement m WHERE m.variant_id = v.id AND m.location = 'NOON') AS "atNoon"
        FROM product_variant v JOIN product p ON p.id = v.product_id
        WHERE v.id = ANY($1::uuid[]) AND v.active AND p.active`,
-      [variantIds, OPENING_IMPORT],
+      [variantIds],
     );
     const byId = new Map(state.map((s) => [s.id, s]));
 
@@ -184,7 +181,7 @@ export class NoonImportService {
     for (const e of [...events].sort((a, b) => String(a.on).localeCompare(String(b.on)))) {
       const v = byId.get(e.variantId);
       if (!v) continue; // archived product
-      if (v.opened && e.on && e.on < v.opened) {
+      if (isBeforeOpening(opened, e.variantId, e.on)) {
         beforeOpening++;
         continue;
       }

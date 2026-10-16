@@ -158,6 +158,71 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     const again = await noon.import(`settlement-${tag}.csv`, Buffer.from(csv));
     assert.equal(again.alreadyImported, true, 'the same file twice moves nothing twice');
   });
+  await t.test('a count already holds everything dated before it: old invoices move no stock and no treasury', async () => {
+    const sales = new SalesService(db, ledger);
+    const tag = randomUUID().slice(0, 8);
+    await importLinkedCatalog(db, [{
+      name: `Counted ${tag}`, category: null, sellingPrice: '90.00', noonStock: 0, warehouseStock: 10,
+      listings: [{ channel: 'amazon', externalId: `CNT-${tag}`, partnerSku: null, title: 'Counted item', price: '90.00' }],
+    }], { actorId: null, apply: true, stockAsOf: new Date('2026-10-12T12:23:00+03:00') });
+    const [{ id: variantId }] = await db.query(
+      `SELECT v.id FROM product_variant v JOIN product p ON p.id = v.product_id WHERE p.name = $1`, [`Counted ${tag}`]);
+    const cash = async () => Number(await ledger.balanceOf('CASH'));
+    const cost = async () => (await db.query('SELECT unit_cost AS c FROM product_variant WHERE id = $1', [variantId]))[0].c;
+
+    // Entered before the count, so it moved the treasury — the count then holds it.
+    const voucher = await finance.recordVoucher({ direction: 'OUT', counter: 'OTHER_EXPENSE', amount: '300', occurredAt: '2026-10-05', userId: user.id });
+    const books = await cash();
+    try {
+      assert.equal((await finance.countCash('5000.00', user.id)).change, (5000 - books).toFixed(2));
+      assert.equal((await finance.countCash('5000.00', user.id)).change, '0.00', 'the same count again records nothing');
+      const counted = await cash();
+      assert.equal(counted, 5000);
+
+      const supplier = await purchasing.createSupplier({ name: `Old supplier ${tag}` });
+      const buy = (invoiceDate: string, unitCost: string, payment: 'CASH' | 'CREDIT') => purchasing.createInvoice(
+        { supplierId: supplier.id, invoiceDate, payment, lines: [{ variantId, quantity: 5, unitCost }] }, user.id, true);
+      const paidCash = await buy('2026-10-01', '40', 'CASH');
+      const typo = await buy('2026-10-05', '42', 'CREDIT');
+      assert.equal(await balance(variantId), 10, 'goods bought before the opening count are already in it');
+      assert.equal(await cost(), '42.0000', 'the latest price before the count is the cost');
+      assert.equal((await purchasing.getInvoice(paidCash.id)).beforeOpening, true);
+      assert.equal(await cash(), counted, 'paid before the cash count: the treasury already reflects it');
+      await purchasing.voidInvoice(typo.id, 'typed twice', user.id);
+      assert.equal(await cost(), '40.0000', 'cancelling it falls back to the price before');
+
+      const owed = await buy('2026-10-03', '41', 'CREDIT');
+      await purchasing.recordSupplierPayment(supplier.id, '100', undefined, user.id, owed.id, '2026-10-06');
+      assert.equal(await cash(), counted, 'an old payment, dated, leaves the treasury alone');
+      await purchasing.recordSupplierPayment(supplier.id, '50', undefined, user.id, owed.id);
+      assert.equal(await cash(), counted - 50, 'paying today moves it');
+      await finance.cancelVoucher(voucher.id, 'wrong amount', user.id);
+      assert.equal(await cash(), counted - 50, 'cancelling a record the count already holds leaves the treasury alone');
+
+      await buy(new Date().toISOString().slice(0, 10), '50', 'CREDIT');
+      assert.equal(await balance(variantId), 15);
+      assert.equal(await cost(), '44.0000', 'the counted units carry the old price into the average: (10×41 + 5×50) / 15');
+
+      const customer = await sales.createCustomer({ name: `Old buyer ${tag}` });
+      const sell = async (quantity: number, paid: string) => {
+        const draft = await sales.createDraft({ customerId: customer.id, invoiceDate: '2026-10-02', lines: [{ variantId, quantity, unitPrice: '90' }] }, user.id);
+        return sales.postInvoice(draft.id, paid, user.id);
+      };
+      const big = await sell(50, '900');
+      assert.equal(big.beforeOpening, true, 'more than is on the shelf today, but sold before the count');
+      assert.equal(await balance(variantId), 15);
+      assert.equal(await cash(), counted - 50);
+      const unpaid = await sell(3, '');
+      await sales.voidInvoice(unpaid.id, 'not ours', user.id);
+      assert.equal(await balance(variantId), 15, 'voiding returns only what it took');
+    } finally {
+      // Later tests post cash on past dates; a live count would hold them.
+      const live: Array<{ id: string }> = await db.query(
+        `SELECT id FROM ledger_entry e WHERE kind = 'CASH_COUNT' AND reverses_id IS NULL
+           AND NOT EXISTS (SELECT 1 FROM ledger_entry r WHERE r.reverses_id = e.id)`);
+      for (const { id } of live) await ledger.reverse(id, user.id);
+    }
+  });
   await t.test('the owners can fix the catalogue by hand: count, move a listing, merge a duplicate', async () => {
     const catalog = new CatalogService(db, finance);
     const tag = randomUUID().slice(0, 8);

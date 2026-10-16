@@ -118,8 +118,8 @@ export async function importLinkedCatalog(
             variantId: variant.id,
           })),
         );
-        const opening = (location: 'WAREHOUSE' | 'NOON', quantity: number, note: string) =>
-          quantity > 0
+        const opening = (location: 'WAREHOUSE' | 'NOON', quantity: number, note: string, always = false) =>
+          quantity > 0 || always
             ? tx.insert(StockMovement, {
                 variantId: variant.id,
                 location,
@@ -132,7 +132,9 @@ export async function importLinkedCatalog(
                 occurredAt: asOf,
               })
             : null;
-        await opening('WAREHOUSE', p.warehouseStock, 'opening stock — declared on the channel listings');
+        // Sold out everywhere is still a count: the zero row marks the day it was taken.
+        const soldOut = !p.warehouseStock && !p.noonStock;
+        await opening('WAREHOUSE', p.warehouseStock, soldOut ? 'opening stock — counted zero' : 'opening stock — declared on the channel listings', soldOut);
         await opening('NOON', p.noonStock, "opening stock — noon's warehouse count");
       });
     } catch (e) {

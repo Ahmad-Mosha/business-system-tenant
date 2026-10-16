@@ -137,6 +137,12 @@ export class FinanceController {
     return this.finance.setAnchor(openingBalance, openingAsOf);
   }
 
+  /** The treasury counted by hand; the difference from the books is recorded. */
+  @Post('cash-count')
+  countCash(@Req() req: Request, @Body() body: { counted?: string; note?: string }) {
+    return this.finance.countCash(body?.counted ?? '', req.user!.id, body?.note);
+  }
+
   /** سند قبض / سند صرف / إيداع نقدي — a hand-entered cash movement. */
   @Post('vouchers')
   recordVoucher(

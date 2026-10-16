@@ -53,6 +53,13 @@ export async function recordVoucher(_prev: FormState, form: FormData): Promise<F
   });
 }
 
+/** The treasury counted by hand — the API records the difference from the books. */
+export async function countCash(_prev: FormState, form: FormData): Promise<FormState> {
+  const counted = String(form.get('counted') ?? '').trim();
+  if (!MONEY.test(counted)) return invalid('amount', '150000.00');
+  return send('/finance/cash-count', 'POST', { counted, note: String(form.get('memo') ?? '').trim() || undefined });
+}
+
 /** إيداع سندي — record a received cheque. */
 export async function recordCheque(_prev: FormState, form: FormData): Promise<FormState> {
   const amount = String(form.get('amount') ?? '').trim();
@@ -156,11 +163,14 @@ export async function paySupplier(_prev: FormState, form: FormData): Promise<For
   const id = String(form.get('id') ?? '');
   const amount = String(form.get('amount') ?? '').trim();
   const invoiceId = String(form.get('invoiceId') ?? '').trim() || undefined;
+  const paidOn = String(form.get('paidOn') ?? '').trim();
   if (!id) return invalid('missingRecord');
   if (!MONEY.test(amount)) return invalid('amount', '10000.00');
+  if (paidOn && !ISO_DATE.test(paidOn)) return invalid('date');
   const state = await send(`/suppliers/${id}/payments`, 'POST', {
     amount,
     invoiceId,
+    paidOn: paidOn || undefined,
     memo: String(form.get('memo') ?? '').trim() || undefined,
   });
   if (state.status === 'saved') {

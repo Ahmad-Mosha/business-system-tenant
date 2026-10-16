@@ -26,7 +26,12 @@ export interface PostEntry {
   orderShippingCost?: string | number | null;
   /** A correction: the entry this one replaces. */
   replacesId?: string | null;
+  /** The day the treasury rule reads, when not `occurredAt` — a reversal reads its original's. */
+  treasuryDate?: Date;
 }
+
+/** Entries that set the treasury to a counted figure. */
+export const CASH_COUNTS: readonly LedgerEntryKind[] = ['OPENING_BALANCE', 'CASH_COUNT'];
 
 export interface EntryFilter {
   sourceType?: string;
@@ -98,14 +103,16 @@ export class LedgerService {
     if (input.debit === input.credit) {
       throw new BadRequestException('a ledger entry must move value between two different accounts');
     }
+    const occurredAt = input.occurredAt ?? new Date();
+    const counted = await this.countedBefore(input, tx);
 
     return tx.save(
       tx.create(LedgerEntry, {
         amount,
-        debitCode: input.debit,
-        creditCode: input.credit,
+        debitCode: counted && input.debit === 'CASH' ? 'OPENING_EQUITY' : input.debit,
+        creditCode: counted && input.credit === 'CASH' ? 'OPENING_EQUITY' : input.credit,
         kind: input.kind,
-        occurredAt: input.occurredAt ?? new Date(),
+        occurredAt,
         memo: input.memo ?? null,
         supplierId: input.supplierId ?? null,
         sourceType: input.sourceType ?? null,
@@ -118,6 +125,21 @@ export class LedgerService {
             : this.normaliseNonNegativeAmount(input.orderShippingCost),
       }),
     );
+  }
+
+  /**
+   * True when cash on this entry moved before the day the treasury was last
+   * counted: the counted figure already holds it, so it is booked against the
+   * opening balance instead of moving the treasury a second time.
+   */
+  private async countedBefore(input: PostEntry, tx: EntityManager): Promise<boolean> {
+    if ((input.debit !== 'CASH' && input.credit !== 'CASH') || CASH_COUNTS.includes(input.kind)) return false;
+    const [{ since }] = await tx.query(
+      `SELECT (date_trunc('day', max(e.occurred_at) AT TIME ZONE 'Africa/Cairo') AT TIME ZONE 'Africa/Cairo') AS since
+       FROM ledger_entry e WHERE e.kind = ANY($1) AND ${live('e')}`,
+      [CASH_COUNTS],
+    );
+    return !!since && (input.treasuryDate ?? input.occurredAt ?? new Date()) < since;
   }
 
   /**
@@ -150,6 +172,7 @@ export class LedgerService {
         credit: original.debitCode as LedgerAccountCode,
         kind: original.kind,
         occurredAt: new Date(),
+        treasuryDate: original.occurredAt,
         memo: `Reversal — ${original.memo ?? original.kind}`,
         supplierId: original.supplierId,
         sourceType: original.sourceType,
@@ -300,6 +323,11 @@ export class LedgerService {
     const capped = Math.min(Math.max(limit, 1), 500);
     // Hidden pairs leave the running balance too: a cancelled entry and its
     // reversal net to zero, so the balance column stays continuous without them.
+    // Only pairs that net here: a record the cash count already held keeps its
+    // treasury line, because its cancellation went to the opening balance.
+    const nets = `NOT (le.reverses_id IS NOT NULL AND EXISTS (
+         SELECT 1 FROM ledger_entry o WHERE o.id = le.reverses_id AND (o.debit_code = $1 OR o.credit_code = $1)))
+       AND NOT EXISTS (SELECT 1 FROM ledger_entry r WHERE r.reverses_id = le.id AND (r.debit_code = $1 OR r.credit_code = $1))`;
     return tx.query(
       `WITH moves AS (
          SELECT le.*,
@@ -310,7 +338,7 @@ export class LedgerService {
          FROM ledger_entry le
          JOIN ledger_account a ON a.code = $1
          WHERE (le.debit_code = $1 OR le.credit_code = $1)
-           ${cancelled ? '' : `AND ${live('le')}`}
+           ${cancelled ? '' : `AND ${nets}`}
        )
        SELECT m.id, m.occurred_at AS "occurredAt", m.amount, m.kind, m.memo,
               m.debit_code AS "debitCode", m.credit_code AS "creditCode",
@@ -386,7 +414,7 @@ export class LedgerService {
     // A cancelled entry and the reversal that cancels it net to nothing — left
     // in, a corrected mistake would read as money that came in and went out.
     const window = `(e.debit_code = $1 OR e.credit_code = $1)
-       AND e.kind <> 'OPENING_BALANCE'
+       AND e.kind NOT IN ('OPENING_BALANCE', 'CASH_COUNT')
        AND e.occurred_at::date BETWEEN $2::date AND $3::date
        AND ${live('e')}`;
 
