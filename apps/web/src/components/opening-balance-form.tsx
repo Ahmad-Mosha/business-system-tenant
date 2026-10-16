@@ -4,7 +4,8 @@ import { AlertTriangle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useActionState } from 'react';
 import { toast } from 'sonner';
-import { setOpeningBalance, type AnchorState } from '@/app/(app)/months/actions';
+import { setOpeningBalance, type AnchorState } from '@/app/(app)/channel-actions';
+import type { Marketplace } from '@/lib/channels';
 import { DatePicker } from '@/components/date-picker';
 import { MoneyInput } from '@/components/money-input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -12,18 +13,20 @@ import { Button } from '@/components/ui/button';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Spinner } from '@/components/ui/spinner';
 
-/** The noon balance every later month is measured from. It can be negative. */
+/** The balance a marketplace owed before the earliest report. It can be negative. */
 export function OpeningBalanceForm({
+  channel,
   openingBalance,
   openingAsOf,
 }: {
+  channel: Marketplace;
   openingBalance: string;
   openingAsOf: string | null;
 }) {
   const t = useTranslations();
   const [state, submit, pending] = useActionState<AnchorState, FormData>(async (prev, form) => {
-    const next = await setOpeningBalance(prev, form);
-    if (next.status === 'saved') toast.success(t('noon.months.updated'));
+    const next = await setOpeningBalance(channel, prev, form);
+    if (next.status === 'saved') toast.success(t('channel.opening.saved'));
     return next;
   }, { status: 'idle' });
 
@@ -31,7 +34,7 @@ export function OpeningBalanceForm({
     <form action={submit} className="grid gap-4">
       <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
         <Field>
-          <FieldLabel htmlFor="openingBalance">{t('noon.months.balance')}</FieldLabel>
+          <FieldLabel htmlFor="openingBalance">{t('channel.opening.balance')}</FieldLabel>
           <MoneyInput
             id="openingBalance"
             name="openingBalance"

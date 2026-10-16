@@ -60,6 +60,12 @@ export class NoonController {
     return this.reporting.periods();
   }
 
+  /** What noon owes today — null until an opening balance is set. */
+  @Get('balance')
+  async balance() {
+    return { balance: await this.reporting.balanceAt(new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' })) };
+  }
+
   @Get('account')
   async account() {
     const repo = this.db.getRepository(ChannelAccount);

@@ -1,3 +1,5 @@
+import { AmazonImport } from '../amazon/amazon-import.entity';
+import { AmazonTransaction } from '../amazon/amazon-transaction.entity';
 import { Expense, ExpenseCategory } from '../finance/expense.entity';
 import { User } from '../auth/user.entity';
 import { ChannelListing } from '../catalog/channel-listing.entity';
@@ -32,6 +34,8 @@ export const ENTITIES = [
   OrderEvent,
   NoonImport,
   NoonTransaction,
+  AmazonImport,
+  AmazonTransaction,
   ChannelAccount,
   EasyOrdersEvent,
   LedgerAccount,

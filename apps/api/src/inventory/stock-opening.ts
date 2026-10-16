@@ -17,6 +17,16 @@ export async function stockOpenedOn(tx: DataSource | EntityManager, variantIds: 
   return new Map(rows.map((r) => [r.id, r.opened]));
 }
 
+/** The moment of each product's opening count, for records that carry a time (Amazon's do). */
+export async function stockOpenedAt(tx: DataSource | EntityManager, variantIds: string[]): Promise<Map<string, Date | null>> {
+  const rows: Array<{ id: string; opened: Date | null }> = await tx.query(
+    `SELECT v.id, (SELECT min(m.occurred_at) FROM stock_movement m WHERE m.variant_id = v.id AND m.source_type = $2) AS opened
+     FROM product_variant v WHERE v.id = ANY($1::uuid[])`,
+    [variantIds, OPENING_IMPORT],
+  );
+  return new Map(rows.map((r) => [r.id, r.opened]));
+}
+
 /** True when a record dated `on` (YYYY-MM-DD) comes before this product's opening count. */
 export const beforeOpening = (opened: Map<string, string | null>, variantId: string, on: string | null) => {
   const day = opened.get(variantId);

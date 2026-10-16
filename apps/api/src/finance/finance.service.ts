@@ -288,6 +288,22 @@ export class FinanceService {
     );
   }
 
+  /** An Amazon transfer to our bank, dated the day Amazon sent it. */
+  recordAmazonPayout(tx: EntityManager, amount: string, sourceId: string, occurredAt: Date) {
+    return this.ledger.post(
+      {
+        amount,
+        occurredAt,
+        debit: 'CASH',
+        credit: 'AMAZON_RECEIVABLE',
+        kind: 'AMAZON_PAYOUT',
+        sourceType: 'amazon_transaction',
+        sourceId,
+      },
+      tx,
+    );
+  }
+
   // ── Cheques (إيداع سندي) ────────────────────────────────────────────────
 
   listCheques(status?: ChequeStatus) {

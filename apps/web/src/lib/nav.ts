@@ -3,12 +3,12 @@ import {
   Contact,
   FileText,
   BookText,
-  CalendarRange,
   ClipboardList,
   LayoutGrid,
   Package,
   Receipt,
   ShoppingBag,
+  ShoppingCart,
   Store,
   Truck,
   Upload,
@@ -79,14 +79,22 @@ export const NAVIGATION: NavGroup[] = [
     ],
   },
   {
-    // These four screens all answer one question — what noon owes and why.
+    // Each marketplace's screens answer one question — what it owes us and why.
     key: 'noon',
     icon: Store,
     items: [
       { href: '/', key: 'noonOverview', icon: LayoutGrid, roles: ['ADMIN'], exact: true },
-      { href: '/months', key: 'months', icon: CalendarRange, roles: ['ADMIN'] },
       { href: '/products', key: 'products', icon: BarChart3, roles: ['ADMIN'] },
       { href: '/imports', key: 'imports', icon: Upload, roles: ['ADMIN'] },
+    ],
+  },
+  {
+    key: 'amazon',
+    icon: ShoppingCart,
+    items: [
+      { href: '/amazon', key: 'amazonOverview', icon: LayoutGrid, roles: ['ADMIN'], exact: true },
+      { href: '/amazon/products', key: 'amazonProducts', icon: BarChart3, roles: ['ADMIN'] },
+      { href: '/amazon/imports', key: 'amazonImports', icon: Upload, roles: ['ADMIN'] },
     ],
   },
   {

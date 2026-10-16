@@ -63,3 +63,13 @@ test('arrow stepping never goes below the minimum', () => {
   assert.equal(stepNumber('', 1, 1), '1');
   assert.equal(stepNumber('9', 1), '10');
 });
+
+test('a leading zero gives way to the next digit, but not to a decimal point', () => {
+  const money = { decimals: 2, negative: true };
+  assert.equal(cleanNumber('05000', money), '5000');
+  assert.equal(cleanNumber('-05', money), '-5');
+  assert.equal(cleanNumber('0.5', money), '0.5');
+  assert.equal(cleanNumber('0', money), '0');
+  // The caret stays after the digit just typed.
+  assert.equal(caretAfterClean('05', 2, money), 1);
+});
