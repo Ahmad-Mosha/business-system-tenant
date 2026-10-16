@@ -1,8 +1,8 @@
 'use client';
 
-import { ArrowDownLeft, ArrowUpRight, Ban, Banknote, FileText, Pencil } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Ban, Banknote, Calculator, FileText, Pencil } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { cancelVoucher, correctVoucher, recordCheque, recordVoucher } from '@/app/(app)/money/actions';
+import { cancelVoucher, correctVoucher, countCash, recordCheque, recordVoucher } from '@/app/(app)/money/actions';
 import { DatePicker, todayISO } from '@/components/date-picker';
 import { FormDialog } from '@/components/form-dialog';
 import { MoneyInput } from '@/components/money-input';
@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { money } from '@/lib/format';
 import { VOUCHER_COUNTERS } from '@/lib/money';
 
 /** The three cash vouchers — `money.vouchers` names each one. */
@@ -26,11 +27,12 @@ const VOUCHERS = {
   out: { direction: 'OUT', fixedCounter: null, title: 'cashOut', hint: 'outHint' },
 } as const;
 
-/** Every hand-entered cash movement, as the Treasury screen's actions. */
-export function TreasuryActions() {
+/** Every hand-entered cash movement, as the Treasury screen's actions. `cash` is the books' figure. */
+export function TreasuryActions({ cash }: { cash: string }) {
   const t = useTranslations('money.vouchers');
   return (
     <>
+      <CountCashDialog cash={cash} />
       <ChequeDialog
         trigger={
           <Button variant="outline">
@@ -67,6 +69,41 @@ export function TreasuryActions() {
         }
       />
     </>
+  );
+}
+
+/** The treasury counted by hand; the API records the difference from the books. */
+function CountCashDialog({ cash }: { cash: string }) {
+  const t = useTranslations('money');
+  return (
+    <FormDialog
+      trigger={
+        <Button variant="outline">
+          <Calculator />
+          {t('count.button')}
+        </Button>
+      }
+      title={t('count.title')}
+      description={t('count.hint')}
+      action={countCash}
+      submitLabel={t('count.button')}
+      success={t('count.recorded')}
+    >
+      <p className="flex items-baseline justify-between gap-3 rounded-lg bg-muted px-3 py-2 text-sm">
+        <span className="text-muted-foreground">{t('count.books')}</span>
+        <span className="num font-medium">{money(cash)}</span>
+      </p>
+      <Field>
+        <FieldLabel htmlFor="count-counted">{t('count.counted')}</FieldLabel>
+        <MoneyInput id="count-counted" name="counted" autoFocus />
+      </Field>
+      <Field>
+        <FieldLabel htmlFor="count-memo">
+          {t('vouchers.note')} <Optional />
+        </FieldLabel>
+        <Input id="count-memo" name="memo" dir="auto" />
+      </Field>
+    </FormDialog>
   );
 }
 

@@ -105,6 +105,12 @@ export default async function SalesInvoicePage({ params }: { params: Promise<{ i
           <AlertDescription>{t('draftNote')}</AlertDescription>
         </Alert>
       ) : null}
+      {invoice.beforeOpening && invoice.status !== 'VOID' ? (
+        <Alert>
+          <Info />
+          <AlertDescription>{t('beforeOpening')}</AlertDescription>
+        </Alert>
+      ) : null}
       {invoice.status === 'VOID' ? (
         <Alert>
           <Ban />

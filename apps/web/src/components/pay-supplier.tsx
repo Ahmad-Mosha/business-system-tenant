@@ -3,11 +3,12 @@ import { useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
 import { paySupplier } from '@/app/(app)/money/actions';
 import { FormDialog } from '@/components/form-dialog';
+import { DatePicker } from '@/components/date-picker';
 import { MoneyInput } from '@/components/money-input';
 import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { money } from '@/lib/format';
+import { money, today } from '@/lib/format';
 import { num } from '@/i18n/rich';
 
 export function PaySupplier({
@@ -51,6 +52,11 @@ export function PaySupplier({
         <FieldLabel htmlFor="pay-amount">{t('vouchers.amount')}</FieldLabel>
         <MoneyInput id="pay-amount" name="amount" defaultValue={defaultAmount ?? owed} autoFocus />
         <FieldDescription>{t.rich('pay.owedTotal', { amount: money(owed), num })}</FieldDescription>
+      </Field>
+      <Field>
+        <FieldLabel htmlFor="pay-date">{t('vouchers.date')}</FieldLabel>
+        <DatePicker id="pay-date" name="paidOn" defaultValue={today()} />
+        <FieldDescription>{t('pay.dateHint')}</FieldDescription>
       </Field>
       <Field>
         <FieldLabel htmlFor="pay-memo">

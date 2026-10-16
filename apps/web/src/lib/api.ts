@@ -541,6 +541,8 @@ export interface PurchaseInvoiceDetail {
   replacedById: string | null;
   /** On a correction draft: the cancelled invoice it re-enters. */
   replacesId: string | null;
+  /** Dated before the stock count: posting it moves no stock. */
+  beforeOpening?: boolean;
   /** What stands in the way of cancelling or editing it, from the API's own rules. */
   blocked?: { cancel: import('@/lib/problem').Reason[] };
 }
@@ -700,6 +702,8 @@ export interface SalesInvoiceDetail {
   lines: SalesInvoiceLine[];
   /** Money received against it; a reversed one stays listed, marked. */
   payments: SalesPayment[];
+  /** Dated before the stock count: posting it moves no stock. */
+  beforeOpening?: boolean;
   /** What stands in the way of posting or voiding it, from the API's own rules. */
   blocked?: { post: import('@/lib/problem').Reason[]; void: import('@/lib/problem').Reason[] };
 }
