@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { StockTransferDialog } from '@/components/stock-transfer-dialog';
-import { recordStock, updateVariant } from '@/app/(app)/inventory/actions';
+import { countStock, recordStock, updateVariant } from '@/app/(app)/inventory/actions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -98,6 +98,8 @@ export function VariantPanel({
   const [cost, setCost] = useState(variant.unitCost ?? '');
   const [costReason, setCostReason] = useState('');
   const [price, setPrice] = useState(variant.sellingPrice ?? '');
+  const [countAt, setCountAt] = useState<'WAREHOUSE' | 'NOON'>('WAREHOUSE');
+  const [counted, setCounted] = useState('');
 
   // Compared as numbers: retyping a stored 120.0000 as 120 is not a change.
   const changed = (next: string, saved: string | null) =>
@@ -121,6 +123,15 @@ export function VariantPanel({
         setCostReason('');
       }
       else toast.error(r.message);
+    });
+
+  const onHandAt = countAt === 'WAREHOUSE' ? variant.warehouseOnHand : variant.noonOnHand;
+  const saveCount = () =>
+    start(async () => {
+      const r = await countStock(variant.id, countAt, Number(counted));
+      if (!r.ok) return void toast.error(r.message);
+      toast.success(t('countSaved', { change: r.data.change, before: r.data.before, counted: r.data.counted }));
+      setCounted('');
     });
 
   const move = () =>
@@ -209,6 +220,32 @@ export function VariantPanel({
             {pending ? <Spinner /> : null}
             {t('savePrices')}
           </Button>
+        </FieldGroup>
+
+        {/* A physical count: type what's on the shelf, the difference is recorded for you. */}
+        <FieldGroup className="gap-3">
+          <p className="text-xs font-medium">{t('count')}</p>
+          <p className="text-xs text-muted-foreground">{t('countHint')}</p>
+          <div className="grid grid-cols-[minmax(0,1fr)_96px_auto] items-end gap-2">
+            <Field>
+              <FieldLabel htmlFor={`count-at-${variant.id}`}>{tr('inventory.location')}</FieldLabel>
+              <Select value={countAt} onValueChange={(v) => setCountAt(v as 'WAREHOUSE' | 'NOON')} disabled={pending}>
+                <SelectTrigger id={`count-at-${variant.id}`}><SelectValue /></SelectTrigger>
+                <SelectContent>{(['WAREHOUSE', 'NOON'] as const).map((l) => <SelectItem key={l} value={l}>{tr(`enums.stockLocation.${l}`)}</SelectItem>)}</SelectContent>
+              </Select>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor={`counted-${variant.id}`}>{t('counted')}</FieldLabel>
+              <NumberField id={`counted-${variant.id}`} value={counted} onValueChange={setCounted} decimals={0} min={0} placeholder={String(onHandAt)} disabled={pending} />
+            </Field>
+            <Button variant="outline" onClick={saveCount} disabled={pending || counted === '' || !Number.isInteger(Number(counted)) || Number(counted) < 0}>
+              {pending ? <Spinner /> : null}
+              {t('saveCount')}
+            </Button>
+          </div>
+          {counted !== '' && Number(counted) !== onHandAt ? (
+            <p className="num text-xs text-muted-foreground">{t('countPreview', { before: onHandAt, counted: Number(counted) })}</p>
+          ) : null}
         </FieldGroup>
 
         <FieldGroup className="gap-3">

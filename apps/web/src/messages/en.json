@@ -269,7 +269,9 @@
       },
       "listing": {
         "taken": "{channel, select, noon {noon} amazon {Amazon} easyorders {Website} other {{channel}}} SKU “{externalId}” is already linked to another product.",
-        "required": "Enter the channel’s SKU."
+        "required": "Enter the channel’s SKU.",
+        "moveTarget": "Choose an active product to move it to.",
+        "moveSame": "This SKU is already on that product."
       },
       "stock": {
         "remove": "{available, plural, =0 {Nothing on hand to remove.} other {Only # on hand — you can remove up to #.}}",
@@ -277,7 +279,8 @@
         "transfer": "Choose different warehouses and a positive whole quantity.",
         "costReason": "Enter a reason for this unit-cost correction.",
         "usePurchaseInvoice": "Record bought stock with a purchase invoice.",
-        "quantity": "Enter a whole quantity other than 0."
+        "quantity": "Enter a whole quantity other than 0.",
+        "counted": "Enter the counted quantity as a whole number of 0 or more."
       },
       "product": {
         "archived": "This product is archived, so its stock and details can’t change. Restore it from its page first.",
@@ -296,7 +299,11 @@
         "archiveBlocked": "This product can’t be archived yet. Archiving hides it from daily work, so first clear what still depends on it:",
         "archiveSalesDrafts": "{count, plural, one {It’s on # draft sales invoice. Post or delete it first.} other {It’s on # draft sales invoices. Post or delete them first.}}",
         "name": "Enter the product name.",
-        "openingStock": "Opening stock must be a whole number, 0 or more."
+        "openingStock": "Opening stock must be a whole number, 0 or more.",
+        "mergeTarget": "Choose an active product to merge into.",
+        "mergeSelf": "A product can’t be merged into itself.",
+        "mergeVariants": "A product with several variants can’t be merged — move its SKUs one by one instead.",
+        "mergeBlocked": "This product already has trading history, so it can’t be merged away. Move its SKUs to the other product instead, then archive it."
       },
       "sync": {
         "notConfigured": "The Easy Orders connection isn’t set up.",
@@ -820,7 +827,13 @@
         "orderEdited": "Order edited — its earlier lines reversed",
         "orderReactivated": "Order reactivated — stock leaves again"
       },
-      "note": "Reason / reference (optional)"
+      "note": "Reason / reference (optional)",
+      "count": "Count the stock",
+      "countHint": "Type what is actually there; the system records the difference for you.",
+      "counted": "Counted",
+      "saveCount": "Save count",
+      "countPreview": "{before} now → {counted} after saving",
+      "countSaved": "{change, plural, =0 {The count matches — nothing changed.} other {Count saved: {before} → {counted}.}}"
     },
     "listings": {
       "variantsNotBuilt": "This product has variants. Per-variant channel mapping isn’t built yet — say the word when you need it.",
@@ -833,7 +846,12 @@
       "skuUpdated": "{channel} SKU updated.",
       "linkedTo": "Linked to {channel}.",
       "unlinked": "Unlinked from {channel}.",
-      "addAnother": "Add another SKU"
+      "addAnother": "Add another SKU",
+      "move": "Move this {channel} SKU to another product",
+      "moveTitle": "Move this {channel} SKU",
+      "moveDescription": "Its future sales go to the product you choose. Stock already counted stays where it is — correct the counts after if needed.",
+      "moveConfirm": "Move",
+      "moved": "Moved to {name}."
     },
     "channelSku": {
       "noon": {
@@ -890,6 +908,18 @@
       "quantity": "Qty",
       "unitPrice": "Supplier price",
       "landed": "With shipping"
+    },
+    "merge": {
+      "action": "Merge into…",
+      "title": "Merge <bdi>{name}</bdi> into another product",
+      "description": "For a duplicate: every SKU and all its stock move into the product you choose, and this one is removed. The stock adds up, so check the counts after.",
+      "confirm": "Merge"
+    },
+    "pick": {
+      "search": "Find the product by name or SKU",
+      "chosen": "Into:",
+      "thisOne": "This product",
+      "onHand": "{count} in the warehouse"
     }
   },
   "validation": {

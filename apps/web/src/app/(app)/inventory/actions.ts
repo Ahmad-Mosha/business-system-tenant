@@ -117,3 +117,32 @@ export async function transferStock(variantId: string, quantity: number, from: '
     quantity, from, to: from === 'WAREHOUSE' ? 'NOON' : 'WAREHOUSE', note,
   }, '/inventory');
 }
+
+/** Sets a location to what was counted; the API records the difference. */
+export async function countStock(variantId: string, location: 'WAREHOUSE' | 'NOON', counted: number, note?: string) {
+  const r = await apiRequest<{ before: number; counted: number; change: number }>(`/catalog/variants/${variantId}/count`, 'POST', { location, counted, note });
+  if (r.ok) {
+    revalidatePath('/inventory', 'layout');
+    revalidatePath('/money', 'layout');
+  }
+  return r;
+}
+
+/** Moves one channel listing to another product. */
+export async function moveListing(productId: string, listingId: string, variantId: string) {
+  const r = await apiRequest<{ productId: string; name: string }>(`/catalog/listings/${listingId}/move`, 'POST', { variantId });
+  if (r.ok) {
+    revalidatePath(`/inventory/${productId}`);
+    revalidatePath(`/inventory/${r.data.productId}`);
+    revalidatePath('/inventory');
+  }
+  return r;
+}
+
+/** Merges a duplicate into another product, then opens that product. */
+export async function mergeProduct(productId: string, intoVariantId: string) {
+  const r = await apiRequest<{ productId: string; name: string }>(`/catalog/products/${productId}/merge`, 'POST', { intoVariantId });
+  if (!r.ok) return r;
+  revalidatePath('/inventory', 'layout');
+  redirect(`/inventory/${r.data.productId}`);
+}
