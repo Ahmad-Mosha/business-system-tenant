@@ -129,16 +129,29 @@ test('concurrent operations preserve stock, cash and supplier balances', { skip:
     await importLinkedCatalog(db, [{
       name: `Settled ${tag}`, category: null, sellingPrice: '100.00', noonStock: 2, warehouseStock: 5,
       listings: [{ channel: 'noon', externalId: `Z${tag}Z-1`, partnerSku: psku, title: 'Settled item', price: '100.00' }],
+    }, {
+      // Sold out at the snapshot, so it has no opening count of its own.
+      name: `Sold out ${tag}`, category: null, sellingPrice: '50.00', noonStock: 0, warehouseStock: 0,
+      listings: [{ channel: 'noon', externalId: `Z${tag}E-1`, partnerSku: `${psku}E`, title: 'Sold out item', price: '50.00' }],
     }], { actorId: null, apply: true, stockAsOf: new Date('2026-10-12T12:23:00+03:00') });
     const [{ id: variantId }] = await db.query(
       `SELECT v.id FROM product_variant v JOIN product p ON p.id = v.product_id WHERE p.name = $1`, [`Settled ${tag}`]);
     const header = 'Contract,Contract Title,Reference Nr,Order Nr,Item Nr,Order Date,Transaction Date,Title,SKUs,Partner SKUs,Transaction Type,Currency,Net Proceeds,Referral Fee including VAT,Fullfilment & Logistics Fees including VAT,Shipping Credits including VAT,Other Order Fees including VAT,Order Subsidies including VAT,Non-Order Fees including VAT,Non-Order Subsidies including VAT,Others including VAT,Total';
     const row = (n: number, ordered: string) =>
       `C1,Noon EG,PS-${tag},N${tag}${n},N${tag}${n}-1,${ordered},2026-10-20,Settled item,Z${tag}Z-1,${psku},order,EGP,100,-10,0,0,0,0,0,0,0,90`;
-    const csv = [header, row(1, '2026-10-05'), row(2, '2026-10-13'), row(3, '2026-10-14'), row(4, '2026-10-15')].join('\n');
+    const soldOut = `C1,Noon EG,PS-${tag},N${tag}9,N${tag}9-1,2026-10-05,2026-10-20,Sold out item,Z${tag}E-1,${psku}E,order,EGP,50,-5,0,0,0,0,0,0,0,45`;
+    const payout = `C1,Noon EG,PS-${tag},,,,2026-10-14,,,,payment,EGP,0,0,0,0,0,0,0,0,-777,-777`;
+    const csv = [header, row(1, '2026-10-05'), row(2, '2026-10-13'), row(3, '2026-10-14'), row(4, '2026-10-15'), soldOut, payout].join('\n');
     const noon = new NoonImportService(db, finance);
     const result = await noon.import(`settlement-${tag}.csv`, Buffer.from(csv));
-    assert.deepEqual([result.rowsInserted, result.unmappedListings, result.stockMoved, result.stockBeforeOpening], [4, 0, 3, 1]);
+    assert.deepEqual([result.rowsInserted, result.unmappedListings, result.stockMoved, result.stockBeforeOpening], [6, 0, 3, 2]);
+    const [{ moved }] = await db.query(
+      `SELECT count(*)::int AS moved FROM stock_movement m JOIN channel_listing l ON l.variant_id = m.variant_id
+       WHERE l.partner_sku = $1 AND m.source_type = 'noon_transaction'`, [`${psku}E`]);
+    assert.equal(moved, 0, 'a product sold out at the snapshot already had its earlier sales netted out');
+    const [{ day }] = await db.query(
+      `SELECT (occurred_at AT TIME ZONE 'Africa/Cairo')::date::text AS day FROM ledger_entry WHERE kind = 'NOON_PAYOUT' AND amount = 777 ORDER BY created_at DESC LIMIT 1`);
+    assert.equal(day, '2026-10-14', 'a payout is dated the day noon sent it');
     const stock = await db.query(
       `SELECT location, SUM(quantity)::int AS n FROM stock_movement WHERE variant_id = $1 GROUP BY location ORDER BY location`, [variantId]);
     assert.deepEqual(stock, [{ location: 'NOON', n: 0 }, { location: 'WAREHOUSE', n: 4 }], 'two from noon, then one from the warehouse; the 5 Oct order left alone');
