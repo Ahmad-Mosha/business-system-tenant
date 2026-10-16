@@ -6,6 +6,7 @@ import { languageOf } from '@/i18n/config';
 /** Every ledger entry kind the messages name (`enums.entryKind`) — a newer one shows as its code. */
 const ENTRY_KINDS = [
   'OPENING_BALANCE',
+  'CASH_COUNT',
   'CASH_DEPOSIT',
   'CHEQUE_DEPOSIT',
   'CHEQUE_CLEAR',

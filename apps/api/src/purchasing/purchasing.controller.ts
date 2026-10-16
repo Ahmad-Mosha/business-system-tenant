@@ -55,7 +55,7 @@ export class SuppliersController {
   pay(
     @Req() req: Request,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: { amount?: string; memo?: string; invoiceId?: string },
+    @Body() body: { amount?: string; memo?: string; invoiceId?: string; paidOn?: string },
   ) {
     return this.purchasing.recordSupplierPayment(
       id,
@@ -63,6 +63,7 @@ export class SuppliersController {
       body?.memo,
       req.user!.id,
       body?.invoiceId,
+      body?.paidOn,
     );
   }
 

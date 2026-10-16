@@ -60,7 +60,7 @@ export default async function TreasuryPage({ searchParams }: { searchParams: Pro
       <PageHeader
         title={tr('nav.items.treasury')}
         description={t('description')}
-        actions={<TreasuryActions />}
+        actions={<TreasuryActions cash={cash} />}
       />
 
       <SummaryStrip label={tr('nav.items.treasury')}>
