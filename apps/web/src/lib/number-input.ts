@@ -32,6 +32,8 @@ export function cleanNumber(raw: string, rules: NumberRules): string | null {
       out += '.';
     } else if ((c === '-' || c === '−') && rules.negative && out === '') out = '-';
   }
+  // A leading zero gives way to the digit typed after it: `0` then `5` is `5`, never `05`.
+  out = out.replace(/^(-?)0+(?=\d)/, '$1');
   const dot = out.indexOf('.');
   if (dot !== -1 && out.length - dot - 1 > rules.decimals) return null;
   return out;
