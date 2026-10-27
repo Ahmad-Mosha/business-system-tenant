@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Typecheck, lint, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # A disposable database for the integration test: it refuses anything
+    # that is not localhost and not named *_test.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: prime
+          POSTGRES_PASSWORD: prime
+          POSTGRES_DB: prime_market_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U prime -d prime_market_test"
+          --health-interval 5s
+          --health-retries 10
+
+    env:
+      TEST_DATABASE_URL: postgres://prime:prime@localhost:5432/prime_market_test
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
