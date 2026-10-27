@@ -1,12 +1,24 @@
 # Prime Market
 
 [![CI](https://github.com/Ahmad-Mosha/business-system-tenant/actions/workflows/ci.yml/badge.svg)](https://github.com/Ahmad-Mosha/business-system-tenant/actions/workflows/ci.yml)
+[![In production](https://img.shields.io/badge/status-in%20production%20since%20Aug%202026-2ea44f)](#in-production)
 
-An operations platform for a multi-channel e-commerce business. It brings
-inventory, orders, shipping, marketplace settlements, purchasing and money
-together in one place. It is built for a real reseller in Egypt and has run in
-production since August 2026, used every day by its owners and staff, in Arabic
-and English.
+**A real business runs on this system.** Prime Market is the operations
+platform of a multi-channel e-commerce reseller in Egypt. It holds the
+business's inventory, orders, shipping, marketplace settlements, purchasing and
+money in one place. It went live on 31 August 2026, and the owners and their
+staff run their operations on it, in Arabic and English.
+
+I built it end to end: I gathered the requirements with the owners, then
+designed the system, wrote the code, deployed it, and support it in production.
+
+| | |
+|---|---|
+| **Status** | Live since 31 August 2026 |
+| **Used by** | The business's owners (admin role) and its order moderator |
+| **Connected to** | noon and Amazon settlement reports, the website's order webhook, the Bosta courier API |
+| **Delivery** | 84 pull requests merged, most of them shipped in small steps while the system was in use |
+| **Runs on** | AWS EC2 · Docker Compose · Caddy · Neon Postgres · nightly encrypted backups |
 
 **Stack:** TypeScript · NestJS 11 · TypeORM · PostgreSQL 17 · Next.js 16 (App
 Router, React 19) · Tailwind 4 · shadcn/ui · next-intl · Docker · Caddy · AWS
@@ -32,6 +44,59 @@ Before this system:
 
 The goal: **one reconciled source of truth, where every number can be opened
 to show the records behind it.**
+
+## In production
+
+### How the business uses it
+
+- **Website orders:** since 1 September 2026 they arrive through the webhook
+  and are handled here, from confirmation to delivery.
+- **Social media orders:** these used to live in spreadsheets. The order
+  moderator now enters them, and sees only the orders assigned to them.
+- **Marketplace reports:** the owners upload noon and Amazon reports instead
+  of reconciling them by hand. The money overview puts profit and loss for
+  all five channels on one screen.
+- **The owners ran it alone for a week** (17–23 October 2026) while I was
+  offline, with no laptop or internet, using an Arabic user guide prepared
+  for them.
+
+### Checked against the real systems
+
+- **noon:** the statement rebuilt from noon's transaction export matches
+  noon's own portal. Net proceeds and payouts match exactly, and fees match to
+  within 2 EGP over a full month.
+- **Bosta:** "has Bosta paid us for this shipment?" was checked row by row
+  against the real Bosta dashboard, and all 24 rows matched. The obvious rule,
+  "delivered means paid", turned out to be wrong: cash-on-delivery shipments
+  are routinely delivered and still unpaid. The real signal is a payout id
+  that only one of Bosta's endpoints returns.
+- **Catalogue:** built from the business's real noon, Amazon and website
+  exports. Each channel names the same product differently, which is why
+  products are linked by listing and never matched by name
+  ([docs/evidence](docs/evidence/)).
+
+### Lessons from running it
+
+| What happened | What changed |
+|---|---|
+| In development, a half-written migration ran under the hot-reloading server, and its missing column surfaced as an error a day later | The migration guard: each migration is fingerprinted once it runs, and an edited one stops the development server and is named |
+| The instance's 8 GB disk filled up during a rebuild | Resized it to 20 GB on the running instance, with no downtime |
+| The Docker build plugin packaged with Amazon Linux 2023 was too old for current Compose | Fixed it on the server and added the fix to the bootstrap script, so a fresh instance works first time |
+| Neon's pooled endpoint starts with an empty `search_path`, which broke raw SQL | Production uses the direct endpoint, and `.env.prod.example` says why |
+| The database moved from the EC2 box to Neon | Row counts and per-table content hashes were verified before cutover, and the old database stayed up as a rollback |
+
+### Working with the owners
+
+- **Money rules are agreed before they are built.** Each one goes to the
+  owners as a short decision with a worked example in Egyptian Arabic, and
+  then becomes a rule in [docs/business-rules.md](docs/business-rules.md).
+  For example: a correction is a reversal, never a delete; a sales invoice
+  books revenue when it is posted; invoices dated before the opening stock
+  count move no stock.
+- **Daily use shaped the details:** a hand cash count for the treasury, a
+  privacy toggle that hides figures when someone is nearby, forms that keep
+  unfinished work, 30-day sessions so nobody signs in every morning, and
+  Arabic as the default language.
 
 ## What it does
 
