@@ -15,3 +15,11 @@ ui-ux/
 
 # Build artefact — regenerated on every typecheck.
 apps/web/tsconfig.tsbuildinfo
+
+# Kept locally, not published: client data, owner notes, planning history.
+docs/internal/
+
+# Editor and agent tooling — `next dev` rewrites the two web files on start.
+.claude/
+apps/web/AGENTS.md
+apps/web/CLAUDE.md

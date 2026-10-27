@@ -59,8 +59,7 @@ product is worse than a visible gap: it looks connected without being connected,
 and it corrupts every number computed from it afterwards.
 
 Related: the VAT report carries `Partner SKU` on only **1 of 842 rows** — it is
-effectively unusable for mapping. See
-[noon-settlement-report.md](noon-settlement-report.md).
+effectively unusable for mapping.
 
 ## Known unresolved item
 
