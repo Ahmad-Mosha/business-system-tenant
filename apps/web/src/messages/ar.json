@@ -171,11 +171,6 @@
     "noMovement": "لم تتحرك أي أموال في هذه الفترة.",
     "grossMargin": "هامش الربح الإجمالي"
   },
-  "noData": {
-    "title": "لم يُرفع أي تقرير بعد",
-    "description": "ارفع ملف تسوية من نون، وستُقرأ منه المنتجات والإيرادات والرسوم تلقائيًا.",
-    "action": "رفع تقرير"
-  },
   "states": {
     "apiDown": "تعذّر الوصول إلى الخادم الآن. تأكد أنه يعمل، ثم حاول مرة أخرى.",
     "failed": "حدث خطأ من جانبنا. غالبًا ما تحل المحاولة مرة أخرى المشكلة.",
@@ -1575,27 +1570,6 @@
       "PARTIAL": "مدفوعة جزئيًا",
       "PAID": "مدفوعة",
       "VOID": "ملغاة"
-    },
-    "cashIn": {
-      "SALES": "المبيعات",
-      "OWNER_CAPITAL": "إيداعات المالك",
-      "SUPPLIER_PAYABLE": "مستردات من الموردين",
-      "INVENTORY": "إلغاء مشتريات نقدية",
-      "NOON_RECEIVABLE": "تحويلات نون",
-      "AMAZON_RECEIVABLE": "تحويلات أمازون",
-      "BOSTA_COD": "تحويلات بوسطة",
-      "CHEQUES_PENDING": "شيكات محصّلة",
-      "CUSTOMER_RECEIVABLE": "تحصيلات العملاء"
-    },
-    "cashOut": {
-      "SALES": "مبيعات مُلغاة",
-      "OWNER_CAPITAL": "مسحوبات المالك",
-      "SUPPLIER_PAYABLE": "مدفوعات الموردين",
-      "INVENTORY": "مشتريات بضاعة نقدًا",
-      "OTHER_EXPENSE": "مصروفات",
-      "SHIPPING": "الشحن",
-      "CHANNEL_FEES": "رسوم وإعلانات",
-      "CUSTOMER_RECEIVABLE": "تحصيلات عملاء معكوسة"
     },
     "voucherCounter": {
       "OTHER_EXPENSE": "مصروف عام",

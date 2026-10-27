@@ -1,5 +1,6 @@
 import { AlertTriangle, RotateCw } from 'lucide-react';
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 import { Amount } from '@/components/amount';
 import { MetricCard, MetricGrid } from '@/components/metric-card';
 import { Page, PageHeader } from '@/components/page';
@@ -8,7 +9,6 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { getBostaShipments } from '@/lib/api';
 import { requireSession } from '@/lib/session';
-import { getTranslations } from 'next-intl/server';
 
 export default async function ShipmentsPage() {
   await requireSession();

@@ -176,18 +176,6 @@ export const getAmazonUnattributed = (from: string, to: string) => get<Unattribu
 /** What a marketplace owes today; null until its opening balance is set. */
 export const getChannelBalance = (channel: 'noon' | 'amazon') => get<{ balance: string | null }>(`/${channel}/balance`);
 
-/**
- * The window every page defaults to: everything we hold. Derived from the
- * imports themselves so the UI is never pinned to a hard-coded month.
- */
-export async function getDataRange(): Promise<{ from: string; to: string } | null> {
-  const imports = await getImports();
-  const starts = imports.map((i) => i.periodStart).filter((d): d is string => !!d);
-  const ends = imports.map((i) => i.periodEnd).filter((d): d is string => !!d);
-  if (!starts.length || !ends.length) return null;
-  return { from: starts.sort()[0], to: ends.sort()[ends.length - 1] };
-}
-
 export type OrderStatus =
   | 'NEW' | 'ASSIGNED' | 'CONFIRMED' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED' | 'RETURNED';
 export type PaymentStatus = 'UNPAID' | 'PAID' | 'REFUND_DUE' | 'REFUNDED';
@@ -612,19 +600,6 @@ export interface PurchaseInvoiceDetail {
   /** What stands in the way of cancelling or editing it, from the API's own rules. */
   blocked?: { cancel: import('@/lib/problem').Reason[] };
 }
-
-export interface PeriodSummary {
-  revenue: string;
-  cogs: string;
-  channelFees: string;
-  shipping: string;
-  otherExpense: string;
-}
-
-export const getCashSeries = (days = 90) =>
-  get<Array<{ date: string; balance: string }>>(`/finance/cash-series?days=${days}`);
-export const getPeriodSummary = (from?: string, to?: string) =>
-  get<PeriodSummary>(`/finance/summary${from && to ? `?from=${from}&to=${to}` : ''}`);
 
 export type SalesChannel = 'noon' | 'amazon' | 'website' | 'social' | 'wholesale';
 

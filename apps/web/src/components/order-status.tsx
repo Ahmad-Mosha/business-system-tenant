@@ -1,8 +1,6 @@
 import { useTranslations } from 'next-intl';
 import { ToneBadge, type Tone } from '@/components/tone-badge';
-import { Badge } from '@/components/ui/badge';
 import type { OrderStatus, PaymentStatus } from '@/lib/api';
-import { isOneOf } from '@/lib/utils';
 
 /** One definition of what each status means, used everywhere a status appears. */
 const STATUS_TONE: Record<OrderStatus, Tone> = {
@@ -39,12 +37,6 @@ export const NEXT_STATUSES: Record<OrderStatus, OrderStatus[]> = {
   RETURNED: [],
 };
 
-/**
- * The statuses an order can still be edited in — mirrors OrdersService.EDITABLE.
- * Once it ships, the goods have left; the API refuses the rest regardless.
- */
-export const EDITABLE_STATUSES: OrderStatus[] = ['NEW', 'ASSIGNED', 'CONFIRMED'];
-
 /** A move that undoes rather than advances — styled as destructive. */
 export const isReverse = (s: OrderStatus) => s === 'CANCELLED' || s === 'RETURNED';
 
@@ -73,22 +65,5 @@ export function PaymentBadge({ status, className }: { status: PaymentStatus; cla
     <ToneBadge tone={PAYMENT_TONE[status]} className={className}>
       {t(status)}
     </ToneBadge>
-  );
-}
-
-/**
- * Deliberately monochrome. A channel is an identity, not a state — colouring
- * it would compete with the badges that do mean something (noon's yellow
- * collided with `warning` when it was tried). Its name is unambiguous.
- */
-const KNOWN_CHANNELS = ['noon', 'amazon', 'easyorders', 'website', 'social'] as const;
-
-export function ChannelBadge({ channel, className }: { channel: string; className?: string }) {
-  const t = useTranslations('enums.channel');
-  const key = (channel ?? '').toLowerCase();
-  return (
-    <Badge variant="outline" className={className}>
-      {isOneOf(KNOWN_CHANNELS, key) ? t(key) : channel}
-    </Badge>
   );
 }

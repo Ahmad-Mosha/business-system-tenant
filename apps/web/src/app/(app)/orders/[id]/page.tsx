@@ -2,6 +2,8 @@ import { AlertTriangle, Clock3, MessageCircle, Package, Pencil, Phone, StickyNot
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
+import { useTranslations } from 'next-intl';
+import { getTranslations } from 'next-intl/server';
 import { Amount } from '@/components/amount';
 import { OrderActions } from '@/components/order-actions';
 import {
@@ -29,8 +31,6 @@ import { whatsappHref } from '@/lib/phone';
 import { BlockedDialog } from '@/components/blocked-dialog';
 import { requireSession } from '@/lib/session';
 import { isOneOf } from '@/lib/utils';
-import { useTranslations } from 'next-intl';
-import { getTranslations } from 'next-intl/server';
 import { getFormat } from '@/i18n/get-format';
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
