@@ -53,9 +53,9 @@ export class ProductVariant {
   attributes: Record<string, string>;
 
   /**
-   * Current purchase cost per unit, EGP.
-   * ponytail: a single current figure, not FIFO/average layers. Costing method
-   * is deliberately undecided — see docs/decisions/001.
+   * Current purchase cost per unit, EGP: the moving average (AVCO), updated
+   * each time a purchase invoice posts. Each receipt's own cost, and the
+   * average right after it, stay on that receipt's stock movement.
    */
   @Column({ type: 'numeric', precision: 16, scale: 4, nullable: true })
   unitCost: string | null;
