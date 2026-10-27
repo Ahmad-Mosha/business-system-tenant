@@ -1,5 +1,5 @@
 import { notFound, redirect } from 'next/navigation';
-import { OrderForm } from '@/components/order-form';
+import { OrderForm } from '@/components/orders/order-form';
 import { getOrder } from '@/lib/api';
 import { requireSession } from '@/lib/session';
 

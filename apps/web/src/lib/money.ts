@@ -1,4 +1,4 @@
-import type { Tone } from '@/components/tone-badge';
+import type { Tone } from '@/components/display/tone-badge';
 import type { AccountBalance, LedgerRow } from '@/lib/api';
 import { isOneOf } from '@/lib/utils';
 import { languageOf } from '@/i18n/config';

@@ -1,4 +1,4 @@
-import { ChannelProducts } from '@/components/channel-screens';
+import { ChannelProducts } from '@/components/channels/channel-screens';
 import { requireAdmin } from '@/lib/session';
 
 export default async function AmazonProductsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {

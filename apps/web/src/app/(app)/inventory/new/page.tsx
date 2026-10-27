@@ -1,4 +1,4 @@
-import { NewProductForm } from '@/components/new-product-form';
+import { NewProductForm } from '@/components/inventory/new-product-form';
 import { requireAdmin } from '@/lib/session';
 
 export default async function NewProductPage() {

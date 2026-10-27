@@ -1,5 +1,5 @@
 import { notFound, redirect } from 'next/navigation';
-import { InvoiceBuilder } from '@/components/invoice-builder';
+import { InvoiceBuilder } from '@/components/money/invoice-builder';
 import { getMoneyAccounts, getPurchase, getSuppliers } from '@/lib/api';
 import { accountByCode } from '@/lib/money';
 import { requireAdmin } from '@/lib/session';

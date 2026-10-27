@@ -2,11 +2,11 @@ import { HandCoins, Inbox, Plus, ShoppingBag, Truck, UserRoundX } from 'lucide-r
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
-import { FilterBar } from '@/components/filter-bar';
-import { QuickViews, SummaryMetric, SummaryStrip } from '@/components/list-page';
-import { OrdersTable } from '@/components/orders-table';
-import { Page, PageHeader } from '@/components/page';
-import { TableEmpty, TablePagination, TablePanel } from '@/components/table-panel';
+import { FilterBar } from '@/components/layout/filter-bar';
+import { QuickViews, SummaryMetric, SummaryStrip } from '@/components/layout/list-page';
+import { OrdersTable } from '@/components/orders/orders-table';
+import { Page, PageHeader } from '@/components/layout/page';
+import { TableEmpty, TablePagination, TablePanel } from '@/components/layout/table-panel';
 import { Button } from '@/components/ui/button';
 import { getFormat } from '@/i18n/get-format';
 import { getAssignees, getOrderSummary, getOrders, type OrderStatus } from '@/lib/api';

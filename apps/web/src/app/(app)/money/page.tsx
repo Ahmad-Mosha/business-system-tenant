@@ -2,11 +2,11 @@ import { ArrowDownRight, ArrowUpRight, ChevronLeft, Minus, Wallet } from 'lucide
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { getTranslations } from 'next-intl/server';
-import { Amount } from '@/components/amount';
-import { ProfitTrendChart, type Bucket } from '@/components/charts';
-import { MoneyAnchorForm } from '@/components/money-anchor-form';
-import { Page, PageHeader } from '@/components/page';
-import { PeriodTabs } from '@/components/period-tabs';
+import { Amount } from '@/components/display/amount';
+import { ProfitTrendChart, type Bucket } from '@/components/money/charts';
+import { MoneyAnchorForm } from '@/components/money/money-anchor-form';
+import { Page, PageHeader } from '@/components/layout/page';
+import { PeriodTabs } from '@/components/layout/period-tabs';
 import {
   Empty,
   EmptyContent,

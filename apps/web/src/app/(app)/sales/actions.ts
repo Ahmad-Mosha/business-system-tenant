@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
-import type { DialogFormState } from '@/components/form-dialog';
+import type { DialogFormState } from '@/components/forms/form-dialog';
 import { apiRequest } from '@/lib/api-request';
 import type { CustomerRow } from '@/lib/api';
 

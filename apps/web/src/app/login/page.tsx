@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
-import { BrandMark } from '@/components/brand-mark';
-import { LanguageToggle } from '@/components/language-switcher';
-import { LoginForm } from '@/components/login-form';
+import { BrandMark } from '@/components/layout/brand-mark';
+import { LanguageToggle } from '@/components/layout/language-switcher';
+import { LoginForm } from '@/components/auth/login-form';
 import { getSession } from '@/lib/session';
 
 export async function generateMetadata(): Promise<Metadata> {

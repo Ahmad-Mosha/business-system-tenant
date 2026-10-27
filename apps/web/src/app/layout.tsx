@@ -3,7 +3,7 @@ import { DM_Sans, Geist_Mono, IBM_Plex_Sans_Arabic, Space_Grotesk } from 'next/f
 import { NextIntlClientProvider } from 'next-intl';
 import { cookies } from 'next/headers';
 import { getLocale, getTranslations } from 'next-intl/server';
-import { ThemeProvider } from '@/components/theme-provider';
+import { ThemeProvider } from '@/components/layout/theme-provider';
 import { DirectionProvider } from '@/components/ui/direction';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';

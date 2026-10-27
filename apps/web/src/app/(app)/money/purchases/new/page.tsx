@@ -1,4 +1,4 @@
-import { InvoiceBuilder } from '@/components/invoice-builder';
+import { InvoiceBuilder } from '@/components/money/invoice-builder';
 import { getMoneyAccounts, getSuppliers } from '@/lib/api';
 import { accountByCode } from '@/lib/money';
 import { requireAdmin } from '@/lib/session';

@@ -1,10 +1,10 @@
 import { AlertTriangle, RotateCw } from 'lucide-react';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
-import { Amount } from '@/components/amount';
-import { MetricCard, MetricGrid } from '@/components/metric-card';
-import { Page, PageHeader } from '@/components/page';
-import { ShipmentsView } from '@/components/shipments-view';
+import { Amount } from '@/components/display/amount';
+import { MetricCard, MetricGrid } from '@/components/display/metric-card';
+import { Page, PageHeader } from '@/components/layout/page';
+import { ShipmentsView } from '@/components/orders/shipments-view';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { getBostaShipments } from '@/lib/api';
