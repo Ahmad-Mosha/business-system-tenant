@@ -1,12 +1,12 @@
 import { Contact, HandCoins, ReceiptText, Store } from 'lucide-react';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
-import { Amount } from '@/components/amount';
-import { CustomerForm } from '@/components/customer-form';
-import { FilterBar } from '@/components/filter-bar';
-import { QuickViews, SummaryMetric, SummaryStrip } from '@/components/list-page';
-import { Page, PageHeader } from '@/components/page';
-import { TableCount, TableEmpty, TablePanel } from '@/components/table-panel';
+import { Amount } from '@/components/display/amount';
+import { CustomerForm } from '@/components/sales/customer-form';
+import { FilterBar } from '@/components/layout/filter-bar';
+import { QuickViews, SummaryMetric, SummaryStrip } from '@/components/layout/list-page';
+import { Page, PageHeader } from '@/components/layout/page';
+import { TableCount, TableEmpty, TablePanel } from '@/components/layout/table-panel';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { getFormat } from '@/i18n/get-format';

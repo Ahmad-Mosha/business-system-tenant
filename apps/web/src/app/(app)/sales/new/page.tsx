@@ -1,4 +1,4 @@
-import { SalesInvoiceBuilder } from '@/components/sales-invoice-builder';
+import { SalesInvoiceBuilder } from '@/components/sales/sales-invoice-builder';
 import { getCustomers } from '@/lib/api';
 import { requireAdmin } from '@/lib/session';
 

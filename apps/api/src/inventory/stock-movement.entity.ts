@@ -27,8 +27,7 @@ export type StockReason =
  *
  * This is the one inventory decision taken up front: a mutable counter can
  * never answer "why is this 94?", and the history cannot be reconstructed
- * afterwards. What each movement means *financially* is deliberately still
- * open — see docs/decisions/001.
+ * afterwards.
  */
 @Entity('stock_movement')
 @Index('ix_stock_variant_date', ['variantId', 'occurredAt'])

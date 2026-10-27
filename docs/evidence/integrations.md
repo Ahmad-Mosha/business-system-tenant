@@ -137,7 +137,7 @@ Easy Orders can only deliver to a **public HTTPS URL**. That is now the deployed
 API:
 
 ```
-https://prime-market.duckdns.org/api/integrations/easyorders/webhook
+https://<your-domain>/api/integrations/easyorders/webhook
 ```
 
 Caddy proxies everything under `/api/*` straight through, path intact, so this
@@ -201,11 +201,7 @@ is no API integration.
 
 Two different reports exist, at different grains, and neither substitutes for
 the other. The transaction report is what reconciles to the money; the VAT
-report is gross customer-facing revenue. Full analysis, including the exact
-reconciliation against noon's own portal figures and the fields that do **not**
-exist, is in
-[noon-settlement-report.md](noon-settlement-report.md) — **read it before
-designing anything that consumes noon data.**
+report is gross customer-facing revenue.
 
 The three facts that most often get assumed wrong:
 

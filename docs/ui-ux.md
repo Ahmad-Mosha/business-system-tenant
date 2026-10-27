@@ -1,71 +1,25 @@
 # UI/UX direction
 
-The reference in [`ui-ux/`](../ui-ux) is a **starting direction, not a
-specification**. It is AI-generated, its data is invented, and several of its
-screens show features this business does not have. What follows is what gets
-kept, what gets dropped, and what the reference is missing.
+An operations tool is read all day by the same few people, so density and
+trust win over decoration. The principles every screen follows:
 
-The design system is settled **once, before the first screen**. Every screen
-after that is assembled from it.
-
----
-
-## What the reference gets right — keep
-
-**Master-detail, not page navigation.** The inventory screen is the strongest
-thing in the folder: a dense list on the left, a detail panel on the right, no
-page load and no lost filters. This becomes the pattern for the whole
-application — inventory, orders, shipments, settlements. It is the direct fix
-for the previous build's rejected "excessive scrolling".
-
-**A filter bar above the table, not a form beside it.** Channel, location,
-stock level as inline dropdowns that show their current value in the control
-itself.
-
-**Structure over containers.** Weight and tonal shift define sections instead
-of nested boxes. The reference calls this avoiding "container fatigue" and it
-is correct.
-
-**Status as a chip with a border, not a coloured pill.** Subtle tinted fill,
-1px border, uppercase label. Readable at a glance, quiet in bulk.
-
-**Right-aligned figures, monospaced.** Money and counts in tabular figures so
-columns line up. Non-negotiable in a system whose whole job is numbers.
+- **Master-detail, not page hopping.** A dense list, a detail beside or behind
+  it, filters that survive the trip. The fix for the "excessive scrolling" an
+  earlier version was rejected for.
+- **A filter bar above the table, not a form beside it.** Each control shows
+  its current value in itself.
+- **Structure over containers.** Weight and tonal shift define sections, not
+  nested boxes.
+- **Status is a mark and a word,** never a loud coloured pill.
+- **Figures are right-aligned and tabular,** so columns of money line up.
+- **Every number opens to the records behind it.** Totals with no way in are
+  exactly what the business could not trust before.
+- **Fulfilment and payment are shown separately.** "Delivered" never implies
+  "paid" — that is the normal state of a cash-on-delivery order.
 
 ---
 
-## What gets dropped
-
-| In the reference | Why it goes |
-|---|---|
-| Product photo / media panel | There are no product images in this business, and none are planned |
-| "Reserved / Pending" stock | Reserved stock is confirmed **not** a concept here — stock leaves on dispatch |
-| "Sync with Bosta", "Sync Inventory" buttons | noon has no API — it is a CSV upload. Amazon is unknown. A sync button that cannot sync is a lie in the interface |
-| "Fulfillment Target 84%", "Critical Pulse" | Invented metrics with no definition in this business |
-| `$` amounts, DXB/AUH/KSA locations, "Warehouse B" | Egyptian business, EGP, one warehouse plus noon |
-| Coloured channel logo circles | Decorative. Channel is a text label with a monochrome mark |
-| Full-page "Manual Order Entry" | Oversized inputs, three stacked sections, heavy scrolling — the exact complaint about the previous build |
-
----
-
-## What the reference is missing
-
-These are required workflows with no screen in the folder:
-
-1. **The unmapped queue.** Every import produces rows that match no product —
-   8 to 78 per real noon file. They need a screen where a human maps them, and
-   an import is not "done" until it has been looked at.
-2. **Statement reconciliation.** Our figures next to noon's own Account
-   Summary, with the difference shown. This is the screen that replaces 8 hours
-   a day.
-3. **Movement history.** Every number must open to the events that produced it.
-   The reference shows totals with no way in.
-4. **Delivered-but-unpaid.** Fulfilment and payment are separate axes and the
-   interface has to show both without implying one from the other.
-
----
-
-## Design system (since the 2026-09 redesign)
+## Design system
 
 Built on **shadcn/ui, style `radix-lyra`** — preset `b6XGy1Otr6`: neutral base,
 teal theme, radius 0, Lucide icons, bold menu accent. Components live in
@@ -115,10 +69,11 @@ The content sits on an inset sheet beside a collapsible, 13rem sidebar (modules
 fold open). `Page` → `PageHeader` (title, description, actions, optional back)
 → `MetricGrid` (one strip of figures with hairline dividers) → `FilterBar`
 (URL-synced) → `TablePanel` with `TablePagination`. The header carries the
-search-and-jump palette (Ctrl/⌘ K, `components/command-menu.tsx`): screens,
-create actions, and live results for orders, products and customers. List screens use `<Page fill>`: on desktop the table scrolls
-inside its panel and the filters and pagination never leave the screen; under
-`lg` the page scrolls. Forms are cards with a sticky summary column; small
+search-and-jump palette (Ctrl/⌘ K, `components/layout/command-menu.tsx`):
+screens, create actions, and live results for orders, products and customers.
+List screens use `<Page fill>`: on desktop the table scrolls inside its panel
+and the filters and pagination never leave the screen; under `lg` the page
+scrolls. Forms are cards with a sticky summary column; small
 records use `FormDialog`.
 
 - Figures are read-only and compact (20px max) — a corner link drills into the
@@ -137,7 +92,7 @@ records use `FormDialog`.
 ### Money and stock rows
 
 Ledger, Treasury, the Money overview and a product's stock history share one
-row (`components/ledger-entry.tsx`): a direction tile, the entry and what's
+row (`components/money/ledger-entry.tsx`): a direction tile, the entry and what's
 behind it (linked to its order or invoice), then its time and note under it;
 days get a heading row.
 
@@ -157,28 +112,18 @@ days get a heading row.
 
 ### Charts
 
-shadcn's chart (`components/ui/chart.tsx`, Recharts v3); every chart lives in
-`components/charts.tsx`. The rules the analytics should keep:
+shadcn's chart (`components/ui/chart.tsx`, Recharts v3); charts live in
+`components/money/charts.tsx`. The rules they keep:
 
 - **Fed by an API aggregate, never by a page of rows.** Totals come from SQL
-  (`GET /finance/cash-flow` buckets money in/out per day, week or month and
-  groups it by the other account); a list screen's rows stop at its page size.
+  (`GET /finance/cash-flow` buckets money per day, week or month); a list
+  screen's rows stop at its page size.
 - **The window is in the URL** — `PeriodTabs` (7 / 30 / 90 days, 12 months), so
   a view can be shared and the page stays a server component.
 - **Only honest comparisons.** A trend or "vs before" appears only when the
-  earlier window is entirely inside the books; the cash chart starts at the
-  opening balance, which is where the books began, not a gain.
-- Plain drawing: thin lines, flat light fills, dashed hairline grids, small
-  bar radii — no gradient fills.
-- Colour: the treasury's balance and money in are teal; money out is a quiet
-  grey (`OUT_FILL`), red only for a value below zero. Breakdowns ("where it
-  came from / went") are ranked lists with a thin share bar (`BarList`), each
-  line opening that account's ledger for the window.
-- Cost of goods sold isn't posted yet, so no screen shows a profit figure.
-
----
-
-## Where screens get built
-
-With the phase they belong to, never as a separate "frontend phase". A phase is
-not finished until its screen is usable.
+  earlier window is entirely inside the books.
+- Plain drawing: thin lines, flat light fills, dashed hairline grids — no
+  gradient fills.
+- Colour: sales are teal, costs a quiet grey, red only for a value below zero.
+  The profit trend draws running totals, which read far better than
+  day-by-day figures that swing with every large payment.

@@ -2,15 +2,17 @@ import { AlertTriangle, Clock3, MessageCircle, Package, Pencil, Phone, StickyNot
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { Amount } from '@/components/amount';
-import { OrderActions } from '@/components/order-actions';
+import { useTranslations } from 'next-intl';
+import { getTranslations } from 'next-intl/server';
+import { Amount } from '@/components/display/amount';
+import { OrderActions } from '@/components/orders/order-actions';
 import {
   ALL_ORDER_STATUSES,
   ALL_PAYMENT_STATUSES,
   PaymentBadge,
   StatusBadge,
-} from '@/components/order-status';
-import { Page, PageHeader } from '@/components/page';
+} from '@/components/orders/order-status';
+import { Page, PageHeader } from '@/components/layout/page';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -26,11 +28,9 @@ import {
 import { getAssignees, getOrder } from '@/lib/api';
 import { money } from '@/lib/format';
 import { whatsappHref } from '@/lib/phone';
-import { BlockedDialog } from '@/components/blocked-dialog';
+import { BlockedDialog } from '@/components/forms/blocked-dialog';
 import { requireSession } from '@/lib/session';
 import { isOneOf } from '@/lib/utils';
-import { useTranslations } from 'next-intl';
-import { getTranslations } from 'next-intl/server';
 import { getFormat } from '@/i18n/get-format';
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {

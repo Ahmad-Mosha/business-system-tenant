@@ -75,7 +75,7 @@ both happen automatically on the API's boot.
 
 **Updating the live box** (no CI/CD — nothing deploys on merge):
 ```bash
-ssh -i ~/Downloads/prime-key.pem ec2-user@prime-market.duckdns.org
+ssh -i <key>.pem ec2-user@<your-domain>
 cd ~/dashboard && git pull && docker compose -f docker-compose.prod.yml up -d --build api web
 ```
 

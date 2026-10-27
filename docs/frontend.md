@@ -11,7 +11,8 @@ interactive.
 | `app/(app)/<module>/page.tsx` | A screen. A server component: checks who's signed in (`requireSession` / `requireAdmin`), reads its data, renders. |
 | `app/(app)/<module>/actions.ts` | That module's writes, as server actions (`'use server'`): call the API, refresh the pages that show it, return a result a form can show. |
 | `app/(app)/layout.tsx` | The signed-in shell — sidebar and header. `loading.tsx`, `error.tsx` and `not-found.tsx` beside it cover every screen. |
-| `components/` | Parts of screens. `'use client'` only when interactive — forms, menus, charts, the live shipments board. |
+| `components/<feature>/` | Parts of screens, grouped by the module they belong to: `orders/`, `inventory/`, `money/`, `sales/`, `channels/` (noon and Amazon), `team/`, `auth/`. `'use client'` only when interactive — forms, menus, charts, the live shipments board. |
+| `components/layout/`, `forms/`, `display/` | What every module shares: the shell and list-screen kit (`Page`, `TablePanel`, `FilterBar`), form inputs and dialogs (`FormDialog`, `MoneyInput`, `DatePicker`), and read-only marks (`Amount`, `ToneBadge`). |
 | `components/ui/` | shadcn primitives: owned code, migrated for RTL. A look changes here, not per screen. |
 | `lib/api.ts` | Every read, and the API's types. A failed read throws; the screen's error boundary shows it. |
 | `lib/api-request.ts` | Every write's call to the API. Answers `{ ok, data }` or `{ ok: false, message }`, in the reader's language. |
@@ -43,7 +44,7 @@ isn't there — and the code says so where it does.
 - Figures go through `Amount` / `money()`; dates through `getFormat()` /
   `useFormat()`.
 - No text in code, logical CSS only — lint enforces the first (`docs/i18n.md`).
-- Checks: `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`.
+- Checks: `npm run typecheck`, `npm run lint`, `npm test`, `npm run build` — CI runs them on every push.
 
 ## Roles, and what comes next
 

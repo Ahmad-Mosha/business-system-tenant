@@ -1,13 +1,14 @@
 import { ArrowDownLeft, ArrowUpRight, FileClock, Landmark, Receipt } from 'lucide-react';
 import { Fragment } from 'react';
-import { Amount } from '@/components/amount';
-import { AccountChip, DayRow, directionOf, EntryCell, MONEY } from '@/components/ledger-entry';
-import { SummaryMetric, SummaryStrip } from '@/components/list-page';
-import { Page, PageHeader } from '@/components/page';
-import { PendingCheques } from '@/components/pending-cheques';
-import { TableCount, TableEmpty, TablePanel } from '@/components/table-panel';
-import { CancelledToggle, toggleCancelledHref } from '@/components/cancelled-toggle';
-import { TreasuryActions, VoucherRowActions } from '@/components/treasury-actions';
+import { getLocale, getTranslations } from 'next-intl/server';
+import { Amount } from '@/components/display/amount';
+import { AccountChip, DayRow, directionOf, EntryCell, MONEY } from '@/components/money/ledger-entry';
+import { SummaryMetric, SummaryStrip } from '@/components/layout/list-page';
+import { Page, PageHeader } from '@/components/layout/page';
+import { PendingCheques } from '@/components/money/pending-cheques';
+import { TableCount, TableEmpty, TablePanel } from '@/components/layout/table-panel';
+import { CancelledToggle, toggleCancelledHref } from '@/components/layout/cancelled-toggle';
+import { TreasuryActions, VoucherRowActions } from '@/components/money/treasury-actions';
 import {
   Table,
   TableBody,
@@ -21,7 +22,6 @@ import { monthStart, today } from '@/lib/format';
 import { accountByCode, accountName } from '@/lib/money';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
-import { getLocale, getTranslations } from 'next-intl/server';
 import { getFormat } from '@/i18n/get-format';
 
 const LIMIT = 150;

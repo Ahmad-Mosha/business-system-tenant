@@ -1,4 +1,4 @@
-import { OrderForm } from '@/components/order-form';
+import { OrderForm } from '@/components/orders/order-form';
 import { requireSession } from '@/lib/session';
 
 export default async function NewOrderPage() {

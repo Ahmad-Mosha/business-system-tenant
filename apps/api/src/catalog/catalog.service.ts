@@ -936,7 +936,7 @@ export class CatalogService {
    * One-time seed from a reviewed Mega export: creates a product + default
    * variant + opening-stock movement per row. Safe to re-run — an exact name
    * match is skipped rather than duplicated, since Mega gives no reliable id
-   * to key off (see docs/decisions).
+   * to key off.
    */
   async importReviewedProducts(
     rows: Array<{ name: string; category: ProductCategory; quantity: number; unitCost: string | null }>,

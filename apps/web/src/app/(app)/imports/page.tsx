@@ -1,4 +1,4 @@
-import { ChannelUploads } from '@/components/channel-screens';
+import { ChannelUploads } from '@/components/channels/channel-screens';
 import { requireAdmin } from '@/lib/session';
 
 export default async function ImportsPage() {

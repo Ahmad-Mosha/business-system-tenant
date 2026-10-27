@@ -1,4 +1,4 @@
-import type { Tone } from '@/components/tone-badge';
+import type { Tone } from '@/components/display/tone-badge';
 import type { AccountBalance, LedgerRow } from '@/lib/api';
 import { isOneOf } from '@/lib/utils';
 import { languageOf } from '@/i18n/config';
@@ -87,33 +87,6 @@ export function entryMemo(e: Pick<LedgerRow, 'memo' | 'kind' | 'reversesId'>): s
   return system ? system.slice(1).find(Boolean) || null : memo;
 }
 
-/**
- * Money moving into or out of the treasury, named by the account on the other
- * side — "Supplier payments" rather than "Supplier payable" (`enums.cashIn` /
- * `enums.cashOut`). Anything not listed goes by the account's own name.
- */
-export const CASH_IN = [
-  'SALES',
-  'OWNER_CAPITAL',
-  'SUPPLIER_PAYABLE',
-  'INVENTORY',
-  'NOON_RECEIVABLE',
-  'AMAZON_RECEIVABLE',
-  'BOSTA_COD',
-  'CHEQUES_PENDING',
-  'CUSTOMER_RECEIVABLE',
-] as const;
-export const CASH_OUT = [
-  'SALES',
-  'OWNER_CAPITAL',
-  'SUPPLIER_PAYABLE',
-  'INVENTORY',
-  'OTHER_EXPENSE',
-  'SHIPPING',
-  'CHANNEL_FEES',
-  'CUSTOMER_RECEIVABLE',
-] as const;
-
 /** How an invoice's paid state looks; its name is `enums.paidStatus`. */
 export const PAID_TONE: Record<string, Tone> = {
   DRAFT: 'neutral',
@@ -125,17 +98,6 @@ export const PAID_TONE: Record<string, Tone> = {
 
 /** The counter-accounts a hand-entered voucher can move cash against (`enums.voucherCounter`). */
 export const VOUCHER_COUNTERS = ['OTHER_EXPENSE', 'SHIPPING', 'CHANNEL_FEES', 'OWNER_CAPITAL'] as const;
-
-/** Groups account balances the way the overview reads them. */
-export function groupAccounts(accounts: AccountBalance[]) {
-  const held = accounts.filter(
-    (a) => a.kind === 'ASSET' && a.code !== 'INVENTORY',
-  );
-  const owe = accounts.filter((a) => a.kind === 'LIABILITY');
-  const capital = accounts.filter((a) => a.kind === 'EQUITY');
-  const performance = accounts.filter((a) => a.kind === 'INCOME' || a.kind === 'EXPENSE');
-  return { held, owe, capital, performance };
-}
 
 export const accountByCode = (accounts: AccountBalance[], code: string) =>
   accounts.find((a) => a.code === code);
