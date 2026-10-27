@@ -1,11 +1,9 @@
 # Business rules
 
-Every rule below traces to the owner's own answers
-([business-answers-ar.md](business-answers-ar.md)) or to verified data.
+Every rule below traces to the owner's own answers or to verified data.
 
 - **[Confirmed]** — stated by the business, or proven by real data. Build to it.
-- **[Open]** — genuinely undecided. **Do not guess.** See
-  [open-decisions.md](open-decisions.md).
+- **[Open]** — genuinely undecided. **Do not guess.**
 
 ---
 
@@ -216,8 +214,7 @@ value increases.
 **[Confirmed] noon's closing balance is a receivable, not cash.** It is money
 noon owes, not money in hand. noon holds roughly one to two weeks of proceeds
 and pays out about a week in arrears. Treating that balance as cash overstates
-the business's position. See
-[evidence/noon-settlement-report.md](evidence/noon-settlement-report.md).
+the business's position.
 
 **[Confirmed] Tax is out of scope.** An external accountant handles it with the
 owner. It is not part of daily operations or moderator work.
