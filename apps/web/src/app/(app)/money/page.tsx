@@ -1,6 +1,7 @@
 import { ArrowDownRight, ArrowUpRight, ChevronLeft, Minus, Wallet } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { getTranslations } from 'next-intl/server';
 import { Amount } from '@/components/amount';
 import { ProfitTrendChart, type Bucket } from '@/components/charts';
 import { MoneyAnchorForm } from '@/components/money-anchor-form';
@@ -26,7 +27,6 @@ import { daysAgo, money, today } from '@/lib/format';
 import { accountByCode } from '@/lib/money';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
-import { getTranslations } from 'next-intl/server';
 
 /** The windows the overview can cover, and how finely its chart is bucketed. */
 const RANGES = [

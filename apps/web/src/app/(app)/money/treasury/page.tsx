@@ -1,5 +1,6 @@
 import { ArrowDownLeft, ArrowUpRight, FileClock, Landmark, Receipt } from 'lucide-react';
 import { Fragment } from 'react';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { Amount } from '@/components/amount';
 import { AccountChip, DayRow, directionOf, EntryCell, MONEY } from '@/components/ledger-entry';
 import { SummaryMetric, SummaryStrip } from '@/components/list-page';
@@ -21,7 +22,6 @@ import { monthStart, today } from '@/lib/format';
 import { accountByCode, accountName } from '@/lib/money';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
-import { getLocale, getTranslations } from 'next-intl/server';
 import { getFormat } from '@/i18n/get-format';
 
 const LIMIT = 150;

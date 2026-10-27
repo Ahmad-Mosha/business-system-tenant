@@ -171,11 +171,6 @@
     "noMovement": "No money moved in this period.",
     "grossMargin": "Gross margin"
   },
-  "noData": {
-    "title": "Nothing imported yet",
-    "description": "Upload a noon settlement export and the products, revenue and fees in it are read automatically.",
-    "action": "Import a report"
-  },
   "states": {
     "apiDown": "The API isn’t reachable right now. Check that it’s running, then try again.",
     "failed": "Something went wrong on our side. Trying again usually fixes it.",
@@ -1575,27 +1570,6 @@
       "PARTIAL": "Partly paid",
       "PAID": "Paid",
       "VOID": "Cancelled"
-    },
-    "cashIn": {
-      "SALES": "Sales",
-      "OWNER_CAPITAL": "Owner deposits",
-      "SUPPLIER_PAYABLE": "Supplier refunds",
-      "INVENTORY": "Cash purchases reversed",
-      "NOON_RECEIVABLE": "noon payouts",
-      "AMAZON_RECEIVABLE": "Amazon payouts",
-      "BOSTA_COD": "Bosta payouts",
-      "CHEQUES_PENDING": "Cheques cleared",
-      "CUSTOMER_RECEIVABLE": "Customer payments"
-    },
-    "cashOut": {
-      "SALES": "Sales reversed",
-      "OWNER_CAPITAL": "Owner withdrawals",
-      "SUPPLIER_PAYABLE": "Supplier payments",
-      "INVENTORY": "Stock bought for cash",
-      "OTHER_EXPENSE": "Expenses",
-      "SHIPPING": "Shipping",
-      "CHANNEL_FEES": "Fees and ads",
-      "CUSTOMER_RECEIVABLE": "Customer payments reversed"
     },
     "voucherCounter": {
       "OTHER_EXPENSE": "General expense",

@@ -1,10 +1,11 @@
 import { Ban, CheckCircle2, ChevronLeft, Info, Package, Pencil, Trash2, Truck, Wallet } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import type { ReactNode } from 'react';
+import { getTranslations } from 'next-intl/server';
 import { cancelPurchase, deleteDraftInvoice } from '@/app/(app)/money/actions';
 import { CancelAction } from '@/components/cancel-action';
 import { ConfirmAction } from '@/components/confirm-action';
-import type { ReactNode } from 'react';
 import { Amount } from '@/components/amount';
 import { Page, PageHeader } from '@/components/page';
 import { PaidChip } from '@/components/paid-chip';
@@ -28,7 +29,6 @@ import { money, unitMoney } from '@/lib/format';
 import { blockedBy } from '@/lib/problem';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
-import { getTranslations } from 'next-intl/server';
 import { num, strong } from '@/i18n/rich';
 import { getFormat } from '@/i18n/get-format';
 

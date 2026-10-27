@@ -1,5 +1,7 @@
 import { Archive, ArchiveRestore, ClipboardList, HandCoins, PackagePlus, Trash2, Undo2, Wallet } from 'lucide-react';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { deleteSupplier, reverseSupplierPayment, setSupplierActive } from '@/app/(app)/money/actions';
 import { CancelAction } from '@/components/cancel-action';
 import { CancelledToggle, toggleCancelledHref } from '@/components/cancelled-toggle';
@@ -8,7 +10,6 @@ import { SupplierForm } from '@/components/supplier-form';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { bdi } from '@/i18n/rich';
-import { notFound } from 'next/navigation';
 import { Amount } from '@/components/amount';
 import { SummaryMetric, SummaryStrip } from '@/components/list-page';
 import { Page, PageHeader } from '@/components/page';
@@ -29,7 +30,6 @@ import { isSystemMemo, purchaseDue } from '@/lib/money';
 import { blockedBy } from '@/lib/problem';
 import { requireAdmin } from '@/lib/session';
 import { cn } from '@/lib/utils';
-import { getTranslations } from 'next-intl/server';
 import { getFormat } from '@/i18n/get-format';
 
 export default async function SupplierDetailPage({

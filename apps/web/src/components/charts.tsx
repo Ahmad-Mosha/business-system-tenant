@@ -4,12 +4,9 @@ import { useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
 import {
   Area,
-  Bar,
-  BarChart,
   CartesianGrid,
   ComposedChart,
   Line,
-  ReferenceLine,
   XAxis,
   YAxis,
 } from 'recharts';
@@ -51,9 +48,6 @@ function bucketLabel(f: Format, weekOf: (date: string) => string, iso: string, b
 
 /** Amounts in a breakdown read unsigned unless they're below zero. */
 const signedOrPlain = (v: number) => (v < 0 ? '−' : '') + money(Math.abs(v));
-
-/** Money out, in charts and breakdowns: present, but never louder than money in. */
-export const OUT_FILL = 'color-mix(in srgb, var(--foreground) 28%, transparent)';
 
 /** Room for the value axis — Arabic compact figures ("1.1 مليون") run longer. */
 const useAxisWidth = () => (useDirection() === 'rtl' ? 64 : 52);

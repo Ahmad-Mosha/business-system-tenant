@@ -20,7 +20,6 @@ import {
 } from './api';
 
 export type Marketplace = 'noon' | 'amazon';
-export const MARKETPLACES: readonly Marketplace[] = ['noon', 'amazon'];
 
 /** Where each marketplace's screens live. noon came first and kept the root. */
 export const channelPath = (channel: Marketplace, screen: '' | 'products' | 'imports' = '') =>
