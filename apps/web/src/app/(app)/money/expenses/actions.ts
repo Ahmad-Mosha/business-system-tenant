@@ -1,7 +1,7 @@
 'use server';
 import { revalidatePath } from 'next/cache';
 import { apiRequest } from '@/lib/api-request';
-import type { DialogFormState } from '@/components/form-dialog';
+import type { DialogFormState } from '@/components/forms/form-dialog';
 
 export async function recordExpense(requestId: string, form: FormData): Promise<DialogFormState> {
   const r = await apiRequest('/expenses', 'POST', {

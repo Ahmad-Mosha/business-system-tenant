@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { ProductScreen } from '@/components/product-screen';
+import { ProductScreen } from '@/components/inventory/product-screen';
 import { getProductDetail, getStockHistory } from '@/lib/api';
 import { requireAdmin } from '@/lib/session';
 

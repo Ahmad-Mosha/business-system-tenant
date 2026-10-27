@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { ChannelOverview } from '@/components/channel-screens';
+import { ChannelOverview } from '@/components/channels/channel-screens';
 import { requireSession } from '@/lib/session';
 
 /** noon's overview — the home screen for admins; moderators start at Orders. */

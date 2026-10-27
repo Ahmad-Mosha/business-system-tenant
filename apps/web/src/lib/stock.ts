@@ -1,4 +1,4 @@
-import type { Tone } from '@/components/tone-badge';
+import type { Tone } from '@/components/display/tone-badge';
 
 /** At or under this many units a product is low — the API's `low_stock` filter draws the same line. */
 export const LOW_STOCK = 5;

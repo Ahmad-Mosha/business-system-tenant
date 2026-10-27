@@ -1,12 +1,12 @@
 import { HandCoins, PackagePlus, Truck, Users } from 'lucide-react';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
-import { Amount } from '@/components/amount';
-import { FilterBar } from '@/components/filter-bar';
-import { QuickViews, SummaryMetric, SummaryStrip } from '@/components/list-page';
-import { Page, PageHeader } from '@/components/page';
-import { SupplierForm } from '@/components/supplier-form';
-import { TableCount, TableEmpty, TablePanel } from '@/components/table-panel';
+import { Amount } from '@/components/display/amount';
+import { FilterBar } from '@/components/layout/filter-bar';
+import { QuickViews, SummaryMetric, SummaryStrip } from '@/components/layout/list-page';
+import { Page, PageHeader } from '@/components/layout/page';
+import { SupplierForm } from '@/components/money/supplier-form';
+import { TableCount, TableEmpty, TablePanel } from '@/components/layout/table-panel';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { getFormat } from '@/i18n/get-format';

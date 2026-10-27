@@ -4,8 +4,8 @@ import { redirect } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { Fragment } from 'react';
-import { Amount } from '@/components/amount';
-import { FilterBar } from '@/components/filter-bar';
+import { Amount } from '@/components/display/amount';
+import { FilterBar } from '@/components/layout/filter-bar';
 import {
   AccountChip,
   BALANCE,
@@ -15,10 +15,10 @@ import {
   MONEY,
   type Direction,
   type Mark,
-} from '@/components/ledger-entry';
-import { Page, PageHeader } from '@/components/page';
-import { CancelledToggle, toggleCancelledHref } from '@/components/cancelled-toggle';
-import { TableEmpty, TablePagination, TablePanel } from '@/components/table-panel';
+} from '@/components/money/ledger-entry';
+import { Page, PageHeader } from '@/components/layout/page';
+import { CancelledToggle, toggleCancelledHref } from '@/components/layout/cancelled-toggle';
+import { TableEmpty, TablePagination, TablePanel } from '@/components/layout/table-panel';
 import { Button } from '@/components/ui/button';
 import {
   Table,

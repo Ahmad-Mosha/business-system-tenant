@@ -1,4 +1,4 @@
-import { ChannelOverview } from '@/components/channel-screens';
+import { ChannelOverview } from '@/components/channels/channel-screens';
 import { requireAdmin } from '@/lib/session';
 
 export default async function AmazonOverviewPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {

@@ -1,4 +1,4 @@
-import { TeamScreen } from '@/components/team-screen';
+import { TeamScreen } from '@/components/team/team-screen';
 import { getTeam } from '@/lib/api';
 import { requireAdmin } from '@/lib/session';
 
