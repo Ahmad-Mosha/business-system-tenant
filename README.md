@@ -1,28 +1,28 @@
-# Prime Market
+# Prime System
 
-[![CI](https://github.com/Ahmad-Mosha/business-system-tenant/actions/workflows/ci.yml/badge.svg)](https://github.com/Ahmad-Mosha/business-system-tenant/actions/workflows/ci.yml)
-[![In production](https://img.shields.io/badge/status-in%20production%20since%20Aug%202026-2ea44f)](#in-production)
+[![CI](https://github.com/Ahmad-Mosha/prime-system/actions/workflows/ci.yml/badge.svg)](https://github.com/Ahmad-Mosha/prime-system/actions/workflows/ci.yml)
 
-**A real business runs on this system.** Prime Market is the operations
-platform of a multi-channel e-commerce reseller in Egypt. It holds the
-business's inventory, orders, shipping, marketplace settlements, purchasing and
-money in one place. It went live on 31 August 2026, and the owners and their
-staff run their operations on it, in Arabic and English.
+Prime System is the operations platform of a multi-channel e-commerce
+business in Egypt. It keeps the business's inventory, orders, shipping,
+marketplace settlements, purchasing and money in one place. It went live on
+31 August 2026, and the owners and their staff use it every day, in Arabic
+and English.
 
-I built it end to end: I gathered the requirements with the owners, then
-designed the system, wrote the code, deployed it, and support it in production.
+I built it end to end. I gathered the requirements with the owners, designed
+the system, wrote the code, deployed it, and I support it in production.
 
-| | |
-|---|---|
-| **Status** | Live since 31 August 2026 |
-| **Used by** | The business's owners (admin role) and its order moderator |
-| **Connected to** | noon and Amazon settlement reports, the website's order webhook, the Bosta courier API |
-| **Delivery** | 84 pull requests merged, most of them shipped in small steps while the system was in use |
-| **Runs on** | AWS EC2 · Docker Compose · Caddy · Neon Postgres · nightly encrypted backups |
+- **Live since:** 31 August 2026
+- **Used by:** the owners (admin role) and their order moderator
+- **Connected to:** noon and Amazon settlement reports, the website's order
+  webhook, and the Bosta courier API
+- **Delivery:** 84 merged pull requests, most of them shipped in small steps
+  while the system was already in use
+- **Runs on:** AWS EC2, Docker Compose, Caddy, Neon Postgres, nightly
+  encrypted backups
 
-**Stack:** TypeScript · NestJS 11 · TypeORM · PostgreSQL 17 · Next.js 16 (App
-Router, React 19) · Tailwind 4 · shadcn/ui · next-intl · Docker · Caddy · AWS
-EC2 · Neon · GitHub Actions
+**Stack:** TypeScript, NestJS 11, TypeORM, PostgreSQL 17, Next.js 16 (App
+Router, React 19), Tailwind 4, shadcn/ui, next-intl, Docker, Caddy, AWS EC2,
+Neon, GitHub Actions
 
 ---
 
@@ -115,30 +115,13 @@ to show the records behind it.**
 
 ## Architecture
 
-```mermaid
-flowchart LR
-  subgraph Browser
-    UI[Arabic / English UI]
-  end
+There are three parts on one EC2 instance, all in Docker Compose:
 
-  subgraph EC2["AWS EC2 · Docker Compose"]
-    Caddy[Caddy<br/>TLS + routing]
-    Web["Next.js<br/>server components<br/>+ server actions"]
-    API["NestJS API<br/>auth · rules · ledger"]
-  end
-
-  DB[(PostgreSQL 17<br/>Neon)]
-  EO[Easy Orders<br/>website]
-  Bosta[Bosta<br/>courier API]
-  Backup[GitHub Actions<br/>nightly encrypted backup]
-
-  UI -->|HTTPS| Caddy --> Web
-  Web -->|REST + session cookie| API
-  EO -->|order webhooks| Caddy -->|"/api/*"| API
-  API --> DB
-  API -->|shipments, COD status| Bosta
-  Backup -.->|pg_dump| DB
-```
+- **Caddy** terminates TLS and routes requests.
+- **The Next.js app** renders every page on the server and writes through
+  server actions.
+- **The NestJS API** holds the business rules, authentication and the ledger.
+  It talks to Postgres (Neon) and to the Bosta API.
 
 The browser never calls the API itself. Pages read from the API inside
 server components; forms write through server actions, which pass the
